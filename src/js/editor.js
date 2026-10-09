@@ -104,7 +104,10 @@ function refreshLink() {
   const guide = document.createElement("a");
   guide.href = "/guides/obs/";
   guide.textContent = "Step by step";
-  linkHint.append(guide, ".");
+  const test = document.createElement("a");
+  test.href = "/guides/test/";
+  test.textContent = "Not LIVE yet? Test it first";
+  linkHint.append(guide, ". ", test, ".");
 }
 linkInput.addEventListener("focus", () => linkInput.select());
 source.onChange(() => { refreshLink(); save(); });

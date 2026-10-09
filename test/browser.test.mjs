@@ -35,7 +35,7 @@ after(async () => {
   server?.kill();
 });
 
-const PAGES = ["/", "/editor/", "/overlay/?demo=1", "/matcha/", "/guides/obs/", "/guides/tiktok/", "/privacy/"];
+const PAGES = ["/", "/editor/", "/overlay/?demo=1", "/matcha/", "/guides/obs/", "/guides/test/", "/guides/tiktok/", "/privacy/"];
 const stubClipboard = () => page.evaluate(`Object.defineProperty(navigator.clipboard, "writeText", { value: async (t) => { window.__copied = t; }, configurable: true })`);
 const css = (selector, name) => page.evaluate(`document.querySelector(${JSON.stringify(selector)}).style.getPropertyValue(${JSON.stringify(name)})`);
 const click = (selector, text) => page.evaluate(`(() => { const list = [...document.querySelectorAll(${JSON.stringify(selector)})]; const el = ${text ? `list.find((e) => e.textContent.trim() === ${JSON.stringify(text)})` : "list[0]"}; if (!el) throw new Error("nothing to click: ${selector}"); el.click(); })()`);

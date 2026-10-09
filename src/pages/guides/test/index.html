@@ -1,0 +1,94 @@
+<!--
+{
+  "title": "Test your chat overlay without going LIVE | Frills",
+  "description": "See your Frills chat overlay working before you go LIVE: use the practice name frills_demo in the editor and in OBS, TikTok LIVE Studio or Streamlabs.",
+  "path": "/guides/test/",
+  "css": "page",
+  "js": "page",
+  "bodyClass": "page-guide",
+  "chrome": "nav",
+  "footer": true,
+  "jsonld": ["breadcrumb:Test your overlay"]
+}
+-->
+<main id="main">
+  <article class="article shell">
+    <ol class="crumbs" aria-label="Breadcrumb">
+      <li><a href="/">Frills</a></li>
+      <li aria-current="page">Test your overlay</li>
+    </ol>
+    <header class="article__head">
+      <h1 class="display">Test your overlay without going LIVE</h1>
+      <p class="lede">Real chat only shows up while you are LIVE, so an overlay you have just set up looks empty. To check it first, use the practice name <code>frills_demo</code>. Frills makes up chat for it, with moderators, gifts and the odd deleted message. Nothing is sent to TikTok.</p>
+    </header>
+
+    <div class="article__body">
+      <h2 class="title">Why you see nothing</h2>
+      <p>The overlay is see-through and has no messages until someone chats in your LIVE. If you add your own @name before you are LIVE, the preview and your streaming app stay empty, and that looks like a mistake when it is not. The practice name gives you chat on demand.</p>
+
+      <h2 class="title">Test it in the editor</h2>
+      <ol class="steps-list" role="list">
+        <li>
+          <div>
+            <h3 class="subtitle">Open the editor</h3>
+            <p>Go to the <a href="/editor/">editor</a> and pick a look in step 1.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h3 class="subtitle">Type the practice name</h3>
+            <p>In step 2, keep TikTok picked, type <code>frills_demo</code> and press <strong>Connect</strong>.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h3 class="subtitle">Watch the preview</h3>
+            <p>Within a few seconds chat starts to appear in the preview at the top. A new message arrives every few seconds, so give it a moment. Change a colour or a look and watch the same messages change.</p>
+          </div>
+        </li>
+      </ol>
+
+      <h2 class="title">Test it in your streaming app</h2>
+      <p>This checks the part the editor cannot: that your streaming app really shows the overlay, at the right size, with a see-through background.</p>
+      <ol class="steps-list" role="list">
+        <li>
+          <div>
+            <h3 class="subtitle">Copy the link with the practice name in it</h3>
+            <p>With <code>frills_demo</code> still typed in step 2, press <strong>Copy link</strong> in step 3. The link will look like this:</p>
+            <p class="linkbox"><code>{{siteAddress}}/overlay/?channel=frills_demo&amp;platform=tiktok&amp;look=bubblegum</code></p>
+            <p>You can also take any Frills link you already have and change the part after <code>channel=</code> to <code>frills_demo</code>.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h3 class="subtitle">Paste it into a source</h3>
+            <p>Add a Browser source (some apps call it a web page or link source) and paste the link. The <a href="/guides/obs/">setup guide</a> has the steps for OBS. For a vertical LIVE use a size of 1080 wide by 1920 high.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h3 class="subtitle">Look at the scene</h3>
+            <p>Made-up messages should appear over your game or camera within a few seconds. Check that the background is see-through, that the chat sits where you want it, and that the text is easy to read on your picture.</p>
+          </div>
+        </li>
+      </ol>
+
+      <h2 class="title">Before you go LIVE, put your own name back</h2>
+      <p class="note note--warm"><strong>Do not forget this.</strong> A link with <code>frills_demo</code> in it shows made-up chat, never your real chat. Open the <a href="/editor/">editor</a>, type your own @name in step 2, copy the link again and paste it into your source to replace the practice link. Then go LIVE and check that a real message shows up.</p>
+
+      <h2 class="title">A second way: <code>&amp;demo=1</code></h2>
+      <p>Add <code>&amp;demo=1</code> to the end of any Frills link and the source shows made-up messages made inside the page itself. It does not connect to anything, so it only tests how the overlay is drawn and shown. Use <code>frills_demo</code> when you also want to test the connection, the way real chat arrives.</p>
+
+      <h2 class="title">If something looks wrong</h2>
+      <ul>
+        <li><strong>Nothing shows up.</strong> Wait ten seconds. A small note appears in the bottom corner of the source while it connects, or if it cannot. Check that the name is exactly <code>frills_demo</code>, with an underscore and no @.</li>
+        {{{testBusy}}}
+        <li><strong>The background is not see-through.</strong> In OBS, check that the Custom CSS box still has its default. In other apps, look for a transparent background option on the source.</li>
+        <li><strong>The source is tiny or the wrong size.</strong> Set its width and height again, or stretch it by hand across the scene.</li>
+        <li><strong>It works with <code>&amp;demo=1</code> but not with <code>frills_demo</code>.</strong> The overlay itself is fine, and the problem is the connection. Reload the source and try again in a minute.</li>
+      </ul>
+
+      <p class="article__foot"><a class="btn" href="/editor/">Open the editor <span class="btn__arrow" aria-hidden="true">→</span></a></p>
+    </div>
+  </article>
+</main>

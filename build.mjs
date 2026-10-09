@@ -127,6 +127,9 @@ const copy = {
     ? '<p class="note note--warm"><strong>Using TikTok LIVE?</strong> Your link reads your chat through the free Frills relay (beta). When the relay is full the source waits for a spot, so open the editor first and check that it connects. The <a href="/guides/tiktok/">TikTok guide</a> has the steps.</p>'
     : '<p class="note note--warm"><strong>Using TikTok LIVE?</strong> Your link points at the Frills helper on your PC, so the helper has to be running and your streaming app has to be on the same PC. The <a href="/guides/tiktok/">TikTok guide</a> has the steps.</p>',
   homeLink: relayOn ? "The editor gives you the link as soon as you have typed your TikTok name or Twitch channel." : "On TikTok the editor gives you the link once the helper is running. On Twitch you can make yours right here, in the look you picked above.",
+  testBusy: relayOn
+    ? '<li><strong>It says it is waiting for a spot.</strong> The free relay is full for now. Leave the source open and it connects when a spot frees up.</li>'
+    : '<li><strong>The editor says TikTok needs the helper.</strong> Open the editor from the address the helper prints, and start the helper first.</li>',
   matchaLede: relayOn ? "real TikTok chat or Twitch chat" : "real TikTok chat (with the Frills helper) or Twitch chat",
 };
 copy.tiktokGuide = render(partials[relayOn ? "guide-tiktok-relay" : "guide-tiktok-helper"], { helperGet }, partials, "guide-tiktok");

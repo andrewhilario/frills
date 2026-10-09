@@ -198,5 +198,8 @@
 .steps-list > li > div { display: grid; gap: var(--space-xs); padding-top: var(--space-2xs); min-width: 0; }
 .note { padding: var(--space-md) var(--space-lg); border-radius: var(--radius-card); background: var(--color-accent-2-tint); color: var(--color-ink); }
 .note--warm { background: var(--color-accent-tint); }
+/* A web address to copy, shown whole: long ones wrap instead of pushing the page sideways. */
+.linkbox { padding: var(--space-md) var(--space-lg); border-radius: var(--radius-card); background: var(--color-paper-2); overflow-wrap: anywhere; }
+.article__body code { overflow-wrap: anywhere; }
 .linkbox { padding: var(--space-md); font-family: var(--font-label); font-size: var(--text-sm); overflow-wrap: anywhere; background: var(--color-paper-2); border: 2px dashed var(--color-rule-2); border-radius: var(--radius-input); }
 .article__foot { margin-top: var(--space-xl); }

@@ -258,7 +258,7 @@ test("the built-in frills_demo account makes up chat through the real path and n
   const page = listen("Frills_Demo");
   await page.until(() => page.chats().length >= 4, 4000);
   const connected = page.events.find((e) => e.name === "status" && e.data.state === "connected");
-  assert.match(connected.data.detail, /Practice chat made up by the Frills helper/, "the page is told it is pretend");
+  assert.match(connected.data.detail, /Practice chat made up by Frills/, "the page is told it is pretend");
   for (const m of page.chats()) {
     assert.ok(m.id && m.name && m.text, "every made-up message has what a real one has");
     assert.equal(typeof m.mod, "boolean");

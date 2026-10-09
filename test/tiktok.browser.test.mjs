@@ -129,7 +129,7 @@ test("editor: the built-in frills_demo account fills the preview and says it is 
   await type("#source-channel", "frills_demo");
   await click("#source .source__row .btn");
   await page.waitFor(`document.getElementById("source-status").dataset.state === "connected"`);
-  assert.match(await text("#source-status"), /Practice chat made up by the Frills helper/);
+  assert.match(await text("#source-status"), /Practice chat made up by Frills/);
   await page.waitFor(`document.querySelectorAll("#chat .m").length >= 3`, { timeout: 6000 });
   await page.waitFor(`document.querySelectorAll("#chat .av.has-img").length >= 2`, { timeout: 4000 });
   assert.equal(await page.evaluate(`[...document.querySelectorAll("#chat .av img")].every((i) => i.naturalWidth > 0)`), true, "the pictures really loaded");

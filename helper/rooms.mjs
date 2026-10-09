@@ -118,7 +118,7 @@ export class Room {
       this.letGo(conn);
       return { kind: "stopped" };
     }
-    this.setStatus("connected", conn.pretend ? "Practice chat made up by the Frills helper. Nothing comes from TikTok." : "");
+    this.setStatus("connected", conn.pretend ? "Practice chat made up by Frills. Nothing comes from TikTok." : "");
     const how = await ended;
     this.letGo(conn);
     return how;

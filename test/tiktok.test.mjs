@@ -159,7 +159,7 @@ test("status lines read the same for both platforms and name the right kind of a
   assert.equal(statusText({ state: "connecting", channel: "pond.pal", platform: "tiktok" }), "Connecting to @pond.pal…");
   assert.equal(statusText({ state: "connecting", channel: "pondpal" }), "Connecting to #pondpal…");
   assert.equal(statusText({ state: "connected", channel: "pond.pal", platform: "tiktok" }), "Reading @pond.pal's LIVE chat");
-  assert.equal(statusText({ state: "connected", channel: "frills_demo", platform: "tiktok", detail: "Practice chat made up by the Frills helper." }), "Practice chat made up by the Frills helper.", "a detail from the helper wins");
+  assert.equal(statusText({ state: "connected", channel: "frills_demo", platform: "tiktok", detail: "Practice chat made up by Frills." }), "Practice chat made up by Frills.", "a detail from the helper wins");
   assert.match(statusText({ state: "offline", channel: "pond.pal", platform: "tiktok" }), /@pond\.pal isn't live right now/);
   assert.match(statusText({ state: "limited", platform: "tiktok" }), /busy/);
   assert.match(statusText({ state: "helper-lost", platform: "tiktok" }), /Frills helper/);

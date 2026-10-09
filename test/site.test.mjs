@@ -25,7 +25,7 @@ const assetOf = (html, kind) => (new RegExp(`${kind === "css" ? 'href="(/assets/
 
 test("the pages we expect are all there", () => {
   const urls = pages.map((p) => p.url).sort();
-  assert.deepEqual(urls, ["/", "/404.html", "/editor/", "/guides/obs/", "/guides/tiktok/", "/matcha/", "/overlay/", "/privacy/"]);
+  assert.deepEqual(urls, ["/", "/404.html", "/editor/", "/guides/obs/", "/guides/test/", "/guides/tiktok/", "/matcha/", "/overlay/", "/privacy/"]);
 });
 
 test("every indexable page has its own title and description, a canonical address, share tags and one h1", () => {
@@ -163,6 +163,11 @@ test("no page still says TikTok is missing or only coming, and the TikTok pages 
   assert.ok(home.includes('href="/guides/tiktok/"'), "the home page links to the TikTok guide");
   assert.ok(pages.find((p) => p.url === "/guides/obs/").html.includes('href="/guides/tiktok/"'), "and so does the OBS guide");
   assert.ok(guide.includes('href="/guides/obs/"'), "the TikTok guide links to the OBS guide");
+  const testGuide = pages.find((p) => p.url === "/guides/test/").html;
+  assert.ok(testGuide.includes("frills_demo"), "the test guide names the practice account");
+  assert.ok(testGuide.includes(`${site.url}/overlay/?channel=frills_demo&amp;platform=tiktok`), "and shows a whole example link on the site's own address");
+  assert.ok(guide.includes('href="/guides/test/"'), "the TikTok guide links to the test guide");
+  assert.ok(pages.find((p) => p.url === "/guides/obs/").html.includes('href="/guides/test/"'), "so does the setup guide");
   assert.ok(guide.includes('<a class="nav__link" href="/guides/tiktok/" aria-current="page">TikTok</a>'), "the nav marks the TikTok guide as the current page");
   const faq = home.slice(home.indexOf('"@type":"FAQPage"'), home.indexOf("</script>", home.indexOf('"@type":"FAQPage"')));
   assert.ok(faq.includes("Does it work with TikTok LIVE?"));
