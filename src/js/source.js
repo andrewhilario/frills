@@ -59,7 +59,7 @@ export function mountSource(host, { feeds, pace, channel = "", platform = "tikto
   const startPractice = () => { if (!practice) practice = fakeSource(list, pace); };
   const stopPractice = () => { practice?.stop(); practice = null; };
   const showHelperNote = () => {
-    helperNote.hidden = !(current === "tiktok" && helper === false);
+    helperNote.hidden = !(current === "tiktok" && helper === false && !relay); // with a relay there is no helper to talk about
     relayNote.hidden = !(current === "tiktok" && found?.kind === "relay");
   };
 
@@ -98,7 +98,7 @@ export function mountSource(host, { feeds, pace, channel = "", platform = "tikto
       const there = await ensureHelper();
       if (mine !== turn) return; // the person changed their mind while we looked
       if (!there) {
-        setStatus("error", "TikTok chat needs the Frills helper running on this PC. It isn't answering here.");
+        setStatus("error", relay ? "The free Frills relay isn’t answering right now. Wait a minute and press Connect again." : "TikTok chat needs the Frills helper running on this PC. It isn't answering here.");
         return;
       }
     }
@@ -158,6 +158,7 @@ export function mountSource(host, { feeds, pace, channel = "", platform = "tikto
 
   return {
     get connected() { return Boolean(conn); },
+    get usesRelay() { return Boolean(relay); }, // TikTok chat comes from the site’s relay, so links work on any PC
     get platform() { return current; },
     get channel() { return input.value; },
     cleanChannel: () => cleanName(current, input.value),

@@ -45,8 +45,14 @@ test("the wording says TikTok works in the browser through a free beta relay, an
   assert.match(privacy, /keeps none of it/);
   assert.doesNotMatch(privacy, /Either way, Frills’ own servers never see your chat/, "that promise is only true without the relay");
   const guide = textOf(read("guides/tiktok/index.html"));
-  assert.match(guide, /No install: the free relay \(beta\)/);
+  assert.match(guide, /A free relay we run does the reading/);
   assert.match(guide, /wait in line/);
+});
+
+test("with a relay, no page tells anyone to install or run a helper", () => {
+  for (const page of ["index.html", "editor/index.html", "matcha/index.html", "guides/tiktok/index.html", "guides/obs/index.html", "privacy/index.html"]) {
+    assert.doesNotMatch(textOf(read(page)), /\bhelper\b/i, `${page} still talks about the helper`);
+  }
 });
 
 test("without a relay the same pages say none of that", () => {

@@ -54,7 +54,7 @@ function refresh() {
   const channel = source.cleanChannel();
   link.value = channel ? matchaOverlayUrl(`${location.origin}/overlay/`, { channel, settings, platform: source.platform }) : "";
   copyBtn.disabled = !channel;
-  hint.textContent = !channel ? "Type your TikTok name or Twitch channel above and your link appears here." : source.platform === "tiktok" ? "This link only works on this PC, while the Frills helper is running." : "";
+  hint.textContent = !channel ? "Type your TikTok name or Twitch channel above and your link appears here." : source.platform === "tiktok" && !source.usesRelay ? "This link only works on this PC, while the Frills helper is running." : "";
   save();
 }
 

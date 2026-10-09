@@ -32,7 +32,7 @@ export function connectTo(feeds, platform, name, onStatus, { relay = "" } = {}) 
   findTikTokSource(relay).then((found) => {
     if (stopped) return;
     if (!found) {
-      onStatus?.({ state: "error", channel: login, platform: "tiktok", fatal: true, detail: relay ? "Couldn't reach TikTok chat. The free Frills relay isn't answering, and no helper is running on this PC." : "TikTok chat needs the Frills helper running on this PC. It isn't answering here." });
+      onStatus?.({ state: "error", channel: login, platform: "tiktok", fatal: true, detail: relay ? "Couldn't reach TikTok chat. The free Frills relay isn't answering right now. Wait a minute and try again." : "TikTok chat needs the Frills helper running on this PC. It isn't answering here." });
       return;
     }
     inner = connectTikTok({ user: name, base: found.base, ...handlers });

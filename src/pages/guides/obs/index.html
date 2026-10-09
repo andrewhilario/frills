@@ -28,7 +28,7 @@
         <li>
           <div>
             <h2 class="subtitle">Make your link</h2>
-            <p>Open the <a href="/editor/">editor</a>, pick a look, type your TikTok @name or your Twitch channel in step 2, and copy the link from step 3. It already has your look and your account in it. On TikTok, open the editor from the Frills helper on your PC first: the <a href="/guides/tiktok/">TikTok guide</a> shows how.</p>
+            <p>Open the <a href="/editor/">editor</a>, pick a look, type your TikTok @name or your Twitch channel in step 2, and copy the link from step 3. It already has your look and your account in it. {{{obsTikTok}}}</p>
           </div>
         </li>
         <li>
@@ -65,12 +65,12 @@
 
       <h2 class="title">If something looks wrong</h2>
       <ul>
-        <li><strong>Nothing shows up.</strong> A small note appears in the bottom corner of the source while it connects, or if it can’t. Check your name for typos. Messages only appear when someone chats. On TikTok, also check that the helper is running and that you are LIVE.</li>
+        <li><strong>Nothing shows up.</strong> A small note appears in the bottom corner of the source while it connects, or if it can’t. Check your name for typos. Messages only appear when someone chats. {{obsNothing}}</li>
         <li><strong>The background isn’t see-through.</strong> Check that the Custom CSS box still has OBS’s default, which starts with <code>body { background-color: rgba(0, 0, 0, 0)</code>.</li>
         <li><strong>You want to test without chat.</strong> Add <code>&amp;demo=1</code> to the end of your link and the source shows made-up messages instead.</li>
       </ul>
 
-      <p class="note note--warm"><strong>Using TikTok LIVE?</strong> Your link points at the Frills helper on your PC, so the helper has to be running and OBS has to be on the same PC. The <a href="/guides/tiktok/">TikTok guide</a> has the steps.</p>
+      {{{obsTikTokNote}}}
 
       <p class="article__foot"><a class="btn" href="/editor/">Open the editor <span class="btn__arrow" aria-hidden="true">→</span></a></p>
     </div>
