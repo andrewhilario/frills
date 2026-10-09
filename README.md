@@ -140,7 +140,7 @@ The fonts are self-hosted from `public/fonts` (the site never calls Google Fonts
 
 ## The shared relay (free beta, for streamers who install nothing)
 
-`npm run relay` runs the same program as the helper, but as a shared service: it answers the Frills website from another address (`RELAY_ORIGINS`), has a limited number of spots (`RELAY_SLOTS`) and a line for them, limits streams per visitor address (`RELAY_PER_IP`), keeps no chat and serves no site of its own. Set `relayUrl` in `site.config.json` (or `RELAY_URL`) to its public address and the site's pages, FAQ, privacy page and security policy follow. [RELAY-PHONE-GUIDE.txt](RELAY-PHONE-GUIDE.txt) sets it up on an Android phone with Termux and a Cloudflare Tunnel. The local helper stays the choice for anyone who wants no waiting.
+`npm run relay` runs the same program as the helper, but as a shared service: it answers the Frills website from another address (`RELAY_ORIGINS`), has a limited number of spots (`RELAY_SLOTS`) and a line for them, limits streams per visitor address (`RELAY_PER_IP`), keeps no chat and serves no site of its own. Set `relayUrl` in `site.config.json` (or `RELAY_URL`) to its public address and the site's pages, FAQ, privacy page and security policy follow. [RELAY-PHONE-GUIDE.md](RELAY-PHONE-GUIDE.md) sets it up on an Android phone with Termux and a Cloudflare Tunnel. The local helper stays the choice for anyone who wants no waiting.
 
 ## Licence
 

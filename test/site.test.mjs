@@ -121,7 +121,8 @@ test("the security headers are in place", () => {
 });
 
 test("the only outside addresses are Twitch, the site itself, Tally and the standards", () => {
-  const allowed = [/^static-cdn\.jtvnw\.net$/, /^irc-ws\.chat\.twitch\.tv$/, new RegExp(`^${new URL(site.url).host.replace(/\./g, "\\.")}$`), new RegExp(`^${new URL(site.tally.url).host.replace(/\./g, "\\.")}$`), /^schema\.org$/, /^www\.w3\.org$/, /^www\.sitemaps\.org$/];
+  const relayHost = site.relayUrl ? new URL(site.relayUrl).host : "no-relay.invalid";
+  const allowed = [new RegExp(`^${relayHost.replace(/\./g, "\\.")}$`), /^static-cdn\.jtvnw\.net$/, /^irc-ws\.chat\.twitch\.tv$/, new RegExp(`^${new URL(site.url).host.replace(/\./g, "\\.")}$`), new RegExp(`^${new URL(site.tally.url).host.replace(/\./g, "\\.")}$`), /^schema\.org$/, /^www\.w3\.org$/, /^www\.sitemaps\.org$/];
   for (const file of files.filter((f) => /\.(html|js|css|xml|txt)$/.test(f) && !f.startsWith("fonts/licenses/"))) {
     for (const m of read(file).matchAll(/(?:https?|wss?):\/\/([a-z0-9.-]+)/gi)) {
       assert.ok(allowed.some((re) => re.test(m[1])), `${file} talks to ${m[1]}`);
@@ -158,7 +159,7 @@ test("no page still says TikTok is missing or only coming, and the TikTok pages 
   }
   const home = pages.find((p) => p.url === "/").html;
   const guide = pages.find((p) => p.url === "/guides/tiktok/").html;
-  assert.match(textOf(home), /TikTok LIVE works with a free helper/);
+  assert.match(textOf(home), site.relayUrl ? /TikTok LIVE works in your browser \(free beta, may queue\)/ : /TikTok LIVE works with a free helper/);
   assert.ok(home.includes('href="/guides/tiktok/"'), "the home page links to the TikTok guide");
   assert.ok(pages.find((p) => p.url === "/guides/obs/").html.includes('href="/guides/tiktok/"'), "and so does the OBS guide");
   assert.ok(guide.includes('href="/guides/obs/"'), "the TikTok guide links to the OBS guide");

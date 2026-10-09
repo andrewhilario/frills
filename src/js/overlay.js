@@ -9,6 +9,7 @@ import { sanitize, fromParams } from "./settings.js";
 import { isMatchaStyle, sanitizeMatcha, matchaFromParams } from "./matcha.js";
 import { fontsReady, generalFaces, matchaFaces, paintGeneral, paintMatcha } from "./look.js";
 import { cleanName, connectTo, statusText } from "./connect.js";
+import { relayForPage } from "./tiktok.js";
 import { fakeSource } from "./fake.js";
 
 const params = new URLSearchParams(location.search);
@@ -41,6 +42,6 @@ fontsReady(faces, 1000).then(() => {
     connectTo([feed], platform, channel, (status) => {
       note.hidden = status.state === "connected" || status.state === "stopped";
       note.textContent = statusText(status);
-    }, { relay: document.body.dataset.relay || "" });
+    }, { relay: relayForPage() });
   }
 });

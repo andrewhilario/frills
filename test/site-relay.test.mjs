@@ -24,6 +24,7 @@ after(() => { rmSync(out, { recursive: true, force: true }); });
 test("every page carries the relay's address (tidied) for the scripts, and the overlay too", () => {
   for (const page of ["index.html", "editor/index.html", "matcha/index.html", "overlay/index.html", "guides/tiktok/index.html"]) {
     assert.ok(read(page).includes(`data-relay="${RELAY}"`), page);
+    assert.ok(read(page).includes(`data-site="https://frills.valwidgets.live"`), page + " knows its own address");
   }
 });
 
@@ -49,7 +50,15 @@ test("the wording says TikTok works in the browser through a free beta relay, an
 });
 
 test("without a relay the same pages say none of that", () => {
-  const plain = readFileSync(join(root, "dist", "index.html"), "utf8");
-  assert.ok(!plain.includes("free relay"));
-  assert.ok(plain.includes('data-relay=""'));
+  const plainOut = mkdtempSync(join(tmpdir(), "frills-plain-site-"));
+  try {
+    const build = spawnSync(process.execPath, ["build.mjs"], { cwd: root, env: { ...process.env, OUT_DIR: plainOut, RELAY_URL: "" }, encoding: "utf8" });
+    assert.equal(build.status, 0, build.stderr || build.stdout);
+    const plain = readFileSync(join(plainOut, "index.html"), "utf8");
+    assert.ok(!plain.includes("free relay"));
+    assert.ok(plain.includes('data-relay=""'));
+    assert.ok(readFileSync(join(plainOut, "_headers"), "utf8").includes("connect-src 'self' wss://irc-ws.chat.twitch.tv;"), "and the policy has no relay in it");
+  } finally {
+    rmSync(plainOut, { recursive: true, force: true });
+  }
 });

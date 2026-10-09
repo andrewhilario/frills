@@ -55,6 +55,9 @@ export function acceptMessage(raw) {
   };
 }
 
+/** The site's relay for this page: only on the website's own address, because the relay only answers the website (nowhere else would it work). */
+export const relayForPage = () => (document.body.dataset.relay && document.body.dataset.site === location.origin ? document.body.dataset.relay : "");
+
 /**
  * Where TikTok chat can come from for this page: { kind: "helper" | "relay", base } or null.
  * First the address the page itself came from (the helper on this PC serves its own pages, and so does a relay in a test), then the

@@ -7,7 +7,7 @@ export function faq({ kb, waitlistUrl, helperUrl, relayUrl }) {
     ? ` <a href="${helperUrl}" rel="noopener">Get the helper</a>.`
     : waitlistUrl
       ? ` There is no download yet. Want to know when it is ready? <a href="${waitlistUrl}" rel="noopener">Join the waitlist</a>.`
-      : " There is no download yet; it will be linked from the TikTok guide when it is ready.";
+      : " There is no download yet. We will link it from the TikTok guide when it is ready.";
   const items = [
     {
       q: "Is Frills really free?",
@@ -17,7 +17,7 @@ export function faq({ kb, waitlistUrl, helperUrl, relayUrl }) {
       q: "Does it work with TikTok LIVE?",
       a: relayUrl
         ? `Yes. TikTok has no official chat connection for overlays, so Frills reads your LIVE’s public chat for you, without logging in to TikTok. Open the editor, pick TikTok and type your @name: it works right in your browser through a free relay we run, which is a beta. It has a limited number of spots, so you may wait in line when it is busy. For no waiting, use the small free Frills helper on your own PC, which is in testing. The <a href="/guides/tiktok/">TikTok guide</a> has both ways.${getHelper}`
-        : `Yes. TikTok has no official chat connection for overlays, so Frills uses a small free helper that runs on your own PC. It reads your LIVE’s public chat without logging in to TikTok and hands it to your overlay. The helper is in testing now. The <a href="/guides/tiktok/">TikTok guide</a> has the steps.${getHelper}`,
+        : `Yes. TikTok has no official way for overlays to read chat, so Frills uses a small free helper that runs on your own PC. It reads your LIVE’s public chat without logging in to TikTok and passes it to your overlay. The helper is still in testing. The <a href="/guides/tiktok/">TikTok guide</a> shows how it works.${getHelper}`,
     },
     {
       q: "Does it work with Twitch?",

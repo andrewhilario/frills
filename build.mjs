@@ -128,6 +128,7 @@ const shared = {
   waitlist: site.waitlistUrl,
   helperGet,
   relay: site.relayUrl,
+  siteAddress: site.url,
   tallyUrl: site.tally.url,
   tallyBlurb: site.tally.blurb,
   year: String(site.year),

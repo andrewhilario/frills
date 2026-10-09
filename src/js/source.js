@@ -2,7 +2,7 @@
 // Fills a container and wires it to one or more feeds.
 
 import { PLATFORMS, cleanName, connectTo, statusText } from "./connect.js";
-import { findTikTokSource } from "./tiktok.js";
+import { findTikTokSource, relayForPage } from "./tiktok.js";
 import { fakeSource, testMessage } from "./fake.js";
 import { chips } from "./ui.js";
 import { el } from "./feed.js";
@@ -23,7 +23,7 @@ export function mountSource(host, { feeds, pace, channel = "", platform = "tikto
   values[current] = channel;
   let practice = null;
   let conn = null;
-  const relay = document.body.dataset.relay || ""; // the site’s shared relay for TikTok, when it has one
+  const relay = relayForPage(); // the site’s shared relay for TikTok, when it has one and this is the site itself
   let helper = null; // null until checked; then whether TikTok chat can come from somewhere (the helper on this PC, or the relay)
   let found = null; // where it can come from: { kind: "helper" | "relay", base }
   let turn = 0; // a click that is still waiting on the helper check gives way to a newer one
