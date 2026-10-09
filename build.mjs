@@ -141,6 +141,7 @@ const shared = {
   helperGet,
   relay: site.relayUrl,
   siteAddress: site.url,
+  gscTag: site.googleSiteVerification ? `\n<meta name="google-site-verification" content="${esc(site.googleSiteVerification)}">` : "",
   tallyUrl: site.tally.url,
   tallyBlurb: site.tally.blurb,
   year: String(site.year),

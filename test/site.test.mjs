@@ -163,6 +163,7 @@ test("no page still says TikTok is missing or only coming, and the TikTok pages 
   assert.ok(home.includes('href="/guides/tiktok/"'), "the home page links to the TikTok guide");
   assert.ok(pages.find((p) => p.url === "/guides/obs/").html.includes('href="/guides/tiktok/"'), "and so does the OBS guide");
   assert.ok(guide.includes('href="/guides/obs/"'), "the TikTok guide links to the OBS guide");
+  assert.ok(site.googleSiteVerification && home.includes(`<meta name="google-site-verification" content="${site.googleSiteVerification}">`), "the home page carries the Google Search Console tag");
   const testGuide = pages.find((p) => p.url === "/guides/test/").html;
   assert.ok(home.includes('<a class="nav__link" href="/guides/test/">Test it</a>'), "the top menu offers the test guide on every page");
   assert.ok(testGuide.includes('<a class="nav__link" href="/guides/test/" aria-current="page">Test it</a>'), "and marks it as the current page there");
