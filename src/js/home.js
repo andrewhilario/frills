@@ -89,7 +89,7 @@ copyButton(
   },
   {
     label: "Copy my link",
-    onResult: (ok) => say(ok ? "Copied. In OBS, add a Browser source and paste it." : "Your browser blocked copying. Select the link in the editor instead.", ok ? "" : "error"),
+    onResult: (ok) => say(ok ? "Copied. In your streaming app, add a Browser source and paste it." : "Your browser blocked copying. Select the link in the editor instead.", ok ? "" : "error"),
   },
 );
 channelInput.addEventListener("input", () => channelInput.removeAttribute("aria-invalid"));

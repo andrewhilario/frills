@@ -16,7 +16,7 @@ export const site = {
   // The shared relay that lets TikTok chat work without installing anything (a capped free beta). Empty means there is none.
   relayUrl: pick("RELAY_URL", "relayUrl").replace(/\/+$/, ""),
   tagline: "Free chat overlays with all the frills.",
-  description: "Free, customizable chat overlays for live streams. Pick a cute look, tweak every detail, and paste one link into OBS. Works with TikTok LIVE and Twitch chat.",
+  description: "Free, customizable chat overlays for live streams. Pick a cute look, tweak every detail, and paste one link into your streaming app. Works with TikTok LIVE and Twitch.",
   tally: { url: "https://valwidgets.live", blurb: "free Valorant rank overlays" },
   year: new Date().getFullYear(),
   // Same policy as Tally: ask AI training crawlers to stay out, and let search and assistant crawlers in.

@@ -100,7 +100,7 @@ function refreshLink() {
   linkInput.value = overlayUrl(`${location.origin}/overlay/`, { channel, settings, platform: source.platform });
   copyBtn.disabled = false;
   // Through the site’s relay a link works anywhere. A link made with the helper points at the helper on this PC, so it only works here.
-  linkHint.replaceChildren(source.platform === "tiktok" && !source.usesRelay ? "Paste it into an OBS Browser source on this PC. It only works while the Frills helper is running. " : "Paste it into an OBS Browser source. ");
+  linkHint.replaceChildren(source.platform === "tiktok" && !source.usesRelay ? "Paste it into a Browser source in your streaming app on this PC. It only works while the Frills helper is running. " : "Paste it into a Browser source in your streaming app. ");
   const guide = document.createElement("a");
   guide.href = "/guides/obs/";
   guide.textContent = "Step by step";

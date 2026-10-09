@@ -110,8 +110,8 @@ const relayOn = Boolean(site.relayUrl);
 const copy = {
   statusTikTok: relayOn ? "TikTok LIVE works in your browser (free beta, may queue)" : "TikTok LIVE works with a free helper (in testing)",
   tiktokLede: relayOn
-    ? "Frills can show your TikTok LIVE chat in OBS or in TikTok LIVE Studio. TikTok has no official way for overlays to read chat, so Frills reads your LIVE’s public chat for you, through a free relay we run. It is a beta, and there is nothing to install."
-    : "Frills can show your TikTok LIVE chat in OBS or in TikTok LIVE Studio. TikTok has no official way for overlays to read chat, so a small free helper on your own PC does the reading. The helper is in testing.",
+    ? "Frills can show your TikTok LIVE chat in your streaming app, such as OBS or TikTok LIVE Studio. TikTok has no official way for overlays to read chat, so Frills reads your LIVE’s public chat for you, through a free relay we run. It is a beta, and there is nothing to install."
+    : "Frills can show your TikTok LIVE chat in your streaming app, such as OBS or TikTok LIVE Studio. TikTok has no official way for overlays to read chat, so a small free helper on your own PC does the reading. The helper is in testing.",
   tiktokStep: relayOn
     ? '<p>On TikTok LIVE, pick TikTok in the editor and type your @name. There is nothing to install: a free relay (beta) reads your chat for you, and when it is busy you wait in line for a spot. <a href="/guides/tiktok/">How it works</a>.</p>'
     : '<p>On TikTok LIVE, start the free Frills helper on your PC and type your @name. It reads your public chat without logging in. <a href="/guides/tiktok/">How the helper works</a>.</p>',
@@ -125,7 +125,7 @@ const copy = {
   obsNothing: relayOn ? "On TikTok, also check that you are LIVE and that the relay isn’t full." : "On TikTok, also check that the helper is running and that you are LIVE.",
   obsTikTokNote: relayOn
     ? '<p class="note note--warm"><strong>Using TikTok LIVE?</strong> Your link reads your chat through the free Frills relay (beta). When the relay is full the source waits for a spot, so open the editor first and check that it connects. The <a href="/guides/tiktok/">TikTok guide</a> has the steps.</p>'
-    : '<p class="note note--warm"><strong>Using TikTok LIVE?</strong> Your link points at the Frills helper on your PC, so the helper has to be running and OBS has to be on the same PC. The <a href="/guides/tiktok/">TikTok guide</a> has the steps.</p>',
+    : '<p class="note note--warm"><strong>Using TikTok LIVE?</strong> Your link points at the Frills helper on your PC, so the helper has to be running and your streaming app has to be on the same PC. The <a href="/guides/tiktok/">TikTok guide</a> has the steps.</p>',
   homeLink: relayOn ? "The editor gives you the link as soon as you have typed your TikTok name or Twitch channel." : "On TikTok the editor gives you the link once the helper is running. On Twitch you can make yours right here, in the look you picked above.",
   matchaLede: relayOn ? "real TikTok chat or Twitch chat" : "real TikTok chat (with the Frills helper) or Twitch chat",
 };

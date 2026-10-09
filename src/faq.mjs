@@ -48,8 +48,8 @@ export function faq({ kb, waitlistUrl, helperUrl, relayUrl }) {
       a: `Frills only reads public chat, never asks for a password, and stores nothing. ${relayUrl ? "On TikTok it doesn’t log in to your account either." : "The TikTok helper doesn’t log in to your TikTok account either."} TikTok offers no official way for overlays to read chat, so every overlay tool uses an unofficial one, and TikTok could change or block it. Frills isn’t affiliated with Twitch or TikTok.`,
     },
     {
-      q: "How do I add it to OBS?",
-      a: "Add a Browser source and paste your link. The <a href=\"/guides/obs/\">OBS guide</a> has every step.",
+      q: "How do I add it to my stream?",
+      a: "Paste your link into a Browser source in your streaming app. Some apps call it a web page or link source. The <a href=\"/guides/obs/\">setup guide</a> has every step for OBS, and other apps work the same way.",
     },
   ];
   return items.map((item) => ({ ...item, text: item.a.replace(/<[^>]+>/g, "") }));

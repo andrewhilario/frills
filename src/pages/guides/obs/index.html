@@ -1,7 +1,7 @@
 <!--
 {
-  "title": "How to add a chat overlay to OBS | Frills",
-  "description": "Step by step: copy your Frills link, add a Browser source in OBS, set its size and place your chat. Works with TikTok LIVE and Twitch.",
+  "title": "How to add a chat overlay to your stream (OBS and more) | Frills",
+  "description": "Step by step: copy your Frills link, add it to your streaming app as a Browser source (shown in OBS), set its size and place your chat.",
   "path": "/guides/obs/",
   "css": "page",
   "js": "page",
@@ -9,18 +9,18 @@
   "chrome": "nav",
   "footer": true,
   "navGuide": true,
-  "jsonld": ["breadcrumb:OBS guide"]
+  "jsonld": ["breadcrumb:Setup guide"]
 }
 -->
 <main id="main">
   <article class="article shell">
     <ol class="crumbs" aria-label="Breadcrumb">
       <li><a href="/">Frills</a></li>
-      <li aria-current="page">OBS guide</li>
+      <li aria-current="page">Setup guide</li>
     </ol>
     <header class="article__head">
-      <h1 class="display">Add Frills to OBS</h1>
-      <p class="lede">Your chat goes into OBS as a Browser source: one link, pasted once. This takes a couple of minutes, and you only do it once.</p>
+      <h1 class="display">Add Frills to your stream</h1>
+      <p class="lede">Your chat goes into your streaming app as a Browser source: one link, pasted once. This takes a couple of minutes, and you only do it once. The steps below are written for OBS. Another app has the same thing under a name like Browser, Browser Source, Web page or Link. We have only tried these steps in OBS, so if your app looks different, look for that option.</p>
     </header>
 
     <div class="article__body">
@@ -34,7 +34,7 @@
         <li>
           <div>
             <h2 class="subtitle">Add a Browser source</h2>
-            <p>In OBS, find the Sources box, press <kbd>+</kbd> and choose <strong>Browser</strong>. Name it something you will recognise, like “Frills chat”, and press OK.</p>
+            <p>In OBS, find the Sources box, press <kbd>+</kbd> and choose <strong>Browser</strong>. Name it something you will recognise, like “Frills chat”, and press OK. In Streamlabs Desktop the same source is called <strong>Browser Source</strong>. In another app, add a source that shows a web page from a link.</p>
           </div>
         </li>
         <li>
@@ -52,7 +52,7 @@
         <li>
           <div>
             <h2 class="subtitle">Leave the rest alone</h2>
-            <p>Keep the custom CSS that OBS fills in: it is what makes the page see-through. Two boxes are worth knowing about. <strong>Refresh browser when scene becomes active</strong> reconnects chat each time you switch to that scene. <strong>Shutdown source when not visible</strong> stops the overlay while its scene is off screen, which saves resources.</p>
+            <p>In OBS, keep the custom CSS that it fills in: it is what makes the page see-through. Two boxes are worth knowing about. <strong>Refresh browser when scene becomes active</strong> reconnects chat each time you switch to that scene. <strong>Shutdown source when not visible</strong> stops the overlay while its scene is off screen, which saves resources.</p>
           </div>
         </li>
         <li>
@@ -66,7 +66,7 @@
       <h2 class="title">If something looks wrong</h2>
       <ul>
         <li><strong>Nothing shows up.</strong> A small note appears in the bottom corner of the source while it connects, or if it can’t. Check your name for typos. Messages only appear when someone chats. {{obsNothing}}</li>
-        <li><strong>The background isn’t see-through.</strong> Check that the Custom CSS box still has OBS’s default, which starts with <code>body { background-color: rgba(0, 0, 0, 0)</code>.</li>
+        <li><strong>The background isn’t see-through.</strong> In OBS, check that the Custom CSS box still has its default, which starts with <code>body { background-color: rgba(0, 0, 0, 0)</code>.</li>
         <li><strong>You want to test without chat.</strong> Add <code>&amp;demo=1</code> to the end of your link and the source shows made-up messages instead.</li>
       </ul>
 

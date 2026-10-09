@@ -1,5 +1,5 @@
 <h2 class="title">How it works</h2>
-      <p>The Frills helper is a small program that runs on your PC while you stream. It reads your LIVE’s public chat, the way a viewer would, without logging in to TikTok. It also serves the Frills editor and your overlay from your PC, so OBS loads your chat from the helper and not from the internet. Frills has no server of its own in the middle, so nothing about your chat is sent to us.</p>
+      <p>The Frills helper is a small program that runs on your PC while you stream. It reads your LIVE’s public chat, the way a viewer would, without logging in to TikTok. It also serves the Frills editor and your overlay from your PC, so your streaming app loads your chat from the helper and not from the internet. Frills has no server of its own in the middle, so nothing about your chat is sent to us.</p>
 
       <h2 class="title">Get the helper</h2>
       {{{helperGet}}}
@@ -26,8 +26,8 @@
         </li>
         <li>
           <div>
-            <h3 class="subtitle">Add it to OBS</h3>
-            <p>Add a Browser source and paste the link, the same as in the <a href="/guides/obs/">OBS guide</a>. OBS and the helper have to run on the same PC.</p>
+            <h3 class="subtitle">Add it to your streaming app</h3>
+            <p>Add a Browser source (some apps call it a web page or link source) and paste the link. The <a href="/guides/obs/">setup guide</a> has the steps for OBS. Your streaming app and the helper have to run on the same PC.</p>
           </div>
         </li>
         <li>
@@ -39,7 +39,7 @@
       </ol>
 
       <h2 class="title">Try it without a LIVE</h2>
-      <p>Type <code>frills_demo</code> as your TikTok name. The helper makes up chat, with moderators, gifts and the odd deleted message, and sends it through the same path as the real thing. It is the quickest way to check your look and your OBS source before you go LIVE. Nothing is sent to TikTok.</p>
+      <p>Type <code>frills_demo</code> as your TikTok name. The helper makes up chat, with moderators, gifts and the odd deleted message, and sends it through the same path as the real thing. It is the quickest way to check your look and your source before you go LIVE. Nothing is sent to TikTok.</p>
 
       <h2 class="title">What shows up</h2>
       <ul>
@@ -62,5 +62,5 @@
         <li><strong>The editor says TikTok needs the helper.</strong> You opened the editor from the website. Open it from the address the helper prints instead.</li>
         <li><strong>“Isn’t live right now.”</strong> Check the spelling of your name, and that you are LIVE. The helper keeps checking and connects by itself.</li>
         <li><strong>“TikTok’s free connection is busy.”</strong> The helper reads TikTok through a free signing service that limits how often it can be used. It waits a minute and tries again.</li>
-        <li><strong>The overlay in OBS is empty.</strong> Check that the helper window is still open, then use the <code>&amp;demo=1</code> trick from the <a href="/guides/obs/">OBS guide</a> to see whether the source itself works.</li>
+        <li><strong>The overlay in your streaming app is empty.</strong> Check that the helper window is still open, then use the <code>&amp;demo=1</code> trick from the <a href="/guides/obs/">setup guide</a> to see whether the source itself works.</li>
       </ul>

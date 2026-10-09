@@ -1,6 +1,6 @@
 # Frills
 
-Free, cute, customizable chat overlays for live streams. Pick a look, change anything, paste one link into an OBS Browser source.
+Free, cute, customizable chat overlays for live streams. Pick a look, change anything, paste one link into a Browser source in your streaming app.
 
 Twitch chat works straight from the browser. TikTok chat works through a small helper that runs on the streamer's own PC (see "TikTok" below). The helper is a testing build with no public download yet, so the site says so: it says TikTok works with the helper (in testing), and the TikTok guide (`/guides/tiktok/`) says there is no download until `helperUrl` is set.
 

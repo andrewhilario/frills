@@ -1,5 +1,5 @@
 <h2 class="title">How it works</h2>
-      <p>TikTok has no official way for overlays to read chat, so Frills reads your LIVE’s public chat for you, the way a viewer would, without logging in to TikTok. A free relay we run does the reading and passes your chat to your overlay. You install nothing, and your overlay link works in OBS on any PC.</p>
+      <p>TikTok has no official way for overlays to read chat, so Frills reads your LIVE’s public chat for you, the way a viewer would, without logging in to TikTok. A free relay we run does the reading and passes your chat to your overlay. You install nothing, and your overlay link works in your streaming app on any PC.</p>
       <p>The relay is a beta with a limited number of spots. When it is full you wait in line and the editor tells you your place. It is a small server, so it can be slow or down at times.</p>
 
       <h2 class="title">Set it up</h2>
@@ -18,8 +18,8 @@
         </li>
         <li>
           <div>
-            <h3 class="subtitle">Add it to OBS</h3>
-            <p>Add a Browser source and paste the link, the same as in the <a href="/guides/obs/">OBS guide</a>.</p>
+            <h3 class="subtitle">Add it to your streaming app</h3>
+            <p>Add a Browser source (some apps call it a web page or link source) and paste the link. The <a href="/guides/obs/">setup guide</a> has the steps for OBS.</p>
           </div>
         </li>
         <li>
@@ -31,7 +31,7 @@
       </ol>
 
       <h2 class="title">Try it without a LIVE</h2>
-      <p>Type <code>frills_demo</code> as your TikTok name. Frills makes up chat, with moderators, gifts and the odd deleted message, and sends it through the same path as the real thing. It is the quickest way to check your look and your OBS source before you go LIVE. Nothing is sent to TikTok.</p>
+      <p>Type <code>frills_demo</code> as your TikTok name. Frills makes up chat, with moderators, gifts and the odd deleted message, and sends it through the same path as the real thing. It is the quickest way to check your look and your source before you go LIVE. Nothing is sent to TikTok.</p>
 
       <h2 class="title">What shows up</h2>
       <ul>
@@ -55,5 +55,5 @@
         <li><strong>“The relay isn’t answering.”</strong> It may be down for a moment. Wait a minute and press Connect again.</li>
         <li><strong>“Isn’t live right now.”</strong> Check the spelling of your name, and that you are LIVE. Frills keeps checking and connects by itself.</li>
         <li><strong>“TikTok’s free connection is busy.”</strong> The relay reads TikTok through a free signing service that limits how often it can be used. It waits a minute and tries again.</li>
-        <li><strong>The overlay in OBS is empty.</strong> Use the <code>&amp;demo=1</code> trick from the <a href="/guides/obs/">OBS guide</a> to see whether the source itself works.</li>
+        <li><strong>The overlay in your streaming app is empty.</strong> Use the <code>&amp;demo=1</code> trick from the <a href="/guides/obs/">setup guide</a> to see whether the source itself works.</li>
       </ul>

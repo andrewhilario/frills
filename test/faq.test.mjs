@@ -36,8 +36,8 @@ test("the plain text for search engines has no tags, and the answers cover Twitc
     assert.ok(item.text.length > 40, item.q);
   }
   const questions = items.map((i) => i.q);
-  for (const wanted of ["Does it work with Twitch?", "Do profile pictures show?", "Is it safe, and is it allowed?", "How do I add it to OBS?"]) assert.ok(questions.includes(wanted), wanted);
-  assert.ok(items.find((i) => i.q === "How do I add it to OBS?").a.includes('href="/guides/obs/"'));
+  for (const wanted of ["Does it work with Twitch?", "Do profile pictures show?", "Is it safe, and is it allowed?", "How do I add it to my stream?"]) assert.ok(questions.includes(wanted), wanted);
+  assert.ok(items.find((i) => i.q === "How do I add it to my stream?").a.includes('href="/guides/obs/"'));
   assert.match(items.find((i) => i.q === "Do profile pictures show?").text, /Twitch doesn’t share pictures/);
 });
 
