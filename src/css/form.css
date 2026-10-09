@@ -1,0 +1,22 @@
+/* The feedback form. Uses the site's tokens only. */
+.form { display: grid; gap: var(--space-lg); max-width: 40rem; }
+.form__group { display: grid; gap: var(--space-xs); border: 0; padding: 0; margin: 0; min-width: 0; }
+.form__label { font-weight: 700; font-size: var(--text-base); padding: 0; }
+.form__opt { font-weight: 500; font-size: var(--text-sm); color: var(--color-ink-2); }
+.form__hint { margin: 0; font-size: var(--text-sm); color: var(--color-ink-2); }
+.form__choice { display: flex; align-items: center; gap: var(--space-sm); min-height: 44px; font-size: var(--text-base); cursor: pointer; }
+.form__choice input { width: 20px; height: 20px; accent-color: var(--color-ink); }
+.form select, .form input[type="text"], .form textarea {
+  width: 100%; min-height: 48px; padding: var(--space-sm) var(--space-md); font: inherit; font-size: var(--text-base);
+  color: var(--color-ink); background: var(--color-paper); border: 2px solid var(--color-rule-2); border-radius: var(--radius-card);
+}
+.form textarea { resize: vertical; min-height: 9rem; line-height: 1.5; }
+.form select:focus-visible, .form input:focus-visible, .form textarea:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+.form [aria-invalid="true"] { border-color: var(--color-error); }
+.form__trap { position: absolute; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
+.form__actions { display: flex; }
+.form__status { margin: 0; min-height: 1.5em; font-size: var(--text-sm); color: var(--color-ink-2); }
+.form__status[data-state="error"] { color: var(--color-error); font-weight: 600; }
+.form__privacy { max-width: 40rem; font-size: var(--text-sm); color: var(--color-ink-2); }
+#fb-thanks { max-width: 40rem; }
+#fb-thanks:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }

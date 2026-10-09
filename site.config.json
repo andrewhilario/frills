@@ -1,6 +1,7 @@
 {
   "url": "https://frills.valwidgets.live",
   "feedbackUrl": "",
+  "feedbackForm": true,
   "waitlistUrl": "",
   "helperUrl": "",
   "relayUrl": "https://relay.valwidgets.live",

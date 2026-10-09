@@ -9,6 +9,8 @@ const pick = (envName, key) => (process.env[envName] ?? config[key] ?? "").trim(
 export const site = {
   name: "Frills",
   url: pick("SITE_URL", "url").replace(/\/+$/, ""),
+  // The feedback form on the site itself (a Worker and a D1 database, see worker/). When on, "Feedback" links point at /feedback/.
+  feedbackForm: (process.env.FEEDBACK_FORM ?? String(config.feedbackForm ?? "")) === "true" || process.env.FEEDBACK_FORM === "1",
   feedbackUrl: pick("FEEDBACK_URL", "feedbackUrl"),
   waitlistUrl: pick("WAITLIST_URL", "waitlistUrl"),
   // Where the TikTok helper can be downloaded. Empty until it can be: the pages then say there is no download yet, and nothing links nowhere.
@@ -26,11 +28,13 @@ export const site = {
 };
 
 /** A deploy built from the wrong address would publish canonical links, a sitemap and social cards that point nowhere. */
+if (site.feedbackForm && !site.feedbackUrl) site.feedbackUrl = "/feedback/";
+
 export function checkSite() {
   const problems = [];
   if (!/^https:\/\/[^/\s]+$/.test(site.url) || /localhost|127\.0\.0\.1/.test(site.url)) problems.push(`the site address "${site.url}" must be a plain https address`);
   if (site.googleSiteVerification && !/^[A-Za-z0-9_-]{20,100}$/.test(site.googleSiteVerification)) problems.push("googleSiteVerification must be just the code from Google Search Console (letters, numbers, - and _)");
-  for (const [name, value] of [["feedbackUrl", site.feedbackUrl], ["waitlistUrl", site.waitlistUrl], ["helperUrl", site.helperUrl], ["relayUrl", site.relayUrl]]) {
+  for (const [name, value] of [["feedbackUrl", site.feedbackForm ? "" : site.feedbackUrl], ["waitlistUrl", site.waitlistUrl], ["helperUrl", site.helperUrl], ["relayUrl", site.relayUrl]]) {
     if (value && !/^https:\/\//.test(value)) problems.push(`${name} must start with https://`);
   }
   return problems;

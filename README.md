@@ -90,7 +90,7 @@ Any of them can be overridden for one build with `SITE_URL`, `FEEDBACK_URL`, `WA
 
 ## Deploy (Cloudflare Workers, static assets)
 
-`wrangler.jsonc` serves `dist/` and nothing else. There is no Worker code, and requests for static files are free on Cloudflare.
+`wrangler.jsonc` serves `dist/`, and runs a small Worker (`worker/`) for `/api/*` only: the feedback form. Requests for static files never reach the Worker and are free on Cloudflare.
 
 One time, from this folder:
 
@@ -145,3 +145,15 @@ The fonts are self-hosted from `public/fonts` (the site never calls Google Fonts
 ## Licence
 
 Frills is free software under the GNU Affero General Public License v3 (see `LICENSE`). The TikTok helper and relay use `tiktok-live-connector`, which has its own modified AGPL licence; see `helper/README.md`. If you run a modified copy of the relay as a service for other people, the AGPL asks you to share your changes.
+
+## Feedback form
+
+`/feedback/` is a form (kind, streaming app, message, optional contact). It POSTs JSON to `/api/feedback`, handled by `worker/feedback.mjs` and saved in a Cloudflare D1 database (binding `DB`, table in `worker/schema.sql`). It keeps the date, kind, app, message and contact, never the sender's address. It refuses wrong-origin and non-JSON requests, over-long messages and, past 60 messages an hour, anything more; a filled hidden field or a form sent in under 1.5 s gets a normal thanks and nothing is saved.
+
+One-time setup (the Cloudflare dashboard, no command line): Storage & Databases > D1 > Create database `frills-feedback`; open its Console and run `worker/schema.sql`; copy the Database ID into `d1_databases` in `wrangler.jsonc`:
+
+```jsonc
+"d1_databases": [{ "binding": "DB", "database_name": "frills-feedback", "database_id": "<the id>" }]
+```
+
+Read messages in the D1 Console: `SELECT id, created, kind, app, message, contact FROM feedback ORDER BY id DESC LIMIT 50;`. `npm run dev` and `npm run serve` answer the form locally with the same code over a SQLite file (`.dev-feedback.sqlite`, ignored by git). `feedbackForm` in `site.config.json` turns the page and every "Feedback" link on or off.

@@ -1,11 +1,18 @@
 {
   "name": "frills",
   "compatibility_date": "2026-10-01",
-  // The whole site is static files in dist/, built by `npm run build`. There is no Worker code and no database,
-  // so serving it costs nothing on Cloudflare's free plan (requests for static assets are free and unlimited).
+  // The site is static files in dist/, built by `npm run build`. Requests for static assets are free and unlimited on Cloudflare's
+  // free plan, and they never reach the Worker: only /api/* does (run_worker_first). The Worker (worker/) takes the feedback form's
+  // messages and saves them in a D1 database (the binding DB, below; its table is in worker/schema.sql).
+  "main": "worker/index.mjs",
+  "d1_databases": [
+    { "binding": "DB", "database_name": "frills-feedback", "database_id": "11ced78c-30ad-4e22-88c7-61360de5cafb" }
+  ],
   "assets": {
     "directory": "./dist",
-    "not_found_handling": "404-page"
+    "binding": "ASSETS",
+    "not_found_handling": "404-page",
+    "run_worker_first": ["/api/*"]
   },
   // The address. A Custom Domain makes Cloudflare create the DNS record and the certificate itself (valwidgets.live has to be an
   // active zone on the account that deploys), so do not add a record for this name by hand: a Custom Domain can't be created on a

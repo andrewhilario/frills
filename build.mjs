@@ -55,7 +55,7 @@ mkdirSync(dist, { recursive: true });
 if (existsSync(join(root, "public"))) cpSync(join(root, "public"), dist, { recursive: true });
 
 const common = { absWorkingDir: root, bundle: true, minify: true, metafile: true, logLevel: "warning", outdir: join(dist, "assets"), entryNames: "[name]-[hash]", target: ["chrome100", "firefox100", "safari15"] };
-const jsEntries = { home: "src/js/home.js", editor: "src/js/editor.js", overlay: "src/js/overlay.js", matcha: "src/js/matcha-page.js", page: "src/js/page.js", ...(withOgCard && { og: "src/js/og.js" }) };
+const jsEntries = { home: "src/js/home.js", editor: "src/js/editor.js", overlay: "src/js/overlay.js", matcha: "src/js/matcha-page.js", page: "src/js/page.js", feedback: "src/js/feedback.js", ...(withOgCard && { og: "src/js/og.js" }) };
 const cssEntries = { home: "src/css/entry/home.css", page: "src/css/entry/page.css", editor: "src/css/entry/editor.css", matcha: "src/css/entry/matcha.css", overlay: "src/css/entry/overlay.css", ...(withOgCard && { og: "src/css/entry/og.css" }) };
 const jsBuild = await esbuild({ ...common, entryPoints: jsEntries, format: "iife", legalComments: "none" });
 const cssBuild = await esbuild({ ...common, entryPoints: cssEntries, external: ["/fonts/*"], legalComments: "inline" });
@@ -78,7 +78,7 @@ const pages = walk(join(src, "pages")).filter((f) => f.endsWith(".html")).map((f
   const m = /^<!--\s*(\{[\s\S]*?\})\s*-->\s*/.exec(text);
   if (!m) throw new Error(`${relative(root, file)} has no front matter`);
   return { file, meta: JSON.parse(m[1]), body: text.slice(m[0].length), mtime: statSync(file).mtime };
-}).filter((p) => !p.meta.devOnly || withOgCard);
+}).filter((p) => !p.meta.devOnly || withOgCard).filter((p) => !p.meta.feature || (p.meta.feature === "feedbackForm" && site.feedbackForm));
 
 const looksCount = Object.keys(PRESETS).length;
 const WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
@@ -141,12 +141,14 @@ const shared = {
   helperGet,
   relay: site.relayUrl,
   siteAddress: site.url,
+  privacyFeedback: site.feedbackForm ? `\n      <h2 class="subtitle">If you send feedback</h2>\n      <p>The feedback form saves your message, the kind you pick, the streaming app you pick, your contact if you type one, and the date, in a database on Cloudflare. It does not save your address with the message. Only we read it, and we use it to improve Frills. Ask us to delete a message by sending another one that says which.</p>` : "",
   gscTag: site.googleSiteVerification ? `\n<meta name="google-site-verification" content="${esc(site.googleSiteVerification)}">` : "",
   tallyUrl: site.tally.url,
   tallyBlurb: site.tally.blurb,
   year: String(site.year),
   builtOn,
   feedbackItem: site.feedbackUrl ? `\n        <li>${linkTag("", site.feedbackUrl, "Feedback")}</li>` : "",
+  feedbackSheetLink: site.feedbackUrl ? `\n    ${linkTag("nav__link", site.feedbackUrl, "Feedback")}` : "",
   feedbackLink: site.feedbackUrl ? linkTag("nav__link", site.feedbackUrl, "Feedback") : "",
   feedbackParagraph: site.feedbackUrl ? `\n      <p>Questions, or something broken? ${linkTag("", site.feedbackUrl, "Tell us")}.</p>` : "",
   looksGrid,
@@ -182,6 +184,7 @@ function renderPage(page, stats) {
     navGuide: meta.navGuide ? ' aria-current="page"' : "",
     navTikTok: meta.navTikTok ? ' aria-current="page"' : "",
     navTest: meta.navTest ? ' aria-current="page"' : "",
+    navFeedback: meta.navFeedback ? ' aria-current="page"' : "",
     faqItems: faqItems.map((i) => `        <details><summary>${esc(i.q)}</summary><div class="faq__answer"><p>${i.a}</p></div></details>`).join("\n"),
   };
   const where = relative(root, page.file);

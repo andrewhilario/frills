@@ -1,0 +1,78 @@
+<!--
+{
+  "title": "Send feedback | Frills",
+  "description": "Found a bug, want a new look, or have an idea for Frills? Tell us here. It takes a minute, and you do not need an account.",
+  "path": "/feedback/",
+  "css": "page",
+  "js": "feedback",
+  "bodyClass": "page-guide",
+  "chrome": "nav",
+  "footer": true,
+  "navFeedback": true,
+  "feature": "feedbackForm",
+  "jsonld": ["breadcrumb:Feedback"]
+}
+-->
+<main id="main">
+  <article class="article shell">
+    <ol class="crumbs" aria-label="Breadcrumb">
+      <li><a href="/">Frills</a></li>
+      <li aria-current="page">Feedback</li>
+    </ol>
+    <header class="article__head">
+      <h1 class="display">Tell us what you think</h1>
+      <p class="lede">Something broken, a look you want, or an idea? Write it here. It takes a minute and you do not need an account.</p>
+    </header>
+
+    <div class="article__body">
+      <form class="form" id="feedback-form" novalidate>
+        <fieldset class="form__group">
+          <legend class="form__label">What is it about?</legend>
+          <label class="form__choice"><input type="radio" name="kind" value="broken"> Something is broken</label>
+          <label class="form__choice"><input type="radio" name="kind" value="idea" checked> I have an idea</label>
+          <label class="form__choice"><input type="radio" name="kind" value="look"> A look I would like</label>
+          <label class="form__choice"><input type="radio" name="kind" value="other"> Something else</label>
+        </fieldset>
+
+        <div class="form__group">
+          <label class="form__label" for="fb-app">Which streaming app do you use? <span class="form__opt">optional</span></label>
+          <select id="fb-app" name="app">
+            <option value="">Choose one</option>
+            <option value="tiktok-live-studio">TikTok LIVE Studio</option>
+            <option value="streamlabs">Streamlabs</option>
+            <option value="obs">OBS</option>
+            <option value="other-app">Another app</option>
+            <option value="none-yet">I have not set one up yet</option>
+          </select>
+        </div>
+
+        <div class="form__group">
+          <label class="form__label" for="fb-message">Your message</label>
+          <textarea id="fb-message" name="message" rows="7" maxlength="2000" required aria-describedby="fb-count"></textarea>
+          <p class="form__hint" id="fb-count">At least 10 characters. If something is broken, say what you did and what you saw.</p>
+        </div>
+
+        <div class="form__group">
+          <label class="form__label" for="fb-contact">Email or @name <span class="form__opt">optional, only if you want a reply</span></label>
+          <input type="text" id="fb-contact" name="contact" maxlength="100" autocomplete="off" spellcheck="false">
+        </div>
+
+        <div class="form__trap" aria-hidden="true">
+          <label>Leave this empty <input type="text" name="website" tabindex="-1" autocomplete="off"></label>
+        </div>
+
+        <div class="form__actions">
+          <button class="btn" type="submit" id="fb-send">Send feedback <span class="btn__arrow" aria-hidden="true">→</span></button>
+        </div>
+        <p class="form__status" id="fb-status" role="status" aria-live="polite"></p>
+      </form>
+
+      <div class="note note--warm" id="fb-thanks" tabindex="-1" hidden>
+        <p><strong>Thank you.</strong> Your message is in. We read every one.</p>
+        <p><button class="btn btn--outline btn--sm" type="button" id="fb-again">Send another</button></p>
+      </div>
+
+      <p class="form__privacy">Your message, the kind, the app you pick and your contact (if you type one) are saved with the date. Your address is not saved with it. Only we read it, and we use it to improve Frills. <a href="/privacy/">Privacy</a></p>
+    </div>
+  </article>
+</main>
