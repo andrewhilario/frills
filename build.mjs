@@ -180,6 +180,7 @@ function renderPage(page, stats) {
     jsonld: jsonLd(meta, canonical, faqItems),
     navGuide: meta.navGuide ? ' aria-current="page"' : "",
     navTikTok: meta.navTikTok ? ' aria-current="page"' : "",
+    navTest: meta.navTest ? ' aria-current="page"' : "",
     faqItems: faqItems.map((i) => `        <details><summary>${esc(i.q)}</summary><div class="faq__answer"><p>${i.a}</p></div></details>`).join("\n"),
   };
   const where = relative(root, page.file);
