@@ -1,0 +1,11 @@
+/* The brand and the links that every top bar shares. */
+.nav__brand { display: inline-flex; align-items: center; gap: var(--space-xs); min-height: 44px; justify-self: start; font-size: 1.4rem; font-weight: 800; letter-spacing: -0.035em; color: var(--color-ink); text-decoration: none; }
+.nav__brand svg { width: 2.1rem; height: 2.1rem; flex: none; }
+.nav__link { display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--space-sm); border-radius: var(--radius-pill); font-size: var(--text-sm); font-weight: 600; white-space: nowrap; color: var(--color-ink); text-decoration: none; transition: background-color 140ms var(--ease-out); }
+@media (hover: hover) { .nav__link:hover { background: var(--color-paper-2); } }
+.nav__link[aria-current="page"] { background: var(--color-accent-tint); }
+
+/* App bar: the brand, and a way back. */
+.appbar { position: sticky; top: 0; z-index: var(--z-sticky-nav); background: var(--color-paper); border-bottom: 2px dashed var(--color-rule); }
+.appbar__inner { padding-inline: var(--page-gutter); display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); min-height: var(--appbar-height); }
+.appbar__links { display: flex; flex-wrap: wrap; gap: 0 var(--space-xs); }

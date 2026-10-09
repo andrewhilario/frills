@@ -1,0 +1,72 @@
+<!--
+{
+  "title": "Chat overlay editor | Frills",
+  "description": "Pick a look, change every colour, font and corner, connect your TikTok or Twitch chat, and copy one link for OBS. Free, no account.",
+  "path": "/editor/",
+  "css": "editor",
+  "js": "editor",
+  "bodyClass": "page-editor",
+  "chrome": "appbar",
+  "footer": false
+}
+-->
+<main class="workspace" id="main">
+  <section class="preview" id="preview" data-back="dark" aria-label="Live preview of your chat">
+    <div class="preview__bar">
+      <span class="preview__tag">Preview</span>
+      <label class="visually-hidden" for="backdrop">What sits behind the chat</label>
+      <select id="backdrop">
+        <option value="dark">Dark game</option>
+        <option value="bright">Bright game</option>
+        <option value="busy">Busy scene</option>
+        <option value="checker">See-through</option>
+      </select>
+    </div>
+    <div class="chatstage" id="stage" aria-hidden="true"><div class="chatbox" id="chat"></div></div>
+  </section>
+
+  <div class="panel">
+    <noscript><p class="note">Frills needs JavaScript to draw your chat. Turn it on for this page and reload.</p></noscript>
+
+    <section class="step-card" aria-labelledby="s1">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">1</span>
+        <h1 class="step-card__title" id="s1">Pick a look</h1>
+        <button class="btn btn--soft btn--sm step-card__aside" type="button" id="reset">Reset</button>
+      </div>
+      <div class="chips" id="presets" role="group" aria-label="Starting looks"></div>
+      <div class="stack" id="main-controls"></div>
+      <details class="more">
+        <summary>More options</summary>
+        <div class="stack" id="more-controls"></div>
+      </details>
+    </section>
+
+    <section class="step-card" aria-labelledby="s2">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">2</span>
+        <h2 class="step-card__title" id="s2">Connect your chat</h2>
+      </div>
+      <div id="source"></div>
+    </section>
+
+    <section class="step-card" aria-labelledby="s3">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">3</span>
+        <h2 class="step-card__title" id="s3">Add it to OBS</h2>
+      </div>
+      <div class="linkfield">
+        <label class="ctl__label" for="link">Your link</label>
+        <input type="text" id="link" readonly placeholder="Appears once you type a name" spellcheck="false" autocomplete="off">
+        <div class="linkfield__actions">
+          <button class="btn" type="button" id="copy-link" disabled>Copy link</button>
+        </div>
+        <p class="linkfield__hint" id="link-hint" role="status"></p>
+      </div>
+    </section>
+
+    <section class="preview-tools" aria-label="Preview options">
+      <div id="preview-width"></div>
+    </section>
+  </div>
+</main>

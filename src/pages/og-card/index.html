@@ -1,0 +1,28 @@
+<!--
+{
+  "title": "Frills share image",
+  "path": "/og-card/",
+  "css": "og",
+  "js": "og",
+  "layout": "bare",
+  "noindex": true,
+  "listed": false,
+  "devOnly": true
+}
+-->
+<main class="og">
+  <div class="og__copy">
+    <div class="og__brand">{{>logo}}<span>Frills</span></div>
+    <h1 class="display">Free chat overlays with all the <span class="frill-underline">frills</span>.</h1>
+    <p class="og__line">For TikTok LIVE and Twitch.</p>
+    <p class="label">{{siteHost}}</p>
+  </div>
+  <div class="og__stage">
+    {{>frilly}}
+    <div class="stage-card og__card">
+      <span class="stage-card__tag">Practice chat</span>
+      <div class="chatstage" id="og-stage"><div class="chatbox"></div></div>
+    </div>
+  </div>
+  <div class="og__hem"></div>
+</main>

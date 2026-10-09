@@ -1,0 +1,134 @@
+/*! Hallmark · genre: playful · macrostructure: Workbench · theme: Hum (tuned for Frills) · enrichment: Tier-B SVG character · nav: N1b · footer: Ft8 */
+/* Hallmark · pre-emit critique: P5 H4 E4 S5 R4 V4 */
+/* Frills design tokens. Every colour, font, size, space, radius and curve on the site comes from a name in this file. */
+
+:root {
+  /* Paper and ink: cream (never white) and a cool near-black (never black). */
+  --color-paper: oklch(97% 0.012 95);
+  --color-paper-2: oklch(94% 0.016 95);
+  --color-paper-3: oklch(91% 0.020 95);
+  --color-rule: oklch(82% 0.024 90);
+  --color-rule-2: oklch(64% 0.022 90);
+  --color-ink: oklch(20% 0.012 250);
+  --color-ink-2: oklch(40% 0.014 250);
+
+  /* Three accents, each owns its own surface. Pear = the main action, sky = links and calm, coral = the one pop per view. */
+  --color-accent: oklch(86% 0.18 95);
+  --color-accent-deep: oklch(62% 0.15 85);
+  --color-accent-tint: oklch(93% 0.07 95);
+  --color-accent-ink: oklch(20% 0.012 250);
+  --color-accent-2: oklch(66% 0.18 235);
+  --color-accent-2-deep: oklch(46% 0.15 245);
+  --color-accent-2-tint: oklch(93% 0.035 235);
+  --color-accent-3: oklch(68% 0.24 18);
+  --color-accent-3-deep: oklch(50% 0.20 22);
+  --color-accent-3-tint: oklch(93% 0.04 18);
+  --color-mint: oklch(80% 0.16 150);
+  --color-mint-deep: oklch(44% 0.10 155);
+  --color-mint-tint: oklch(93% 0.05 150);
+  --color-lavender: oklch(74% 0.16 305);
+  --color-lavender-tint: oklch(93% 0.04 305);
+
+  /* The coloured edge and the ground shadow that make a push button look thick. */
+  --color-accent-cast: oklch(76% 0.2 95 / 0.45);
+  --color-accent-2-cast: oklch(56% 0.18 235 / 0.4);
+  --color-accent-3-cast: oklch(58% 0.24 18 / 0.4);
+  --color-mint-cast: oklch(60% 0.14 150 / 0.4);
+  --color-ink-cast: oklch(20% 0.012 250 / 0.35);
+  --color-ink-edge: oklch(36% 0.02 250);
+
+  /* State colours */
+  --color-focus: oklch(48% 0.20 265);
+  --color-error: oklch(50% 0.20 25);
+  --color-success: oklch(46% 0.10 155);
+
+  /* The dark "game" the demos sit on, so a chat can be judged against something. */
+  --color-stage: oklch(24% 0.035 275);
+  --color-stage-2: oklch(30% 0.045 275);
+  --color-stage-ink: oklch(96% 0.01 95);
+  --color-stage-bright: oklch(88% 0.07 225);
+  --color-stage-busy-a: oklch(62% 0.17 28);
+  --color-stage-busy-b: oklch(84% 0.14 90);
+
+  /* Type: one rounded humanist sans for everything, one mono for labels and numbers. */
+  --font-display: "Plus Jakarta Sans", "Plus Jakarta Fallback", ui-rounded, system-ui, sans-serif;
+  --font-body: "Plus Jakarta Sans", "Plus Jakarta Fallback", ui-rounded, system-ui, sans-serif;
+  --font-label: "JetBrains Mono", "JetBrains Fallback", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* The chat overlays' own faces (product content the streamer picks, not the site's voice). */
+  --look-font-geist: "Geist", system-ui, sans-serif;
+  --look-font-round: "Plus Jakarta Sans", system-ui, sans-serif;
+  --look-font-cute: "Fredoka", system-ui, sans-serif;
+  --look-font-chunky: "Baloo 2", system-ui, sans-serif;
+  --look-font-grotesk: "Space Grotesk", system-ui, sans-serif;
+  --look-font-bricolage: "Bricolage Grotesque", system-ui, sans-serif;
+  --look-font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --look-font-pixel: "Press Start 2P", ui-monospace, monospace;
+
+  /* Scale: major third from a 16px base. Display is clamped. */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-md: 1.25rem;
+  --text-lg: 1.5625rem;
+  --text-xl: 1.9531rem;
+  --text-2xl: 2.4414rem;
+  --text-3xl: 3.0518rem;
+  --text-display: clamp(2.5rem, 4.4vw + 1rem, 4.75rem);
+  --text-display-s: clamp(2.125rem, 3vw + 1rem, 3.5rem);
+  --text-counter: clamp(3rem, 5vw + 1rem, 5rem);
+
+  /* Space: 4pt scale named by role. */
+  --space-3xs: 0.125rem;
+  --space-2xs: 0.25rem;
+  --space-xs: 0.5rem;
+  --space-sm: 0.75rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2.5rem;
+  --space-2xl: 4rem;
+  --space-3xl: 6rem;
+  --space-4xl: 9rem;
+  --page-max: 76rem;
+  --page-gutter: clamp(1.25rem, 4vw, 2.5rem);
+  --section-gap: clamp(4rem, 8vw, 7rem);
+
+  /* Shape: no square corners anywhere. */
+  --radius-sm: 8px;
+  --radius-input: 12px;
+  --radius-card: 20px;
+  --radius-chunk: 28px;
+  --radius-pill: 999px;
+  --rule-hair: 1px;
+  --rule-thick: 2px;
+
+  /* Depth: a tight contact shadow plus a soft ambient one. Cards that sit flat use the edge instead. */
+  --shadow-soft: 0 1px 2px oklch(20% 0.012 250 / 0.06), 0 12px 32px -16px oklch(20% 0.012 250 / 0.2);
+  --shadow-lift: 0 2px 4px oklch(20% 0.012 250 / 0.08), 0 20px 40px -18px oklch(20% 0.012 250 / 0.28);
+  --shadow-pop: 0 18px 40px -14px oklch(20% 0.03 275 / 0.5);
+
+  /* Motion: three easings and three durations. The spring is for cards and the mascot only. */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --ease-snap: cubic-bezier(0.2, 0.7, 0.3, 1);
+  --dur-micro: 120ms;
+  --dur-short: 220ms;
+  --dur-long: 420ms;
+
+  /* The frill: the scalloped seam between sections. */
+  --scallop: 22px;
+
+  /* The bars that stay at the top while a page scrolls. Anything else that sticks docks beneath them. */
+  --nav-height: 4.25rem;
+  --appbar-height: 3.75rem;
+
+  /* Stacking: named levels. The nav always out-paints anything else that sticks. */
+  --z-base: 1;
+  --z-raised: 10;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-sticky-nav: 300;
+  --z-modal: 400;
+  --z-toast: 500;
+}

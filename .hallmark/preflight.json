@@ -1,0 +1,10 @@
+{
+  "scanned": "2026-10-07",
+  "note": "Written when the project was created, so these are the choices made for Frills, not an inherited stack. Say 'refresh pre-flight' to scan again.",
+  "fontStack": "Plus Jakarta Sans (display and body) and JetBrains Mono (labels), self-hosted woff2 from Fontsource packages under the SIL Open Font License, declared in src/css/fonts.css. Chat-look fonts: Geist, Bricolage Grotesque, Space Grotesk, Fredoka, Baloo 2, Press Start 2P (public/fonts, licences in public/fonts/licenses).",
+  "palette": "OKLCH custom properties in tokens.css: paper and ink, pear accent, sky, coral, mint, lavender. The overlay files (chat.css, looks.css, looks-matcha.css) use plain hex and rgba on purpose, because the browser inside OBS can be old.",
+  "motion": "No animation library. Plain CSS keyframes and the Web Animations API, all behind prefers-reduced-motion.",
+  "spacing": "--space-3xs to --space-4xl in tokens.css.",
+  "framework": "None. A static site built by build.mjs (esbuild plus a small template engine) and served as Cloudflare Workers static assets.",
+  "preserve": ["tokens.css", "src/css/fonts.css", "public/fonts"]
+}

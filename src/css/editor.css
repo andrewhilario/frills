@@ -1,0 +1,74 @@
+/* The editor: a panel of three steps beside (or, on a phone, under) a live preview of the chat. */
+
+.workspace { display: flex; flex-direction: column; }
+.preview { position: sticky; top: var(--appbar-height); z-index: var(--z-sticky); display: flex; flex-direction: column; height: 44dvh; min-height: 16rem; background: var(--color-stage); }
+.preview__bar { flex: none; display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); padding: var(--space-2xs) var(--space-md); }
+.preview .chatstage { position: relative; flex: 1 1 0; min-height: 0; display: flex; align-items: flex-end; padding: 0 var(--space-md) var(--space-md); overflow: hidden; }
+.preview .chatbox { width: min(100%, var(--preview-w, 440px)); max-height: 100%; }
+.preview[data-back="dark"] { background: var(--color-stage); }
+.preview[data-back="bright"] { background: var(--color-stage-bright); }
+.preview[data-back="busy"] { background: repeating-linear-gradient(135deg, var(--color-stage-busy-a) 0 22px, var(--color-stage-busy-b) 22px 44px); }
+.preview[data-back="checker"] { background: conic-gradient(var(--color-stage) 25%, var(--color-stage-2) 0 50%, var(--color-stage) 0 75%, var(--color-stage-2) 0) 0 0 / 24px 24px; }
+.preview__tag { font-family: var(--font-label); font-size: var(--text-xs); letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-stage-ink); opacity: 0.8; }
+
+.panel { display: grid; gap: var(--space-lg); align-content: start; padding: var(--space-lg) var(--page-gutter) var(--space-3xl); background: var(--color-paper-2); }
+.step-card { display: grid; gap: var(--space-md); padding: var(--space-lg); background: var(--color-paper); border-radius: var(--radius-card); box-shadow: var(--shadow-soft); }
+.step-card__head { display: flex; align-items: center; gap: var(--space-sm); }
+.step-card__num { display: grid; place-items: center; width: 2.25rem; height: 2.25rem; flex: none; border: 2px solid var(--color-ink); border-radius: 50%; font-weight: 800; background: var(--color-accent); }
+.step-card:nth-of-type(2) .step-card__num { background: var(--color-accent-2); }
+.step-card:nth-of-type(3) .step-card__num { background: var(--color-accent-3); }
+.step-card__aside { margin-left: auto; }
+.step-card__title { font-size: var(--text-md); font-weight: 700; letter-spacing: -0.015em; }
+.stack { display: grid; gap: var(--space-md); }
+
+/* One control: a label, and the thing you change. */
+.ctl { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-2xs) var(--space-sm); }
+.ctl output { font-size: var(--text-sm); font-variant-numeric: tabular-nums; color: var(--color-ink-2); }
+.ctl input[type="range"] { grid-column: 1 / -1; }
+.ctl--wide .chips, .ctl__hint { grid-column: 1 / -1; }
+.ctl__hint { font-size: var(--text-sm); color: var(--color-ink-2); }
+.ctl select { max-width: 14rem; }
+
+.more { border-top: 2px dashed var(--color-rule-2); }
+.more > summary { display: flex; align-items: center; justify-content: space-between; min-height: 3.25rem; padding: 0; font-weight: 650; list-style: none; cursor: pointer; }
+@media (hover: hover) { .more > summary:hover { background: var(--color-paper-2); } }
+.more > summary:active { background: var(--color-paper-3); }
+.more > summary::-webkit-details-marker { display: none; }
+.more > summary::after { content: ""; flex: none; width: 1.6rem; height: 1.6rem; border-radius: 50%; background: linear-gradient(var(--color-ink) 0 0) center / 0.7rem 2px no-repeat, linear-gradient(var(--color-ink) 0 0) center / 2px 0.7rem no-repeat, var(--color-accent); }
+.more[open] > summary::after { background-size: 0.7rem 2px, 0 0, auto; }
+.more > summary:focus-visible { outline-offset: 2px; }
+.more > .stack { padding: var(--space-xs) 0 var(--space-md); }
+
+/* Step 2: where chat comes from */
+.source { display: grid; gap: var(--space-sm); }
+.source__hint { font-size: var(--text-sm); color: var(--color-ink-2); }
+.source__hint[hidden] { display: none; }
+.source__twitch { display: none; gap: var(--space-xs); }
+.source[data-mode="twitch"] .source__twitch { display: grid; }
+.source[data-mode="twitch"] .source__practice-only { display: none; }
+.source__row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs); }
+.source__row .btn { min-height: 44px; }
+.source__row input { flex: 1 1 10rem; min-width: 0; }
+.source__status { min-height: 1lh; font-size: var(--text-sm); color: var(--color-ink-2); }
+.source__status[data-state="connected"] { color: var(--color-success); }
+.source__status[data-state="error"] { color: var(--color-error); }
+.source__tools { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
+
+/* Step 3: the link */
+.linkfield { display: grid; gap: var(--space-xs); }
+.linkfield input { width: 100%; font-family: var(--font-label); font-size: var(--text-sm); }
+.linkfield__actions { display: flex; flex-wrap: wrap; gap: var(--space-sm); align-items: center; }
+.linkfield__hint { min-height: 1lh; font-size: var(--text-sm); color: var(--color-ink-2); }
+.linkfield__hint[data-state="error"] { color: var(--color-error); }
+.linkfield__hint a { font-weight: 600; }
+
+.preview-tools { display: grid; gap: var(--space-sm); padding: var(--space-md) var(--space-lg); border-radius: var(--radius-card); background: var(--color-paper-2); }
+
+/* Wide screens: the panel on the left, the preview filling the rest and staying put while the panel scrolls. */
+@media (min-width: 56rem) {
+  .workspace { flex-direction: row; align-items: flex-start; }
+  .panel { order: 1; flex: 0 0 25rem; max-width: 25rem; padding-inline: var(--space-lg); }
+  .preview { order: 2; position: sticky; top: var(--appbar-height); flex: 1 1 0; min-width: 0; height: calc(100dvh - var(--appbar-height)); }
+  .preview__bar { padding-inline: var(--space-lg); }
+  .preview .chatstage { padding: 0 var(--space-lg) var(--space-lg); }
+}

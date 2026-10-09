@@ -1,0 +1,76 @@
+/* The six matcha styles. Each reads a palette (--bg --ink --soft --matcha --deep --pop and a few blends), all set from script.
+   The matcha page's "More options" change them through a few more variables. Every one has a fallback, so a link that sets none of
+   them draws each style exactly as designed:
+     --m-scale   text size, as a multiple      --m-round   corners, as a multiple
+     --m-font    a font instead of the style's own
+     --m-anim --m-speed --m-ease   an entrance instead of the style's own
+     --bg-fill --soft-fill --night-body-fill --glass-fill   the boxes' fills, which carry the box opacity
+   Only the overlay page and the matcha page load this file. Plain colours only, as in chat.css. */
+
+/* ── Matcha Latte: soft cream bubbles that hop in, with a ripple under each new message ───────────────────────────────── */
+.look-latte { --ico: var(--matcha); --ico-ink: var(--bg); }
+.look-latte .m { font-family: var(--m-font, var(--look-font-cute)); font-size: calc(16px * var(--m-scale, 1)); font-weight: 500; animation-name: var(--m-anim, hop); animation-duration: var(--m-speed, 520ms); animation-timing-function: var(--m-ease, cubic-bezier(0.3, 1.4, 0.5, 1)); }
+.look-latte .txt { font-size: 1em; }
+.look-latte .body { background: var(--bg-fill, var(--bg)); color: var(--ink); border-radius: calc(20px * var(--m-round, 1)) calc(20px * var(--m-round, 1)) calc(20px * var(--m-round, 1)) calc(6px * var(--m-round, 1)); padding: 8px 14px 10px; box-shadow: 0 6px 14px -6px var(--look-shadow-green); }
+.look-latte .name { color: var(--deep); }
+.look-latte .av { background: var(--matcha); color: var(--ink); }
+.look-latte .badge { background: var(--pop); }
+.look-latte .m::after { content: ""; position: absolute; left: 6px; bottom: -4px; width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--matcha); opacity: 0; transform: scale(0.5); animation: ripple 900ms ease-out 180ms 1 both; pointer-events: none; }
+.look-latte .m.gift .body { background: var(--pop); }
+
+/* ── Matcha Glass: frosted panes with a green glow (the blur costs more on a weak PC) ─────────────────────────────────── */
+.look-glass { --ico: var(--matcha-lift); --ico-ink: var(--look-night-avatar-ink); }
+.look-glass .m { font-family: var(--m-font, var(--look-font-round)); font-size: calc(16px * var(--m-scale, 1)); font-weight: 600; animation-name: var(--m-anim, rise); animation-duration: var(--m-speed, 420ms); animation-timing-function: var(--m-ease, ease-out); }
+.look-glass .body { color: var(--look-glass-ink); background: var(--glass-fill, var(--look-glass-fill)); border: 1px solid var(--look-glass-line); border-radius: calc(18px * var(--m-round, 1)); padding: 8px 14px 10px; -webkit-backdrop-filter: blur(10px) saturate(1.3); backdrop-filter: blur(10px) saturate(1.3); box-shadow: 0 0 22px -4px var(--matcha-a70), inset 0 1px 0 var(--look-glass-lit); }
+.look-glass .name { color: var(--matcha-lift); }
+.look-glass .av { background: var(--matcha-a55); border: 1px solid var(--look-glass-line); color: var(--look-glass-avatar-ink); }
+.look-glass .badge { background: var(--pop); }
+.look-glass .m.gift .body { box-shadow: 0 0 26px 0 var(--pop); }
+
+/* ── Cartoon Sticker: thick outlines and a hard shadow, popping in with a little tilt ────────────────────────────────── */
+.look-sticker { --ico: var(--deep); --ico-ink: var(--soft); }
+.look-sticker .m { font-family: var(--m-font, var(--look-font-chunky)); font-size: calc(16px * var(--m-scale, 1)); font-weight: 500; animation-name: var(--m-anim, pop); animation-duration: var(--m-speed, 380ms); animation-timing-function: var(--m-ease, cubic-bezier(0.2, 1.6, 0.4, 1)); }
+.look-sticker .m:nth-child(odd) { --tilt: -1.6deg; }
+.look-sticker .m:nth-child(even) { --tilt: 1.4deg; }
+.look-sticker .body { background: var(--soft-fill, var(--soft)); color: var(--ink); border: 3px solid var(--deep); border-radius: calc(16px * var(--m-round, 1)); padding: 4px 12px 6px; box-shadow: 4px 4px 0 var(--deep); transform: rotate(var(--tilt)); }
+.look-sticker .name { color: var(--deep); text-transform: uppercase; letter-spacing: 0.04em; font-size: calc(12.5px * var(--m-scale, 1)); font-weight: 700; }
+.look-sticker .av { background: var(--matcha); border: 3px solid var(--deep); color: var(--ink); }
+.look-sticker .badge { background: var(--pop); }
+.look-sticker .m.gift .body { background: var(--pop); }
+
+/* ── Pixel Pond: stepped borders and a stepped slide (animations in steps, so it costs almost nothing) ──────────────── */
+.look-pixel { --ico: var(--deep); --ico-ink: var(--bg); }
+.look-pixel .m { font-family: var(--m-font, var(--look-font-pixel)); font-size: calc(16px * var(--m-scale, 1)); font-weight: 400; animation-name: var(--m-anim, slidepx); animation-duration: var(--m-speed, 360ms); animation-timing-function: var(--m-ease, steps(5)); }
+.look-pixel .body { background: var(--bg-fill, var(--bg)); color: var(--ink); padding: 8px 10px 10px; box-shadow: 0 -4px 0 -0px var(--deep), 0 4px 0 0 var(--deep), -4px 0 0 0 var(--deep), 4px 0 0 0 var(--deep), 6px 6px 0 0 var(--look-pixel-shadow); }
+.look-pixel .name { color: var(--deep); font-size: calc(9px * var(--m-scale, 1)); font-weight: 400; }
+.look-pixel .txt { font-size: calc(9px * var(--m-scale, 1)); line-height: 1.6; margin-top: 6px; }
+.look-pixel .av { border-radius: 0; width: calc(34px * var(--m-scale, 1)); height: calc(34px * var(--m-scale, 1)); background: var(--matcha); color: var(--ink); box-shadow: 0 0 0 3px var(--deep); font-size: calc(12px * var(--m-scale, 1)); font-weight: 400; }
+/* The sizes above suit the pixel font. With a font picked in More options they would be tiny, so they are larger then. */
+.look-pixel[data-font="custom"] .name { font-size: calc(12px * var(--m-scale, 1)); }
+.look-pixel[data-font="custom"] .txt { font-size: calc(14px * var(--m-scale, 1)); line-height: 1.3; }
+.look-pixel[data-font="custom"] .av { font-size: calc(14px * var(--m-scale, 1)); font-weight: 700; }
+.look-pixel .badge { border-radius: 0; background: var(--pop); }
+.look-pixel .ico { width: calc(14px * var(--m-scale, 1)); height: calc(14px * var(--m-scale, 1)); }
+.look-pixel .m.gift .body { background: var(--pop); }
+
+/* ── Clean Broadcast: no boxes at all, just outlined text that stays readable over anything ───────────────────────────── */
+.look-minimal { --ico: var(--matcha); --ico-ink: var(--outline); }
+.look-minimal .m { font-family: var(--m-font, var(--look-font-round)); font-size: calc(16px * var(--m-scale, 1)); font-weight: 700; animation-name: var(--m-anim, rise); animation-duration: var(--m-speed, 380ms); animation-timing-function: var(--m-ease, ease-out); gap: 8px; grid-template-columns: minmax(0, 1fr); }
+.look-minimal .av { display: none; }
+.look-minimal .name { color: var(--matcha); font-weight: 800; font-size: calc(17px * var(--m-scale, 1)); }
+.look-minimal .txt { color: var(--look-white); font-weight: 700; font-size: calc(17px * var(--m-scale, 1)); margin-top: 0; display: inline; }
+.look-minimal .who { display: inline-flex; margin-right: 8px; vertical-align: baseline; }
+.look-minimal .name, .look-minimal .txt { text-shadow: 0 2px 0 var(--outline), 0 -2px 0 var(--outline), 2px 0 0 var(--outline), -2px 0 0 var(--outline), 2px 2px 0 var(--outline), -2px -2px 0 var(--outline), 2px -2px 0 var(--outline), -2px 2px 0 var(--outline), 0 4px 10px var(--look-shadow); }
+.look-minimal .ico { width: calc(22px * var(--m-scale, 1)); height: calc(22px * var(--m-scale, 1)); filter: drop-shadow(0 0 1.5px var(--outline)) drop-shadow(0 0 1.5px var(--outline)); }
+.look-minimal .badge { background: var(--pop); }
+.look-minimal .m.gift .txt { color: var(--pop); }
+.look-minimal .body { display: block; }
+
+/* ── Night Matcha: dark green bubbles with a soft green edge, good over bright gameplay ───────────────────────────────── */
+.look-night { --ico: var(--matcha); --ico-ink: var(--look-night-avatar-ink); }
+.look-night .m { font-family: var(--m-font, var(--look-font-cute)); font-size: calc(16px * var(--m-scale, 1)); font-weight: 500; animation-name: var(--m-anim, rise); animation-duration: var(--m-speed, 420ms); animation-timing-function: var(--m-ease, ease-out); }
+.look-night .body { background: var(--night-body-fill, var(--night-body)); color: var(--look-night-ink); border: 1px solid var(--matcha-a55); border-radius: calc(16px * var(--m-round, 1)); padding: 8px 14px 10px; box-shadow: 0 0 18px -6px var(--matcha); }
+.look-night .name { color: var(--matcha); }
+.look-night .av { background: var(--night-av); color: var(--look-night-avatar-ink); }
+.look-night .badge { background: var(--pop); }
+.look-night .m.gift .body { border-color: var(--pop); box-shadow: 0 0 20px -4px var(--pop); }

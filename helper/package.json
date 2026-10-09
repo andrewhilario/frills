@@ -1,0 +1,17 @@
+{
+  "name": "frills-helper",
+  "version": "0.1.0",
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "type": "module",
+  "description": "Reads TikTok LIVE chat on your own PC and gives it to the Frills overlay. For testing.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "tiktok-live-connector": "2.5.0"
+  }
+}

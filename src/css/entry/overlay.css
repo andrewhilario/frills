@@ -1,0 +1,16 @@
+/* The overlay page: only the chat, on a see-through page, for a browser source in OBS.
+   Plain colours only, because OBS can ship an older browser engine than your own. */
+@import "../../../tokens.css";
+@import "../fonts.css";
+@import "../chat.css";
+@import "../looks.css";
+@import "../looks-matcha.css";
+
+html { color-scheme: normal; background: transparent; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; }
+
+.chatstage { position: fixed; inset: 0; display: flex; align-items: flex-end; overflow: hidden; }
+
+/* A small note that only shows while connecting or when something is wrong, so a typo in the channel doesn't fail silently. */
+.note-live { position: fixed; right: 8px; bottom: 6px; max-width: 80vw; margin: 0; padding: 2px 8px; border-radius: 6px; font: 600 12px/1.4 var(--look-font-system); color: var(--look-note-ink); background: var(--look-note-bg); }
+.note-live[hidden] { display: none; }

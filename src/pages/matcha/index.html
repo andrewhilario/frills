@@ -1,0 +1,44 @@
+<!--
+{
+  "title": "Matcha chat styles | Frills",
+  "description": "Six matcha-green chat styles on made-up messages or real TikTok and Twitch chat. Pick one and copy its link.",
+  "path": "/matcha/",
+  "css": "matcha",
+  "js": "matcha",
+  "bodyClass": "page-matcha",
+  "chrome": "appbar",
+  "footer": false,
+  "noindex": true,
+  "listed": false
+}
+-->
+<main class="shell" id="main">
+  <div class="matcha-head">
+    <h1 class="display">Matcha chat styles</h1>
+    <p class="lede">Six looks for the chat box, on made-up messages or on real TikTok chat (with the Frills helper) or Twitch chat. Colours and motion only for now; the bigger frog graphics come later. Pick a palette, a mod icon and a background, change anything you like under More options, then use the style you like best and copy its link.</p>
+  </div>
+
+  <div class="matcha-tools">
+    <div class="matcha-tools__row"><span class="label">Palette</span><div class="chips" id="palettes" role="group" aria-label="Palette"></div></div>
+    <div class="matcha-tools__row"><span class="label">Mod icon</span><div class="chips" id="icons" role="group" aria-label="Moderator icon"></div></div>
+    <div class="matcha-tools__row"><span class="label">Behind it</span><div class="chips" id="backs" role="group" aria-label="Background"></div></div>
+    <details class="more matcha-more">
+      <summary>More options</summary>
+      <div class="stack" id="more-controls"></div>
+      <p class="matcha-more__foot"><button class="btn btn--soft btn--sm" type="button" id="more-reset">Reset these options</button></p>
+    </details>
+    <div id="source"></div>
+  </div>
+
+  <div class="matcha-grid" id="matcha-grid"></div>
+
+  <section class="matcha-link" aria-labelledby="link-title">
+    <h2 class="subtitle" id="link-title">Your link</h2>
+    <p>Paste it into an OBS Browser source. The style you picked has a dark outline around its card.</p>
+    <div class="matcha-link__row">
+      <input type="text" id="link" readonly placeholder="Appears once you type a name" spellcheck="false" autocomplete="off" aria-label="Your link">
+      <button class="btn" type="button" id="copy-link" disabled>Copy link</button>
+    </div>
+    <p class="linkfield__hint" id="link-hint" role="status"></p>
+  </section>
+</main>

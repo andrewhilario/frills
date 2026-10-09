@@ -1,0 +1,78 @@
+<!--
+{
+  "title": "How to add a chat overlay to OBS | Frills",
+  "description": "Step by step: copy your Frills link, add a Browser source in OBS, set its size and place your chat. Works with TikTok LIVE and Twitch.",
+  "path": "/guides/obs/",
+  "css": "page",
+  "js": "page",
+  "bodyClass": "page-guide",
+  "chrome": "nav",
+  "footer": true,
+  "navGuide": true,
+  "jsonld": ["breadcrumb:OBS guide"]
+}
+-->
+<main id="main">
+  <article class="article shell">
+    <ol class="crumbs" aria-label="Breadcrumb">
+      <li><a href="/">Frills</a></li>
+      <li aria-current="page">OBS guide</li>
+    </ol>
+    <header class="article__head">
+      <h1 class="display">Add Frills to OBS</h1>
+      <p class="lede">Your chat goes into OBS as a Browser source: one link, pasted once. This takes a couple of minutes, and you only do it once.</p>
+    </header>
+
+    <div class="article__body">
+      <ol class="steps-list" role="list">
+        <li>
+          <div>
+            <h2 class="subtitle">Make your link</h2>
+            <p>Open the <a href="/editor/">editor</a>, pick a look, type your TikTok @name or your Twitch channel in step 2, and copy the link from step 3. It already has your look and your account in it. On TikTok, open the editor from the Frills helper on your PC first: the <a href="/guides/tiktok/">TikTok guide</a> shows how.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h2 class="subtitle">Add a Browser source</h2>
+            <p>In OBS, find the Sources box, press <kbd>+</kbd> and choose <strong>Browser</strong>. Name it something you will recognise, like “Frills chat”, and press OK.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h2 class="subtitle">Paste your link</h2>
+            <p>Paste it into the <strong>URL</strong> box. Leave “Local file” unticked.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h2 class="subtitle">Set the size</h2>
+            <p>Set <strong>Width</strong> and <strong>Height</strong> to the space you want for chat. 500 by 800 is a good start for a column at the side. You can change it later by dragging the red handles on the source.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h2 class="subtitle">Leave the rest alone</h2>
+            <p>Keep the custom CSS that OBS fills in: it is what makes the page see-through. Two boxes are worth knowing about. <strong>Refresh browser when scene becomes active</strong> reconnects chat each time you switch to that scene. <strong>Shutdown source when not visible</strong> stops the overlay while its scene is off screen, which saves resources.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h2 class="subtitle">Place it</h2>
+            <p>New messages appear at the bottom edge of the source and push older ones up. Put the source where you want the newest message to sit.</p>
+          </div>
+        </li>
+      </ol>
+
+      <h2 class="title">If something looks wrong</h2>
+      <ul>
+        <li><strong>Nothing shows up.</strong> A small note appears in the bottom corner of the source while it connects, or if it can’t. Check your name for typos. Messages only appear when someone chats. On TikTok, also check that the helper is running and that you are LIVE.</li>
+        <li><strong>The background isn’t see-through.</strong> Check that the Custom CSS box still has OBS’s default, which starts with <code>body { background-color: rgba(0, 0, 0, 0)</code>.</li>
+        <li><strong>You want to test without chat.</strong> Add <code>&amp;demo=1</code> to the end of your link and the source shows made-up messages instead.</li>
+      </ul>
+
+      <p class="note note--warm"><strong>Using TikTok LIVE?</strong> Your link points at the Frills helper on your PC, so the helper has to be running and OBS has to be on the same PC. The <a href="/guides/tiktok/">TikTok guide</a> has the steps.</p>
+
+      <p class="article__foot"><a class="btn" href="/editor/">Open the editor <span class="btn__arrow" aria-hidden="true">→</span></a></p>
+    </div>
+  </article>
+</main>

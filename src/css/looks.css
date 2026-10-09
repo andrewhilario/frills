@@ -1,0 +1,37 @@
+/* The general look: every part of it is a setting (the page sets the --g-* variables from the controls). The matcha styles are in
+   looks-matcha.css. Plain colours only (see chat.css): the page hands over finished hex and rgba() values. */
+
+:root {
+  --look-shadow: rgba(0, 0, 0, 0.45);
+  --look-shadow-green: rgba(30, 50, 20, 0.45);
+  --look-glass-fill: rgba(255, 255, 255, 0.14);
+  --look-glass-line: rgba(255, 255, 255, 0.38);
+  --look-glass-lit: rgba(255, 255, 255, 0.35);
+  --look-glass-ink: #f7fbef;
+  --look-glass-avatar-ink: #ffffff;
+  --look-white: #ffffff;
+  --look-night-ink: #f2f8e6;
+  --look-night-avatar-ink: #0a120b;
+  --look-pixel-shadow: rgba(0, 0, 0, 0.35);
+  --look-note-ink: #ffffff;
+  --look-note-bg: rgba(0, 0, 0, 0.6);
+  --look-font-system: system-ui, sans-serif;
+}
+
+/* ── General: every part is a setting ───────────────────────────────────────────────────────────────────────────────── */
+.look-general { --ico: var(--g-accent); --ico-ink: var(--g-accent-ink); }
+.look-general .m { font-family: var(--g-font); font-size: var(--g-size); font-weight: 500; gap: 0.55em; animation-name: var(--g-anim); animation-duration: var(--g-speed); animation-timing-function: var(--g-ease); }
+.look-general .body { min-width: 0; color: var(--g-text); background: var(--g-bg); border: var(--g-bw) solid var(--g-accent); border-radius: var(--g-radius); padding: 0.45em 0.85em 0.55em; box-shadow: var(--g-shadow); -webkit-backdrop-filter: var(--g-bf); backdrop-filter: var(--g-bf); }
+.look-general .name { color: var(--g-accent); font-size: 0.85em; font-weight: 700; }
+.look-general .av { background: var(--g-accent); color: var(--g-accent-ink); }
+.look-general .badge { background: var(--g-pop); }
+.look-general[data-avatar="off"] .m { grid-template-columns: minmax(0, 1fr); }
+.look-general[data-avatar="off"] .av { display: none; }
+.look-general[data-shape="filled"] .m.gift .body { background: var(--g-pop); border-color: var(--g-pop); color: var(--g-pop-ink); }
+.look-general[data-shape="filled"] .m.gift .name { color: var(--g-pop-ink); }
+.look-general[data-shape="outline"] .m.gift .body { border-color: var(--g-pop); }
+.look-general[data-shape="none"] .body { padding: 0; }
+.look-general[data-shape="none"] .m.gift .txt { color: var(--g-pop); }
+.look-general[data-shape="none"] .name,
+.look-general[data-shape="none"] .txt { text-shadow: 0 2px 0 var(--g-outline), 0 -2px 0 var(--g-outline), 2px 0 0 var(--g-outline), -2px 0 0 var(--g-outline), 2px 2px 0 var(--g-outline), -2px -2px 0 var(--g-outline), 2px -2px 0 var(--g-outline), -2px 2px 0 var(--g-outline), 0 4px 10px var(--look-shadow); }
+.look-general[data-shape="none"] .ico { filter: drop-shadow(0 0 1.5px var(--g-outline)) drop-shadow(0 0 1.5px var(--g-outline)); }

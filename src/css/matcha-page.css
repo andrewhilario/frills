@@ -1,0 +1,26 @@
+/* The matcha page: six looks side by side, with a place to get the link for the one you pick. */
+
+.matcha-head { display: grid; gap: var(--space-md); padding-block: var(--space-xl) var(--space-lg); max-width: 46rem; }
+.matcha-tools { display: grid; gap: var(--space-md); padding-bottom: var(--space-lg); }
+.matcha-tools__row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-md); }
+.matcha-tools__row .label { margin-right: var(--space-2xs); }
+
+/* More options: the editor's panel, spread over as many columns as fit, because on this page it has the whole width. */
+.matcha-more { max-width: 62rem; }
+.matcha-more > .stack { grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr)); gap: var(--space-md) var(--space-xl); align-items: start; }
+.matcha-more__foot { padding-bottom: var(--space-md); }
+
+.matcha-grid { display: grid; gap: var(--space-lg); grid-template-columns: repeat(auto-fill, minmax(min(100%, 21rem), 1fr)); padding-bottom: var(--space-lg); }
+.matcha-card { display: grid; grid-template-rows: auto 1fr auto; min-width: 0; overflow: hidden; background: var(--color-paper); border-radius: var(--radius-chunk); box-shadow: var(--shadow-soft); }
+.matcha-card[data-picked="true"] { box-shadow: 0 0 0 3px var(--color-ink), var(--shadow-soft); }
+.matcha-card__head { display: grid; gap: var(--space-2xs); padding: var(--space-md) var(--space-md) var(--space-sm); }
+.matcha-card__head p { font-size: var(--text-sm); color: var(--color-ink-2); }
+.matcha-card__stage { position: relative; height: 22rem; background: var(--color-stage); }
+.matcha-card__stage[data-back="bright"] { background: var(--color-stage-bright); }
+.matcha-card__stage[data-back="busy"] { background: repeating-linear-gradient(135deg, var(--color-stage-busy-a) 0 22px, var(--color-stage-busy-b) 22px 44px); }
+.matcha-card__stage .chatstage { position: absolute; inset: 0; display: flex; align-items: flex-end; padding: var(--space-md); overflow: hidden; }
+.matcha-card__foot { padding: var(--space-sm) var(--space-md) var(--space-md); }
+
+.matcha-link { display: grid; gap: var(--space-sm); padding: var(--space-lg); margin-bottom: var(--space-3xl); border-radius: var(--radius-card); background: var(--color-accent-tint); }
+.matcha-link input { width: 100%; font-family: var(--font-label); font-size: var(--text-sm); }
+.matcha-link__row { display: flex; flex-wrap: wrap; gap: var(--space-sm); align-items: center; }

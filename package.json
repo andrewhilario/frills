@@ -1,0 +1,24 @@
+{
+  "name": "frills",
+  "version": "0.1.0",
+  "license": "AGPL-3.0-only",
+  "private": true,
+  "description": "Free, cute, customizable chat overlays for live streams.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "node scripts/dev.mjs",
+    "serve": "node scripts/serve.mjs",
+    "tiktok": "node build.mjs && node helper/server.mjs",
+    "relay": "node helper/server.mjs --relay",
+    "tiktok:setup": "cd helper && npm install --ignore-scripts --no-audit --no-fund",
+    "test": "node build.mjs && node --test \"test/**/*.test.mjs\"",
+    "deploy": "node build.mjs && npx wrangler deploy"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

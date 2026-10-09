@@ -1,0 +1,47 @@
+<!--
+{
+  "title": "Privacy | Frills",
+  "description": "Frills has no accounts and no database. What stays in your browser, what is in your link, and who sees what.",
+  "path": "/privacy/",
+  "css": "page",
+  "js": "page",
+  "bodyClass": "page-privacy",
+  "chrome": "nav",
+  "footer": true,
+  "jsonld": ["breadcrumb:Privacy"]
+}
+-->
+<main id="main">
+  <article class="article shell">
+    <ol class="crumbs" aria-label="Breadcrumb">
+      <li><a href="/">Frills</a></li>
+      <li aria-current="page">Privacy</li>
+    </ol>
+    <header class="article__head">
+      <h1 class="display">Privacy</h1>
+      <p class="lede">Frills has no accounts and no database. Here is what that means in practice.</p>
+    </header>
+
+    <div class="article__body">
+      <h2 class="subtitle">What stays on your device</h2>
+      <p>The editor saves your settings and your last channel name in your browser’s local storage, so it remembers you next time. They never leave your device. Clear your browser data and they are gone.</p>
+
+      <h2 class="subtitle">What is in your link</h2>
+      <p>Your overlay link carries your look settings and your channel name. That is how the overlay page knows what to draw. Anyone you share the link with can see them.</p>
+
+      <h2 class="subtitle">How chat is read</h2>
+      <p>On Twitch, your browser, or OBS, connects straight to Twitch’s chat servers to read public chat. Twitch sees a connection from your address, the same as it does for any viewer.</p>
+      {{{privacyTikTok}}}
+
+      <h2 class="subtitle">Fonts and pictures</h2>
+      <p>Fonts are served from Frills itself. Emote pictures come from Twitch’s image server. If you use the TikTok helper on your own PC, chatters’ profile pictures come from TikTok’s picture servers.</p>
+
+      <h2 class="subtitle">Hosting, cookies and counting</h2>
+      <p>Frills is hosted on Cloudflare, which, like any host, sees ordinary web request data such as your address and the pages you open. Frills itself sets no cookies and runs no analytics today. If that changes, this page will say so first.</p>
+
+      <h2 class="subtitle">Who we are not</h2>
+      <p>Frills isn’t affiliated with, endorsed by or sponsored by Twitch, TikTok or OBS. Those names belong to their owners.</p>{{{feedbackParagraph}}}
+      <p class="label">Last updated {{builtOn}}</p>
+    </div>
+  </article>
+</main>

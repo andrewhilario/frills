@@ -1,0 +1,16 @@
+{
+  "name": "frills",
+  "compatibility_date": "2026-10-01",
+  // The whole site is static files in dist/, built by `npm run build`. There is no Worker code and no database,
+  // so serving it costs nothing on Cloudflare's free plan (requests for static assets are free and unlimited).
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "404-page"
+  },
+  // The address. A Custom Domain makes Cloudflare create the DNS record and the certificate itself (valwidgets.live has to be an
+  // active zone on the account that deploys), so do not add a record for this name by hand: a Custom Domain can't be created on a
+  // name that already has a CNAME. To use another name, change it here and `url` in site.config.json, then build and deploy again.
+  "routes": [
+    { "pattern": "frills.valwidgets.live", "custom_domain": true }
+  ]
+}

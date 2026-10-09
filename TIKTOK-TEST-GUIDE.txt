@@ -1,0 +1,249 @@
+TESTING FRILLS WITH TIKTOK ON YOUR PC
+=====================================
+
+What this is
+------------
+Frills can now show TikTok LIVE chat. A web page is not allowed to read TikTok by itself, so there
+is a small program that runs on your own PC: the Frills helper. It does two jobs:
+
+  1. It reads the chat of a TikTok account that is LIVE.
+  2. It serves the Frills editor and the overlay page, so they can get that chat.
+
+OBS then loads the overlay from the helper, on the same PC. Nothing goes through any Frills server.
+The helper reads PUBLIC chat only. It does not log in to TikTok, it does not need your password
+or any key, and it saves nothing to disk. TikTok, and the free signing service the connector uses
+(Euler Stream), can see your internet address and which account you are watching, as for any viewer.
+When chatters' profile pictures show, your browser (or OBS) loads them straight from TikTok's picture
+servers, so those see your address too.
+
+This is a TEST version. TikTok has no official way to read chat, so the helper uses an unofficial
+connection that TikTok can break at any time. Use it to see that it works. Do not build your
+stream around it yet.
+
+The public Frills site now says TikTok works with the helper (in testing), and has its own TikTok
+guide page for streamers. It says there is no download yet. When there is one, put its address in
+site.config.json as "helperUrl" and the FAQ and that guide will link to it.
+
+I tested it on 2026-10-08 against a real public TikTok LIVE. It connected within about 5 seconds,
+the chat showed up in the Frills editor and in the overlay page (Japanese text and emoji too),
+and there were no errors. I have NOT tested it inside OBS or TikTok LIVE Studio themselves, or with
+gifts and moderators on a real LIVE. That is what the tests below are for.
+
+
+1. What you need
+----------------
+  - This Windows PC, with Node.js 22 or newer (it already has it: type  node -v  to check).
+  - Chrome or Edge.
+  - A TikTok account that is LIVE right now. For the first test any public account will do:
+    open TikTok, find someone who is live, and note their @name. If you just want something to
+    try, tv_asahi_news (a Japanese TV news account) was live every time I looked, but a LIVE can
+    end at any moment, so it may not be.
+  - OBS Studio, only for test C.
+  - Nothing else. No TikTok login, no API key, no account anywhere.
+
+
+2. One-time setup  (already done on this PC)
+--------------------------------------------
+Only for another computer. In the project folder, type:
+
+    npm install
+    npm run tiktok:setup
+
+The second command downloads the TikTok connector (about 25 MB).
+
+
+3. Start the helper
+-------------------
+Easiest: double-click   Start-TikTok-Helper.bat   in  G:\Personal Project\frills
+
+Or in a terminal:
+
+    cd "G:\Personal Project\frills"
+    npm run tiktok
+
+It builds the site, starts the helper and opens the editor in your browser. The window shows:
+
+    Frills helper 0.1.0 is running.
+
+      Editor (pick a look, connect TikTok):  http://127.0.0.1:8765/editor/
+      Matcha styles:                         http://127.0.0.1:8765/matcha/
+
+LEAVE THAT WINDOW OPEN. The helper only works while it is running. To stop it, press Ctrl+C or
+close the window.
+
+Important: use the address the helper shows (127.0.0.1:8765). The TikTok button only works on
+pages that the helper serves. On any other address (the normal website, or "npm run dev") the
+editor will tell you that TikTok needs the helper.
+
+
+4. Test 0: no LIVE handy? Use the pretend account  (1 minute)
+------------------------------------------------------------
+Before anything else you can check that the whole chain works on your PC without TikTok at all.
+In step 2 of the editor type
+
+    frills_demo
+
+and press Connect. The line under the button says "Practice chat made up by the Frills helper.
+Nothing comes from TikTok." and made-up chat starts to arrive. It goes through exactly the same
+path as real TikTok chat (the helper, the editor, the OBS link), including now and then a
+moderator, a gift and a message being deleted. Nothing is sent to TikTok.
+
+Use it to try the editor, to copy the link for OBS, and to check OBS shows the overlay. It is also
+the thing to use when TikTok is being difficult, or when nobody you know is live. If this works
+and a real account does not, the problem is between the helper and TikTok, not in Frills.
+
+
+5. Test A: watch someone else's LIVE  (2 minutes)
+-------------------------------------------------
+  1. In the editor, look at step 2, "Connect your chat". TikTok is already selected.
+  2. Type the @name of an account that is live. With or without the @ is fine. You can even
+     paste the whole link to their LIVE.
+  3. Press Connect.
+
+You should see, under the box:
+
+    Connecting to @name...
+    Reading @name's LIVE chat
+
+and then the chat appears in the preview on the right, a few seconds after people write it.
+Messages stay on screen for 15 seconds (you can change that under More options).
+
+Check these:
+  [ ] Messages arrive within a few seconds of being written.
+  [ ] Names, emoji and non-English text look right.
+  [ ] Each chatter's own profile picture shows in the round badge beside their message.
+  [ ] Picking another look in step 1 restyles the chat straight away.
+  [ ] A busy chat does not freeze the page.
+  [ ] Pressing Disconnect goes back to the made-up practice messages.
+
+The helper window also prints a line every minute, for example:
+    [19:42:10] @name: 13 chat and 0 gifts in the last minute
+That is a quick way to see it is working without looking at the browser.
+
+If the account is not live you will see:   @name isn't live right now. Waiting for the LIVE to start...
+That is fine. The helper checks again every 20 seconds and connects the moment the LIVE starts.
+
+
+6. Test B: your own LIVE  (so you control the chat)
+---------------------------------------------------
+  1. Go live from the TikTok app or from TikTok LIVE Studio.
+  2. In the editor, type YOUR @name and press Connect.
+  3. From a second phone or account (or ask your partner), write comments in your LIVE.
+     Also write one yourself as the host. They should all appear.
+  4. If someone you made a moderator writes, their message should show the moderator icon
+     (change the icon in step 1, More options, "Moderator icon").
+  5. Gifts: if someone sends one, it shows as a highlighted line like "sent Rose x3". Do not spend
+     money just for this test.
+
+Only NEW messages are shown. Anything written before you pressed Connect does not appear. That is
+on purpose, so an overlay never replays old chat.
+
+
+7. Test C: in OBS
+-----------------
+  1. In the editor, step 3: press "Copy link". It looks like
+        http://127.0.0.1:8765/overlay/?channel=yourname&platform=tiktok
+     (plus your look settings).
+  2. In OBS: Sources, + , Browser. Name it "Frills chat".
+  3. Paste the link into URL. Set Width and Height to the size of the chat box you want, for
+     example 500 and 700. Press OK.
+  4. Put the source where you want the chat. It grows upward from the bottom edge.
+  5. Check the box that says "Refresh browser when scene becomes active" if you like; leave
+     "Shutdown source when not visible" off.
+
+The helper and OBS must be on the SAME PC. The link only works while the helper is running.
+Until the account is live, the overlay may show a small note such as "isn't live right now". It
+disappears once the chat is connected.
+
+The overlay is see-through, so it sits on top of your game or camera.
+More OBS steps: http://127.0.0.1:8765/guides/obs/
+
+
+8. Test D: TikTok LIVE Studio
+-----------------------------
+I could not test this one. Streamer guides say LIVE Studio has an "Add source" button with a
+"Link" option (some versions call it Browser or Web page). Paste the same link there.
+Known problems that other overlay makers report:
+  - The source can open at 0 x 0 pixels. Stretch it by hand across the scene.
+  - There is no reload button. To force a reload, change the end of the link, for example add
+    &refresh=1 and next time &refresh=2. The overlay ignores that part.
+If the helper is running and the chat does not show, tell me what you see.
+
+
+9. Test E: the matcha styles with TikTok
+----------------------------------------
+Open   http://127.0.0.1:8765/matcha/
+TikTok is selected there too. Type the @name, press Connect, and the same chat appears in all six
+matcha styles side by side. Pick a palette and a style, then copy the link for OBS.
+
+Open "More options" to change things further: each of the six colours on its own, text size, font,
+how round the boxes are, how see-through they are, the entrance and its speed, spacing, how many
+messages show and for how long, and the switches for the round picture, profile pictures, name
+colours and emotes. Every change shows in all six styles at once, "Reset these options" puts them
+back, and the page remembers what you chose. The link for OBS carries only what you changed.
+
+
+10. If something goes wrong
+---------------------------
+  "Port 8765 is already in use"
+      The helper is already running in another window, or another program uses that port.
+      Close the other window, or start on another port:
+          npm run tiktok -- --port=8766
+      Then open the address the window shows.
+
+  The editor says "TikTok chat needs the Frills helper running on this PC"
+      You opened the editor from another address. Open  http://127.0.0.1:8765/editor/  while the
+      helper window is running.
+
+  "isn't live right now" but the account IS live
+      Check the spelling. It is the name after the @ in their TikTok link.
+
+  "TikTok's free connection is busy"
+      TikTok chat is read through a free signing service that limits how often you can connect.
+      The helper waits a minute and tries again by itself. If it keeps happening, a free key from
+      Euler Stream (eulerstream.com) raises the limit. Set it before starting, never in a link:
+          PowerShell:   $env:EULER_API_KEY="your-key"; npm run tiktok
+          cmd:          set EULER_API_KEY=your-key   then   npm run tiktok
+      I have not tried a key myself.
+
+  It says "Reading ..." but nothing appears
+      The LIVE may simply be quiet. Press "Send a test message" to check the look, and watch the
+      helper window: it prints how many chat messages arrived each minute.
+
+  "Lost the Frills helper. Start it again and this reconnects by itself."
+      The helper window was closed. Start it again; the page reconnects without a reload.
+
+  Anything else
+      Copy the last lines of the helper window and the line under the Connect button, and send
+      them to me.
+
+
+11. What is not finished
+------------------------
+  - TikTok's own stickers and custom emotes show as plain text, not pictures. Ordinary emoji are
+    fine. If you see words in square brackets, like [smile], that is TikTok's emoji code and it is
+    not translated yet.
+  - No "Heart Me" icon. Moderators do get their icon.
+  - Profile pictures: TikTok chatters show their own picture in the round badge. It is loaded
+    straight from TikTok's picture servers, so for a moment (or if a picture can't be loaded) you
+    see the first letter of the name instead. Viewers choose their own pictures, so if you would
+    rather not risk showing one you didn't choose, turn off "Use profile pictures" under More
+    options. Twitch doesn't give pictures out with chat, so Twitch chatters keep the letter.
+  - Follows, shares and joins are not shown, only chat and gifts.
+  - Messages a moderator deletes disappear from the overlay, but I have only tested that with a
+    pretend TikTok, not on a real LIVE. Gifts the same.
+  - The helper works on the PC it runs on. Your partner's PC would need its own copy and Node.js.
+    Packaging it into one download for everyone is a later step.
+  - It is an unofficial connection. TikTok can change something and it stops working. When that
+    happens the helper shows an error instead of chat.
+  - Licence: the TikTok connector it uses has a modified AGPL licence. Testing on your own PC is
+    fine. Before you give the helper to other people, charge for anything with it or run it as a
+    hosted service, we must settle the licence first. See  helper\README.md.
+
+
+12. What to tell me after you test
+----------------------------------
+  - Which tests you did (0, A, B, C, D, E) and whether the chat appeared in each.
+  - The line shown under the Connect button, word for word, if it was not "Reading ...".
+  - The last lines of the helper window if something failed.
+  - Anything that looked wrong: spacing, colours, missing icons, delays.
