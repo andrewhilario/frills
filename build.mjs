@@ -55,8 +55,8 @@ mkdirSync(dist, { recursive: true });
 if (existsSync(join(root, "public"))) cpSync(join(root, "public"), dist, { recursive: true });
 
 const common = { absWorkingDir: root, bundle: true, minify: true, metafile: true, logLevel: "warning", outdir: join(dist, "assets"), entryNames: "[name]-[hash]", target: ["chrome100", "firefox100", "safari15"] };
-const jsEntries = { home: "src/js/home.js", editor: "src/js/editor.js", overlay: "src/js/overlay.js", matcha: "src/js/matcha-page.js", page: "src/js/page.js", feedback: "src/js/feedback.js", ...(withOgCard && { og: "src/js/og.js" }) };
-const cssEntries = { home: "src/css/entry/home.css", page: "src/css/entry/page.css", editor: "src/css/entry/editor.css", matcha: "src/css/entry/matcha.css", overlay: "src/css/entry/overlay.css", ...(withOgCard && { og: "src/css/entry/og.css" }) };
+const jsEntries = { home: "src/js/home.js", editor: "src/js/editor.js", overlay: "src/js/overlay.js", matcha: "src/js/matcha-page.js", page: "src/js/page.js", feedback: "src/js/feedback.js", alerts: "src/js/alerts-editor.js", alertsOverlay: "src/js/alerts-overlay.js", ...(withOgCard && { og: "src/js/og.js" }) };
+const cssEntries = { home: "src/css/entry/home.css", page: "src/css/entry/page.css", editor: "src/css/entry/editor.css", matcha: "src/css/entry/matcha.css", overlay: "src/css/entry/overlay.css", alerts: "src/css/entry/alerts.css", alertsOverlay: "src/css/entry/alerts-overlay.css", ...(withOgCard && { og: "src/css/entry/og.css" }) };
 const jsBuild = await esbuild({ ...common, entryPoints: jsEntries, format: "iife", legalComments: "none" });
 const cssBuild = await esbuild({ ...common, entryPoints: cssEntries, external: ["/fonts/*"], legalComments: "inline" });
 

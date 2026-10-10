@@ -16,7 +16,7 @@ const COPY = {
  * The "where does chat come from" control. `host` is an empty element. Options: feeds, pace (a function giving [min, max] ms between
  * practice messages), platform and channel (to start with), autoconnect, waitlistUrl (shown beside the helper note when set).
  */
-export function mountSource(host, { feeds, pace, channel = "", platform = "tiktok", autoconnect = false, waitlistUrl = "" }) {
+export function mountSource(host, { feeds, pace, channel = "", platform = "tiktok", autoconnect = false, waitlistUrl = "", platforms = PLATFORMS, events = [], onAlert, onFound, onState, tools: showTools = true, idleHint = "Until you connect, the preview shows made-up messages." } = {}) {
   const list = Array.isArray(feeds) ? feeds : [feeds];
   let current = PLATFORMS.includes(platform) ? platform : "tiktok";
   const values = { tiktok: "", twitch: "" };
@@ -26,7 +26,8 @@ export function mountSource(host, { feeds, pace, channel = "", platform = "tikto
   const relay = relayForPage(); // the site’s shared relay for TikTok, when it has one and this is the site itself
   let helper = null; // null until checked; then whether TikTok chat can come from somewhere (the helper on this PC, or the relay)
   let found = null; // where it can come from: { kind: "helper" | "relay", base }
-  let turn = 0; // a click that is still waiting on the helper check gives way to a newer one
+  let turn = 0;
+  let silence = 0; // the timer that says "nothing has arrived yet" // a click that is still waiting on the helper check gives way to a newer one
   const listeners = new Set();
   const changed = () => listeners.forEach((fn) => fn());
 
@@ -40,7 +41,7 @@ export function mountSource(host, { feeds, pace, channel = "", platform = "tikto
   const go = el("button", { type: "button", className: "btn btn--soft btn--sm", textContent: "Connect" });
   const status = el("p", { className: "source__status", id: "source-status" });
   status.setAttribute("role", "status");
-  const hint = el("p", { className: "source__hint", textContent: "Until you connect, the preview shows made-up messages." });
+  const hint = el("p", { className: "source__hint", textContent: idleHint });
   const helperNote = el("p", { className: "source__hint source__helper" }, "TikTok chat comes through the free Frills helper, a small program on your PC (in testing). It isn’t answering at this address, so open the editor from the helper. ");
   helperNote.append(el("a", { href: "/guides/tiktok/", textContent: "How to set it up" }));
   helperNote.append(".");
@@ -69,11 +70,13 @@ export function mountSource(host, { feeds, pace, channel = "", platform = "tikto
     found = await findTikTokSource(relay);
     helper = Boolean(found);
     showHelperNote();
+    onFound?.(found);
     return helper;
   }
 
   function disconnect(message = "Disconnected") {
     turn += 1;
+    clearTimeout(silence);
     conn?.stop();
     conn = null;
     go.textContent = "Connect";
@@ -109,14 +112,34 @@ export function mountSource(host, { feeds, pace, channel = "", platform = "tikto
     hint.hidden = true;
     go.textContent = "Disconnect";
     let fatal = false; // the connection gave up for good (Twitch refused the guest login, TikTok name not accepted)
+    clearTimeout(silence);
+    let chatSeen = false;
+    let pretend = false; // the practice account says so itself, and keeps saying it
     conn = connectTo(list, current, name, (s) => {
+      onState?.(s.state);
+      if (s.state === "connected" && s.detail) pretend = true;
+      if (s.state === "connected" && chatSeen) return; // already reading: a status repeat does not take that back
       setStatus(s.state, statusText(s));
+      // TikTok can accept a connection to an account that is not LIVE, and then nothing ever arrives. After a while of nothing, say so.
+      clearTimeout(silence);
+      if (s.platform === "tiktok" && s.state === "connected" && !s.detail) {
+        silence = setTimeout(() => { if (!chatSeen && conn) setStatus("silent", statusText({ state: "silent" })); }, 20000);
+      }
       if (s.fatal) {
         fatal = true;
         disconnect(statusText(s));
         setStatus("error", statusText(s));
       }
-    }, { relay });
+    }, {
+      relay,
+      events,
+      onAlert,
+      onFirstMessage: () => {
+        chatSeen = true;
+        clearTimeout(silence);
+        if (current === "tiktok" && !pretend && status.dataset.state !== "error") setStatus("connected", statusText({ state: "reading", platform: current, channel: name }));
+      },
+    });
     if (fatal) conn = null;
   }
 
@@ -137,7 +160,7 @@ export function mountSource(host, { feeds, pace, channel = "", platform = "tikto
 
   const platformChips = chips(
     platformRow,
-    [{ id: "tiktok", name: "TikTok" }, { id: "twitch", name: "Twitch" }],
+    [{ id: "tiktok", name: "TikTok" }, { id: "twitch", name: "Twitch" }].filter((p) => platforms.includes(p.id)),
     current,
     (item) => setPlatform(item.id),
   );
@@ -151,13 +174,15 @@ export function mountSource(host, { feeds, pace, channel = "", platform = "tikto
   label.textContent = COPY[current].label;
   input.maxLength = COPY[current].max;
   host.classList.add("source");
-  host.append(platformRow, label, el("div", { className: "source__row" }, input, go), status, helperNote, relayNote, hint, tools);
+  if (platforms.length < 2) platformRow.hidden = true; // nothing to choose between
+  host.append(platformRow, label, el("div", { className: "source__row" }, input, go), status, helperNote, relayNote, hint, ...(showTools ? [tools] : []));
   startPractice();
   if (current === "tiktok") ensureHelper();
   if (autoconnect && channel) connectNow();
 
   return {
     get connected() { return Boolean(conn); },
+    get features() { return found?.features ?? null; }, // what the program we found can send (null until we have looked)
     get usesRelay() { return Boolean(relay); }, // TikTok chat comes from the site’s relay, so links work on any PC
     get platform() { return current; },
     get channel() { return input.value; },

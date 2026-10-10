@@ -158,7 +158,9 @@ test("TikTok links carry the platform and Twitch links stay as they were", () =>
 test("status lines read the same for both platforms and name the right kind of account", () => {
   assert.equal(statusText({ state: "connecting", channel: "pond.pal", platform: "tiktok" }), "Connecting to @pond.pal…");
   assert.equal(statusText({ state: "connecting", channel: "pondpal" }), "Connecting to #pondpal…");
-  assert.equal(statusText({ state: "connected", channel: "pond.pal", platform: "tiktok" }), "Reading @pond.pal's LIVE chat");
+  assert.match(statusText({ state: "connected", channel: "pond.pal", platform: "tiktok" }), /^Connected to TikTok\. Waiting for the first chat message\. Real chat only shows while you are LIVE\.$/, "connected does not claim to be reading");
+  assert.equal(statusText({ state: "reading", channel: "pond.pal", platform: "tiktok" }), "Reading @pond.pal's LIVE chat");
+  assert.match(statusText({ state: "silent", platform: "tiktok" }), /Are you LIVE\?.*press Disconnect and then Connect again/);
   assert.equal(statusText({ state: "connected", channel: "frills_demo", platform: "tiktok", detail: "Practice chat made up by Frills." }), "Practice chat made up by Frills.", "a detail from the helper wins");
   assert.match(statusText({ state: "offline", channel: "pond.pal", platform: "tiktok" }), /@pond\.pal isn't live right now/);
   assert.match(statusText({ state: "limited", platform: "tiktok" }), /busy/);

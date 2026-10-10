@@ -122,6 +122,12 @@ export function buildControl(control, value, onSet, { id = "c-" + control.key } 
     input.addEventListener("change", () => onSet(input.value));
     row.append(label(), input);
     write = (v) => { input.value = v; };
+  } else if (control.type === "text") {
+    row.classList.add("ctl--wide");
+    const input = el("input", { type: "text", id, maxLength: control.max, autocomplete: "off", spellcheck: false });
+    input.addEventListener("input", () => onSet(input.value));
+    row.append(label(), input);
+    write = (v) => { input.value = v; };
   } else if (control.type === "toggle") {
     const input = el("input", { type: "checkbox", id });
     input.setAttribute("role", "switch");

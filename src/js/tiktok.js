@@ -55,6 +55,33 @@ export function acceptMessage(raw) {
   };
 }
 
+const ALERT_KINDS = ["follow", "gift", "share"];
+const num = (value, max) => Math.max(0, Math.min(max, Math.round(Number(value) || 0)));
+
+/** One alert from the helper or relay -> the plain object the alerts draw, with every field checked. Null if there is nothing to draw. */
+export function acceptAlert(raw) {
+  if (!raw || typeof raw !== "object" || !ALERT_KINDS.includes(raw.kind)) return null;
+  const name = String(raw.name ?? "").replace(/[\u0000-\u001f\u007f]+/g, " ").trim().slice(0, 60);
+  if (!name) return null;
+  const alert = {
+    kind: raw.kind,
+    id: String(raw.id ?? "").slice(0, 80),
+    user: String(raw.user ?? "").slice(0, 80),
+    name,
+    avatar: isAvatarUrl(raw.avatar) ? raw.avatar : "",
+  };
+  if (raw.kind === "gift") {
+    Object.assign(alert, {
+      gift: String(raw.gift ?? "").replace(/[\u0000-\u001f\u007f]+/g, " ").trim().slice(0, 40) || "a gift",
+      picture: isAvatarUrl(raw.picture) ? raw.picture : "",
+      diamonds: num(raw.diamonds, 1000000),
+      count: Math.max(1, num(raw.count, 9999)),
+    });
+    alert.total = alert.diamonds * alert.count;
+  }
+  return alert;
+}
+
 /** The site's relay for this page: only on the website's own address, because the relay only answers the website (nowhere else would it work). */
 export const relayForPage = () => (document.body.dataset.relay && document.body.dataset.site === location.origin ? document.body.dataset.relay : "");
 
@@ -70,8 +97,10 @@ export async function findTikTokSource(relayBase = "") {
       if (!res.ok) return null;
       const body = await res.json();
       if (body?.ok !== true) return null;
-      if (body.name === "frills-helper") return { kind: "helper", base };
-      if (body.name === "frills-relay") return { kind: "relay", base };
+      // `features` says what it can send; an older one has none, which means chat only.
+      const features = Array.isArray(body.features) ? body.features.map(String) : ["chat"];
+      if (body.name === "frills-helper") return { kind: "helper", base, features };
+      if (body.name === "frills-relay") return { kind: "relay", base, features };
     } catch { /* nothing answered there */ }
     return null;
   };
@@ -81,9 +110,10 @@ export async function findTikTokSource(relayBase = "") {
 /**
  * Reads one TikTok account's LIVE chat through the helper. Calls back like the Twitch connection does, so the pages treat both the
  * same:  onMessage(msg)  onRemove({ id })  onClear({ user })  onStatus({ state, channel, detail, fatal, platform }).
+ * `events` (a list of "follow", "gift", "share") also asks for those alerts, which arrive at onAlert(alert).
  * States: connecting, connected, offline (not live yet), reconnecting, limited, helper-lost, error, stopped. Returns { stop() }.
  */
-export function connectTikTok({ user, base = "", onMessage, onRemove, onClear, onStatus, eventSourceFactory } = {}) {
+export function connectTikTok({ user, base = "", onMessage, onRemove, onClear, onStatus, onAlert, events = [], eventSourceFactory } = {}) {
   const name = cleanTikTokUser(user);
   const say = (state, detail, fatal = false, extra = {}) => onStatus && onStatus({ state, channel: name, detail, fatal, platform: "tiktok", ...extra });
   if (!name) {
@@ -92,7 +122,8 @@ export function connectTikTok({ user, base = "", onMessage, onRemove, onClear, o
   }
   let stopped = false;
   say("connecting");
-  const source = (eventSourceFactory ?? ((url) => new EventSource(url)))(`${base}/tiktok/stream?user=${encodeURIComponent(name)}`);
+  const wanted = events.filter((kind) => ALERT_KINDS.includes(kind));
+  const source = (eventSourceFactory ?? ((url) => new EventSource(url)))(`${base}/tiktok/stream?user=${encodeURIComponent(name)}${wanted.length ? `&events=${wanted.join(",")}` : ""}`);
   const listen = (event, fn) => source.addEventListener(event, (e) => {
     if (stopped) return;
     let data;
@@ -101,6 +132,7 @@ export function connectTikTok({ user, base = "", onMessage, onRemove, onClear, o
   });
   listen("status", (s) => say(String(s.state ?? ""), typeof s.detail === "string" ? s.detail : "", s.fatal === true, { position: Number(s.position) || 0, total: Number(s.total) || 0 }));
   listen("chat", (raw) => { const m = acceptMessage(raw); if (m && onMessage) onMessage(m); });
+  listen("alert", (raw) => { const a = acceptAlert(raw); if (a && onAlert) onAlert(a); });
   listen("remove", ({ id }) => id && onRemove && onRemove({ id: String(id) }));
   listen("clear", ({ user: who }) => who && onClear && onClear({ user: String(who) }));
   source.onerror = () => {

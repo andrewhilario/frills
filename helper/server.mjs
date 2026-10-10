@@ -18,9 +18,12 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { createStatic } from "../scripts/lib/static.mjs";
 import { cleanTikTokUser } from "../src/js/tiktok.js";
 import { Hub } from "./rooms.mjs";
+import { ALERT_KINDS } from "./map.mjs";
 import { DEMO_USER, DemoConnection } from "./demo.mjs";
 
-const VERSION = "0.1.0";
+const VERSION = "0.2.0";
+/** What this program can do, so a page can tell an old one ("chat" only) from one that sends alerts. */
+const FEATURES = ["chat", "alerts"];
 
 /** Makes a connection to TikTok for one account. The library is loaded only now, so everything else works (and is tested) without it. */
 export async function realFactory(user, { apiKey } = {}) {
@@ -56,7 +59,7 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
   const files = distDir ? createStatic(distDir) : nothing;
   const allowedOrigins = new Set((relay?.origins ?? []).map((o) => o.replace(/\/+$/, "")));
   const perIp = new Map(); // open streams per visitor address (relay only)
-  const maxPerIp = relay?.maxPerIp ?? 4;
+  const maxPerIp = relay?.maxPerIp ?? 8; // chat, alerts and the editor for one streamer are several open pages
   let hosts = new Set();
   let origins = new Set();
 
@@ -90,7 +93,7 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
     }
     if (url.pathname === "/tiktok/ping" || (relay && url.pathname === "/health")) {
       res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", ...cors });
-      res.end(JSON.stringify(relay ? { ok: true, name: "frills-relay", version: VERSION, slots: hub.stats() } : { ok: true, name: "frills-helper", version: VERSION }));
+      res.end(JSON.stringify(relay ? { ok: true, name: "frills-relay", version: VERSION, features: FEATURES, slots: hub.stats() } : { ok: true, name: "frills-helper", version: VERSION, features: FEATURES }));
     } else if (url.pathname === "/tiktok/stream") {
       stream(req, res, url, cors);
     } else {
@@ -113,7 +116,8 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
     });
     res.on("error", () => {}); // a page that has gone away mid-write is not worth stopping for
     res.write("retry: 3000\n\n");
-    const client = { send: (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`) };
+    const events = new Set((url.searchParams.get("events") ?? "").split(",").filter((kind) => ALERT_KINDS.includes(kind)));
+    const client = { events, send: (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`) };
     const room = hub.subscribe(user, client);
     if (!room) {
       res.end(); // too many accounts at once: the page has been told why
@@ -167,7 +171,7 @@ async function mainRelay() {
   const numberOr = (value, fallback) => (Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : fallback);
   const origins = (process.env.RELAY_ORIGINS ?? "https://frills.valwidgets.live").split(",").map((o) => o.trim()).filter(Boolean);
   const slots = numberOr(process.env.RELAY_SLOTS, 30);
-  const relay = { origins, slots, maxPerIp: numberOr(process.env.RELAY_PER_IP, 4), trustProxy: process.env.RELAY_TRUST_PROXY !== "0" };
+  const relay = { origins, slots, maxPerIp: numberOr(process.env.RELAY_PER_IP, 8), trustProxy: process.env.RELAY_TRUST_PROXY !== "0" };
   const port = numberOr(process.argv.find((a) => a.startsWith("--port="))?.slice(7) ?? process.env.PORT, 8765);
   const bind = process.env.RELAY_BIND ?? "127.0.0.1"; // behind a tunnel nothing else may reach it
   const helper = createHelper({ relay, apiKey: (process.env.EULER_API_KEY ?? "").trim(), log: say });

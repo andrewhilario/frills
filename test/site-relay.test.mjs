@@ -50,7 +50,7 @@ test("the wording says TikTok works in the browser through a free beta relay, an
 });
 
 test("with a relay, no page tells anyone to install or run a helper", () => {
-  for (const page of ["index.html", "editor/index.html", "matcha/index.html", "guides/tiktok/index.html", "guides/obs/index.html", "guides/test/index.html", "privacy/index.html"]) {
+  for (const page of ["index.html", "editor/index.html", "matcha/index.html", "guides/tiktok/index.html", "guides/obs/index.html", "guides/test/index.html", "guides/alerts/index.html", "alerts/index.html", "privacy/index.html"]) {
     assert.doesNotMatch(textOf(read(page)), /\bhelper\b/i, `${page} still talks about the helper`);
   }
 });

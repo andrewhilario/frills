@@ -1,0 +1,120 @@
+<!--
+{
+  "title": "TikTok alerts overlay editor | Frills",
+  "description": "Pop-up alerts for TikTok LIVE follows, gifts and shares, with your own animations, sounds and words. Pick a look, test it, and copy one link. Free, no account.",
+  "path": "/alerts/",
+  "css": "alerts",
+  "js": "alerts",
+  "bodyClass": "page-editor page-alerts",
+  "chrome": "appbar",
+  "noindex": true,
+  "listed": false,
+  "footer": false
+}
+-->
+<main class="workspace" id="main">
+  <section class="preview" id="preview" data-back="dark" aria-label="Live preview of your alerts">
+    <div class="preview__bar">
+      <span class="preview__tag">Preview</span>
+      <label class="visually-hidden" for="backdrop">What sits behind the alerts</label>
+      <select id="backdrop">
+        <option value="dark">Dark game</option>
+        <option value="bright">Bright game</option>
+        <option value="busy">Busy scene</option>
+        <option value="checker">See-through</option>
+      </select>
+    </div>
+    <div class="chatstage" id="stage" aria-hidden="true"><div id="alerts"></div></div>
+    <div class="preview__tests" role="group" aria-label="Try an alert">
+      <button class="btn btn--soft btn--sm" type="button" data-test="follow">Test follow</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="gift-1">Test gift</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="gift-3">Test big gift</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="share">Test share</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="crowd">Test a crowd</button>
+      <span class="preview__sound" id="sound-state" role="status"></span>
+    </div>
+  </section>
+
+  <div class="panel">
+    <noscript><p class="note">Frills needs JavaScript to draw your alerts. Turn it on for this page and reload.</p></noscript>
+
+    <section class="step-card" aria-labelledby="s1">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">1</span>
+        <h1 class="step-card__title" id="s1">Pick a look</h1>
+        <button class="btn btn--soft btn--sm step-card__aside" type="button" id="reset">Reset</button>
+      </div>
+      <div class="chips" id="looks" role="group" aria-label="Starting looks"></div>
+      <div class="stack" id="look-controls"></div>
+    </section>
+
+    <section class="step-card" aria-labelledby="s2">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">2</span>
+        <h2 class="step-card__title" id="s2">Words, sounds and effects</h2>
+      </div>
+      <p class="ctl__hint">Use <code>{name}</code>, <code>{gift}</code>, <code>{count}</code>, <code>{diamonds}</code> and <code>{total}</code> in a text. A crowd text can also use <code>{others}</code>. Press a test button above after each change to hear it.</p>
+      <details class="more" open>
+        <summary>Gifts</summary>
+        <div class="stack" id="gift-controls"></div>
+      </details>
+      <details class="more">
+        <summary>Follows</summary>
+        <div class="stack" id="follow-controls"></div>
+      </details>
+      <details class="more">
+        <summary>Shares</summary>
+        <div class="stack" id="share-controls"></div>
+      </details>
+    </section>
+
+    <section class="step-card" aria-labelledby="s3">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">3</span>
+        <h2 class="step-card__title" id="s3">Where it sits and how it moves</h2>
+      </div>
+      <div class="stack" id="move-controls"></div>
+      <details class="more">
+        <summary>Crowds, line and volume</summary>
+        <div class="stack" id="queue-controls"></div>
+      </details>
+    </section>
+
+    <section class="step-card" aria-labelledby="s4">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">4</span>
+        <h2 class="step-card__title" id="s4">Connect your TikTok</h2>
+      </div>
+      <div id="source"></div>
+      <div class="seen" aria-labelledby="seen-title">
+        <h3 class="seen__title" id="seen-title">What Frills sees</h3>
+        <p class="ctl__hint">Counted since you pressed Connect. Follow your own account from another account, or send a 1 coin gift, and watch the numbers move.</p>
+        <dl class="seen__list">
+          <div><dt>Follows</dt><dd id="seen-follow">0</dd></div>
+          <div><dt>Gifts</dt><dd id="seen-gift">0</dd></div>
+          <div><dt>Shares</dt><dd id="seen-share">0</dd></div>
+        </dl>
+        <p class="ctl__hint" id="seen-note" role="status"></p>
+      </div>
+    </section>
+
+    <section class="step-card" aria-labelledby="s5">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">5</span>
+        <h2 class="step-card__title" id="s5">Add it to your stream</h2>
+      </div>
+      <div class="linkfield">
+        <label class="ctl__label" for="link">Your link</label>
+        <input type="text" id="link" readonly placeholder="Appears once you type a name" spellcheck="false" autocomplete="off">
+        <div class="linkfield__actions">
+          <button class="btn" type="button" id="copy-link" disabled>Copy link</button>
+        </div>
+        <p class="linkfield__hint" id="link-hint" role="status"></p>
+      </div>
+    </section>
+
+    <section class="preview-tools" aria-label="Preview options">
+      <div id="preview-canvas"></div>
+    </section>
+  </div>
+</main>

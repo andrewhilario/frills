@@ -2,7 +2,7 @@
 // listening, and keeps trying again by itself (the account may not be live yet, TikTok may drop us, the free connection may be busy).
 // The Hub keeps the rooms, so two pages watching the same account (the editor's preview and OBS) share one connection.
 
-import { mapChat, mapDelete, mapGift } from "./map.mjs";
+import { mapChat, mapDelete, mapFollow, mapGift, mapGiftAlert, mapShare } from "./map.mjs";
 
 /** What went wrong when connecting, in the three ways that need different handling. */
 export function classify(err) {
@@ -30,7 +30,7 @@ export class Room {
     this.idleTimer = 0;
     this.sleeper = null;
     this.seen = new Set(); // ids of the latest messages, so a message is never shown twice
-    this.counts = { chat: 0, gift: 0 };
+    this.counts = { chat: 0, gift: 0, follow: 0, share: 0 };
     this.report = 0;
   }
 
@@ -48,6 +48,8 @@ export class Room {
 
   broadcast(event, data) {
     for (const client of [...this.clients]) {
+      // An alert goes only to pages that asked for its kind (?events=follow,gift,share); everything else goes to everyone.
+      if (event === "alert" && !client.events?.has(data.kind)) continue;
       try {
         client.send(event, data);
       } catch {
@@ -82,10 +84,14 @@ export class Room {
     });
     conn.on("gift", (d) => {
       const m = mapGift(d);
-      if (!m || !this.fresh(m.id)) return;
-      this.counts.gift += 1;
-      this.broadcast("chat", m);
+      if (m && this.fresh(m.id)) {
+        this.counts.gift += 1;
+        this.broadcast("chat", m);
+      }
+      this.alert(mapGiftAlert(d));
     });
+    conn.on("follow", (d) => this.alert(mapFollow(d)));
+    conn.on("share", (d) => this.alert(mapShare(d)));
     conn.on("imDelete", (d) => {
       const { ids, users } = mapDelete(d);
       for (const id of ids) this.broadcast("remove", { id });
@@ -94,6 +100,13 @@ export class Room {
     conn.on("streamEnd", () => finish({ kind: "offline", detail: "The LIVE ended. Waiting for the next one…", wasConnected: true }));
     conn.on("disconnected", () => finish({ kind: "dropped", wasConnected: true }));
     conn.on("error", (err) => this.hub.log(`@${this.user}: ${String(err?.constructor?.name ?? "error")} ${String(err?.message ?? "").slice(0, 120)}`));
+  }
+
+  /** An alert event for the pages that asked for it. Its id is kept apart from chat ids, so a gift is both a chat line and an alert. */
+  alert(m) {
+    if (!m || !this.fresh(m.id && `alert:${m.kind}:${m.id}`)) return;
+    if (m.kind in this.counts) this.counts[m.kind] += 1;
+    this.broadcast("alert", m);
   }
 
   /** One try: connect, then wait until the connection ends. Resolves with how it ended. */
@@ -141,8 +154,9 @@ export class Room {
     this.running = true;
     this.hub.log(`@${this.user}: connecting`); // the pages are told by the status above; this is the line for the window you are watching
     this.report = setInterval(() => {
-      if (this.counts.chat || this.counts.gift) this.hub.log(`@${this.user}: ${this.counts.chat} chat and ${this.counts.gift} gifts in the last minute`);
-      this.counts = { chat: 0, gift: 0 };
+      const c = this.counts;
+      if (c.chat || c.gift || c.follow || c.share) this.hub.log(`@${this.user}: ${c.chat} chat, ${c.gift} gifts, ${c.follow} follows and ${c.share} shares in the last minute`);
+      this.counts = { chat: 0, gift: 0, follow: 0, share: 0 };
     }, 60000);
     const { offlineWaitMs, limitedWaitMs, backoffMs } = this.hub.opts;
     let attempt = 0;

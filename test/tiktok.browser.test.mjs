@@ -74,10 +74,11 @@ test("editor: TikTok comes first, and with the helper running a name connects an
   await type("#source-channel", "  @Pond.Pal ");
   await click("#source .source__row .btn");
   await page.waitFor(`document.getElementById("source-status").dataset.state === "connected"`);
-  assert.equal(await text("#source-status"), "Reading @pond.pal's LIVE chat");
+  assert.match(await text("#source-status"), /^Connected to TikTok\. Waiting for the first chat message/, "connected is not yet reading");
   assert.equal(made[0].user, "pond.pal");
 
   made[0].conn.emit("chat", chat("m1", "hello from the pond"));
+  await page.waitFor(`document.getElementById("source-status").textContent === "Reading @pond.pal's LIVE chat"`);
   made[0].conn.emit("chat", chat("m2", "a moderator speaks", { userIdentity: { isModeratorOfAnchor: true } }));
   made[0].conn.emit("gift", { common: { msgId: "g1" }, user: { id: "7", displayId: "ann", nickname: "Ann" }, gift: { name: "Rose", type: 2 }, repeatCount: 3, repeatEnd: 0 });
   await page.waitFor(`document.querySelectorAll("#chat .m").length === 3`);
@@ -256,4 +257,21 @@ test("matcha page: TikTok first too, and its link carries the platform", { skip 
   assert.equal(link.searchParams.get("style"), "latte");
   assert.match(await text("#link-hint"), /only works on this PC/);
   assert.deepEqual(page.problems, [], page.problems.join(" | "));
+});
+
+test("editor: connected but silent (an account that is not LIVE) says so after a while, and says what to do; chat turns it into 'Reading'", { skip }, async () => {
+  const { base, made } = await withHelper();
+  await page.goto(base + "/editor/", { settle: 700 });
+  // the 20 second wait is cut to under a second, only for this page
+  await page.evaluate(`(() => { const real = window.setTimeout; window.setTimeout = (fn, ms, ...rest) => real(fn, ms === 20000 ? 700 : ms, ...rest); })()`);
+  await type("#source-channel", "not_live_yet");
+  await click("#source .source__row .btn");
+  await page.waitFor(`document.getElementById("source-status").dataset.state === "connected"`);
+  assert.match(await text("#source-status"), /^Connected to TikTok\. Waiting for the first chat message/);
+  await page.waitFor(`document.getElementById("source-status").dataset.state === "silent"`);
+  assert.match(await text("#source-status"), /Are you LIVE\?.*press Disconnect and then Connect again/);
+  made[0].conn.emit("chat", chat("late1", "finally someone"));
+  await page.waitFor(`document.getElementById("source-status").dataset.state === "connected"`);
+  assert.equal(await text("#source-status"), "Reading @not_live_yet's LIVE chat");
+  assert.match(await text("#source ~ .checklist, .checklist"), /go LIVE first/, "the checklist is on the page");
 });

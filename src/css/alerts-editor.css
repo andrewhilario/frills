@@ -1,0 +1,18 @@
+/* The alerts editor's own parts: the test buttons under the preview, and the "what Frills sees" counters. */
+.page-alerts .preview { min-height: 19rem; }
+@media (max-width: 63.99rem) { .page-alerts .preview { height: 50dvh; } } /* on a wide screen the editor lets the preview fill its column */
+.preview__tests { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs); padding: var(--space-xs) var(--space-md) var(--space-sm); }
+.preview__sound { margin-left: auto; font-size: var(--text-xs); color: var(--color-stage-ink); opacity: 0.85; }
+@media (min-width: 64rem) { .preview__tests { padding-inline: var(--space-lg); } }
+
+.seen { display: grid; gap: var(--space-xs); padding: var(--space-md); border-radius: var(--radius-card); background: var(--color-paper-2); }
+.seen__title { margin: 0; font-size: var(--text-base); font-weight: 700; }
+.seen__list { display: flex; flex-wrap: wrap; gap: var(--space-sm); margin: 0; }
+.seen__list div { min-width: 6rem; padding: var(--space-xs) var(--space-md); border-radius: var(--radius-card); background: var(--color-paper); border: 2px solid var(--color-ink); }
+.seen__list dt { font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-ink-2); }
+.seen__list dd { margin: 0; font-size: var(--text-lg); font-weight: 800; font-variant-numeric: tabular-nums; }
+.seen__list dd[data-bump] { animation: seen-bump 400ms ease-out; }
+@keyframes seen-bump { 0% { transform: scale(1); } 40% { transform: scale(1.25); } 100% { transform: scale(1); } }
+
+/* The alerts' area is the real page (1080 x 1920 and so on), centred and scaled down to fit by alerts-editor.js, with its edge drawn. */
+.page-alerts #alerts { inset: auto; left: 50%; top: 50%; transform-origin: center; outline: 6px dashed rgba(255, 255, 255, 0.22); background: rgba(255, 255, 255, 0.03); }

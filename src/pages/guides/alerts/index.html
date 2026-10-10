@@ -1,0 +1,101 @@
+<!--
+{
+  "title": "Set up and test TikTok alerts | Frills",
+  "description": "Show follows, gifts and shares as pop-ups on your TikTok LIVE, with your own animations and sounds. Set them up, test them without a LIVE, and add them to your stream.",
+  "path": "/guides/alerts/",
+  "css": "page",
+  "js": "page",
+  "bodyClass": "page-guide",
+  "chrome": "nav",
+  "noindex": true,
+  "listed": false,
+  "footer": true,
+  "jsonld": ["breadcrumb:Alerts guide"]
+}
+-->
+<main id="main">
+  <article class="article shell">
+    <ol class="crumbs" aria-label="Breadcrumb">
+      <li><a href="/">Frills</a></li>
+      <li aria-current="page">Alerts guide</li>
+    </ol>
+    <header class="article__head">
+      <h1 class="display">Alerts for your TikTok LIVE</h1>
+      <p class="lede">A pop-up appears on your stream when someone follows, sends a gift or shares your LIVE. You choose the words, the look, the animation and the sound. Alerts are in beta, so please tell us what is not right.</p>
+    </header>
+
+    <div class="article__body">
+      <h2 class="title">What you get</h2>
+      <ul>
+        <li><strong>Follows, gifts and shares.</strong> Each has its own words, sound, effect and time on screen.</li>
+        <li><strong>Gift sizes.</strong> Small, medium and big gifts (set by their diamond value) get a bigger look, a longer stay, a higher sound and their own words.</li>
+        <li><strong>Animations.</strong> Pop, bounce, slide, drop, zoom or fade in, a gentle float or wiggle while it shows, and a burst of hearts, sparkles, confetti or bubbles.</li>
+        <li><strong>Sounds.</strong> Ten built-in sounds that the page makes itself, so there is nothing to download. Pick one for each kind and set the volume.</li>
+        <li><strong>Crowds.</strong> When many people follow at once, they join into one alert: “Mochi and 5 others followed!”.</li>
+        <li><strong>Your look.</strong> Five starting looks, and every colour, font, size and corner can be changed.</li>
+      </ul>
+
+      <h2 class="title">Set them up</h2>
+      <ol class="steps-list" role="list">
+        <li>
+          <div>
+            <h3 class="subtitle">Open the alerts editor</h3>
+            <p>Go to the <a href="/alerts/">alerts editor</a>. The preview on one side is a true copy of a 1080 by 1920 vertical LIVE, shrunk to fit, so sizes and distances are what you will really get.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h3 class="subtitle">Pick a look and write your words</h3>
+            <p>Choose a starting look, then change anything. In the texts, <code>{name}</code> is the person and <code>{gift}</code> the gift. <code>{count}</code>, <code>{diamonds}</code> and <code>{total}</code> are there too, and a crowd text can use <code>{others}</code>.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h3 class="subtitle">Try every alert</h3>
+            <p>Press <strong>Test follow</strong>, <strong>Test gift</strong>, <strong>Test big gift</strong>, <strong>Test share</strong> and <strong>Test a crowd</strong> above the preview. Your browser only allows sound after you click something, so the test buttons are what turn sound on.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h3 class="subtitle">Connect your TikTok name</h3>
+            <p>In step 4 type your @name and press <strong>Connect</strong>. Under it, <strong>What Frills sees</strong> counts the follows, gifts and shares that arrive, so you can check that they really do.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h3 class="subtitle">Copy your link into your streaming app</h3>
+            <p>Add a Browser source (some apps call it a web page or link source), paste the link and set its size to 1080 wide by 1920 high for a vertical LIVE. Put it above your game and camera, next to your chat overlay. The <a href="/guides/obs/">setup guide</a> has the steps for OBS.</p>
+          </div>
+        </li>
+      </ol>
+
+      <h2 class="title">Test without going LIVE</h2>
+      <p>Type <code>frills_demo</code> as your TikTok name in step 4. Frills makes up follows, gifts of every size, shares and the odd crowd, and sends them the same way real ones arrive. Copy the link with that name in it into your streaming app to check the size, the position and the sound. Put your own name back before you go LIVE. The <a href="/guides/test/">test guide</a> explains the same trick for chat.</p>
+
+      <h2 class="title">Sound in your streaming app</h2>
+      <ul>
+        <li><strong>OBS.</strong> The Browser source plays sound into your desktop audio. To control it, tick <strong>Control audio via OBS</strong> on the source.</li>
+        <li><strong>TikTok LIVE Studio and Streamlabs.</strong> We have not confirmed that a web page can play sound there. Test it first: if you hear nothing, alerts still show, and you can play your own sound another way.</li>
+      </ul>
+
+      <h2 class="title">Good to know</h2>
+      <ul>
+        <li><strong>It only counts what it sees.</strong> Alerts start when the overlay connects. Add it to your streaming app before you go LIVE, and leave <strong>Shutdown source when not visible</strong> unticked in OBS.</li>
+        <li><strong>It is unofficial.</strong> TikTok has no official way for overlays to read follows, gifts and shares, so TikTok could change something and stop it. When that happens the overlay says so.</li>
+        <li><strong>Gift sizes follow what TikTok reports.</strong> If a gift looks the wrong size, tell us which one.</li>
+        <li><strong>It only reads.</strong> It cannot post, moderate or touch your account, and it keeps nothing.</li>
+      </ul>
+
+      <h2 class="title">If something looks wrong</h2>
+      <ul>
+        <li><strong>Nothing shows up.</strong> Press a test button in the editor. If that works, the look is fine and the connection is the question: check the name, and that the counters under Connect move.</li>
+        <li><strong>The counters stay at zero.</strong> Follow your account from another account, or send a 1 coin gift, and watch them. If they still do not move, tell us.</li>
+        <li><strong>The overlay says the relay needs an update.</strong> The free relay is being updated for alerts. Try again later.</li>
+        <li><strong>No sound.</strong> Press a test button in the editor first. In your streaming app, see the sound notes above.</li>
+        <li><strong>Everything is too small or too big.</strong> The text size is in pixels of the page your streaming app shows, so set the source to 1080 by 1920 and change the size in the editor.</li>
+      </ul>
+
+      <p class="article__foot"><a class="btn" href="/alerts/">Open the alerts editor <span class="btn__arrow" aria-hidden="true">→</span></a></p>
+    </div>
+  </article>
+</main>

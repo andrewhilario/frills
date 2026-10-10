@@ -14,11 +14,15 @@ export const cleanName = (platform, input) => (platform === "tiktok" ? cleanTikT
  * Sends one account's chat into one or more feeds. Returns the connection: stop() ends it. For TikTok it first looks for where the chat
  * can come from (the helper on this PC, else the site's relay, `relay` being its address); with neither it says so.
  */
-export function connectTo(feeds, platform, name, onStatus, { relay = "" } = {}) {
+export function connectTo(feeds, platform, name, onStatus, { relay = "", events = [], onAlert, onFound, onFirstMessage } = {}) {
   const list = Array.isArray(feeds) ? feeds : [feeds];
+  let sawChat = false;
   const handlers = {
     onStatus,
-    onMessage: (m) => list.forEach((f) => f.add(m)),
+    onMessage: (m) => {
+      if (!sawChat) { sawChat = true; onFirstMessage?.(); }
+      list.forEach((f) => f.add(m));
+    },
     onRemove: ({ id }) => list.forEach((f) => f.removeById(id)),
     onClear: ({ user }) => list.forEach((f) => (user ? f.removeUser(user) : f.clear())),
   };
@@ -31,11 +35,12 @@ export function connectTo(feeds, platform, name, onStatus, { relay = "" } = {}) 
   onStatus?.({ state: "connecting", channel: login, platform: "tiktok" });
   findTikTokSource(relay).then((found) => {
     if (stopped) return;
+    onFound?.(found);
     if (!found) {
       onStatus?.({ state: "error", channel: login, platform: "tiktok", fatal: true, detail: relay ? "Couldn't reach TikTok chat. The free Frills relay isn't answering right now. Wait a minute and try again." : "TikTok chat needs the Frills helper running on this PC. It isn't answering here." });
       return;
     }
-    inner = connectTikTok({ user: name, base: found.base, ...handlers });
+    inner = connectTikTok({ user: name, base: found.base, events, onAlert, ...handlers });
   });
   return {
     stop() {
@@ -49,7 +54,11 @@ const who = (s) => (s.platform === "tiktok" ? `@${s.channel}` : `#${s.channel}`)
 
 const STATUS = {
   connecting: (s) => `Connecting to ${who(s)}…`,
-  connected: (s) => s.detail || (s.platform === "tiktok" ? `Reading ${who(s)}'s LIVE chat` : `Reading chat from ${who(s)}`),
+  // Connected is not the same as reading: TikTok accepts a connection to an account that is not LIVE, and then nothing arrives. So for
+  // TikTok it says what is true until the first message comes, and the page changes it to "Reading ..." when one does.
+  connected: (s) => s.detail || (s.platform === "tiktok" ? "Connected to TikTok. Waiting for the first chat message. Real chat only shows while you are LIVE." : `Reading chat from ${who(s)}`),
+  reading: (s) => `Reading ${who(s)}'s LIVE chat`,
+  silent: () => "Nothing has arrived yet. Are you LIVE? Real chat only shows while you are LIVE. If you just went LIVE, press Disconnect and then Connect again.",
   queued: (s) => (s.position ? `The free relay is full. Waiting for a spot: ${s.position} of ${s.total}…` : "The free relay is full. Waiting for a spot…"),
   offline: (s) => s.detail || `${who(s)} isn't live right now. Waiting for the LIVE to start…`,
   limited: (s) => s.detail || "TikTok's free connection is busy. Trying again in a minute…",

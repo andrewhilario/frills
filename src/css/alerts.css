@@ -1,0 +1,95 @@
+/* The alerts: a card with the person's picture, the words and sometimes the gift, a burst of little shapes around it, and an entrance,
+   an idle movement and an exit chosen in the settings. Plain colours and transforms only, so even an old streaming browser draws it.
+   The look comes in as variables on .alerts: --a-font --a-size --a-text --a-accent --a-pop --a-bg --a-border --a-radius --a-shadow
+   --a-speed --a-offset --a-dir (see alertVars in alerts-settings.js). */
+
+.alerts {
+  position: absolute; inset: 0; display: flex; flex-direction: column; gap: 0.7em; padding: var(--a-offset, 8%);
+  pointer-events: none; overflow: hidden; font-family: var(--a-font, sans-serif); font-size: var(--a-size, 24px);
+}
+.alerts[data-vpos="top"] { justify-content: flex-start; }
+.alerts[data-vpos="middle"] { justify-content: center; }
+.alerts[data-vpos="bottom"] { justify-content: flex-end; }
+.alerts[data-hpos="left"] { align-items: flex-start; }
+.alerts[data-hpos="center"] { align-items: center; }
+.alerts[data-hpos="right"] { align-items: flex-end; }
+
+.alert { position: relative; max-width: 100%; }
+.alert__card {
+  position: relative; display: flex; align-items: center; gap: 0.6em; max-width: 100%; box-sizing: border-box;
+  padding: 0.5em 1em 0.5em 0.5em; color: var(--a-text, #222); background: var(--a-bg, #fff);
+  border: var(--a-border, 2px) solid var(--a-accent, #fc0); border-radius: var(--a-radius, 20px); box-shadow: var(--a-shadow, none);
+  font-weight: 700; line-height: 1.2; overflow-wrap: anywhere;
+}
+.alert[data-tier="2"] .alert__card { font-size: 1.12em; }
+.alert[data-tier="3"] .alert__card { font-size: 1.28em; }
+/* A ring around a big one: a drawn border rather than a second shadow, because a shadow list that starts with "none" is not valid. */
+.alert[data-tier="3"] .alert__card::after { content: ""; position: absolute; inset: -0.3em; border: 0.12em solid var(--a-accent, #fc0); border-radius: calc(var(--a-radius, 20px) + 0.3em); opacity: 0.55; }
+.alert__mark { color: var(--a-pop, #f48); font-weight: 800; }
+.alert__words { min-width: 0; }
+
+.alert__av {
+  position: relative; flex: none; display: grid; place-items: center; width: 2.3em; height: 2.3em; border-radius: 50%; overflow: hidden;
+  background: var(--a-accent, #fc0); color: var(--a-bg, #fff); font-size: 0.95em; font-weight: 800;
+}
+.alert__av--pic { color: transparent; }
+.alert__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.alert__gift { flex: none; height: 2.4em; width: auto; max-width: 3.4em; object-fit: contain; margin-left: 0.2em; }
+
+/* ── Entrances (on the wrapper) and exits ───────────────────────────────────────────────────────────────────────────── */
+.alert--in { animation-duration: var(--a-speed, 500ms); animation-fill-mode: both; animation-timing-function: cubic-bezier(0.2, 1, 0.3, 1); }
+.alerts[data-enter="pop"] .alert--in { animation-name: a-pop; }
+.alerts[data-enter="bounce"] .alert--in { animation-name: a-bounce; animation-timing-function: cubic-bezier(0.3, 1.4, 0.5, 1); }
+.alerts[data-enter="slide"] .alert--in { animation-name: a-slide; }
+.alerts[data-enter="drop"] .alert--in { animation-name: a-drop; animation-timing-function: cubic-bezier(0.3, 1.5, 0.5, 1); }
+.alerts[data-enter="zoom"] .alert--in { animation-name: a-zoom; }
+.alerts[data-enter="fade"] .alert--in { animation-name: a-fade; animation-timing-function: ease-out; }
+
+.alert--out { animation-duration: var(--a-speed, 500ms); animation-fill-mode: forwards; animation-timing-function: ease-in; }
+.alerts[data-leave="fade"] .alert--out { animation-name: a-out-fade; }
+.alerts[data-leave="slide"] .alert--out { animation-name: a-out-slide; }
+.alerts[data-leave="shrink"] .alert--out { animation-name: a-out-shrink; }
+
+@keyframes a-pop { 0% { opacity: 0; transform: scale(0.5); } 60% { opacity: 1; transform: scale(1.08); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes a-bounce { 0% { opacity: 0; transform: translateY(-160%); } 55% { opacity: 1; transform: translateY(8%); } 75% { transform: translateY(-4%); } 100% { opacity: 1; transform: translateY(0); } }
+@keyframes a-slide { from { opacity: 0; transform: translateX(calc(var(--a-dir, -1) * 130%)); } to { opacity: 1; transform: translateX(0); } }
+@keyframes a-drop { from { opacity: 0; transform: translateY(-150%) rotate(-4deg); } to { opacity: 1; transform: translateY(0) rotate(0); } }
+@keyframes a-zoom { from { opacity: 0; transform: scale(2.4); } to { opacity: 1; transform: scale(1); } }
+@keyframes a-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes a-out-fade { from { opacity: 1; } to { opacity: 0; } }
+@keyframes a-out-slide { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(calc(var(--a-dir, -1) * -130%)); } }
+@keyframes a-out-shrink { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(0.2); } }
+
+/* ── While it shows (on the card, so it never fights the entrance on the wrapper) ───────────────────────────────────── */
+.alerts[data-idle="float"] .alert__card { animation: a-float 2.4s ease-in-out infinite; }
+.alerts[data-idle="wiggle"] .alert__card { animation: a-wiggle 1s ease-in-out infinite; }
+.alerts[data-idle="pulse"] .alert__card { animation: a-pulse 1.4s ease-in-out infinite; }
+@keyframes a-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-0.25em); } }
+@keyframes a-wiggle { 0%, 100% { transform: rotate(-1.6deg); } 50% { transform: rotate(1.6deg); } }
+@keyframes a-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+
+/* ── The burst of little shapes around the card ─────────────────────────────────────────────────────────────────────── */
+.alert__fx { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; z-index: 2; }
+.alert__fx i {
+  position: absolute; left: 0; top: 0; width: 0.7em; height: 0.7em; margin: -0.35em 0 0 -0.35em; opacity: 0;
+  animation: a-burst 1.3s ease-out var(--d, 0ms) both; background-repeat: no-repeat; background-size: contain; background-position: center;
+}
+@keyframes a-burst {
+  0% { opacity: 0; transform: translate(0, 0) rotate(0) scale(0.2); }
+  15% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--x, 0), var(--y, 0)) rotate(var(--r, 0)) scale(var(--s, 1)); }
+}
+.alert__fx[data-fx="hearts"] i {
+  width: 0.9em; height: 0.9em; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 21s-8.5-5.3-8.5-11.2A4.8 4.8 0 0 1 12 7a4.8 4.8 0 0 1 8.5 2.8C20.5 15.7 12 21 12 21z' fill='%23ff5f86'/%3E%3C/svg%3E");
+}
+.alert__fx[data-fx="sparkles"] i {
+  width: 0.9em; height: 0.9em; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 1l2.6 8.4L23 12l-8.4 2.6L12 23l-2.6-8.4L1 12l8.4-2.6z' fill='%23ffd23f'/%3E%3C/svg%3E");
+}
+.alert__fx[data-fx="confetti"] i { width: 0.5em; height: 0.9em; border-radius: 1px; background: #ff5f86; }
+.alert__fx[data-fx="confetti"] i:nth-child(4n + 2) { background: #ffd23f; }
+.alert__fx[data-fx="confetti"] i:nth-child(4n + 3) { background: #59d4ff; }
+.alert__fx[data-fx="confetti"] i:nth-child(4n) { background: #7be06a; }
+.alert__fx[data-fx="bubbles"] i { border: 0.12em solid var(--a-accent, #fc0); border-radius: 50%; background: rgba(255, 255, 255, 0.25); }
+
+/* ── Where the editor shows them: over the preview stage ────────────────────────────────────────────────────────────── */
+.alertstage { position: relative; }

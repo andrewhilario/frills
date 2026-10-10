@@ -68,3 +68,55 @@ export function mapDelete(d) {
   const list = (v) => (Array.isArray(v) ? v.map((x) => clean(x, 60)).filter(Boolean) : []);
   return { ids: list(d?.deleteMsgIds), users: list(d?.deleteUserIds) };
 }
+
+// ── Alerts: the events a page asks for with ?events=follow,gift,share ────────────────────────────────────────────────────────────
+// One SSE event named "alert", whose data says what it is (`kind`). Pages only get the kinds they asked for.
+
+export const ALERT_KINDS = ["follow", "gift", "share"];
+
+const person = (d) => {
+  const u = d?.user;
+  if (!u) return null;
+  const handle = clean(u.displayId ?? u.uniqueId, 40);
+  return {
+    id: clean(d.common?.msgId ?? d.msgId, 60),
+    user: clean(u.idStr || u.id || u.userId || handle, 40),
+    name: clean(u.nickname, 40) || handle || "viewer",
+    avatar: avatarUrl(u),
+  };
+};
+
+/** Someone followed -> { kind: "follow", id, user, name, avatar }, or null. */
+export function mapFollow(d) {
+  const p = person(d);
+  return p && { kind: "follow", ...p };
+}
+
+/** Someone shared the LIVE -> { kind: "share", ... }, or null. */
+export function mapShare(d) {
+  const p = person(d);
+  return p && { kind: "share", ...p };
+}
+
+/** The first picture address of a gift that a page may load (TikTok's own picture servers), or "". */
+function giftPicture(gift) {
+  for (const image of [gift?.image, gift?.giftImage, gift?.icon]) {
+    for (const address of Array.isArray(image?.urlList) ? image.urlList : []) if (isAvatarUrl(address)) return address;
+  }
+  return "";
+}
+
+/**
+ * A gift -> { kind: "gift", ..., gift: name, picture, diamonds (each), count, total (diamonds x count) }, or null. A streak that is
+ * still counting up is skipped, like mapGift: only its last event, with the final count, is an alert.
+ */
+export function mapGiftAlert(d) {
+  const p = person(d);
+  if (!p) return null;
+  const gift = d.gift ?? d.giftDetails ?? {};
+  const streak = Number(gift.type ?? gift.giftType) === 1;
+  if (streak && !d.repeatEnd) return null;
+  const count = Math.max(1, Math.min(9999, Math.round(Number(d.repeatCount) || Number(d.groupCount) || 1)));
+  const diamonds = Math.max(0, Math.min(1000000, Math.round(Number(gift.diamondCount ?? gift.diamond_count ?? d.diamondCount) || 0)));
+  return { kind: "gift", ...p, gift: clean(gift.name ?? gift.giftName ?? d.giftName, 40) || "a gift", picture: giftPicture(gift), diamonds, count, total: diamonds * count };
+}

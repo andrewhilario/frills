@@ -52,6 +52,11 @@
 .source__status { min-height: 1lh; font-size: var(--text-sm); color: var(--color-ink-2); }
 .source__status[data-state="connected"] { color: var(--color-success); }
 .source__status[data-state="error"] { color: var(--color-error); }
+.source__status[data-state="silent"] { color: var(--color-accent-3-deep); font-weight: 600; }
+
+/* The "before you start" list above the name box. */
+.checklist { display: grid; gap: var(--space-xs); margin: 0; padding: var(--space-md) var(--space-md) var(--space-md) var(--space-xl); border-radius: var(--radius-card); background: var(--color-accent-tint); font-size: var(--text-sm); line-height: 1.45; }
+.checklist code { font-weight: 600; }
 .source__tools { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
 
 /* Step 3: the link */

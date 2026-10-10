@@ -29,12 +29,14 @@ function pretendFetch(t, routes) {
 
 test("TikTok chat is looked for on the page's own address first, then at the site's relay", async (t) => {
   pretendFetch(t, { "/tiktok/ping": answer({ ok: true, name: "frills-helper" }), "https://relay.test/tiktok/ping": answer({ ok: true, name: "frills-relay" }) });
-  assert.deepEqual(await findTikTokSource("https://relay.test"), { kind: "helper", base: "" }, "a helper on this PC wins");
+  assert.deepEqual(await findTikTokSource("https://relay.test"), { kind: "helper", base: "", features: ["chat"] }, "a helper on this PC wins, and one that says nothing about features can only send chat");
+  pretendFetch(t, { "/tiktok/ping": answer({ ok: true, name: "frills-helper", features: ["chat", "alerts"] }) });
+  assert.deepEqual((await findTikTokSource("")).features, ["chat", "alerts"], "a newer one lists what it can send");
 });
 
 test("with no helper the relay is used, and with neither there is nothing", async (t) => {
   pretendFetch(t, { "/tiktok/ping": answer({ ok: false, name: "frills-site" }), "https://relay.test/tiktok/ping": answer({ ok: true, name: "frills-relay", slots: { used: 1, max: 30, waiting: 0 } }) });
-  assert.deepEqual(await findTikTokSource("https://relay.test/"), { kind: "relay", base: "https://relay.test" }, "a trailing slash is tidied");
+  assert.deepEqual(await findTikTokSource("https://relay.test/"), { kind: "relay", base: "https://relay.test", features: ["chat"] }, "a trailing slash is tidied");
   assert.equal(await findTikTokSource(""), null, "no relay named, so only the page's own address is asked");
   const asked = pretendFetch(t, { "/tiktok/ping": "down", "https://relay.test/tiktok/ping": answer({}, false) });
   assert.equal(await findTikTokSource("https://relay.test"), null);

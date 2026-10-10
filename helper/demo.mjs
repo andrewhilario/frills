@@ -15,7 +15,9 @@ const LINES = [
   "this is my comfort stream", "ahhh clutch!!", "love the vibe today", "how long have you been live", "so good", "😂😂", "wait what",
   "you're so funny", "sending love from everywhere", "こんにちは！", "best chat box ever", "okay that jump scared me",
 ];
-const GIFTS = ["Rose", "Heart", "Finger Heart", "Panda", "Galaxy"];
+// Gifts with what they cost in diamonds, so the alerts can be tried at every size.
+const GIFTS = [["Rose", 1, "#ff5f86"], ["Finger Heart", 5, "#ffb347"], ["Heart", 20, "#ff4d6d"], ["Panda", 100, "#6c7a89"], ["Galaxy", 1000, "#7b61ff"]];
+const giftIcon = (colour) => `data:image/svg+xml;base64,${Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="${colour}"/><path d="M32 18l4.6 9.4 10.4 1.5-7.5 7.3 1.8 10.3L32 41.6l-9.3 4.9 1.8-10.3-7.5-7.3 10.4-1.5z" fill="#fff"/></svg>`).toString("base64")}`;
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 
 // Each made-up chatter gets a small drawn face as a profile picture, so a look can be judged with pictures in it. Real TikTok pictures
@@ -57,18 +59,35 @@ export class DemoConnection extends EventEmitter {
     }, after);
   }
 
+  /** A made-up person by number (for a crowd). */
+  fan(n) {
+    const [handle, nickname] = NAMES[n % NAMES.length];
+    return { id: String(6800000000000001000n + BigInt(n)), displayId: handle + (n >= NAMES.length ? n : ""), nickname, avatarThumb: { urlList: [PICTURES[n % PICTURES.length]] } };
+  }
+
   say() {
     const [handle, nickname] = pick(NAMES);
     const user = { id: String(6800000000000000000n + BigInt(handle.length * 7919)), displayId: handle, nickname, avatarThumb: { urlList: [PICTURES[NAMES.findIndex(([h]) => h === handle) % PICTURES.length]] } };
     const id = `demo-${++this.count}`;
-    const roll = Math.random();
-    if (roll < 0.1) {
+    // Alerts come on a fixed rhythm so each kind turns up regularly: a crowd every 23rd tick, a share every 11th, a follow every 7th and a
+    // gift every 5th. The rest is chat, and now and then a moderator deleting a message.
+    const n = this.count;
+    const roll = n % 23 === 10 ? 0 : n % 11 === 4 ? 0.15 : n % 7 === 3 ? 0.1 : n % 5 === 2 ? 0.25 : 0.4 + Math.random() * 0.6;
+    if (roll < 0.04) {
+      // A crowd of follows at once, to see them merge.
+      for (let i = 0; i < 6; i++) setTimeout(() => !this.gone && this.emit("follow", { common: { msgId: `${id}-f${i}` }, user: this.fan(i + this.count) }), i * 250);
+    } else if (roll < 0.14) {
+      this.emit("follow", { common: { msgId: id }, user });
+    } else if (roll < 0.18) {
+      this.emit("share", { common: { msgId: id }, user });
+    } else if (roll < 0.3) {
       // A gift. The ones that can be sent in a streak arrive twice, as they do from TikTok: counting, then the final count.
-      const gift = { name: pick(GIFTS), type: 1 };
+      const [name, diamondCount, colour] = pick(GIFTS);
+      const gift = { name, type: 1, diamondCount, image: { urlList: [giftIcon(colour)] } };
       const count = 1 + Math.floor(Math.random() * 5);
       this.emit("gift", { common: { msgId: id + "-a" }, user, gift, repeatCount: Math.max(1, count - 1), repeatEnd: 0 });
       setTimeout(() => !this.gone && this.emit("gift", { common: { msgId: id + "-b" }, user, gift, repeatCount: count, repeatEnd: 1 }), 700);
-    } else if (roll < 0.15 && this.recent.length) {
+    } else if (roll > 0.4 && roll < 0.43 && this.recent.length) {
       // A moderator deleting one of the last few messages.
       this.emit("imDelete", { deleteMsgIds: [this.recent.splice(Math.floor(Math.random() * this.recent.length), 1)[0]], deleteUserIds: [] });
     } else {

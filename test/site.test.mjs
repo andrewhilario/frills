@@ -25,7 +25,7 @@ const assetOf = (html, kind) => (new RegExp(`${kind === "css" ? 'href="(/assets/
 
 test("the pages we expect are all there", () => {
   const urls = pages.map((p) => p.url).sort();
-  assert.deepEqual(urls, ["/", "/404.html", "/editor/", "/feedback/", "/guides/obs/", "/guides/test/", "/guides/tiktok/", "/matcha/", "/overlay/", "/privacy/"]);
+  assert.deepEqual(urls, ["/", "/404.html", "/alerts/", "/editor/", "/feedback/", "/guides/alerts/", "/guides/obs/", "/guides/test/", "/guides/tiktok/", "/matcha/", "/overlay/", "/overlay/alerts/", "/privacy/"]);
 });
 
 test("every indexable page has its own title and description, a canonical address, share tags and one h1", () => {
