@@ -131,7 +131,7 @@ test("the ping says the program can send alerts, so a page can tell an old one",
   await helper?.close();
   await start();
   const body = await new Promise((resolve) => http.get({ host: "127.0.0.1", port, path: "/tiktok/ping", headers: { Host: `127.0.0.1:${port}` } }, (res) => { let t = ""; res.on("data", (c) => { t += c; }); res.on("end", () => resolve(JSON.parse(t))); }));
-  assert.deepEqual(body.features, ["chat", "alerts"]);
+  assert.deepEqual(body.features, ["chat", "alerts", "info"]);
   assert.deepEqual(ALERT_KINDS, ["follow", "gift", "share", "like"]);
 });
 
@@ -187,4 +187,42 @@ test("nobody asking for likes means none are even held", async () => {
   made[0].emit("like", { common: { msgId: "x" }, user: user(), likeCount: 3, totalLikeCount: 3 });
   assert.equal(helper.hub.rooms.get("pond_cafe")?.likes.size ?? 0, 0);
   a.close();
+});
+
+// ── the account's follower count ────────────────────────────────────────────────────────────────────────────────────
+
+const withFollowers = (count) => async () => {
+  const c = new FakeConnection();
+  if (count !== undefined) c.roomInfo = { data: { owner: { follow_info: { follower_count: count } } } };
+  return c;
+};
+
+test("the relay tells pages the account's follower count, and a page that joins later gets a current one", async () => {
+  await helper?.close();
+  helper = createHelper({ distDir: dist, factory: withFollowers(5000), idleStopMs: 80, offlineWaitMs: 40, limitedWaitMs: 40, backoffMs: [30, 30] });
+  port = await helper.listen(0);
+  const a = listen("pond_cafe", "follow");
+  await a.until(() => a.seen.some((e) => e.name === "info"));
+  assert.deepEqual(a.seen.find((e) => e.name === "info").data, { followers: 5000 });
+  const room = helper.hub.rooms.get("pond_cafe");
+  room.conn.emit("follow", follow("f1"));
+  room.conn.emit("follow", follow("f2", { user: user({ id: "43", displayId: "x" }) }));
+  await a.until(() => a.alerts().length === 2);
+  const b = listen("pond_cafe", "follow");
+  await b.until(() => b.seen.some((e) => e.name === "info"));
+  assert.deepEqual(b.seen.find((e) => e.name === "info").data, { followers: 5002 }, "the 2 follows since connecting are added");
+  a.close(); b.close();
+});
+
+test("no follower count in the room details means no info event, and nonsense is ignored", async () => {
+  for (const count of [undefined, 0, -4, "lots", 1e12]) {
+    await helper?.close();
+    helper = createHelper({ distDir: dist, factory: withFollowers(count), idleStopMs: 80, offlineWaitMs: 40, limitedWaitMs: 40, backoffMs: [30, 30] });
+    port = await helper.listen(0);
+    const a = listen("pond_cafe", "follow");
+    await a.until(() => a.seen.some((e) => e.name === "status" && e.data.state === "connected"));
+    await sleep(60);
+    assert.equal(a.seen.some((e) => e.name === "info"), false, `nothing sent for ${String(count)}`);
+    a.close();
+  }
 });

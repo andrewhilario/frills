@@ -2,6 +2,7 @@
 // Everything somebody else wrote (a name, a gift) goes in with textContent and text nodes, never as HTML.
 
 import { el } from "./feed.js";
+import { GOAL_TYPES } from "./goal.js";
 import { fillTemplate } from "./alerts.js";
 import { lookVars } from "./widget-settings.js";
 
@@ -106,9 +107,10 @@ export function createGoalView(host) {
 
   const show = () => {
     if (!settings || !last) return;
-    label.textContent = settings.label;
+    const type = GOAL_TYPES[settings.type] ?? GOAL_TYPES.follow;
+    label.textContent = settings.label || type.label;
     const parts = [];
-    if (settings.showNumbers) parts.push(`${last.value.toLocaleString("en-US")} / ${last.goal.toLocaleString("en-US")}`);
+    if (settings.showNumbers) parts.push(`${last.value.toLocaleString("en-US")} / ${last.goal.toLocaleString("en-US")}${type.unit ? " " + type.unit : ""}`);
     if (settings.showPercent) parts.push(`${last.percent}%`);
     numbers.textContent = parts.join("  ·  ");
     fill.style.width = last.percent + "%";

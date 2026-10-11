@@ -14,12 +14,14 @@ const CANVASES = { vertical: [1080, 1920], landscape: [1920, 1080], square: [108
  * `widget` is the settings (GIFTS or GOAL). `create(host, settings)` makes the overlay's view and returns
  * { apply(settings), onEvent(event), tests: { id: () => void } }. `events` are the TikTok event kinds it wants.
  */
-export function startWidgetEditor({ widget, storeKey, overlayPath, events, create, idleHint }) {
+export function startWidgetEditor({ widget, storeKey, overlayPath, events, onInfo, create, idleHint }) {
   const params = new URLSearchParams(location.search);
   const load = () => { try { return JSON.parse(localStorage.getItem(storeKey) ?? "null"); } catch { return null; } };
   const saved = load();
   let settings = widget.sanitize({ ...saved?.settings, ...widget.fromParams(params) });
-  const api = create($("widget"), settings);
+  let source = null;
+  // `ctx.restart()` reconnects (for an overlay whose settings change what it waits for); `ctx.info(fn)` is for what the account says.
+  const api = create($("widget"), settings, { restart: () => source?.restart() });
 
   // ── the look and the options ────────────────────────────────────────────────────────────────────────────────────
   const swatch = (p) => (luminance(p.accent) < 0.08 ? p.bg : p.accent);
@@ -69,7 +71,7 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, creat
 
   // ── the account ─────────────────────────────────────────────────────────────────────────────────────────────────
   const channelFromLink = params.get("channel") ?? "";
-  const source = mountSource($("source"), {
+  source = mountSource($("source"), {
     feeds: [],
     pace: () => [2000, 4000],
     channel: channelFromLink || saved?.channel || "",
@@ -80,6 +82,7 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, creat
     tools: false,
     idleHint,
     events,
+    onInfo: (info) => api.onInfo?.(info),
     onAlert: (event) => api.onEvent(event),
     onFound: (found) => {
       $("relay-note").textContent = !found ? ""

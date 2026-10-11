@@ -20,9 +20,9 @@ class FakeConnection extends EventEmitter {
   disconnect() { this.emit("disconnected"); }
 }
 const opened = [];
-async function withHelper() {
+async function withHelper({ followers } = {}) {
   const made = [];
-  const helper = createHelper({ distDir: dist, factory: async () => { const c = new FakeConnection(); made.push(c); return c; }, idleStopMs: 200, offlineWaitMs: 5000 });
+  const helper = createHelper({ distDir: dist, factory: async () => { const c = new FakeConnection(); if (followers) c.roomInfo = { data: { owner: { follow_info: { follower_count: followers } } } }; made.push(c); return c; }, idleStopMs: 200, offlineWaitMs: 5000 });
   const port = await helper.listen(0);
   opened.push(helper);
   return { base: `http://127.0.0.1:${port}`, made };
@@ -129,6 +129,24 @@ test("editor: the follower goal talks about follows, not chat, and a follow coun
   await sleep(150);
   made[0].emit("follow", follow("f1", "Ann"));
   await until(async () => (await text("#source-status")) === "Reading @pond_cafe's LIVE. Follows will show up here.");
+});
+
+test("overlay: the goal starts from the account's real follower count, and a gift goal counts diamonds", { skip }, async () => {
+  const { base, made } = await withHelper({ followers: 5000 });
+  await page.goto(`${base}/overlay/goal/?channel=pond_cafe&platform=tiktok&start=0&target=100&step=25`, { settle: 800 });
+  await until(async () => (await text(".goal__numbers")) === "5,000 / 5,025");
+  assert.equal(await text(".goal__label"), "Follower goal", "no label typed: the type's name");
+  await until(() => made.length === 1);
+  made[0].emit("follow", follow("f1", "Ann"));
+  await until(async () => (await text(".goal__numbers")) === "5,001 / 5,025");
+
+  await page.goto(`${base}/overlay/goal/?channel=pond_two&platform=tiktok&type=gift&target=1000&step=0`, { settle: 800 });
+  await until(() => made.length >= 2);
+  await sleep(150);
+  assert.equal(await text(".goal__label"), "Gift goal");
+  made[made.length - 1].emit("gift", gift("g1", "Ann", "Panda", 100, 3));
+  made[made.length - 1].emit("follow", follow("f9", "Ben")); // not counted by a gift goal
+  await until(async () => (await text(".goal__numbers")) === "300 / 1,000 diamonds");
 });
 
 test("editor: the gifts test buttons list gifts, and changing the words and the link work", { skip }, async () => {

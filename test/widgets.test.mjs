@@ -4,7 +4,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { GIFTS, GiftList } from "../src/js/gifts.js";
-import { GOAL, GoalState, goalKey, loadGoal, saveGoal } from "../src/js/goal.js";
+import { GOAL, GoalState, goalKey, loadGoal, saveGoal, GOAL_TYPES, goalAmount } from "../src/js/goal.js";
 import { LOOKS, coerce } from "../src/js/widget-settings.js";
 import { fakeAlert, fakeAlertSource } from "../src/js/fake-alerts.js";
 
@@ -166,6 +166,39 @@ test("a count restored past its goal does not celebrate again, and editing the g
   assert.deepEqual([state.value, state.goal], [31, 500], "changing the start keeps the people counted");
   state.reset();
   assert.deepEqual([state.gained, state.value], [0, 0]);
+});
+
+test("goal types: a goal counts what its type says, and nothing else", () => {
+  assert.deepEqual(Object.keys(GOAL_TYPES), ["follow", "gift", "like"]);
+  assert.equal(goalAmount("follow", { kind: "follow" }), 1);
+  assert.equal(goalAmount("follow", { kind: "gift", total: 500 }), 0, "a gift is not a follower");
+  assert.equal(goalAmount("gift", { kind: "gift", total: 500, diamonds: 100, count: 5 }), 500, "a gift adds its diamonds");
+  assert.equal(goalAmount("gift", { kind: "gift", total: 0 }), 0);
+  assert.equal(goalAmount("like", { kind: "like", count: 15 }), 15, "likes add their taps");
+  assert.equal(goalAmount("like", { kind: "like", count: -3 }), 0);
+  assert.equal(goalAmount("nope", { kind: "like", count: 3 }), 0);
+});
+
+test("the real follower count: the bar starts from it, a goal already passed moves up quietly, and a type change starts again", () => {
+  const { state, events, settings } = goalRig({ start: 0, target: 100, step: 25 });
+  state.add(3);
+  state.setLive(81371);
+  assert.deepEqual([state.value, state.gained], [81371, 0], "the real count replaces what was typed and what was counted");
+  assert.equal(state.goal, 81375, "100 is long passed, so the goal moves up by the step");
+  assert.ok(!events.includes("reached"), "nobody just reached it, so no celebration");
+  state.add(4);
+  assert.deepEqual(events.filter((e) => e === "reached"), ["reached"], "the next follower that gets there celebrates");
+  const stop = goalRig({ start: 0, target: 100, step: 0 });
+  stop.state.setLive(500);
+  assert.deepEqual([stop.state.goal, stop.state.reached], [100, true], "with no step the goal stays and the bar is full");
+  state.setSettings({ ...settings, type: "gift", target: 1000 });
+  assert.deepEqual([state.value, state.goal], [0, 1000], "a different type counts from the start again");
+});
+
+test("a goal's remembered count is kept apart for each type", () => {
+  assert.equal(goalKey("pond", "follow"), "frills:goal:pond", "followers keep the key links already use");
+  assert.notEqual(goalKey("pond", "gift"), goalKey("pond", "like"));
+  assert.notEqual(goalKey("pond", "gift"), goalKey("pond", "follow"));
 });
 
 test("a count is kept per account in the browser's storage, and bad or missing storage is harmless", () => {

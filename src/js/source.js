@@ -16,7 +16,7 @@ const COPY = {
  * The "where does chat come from" control. `host` is an empty element. Options: feeds, pace (a function giving [min, max] ms between
  * practice messages), platform and channel (to start with), autoconnect, waitlistUrl (shown beside the helper note when set).
  */
-export function mountSource(host, { feeds, pace, channel = "", platform = "tiktok", autoconnect = false, waitlistUrl = "", platforms = PLATFORMS, events = [], onAlert, onFound, onState, tools: showTools = true, idleHint = "Until you connect, the preview shows made-up messages." } = {}) {
+export function mountSource(host, { feeds, pace, channel = "", platform = "tiktok", autoconnect = false, waitlistUrl = "", platforms = PLATFORMS, events: eventsOf = [], onAlert, onInfo, onFound, onState, tools: showTools = true, idleHint = "Until you connect, the preview shows made-up messages." } = {}) {
   const list = Array.isArray(feeds) ? feeds : [feeds];
   let current = PLATFORMS.includes(platform) ? platform : "tiktok";
   const values = { tiktok: "", twitch: "" };
@@ -31,9 +31,12 @@ export function mountSource(host, { feeds, pace, channel = "", platform = "tikto
   const listeners = new Set();
   const changed = () => listeners.forEach((fn) => fn());
   // What the page waits for besides chat, in words ("follows", "gifts and likes"), so the status says that and not "chat".
+  const eventsNow = () => (typeof eventsOf === "function" ? eventsOf() : eventsOf); // a page can change what it wants (the goal's type)
   const WORDS = { follow: "follows", gift: "gifts", share: "shares", like: "likes" };
-  const names = events.map((kind) => WORDS[kind]).filter(Boolean);
-  const wants = names.length ? (names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0]) : "";
+  const wantsNow = () => {
+    const names = eventsNow().map((kind) => WORDS[kind]).filter(Boolean);
+    return names.length ? (names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0]) : "";
+  };
 
   const platformRow = el("div", { className: "chips" });
   platformRow.setAttribute("role", "group");
@@ -117,6 +120,8 @@ export function mountSource(host, { feeds, pace, channel = "", platform = "tikto
     go.textContent = "Disconnect";
     let fatal = false; // the connection gave up for good (Twitch refused the guest login, TikTok name not accepted)
     clearTimeout(silence);
+    const events = eventsNow();
+    const wants = wantsNow();
     let chatSeen = false;
     const seen = () => {
       chatSeen = true;
@@ -142,6 +147,7 @@ export function mountSource(host, { feeds, pace, channel = "", platform = "tikto
     }, {
       relay,
       events,
+      onInfo,
       // Anything arriving proves the account is LIVE and we are reading it: a follow or a like counts, not only a chat message.
       onAlert: onAlert && ((event) => { seen(); onAlert(event); }),
       onFirstMessage: seen,
@@ -195,5 +201,7 @@ export function mountSource(host, { feeds, pace, channel = "", platform = "tikto
     cleanChannel: () => cleanName(current, input.value),
     onChange: (fn) => listeners.add(fn),
     setPlatform: (id) => { platformChips.set(id); setPlatform(id); },
+    /** Connects again (for a page whose settings changed what it waits for). Does nothing when not connected. */
+    restart: () => { if (conn) { disconnect(); connectNow(); } },
   };
 }

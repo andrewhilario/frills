@@ -1,8 +1,8 @@
 // The Follower Goal overlay: what a streaming app opens. A see-through page with one progress bar.
-//   /overlay/goal/?channel=yourname&platform=tiktok&start=120&target=150&step=25      your account
-//   add &demo=1 to see practice followers instead of a real account
+//   /overlay/goal/?channel=yourname&platform=tiktok&type=follow&target=150&step=25      your account (type: follow, gift or like)
+//   add &demo=1 to see practice events instead of a real account
 
-import { GOAL, GoalState, loadGoal, saveGoal } from "./goal.js";
+import { GOAL, GOAL_TYPES, GoalState, goalAmount, loadGoal, saveGoal } from "./goal.js";
 import { createGoalView } from "./widgets-view.js";
 import { channelFromParams, connectEvents } from "./widget-overlay.js";
 import { fontsReady, generalFaces } from "./look.js";
@@ -19,7 +19,7 @@ const demo = params.get("demo") === "1";
 
 const view = createGoalView(document.getElementById("goal"));
 view.apply(settings);
-const remembered = settings.keep && channel ? loadGoal(globalThis.localStorage, channel) : null;
+const remembered = settings.keep && channel ? loadGoal(globalThis.localStorage, channel, settings.type) : null;
 const state = new GoalState(settings, {
   gained: remembered?.gained ?? 0,
   target: remembered?.goal,
@@ -36,11 +36,19 @@ view.update(state.snapshot);
 
 if (demo) {
   fontsReady(generalFaces(settings), 1000).then(() => {
-    const send = () => { state.follow(1 + Math.floor(Math.random() * 3)); setTimeout(send, demoPace ? demoPace * (0.6 + Math.random() * 0.8) : 1800 + Math.random() * 2500); };
+    const type = GOAL_TYPES[settings.type] ?? GOAL_TYPES.follow;
+    const send = () => { state.add(Math.max(1, Math.round(type.small * (1 + Math.random() * 2)))); setTimeout(send, demoPace ? demoPace * (0.6 + Math.random() * 0.8) : 1800 + Math.random() * 2500); };
     send();
   });
 } else if (!channel) {
   say("Add ?channel=yourname to this link.");
 } else {
-  fontsReady(generalFaces(settings), 1000).then(() => connectEvents({ channel, events: ["follow"], onAlert: (event) => event.kind === "follow" && state.follow(), say }));
+  fontsReady(generalFaces(settings), 1000).then(() => connectEvents({
+    channel,
+    events: [GOAL_TYPES[settings.type].kind],
+    onAlert: (event) => { const n = goalAmount(settings.type, event); if (n) state.add(n); },
+    // The account's real follower count: the bar starts from it instead of from the number typed in the editor.
+    onInfo: (info) => { if (settings.type === "follow" && settings.fromLive) state.setLive(info.followers); },
+    say,
+  }));
 }

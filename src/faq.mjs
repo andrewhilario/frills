@@ -48,8 +48,8 @@ export function faq({ kb, waitlistUrl, helperUrl, relayUrl }) {
       a: `Frills only reads public chat, never asks for a password, and stores nothing. ${relayUrl ? "On TikTok it doesn’t log in to your account either." : "The TikTok helper doesn’t log in to your TikTok account either."} TikTok offers no official way for overlays to read chat, so every overlay tool uses an unofficial one, and TikTok could change or block it. Frills isn’t affiliated with Twitch or TikTok.`,
     },
     {
-      q: "Does Frills have alerts, a last gifts list, a follower goal and top likers?",
-      a: "Yes, for TikTok LIVE, in beta. Alerts pop up for follows, gifts and shares with your own words, animation, effect, sound, image or GIF, and bigger gifts get a bigger alert. The last gifts list, the follower goal and the top likers ranking work the same way: pick a look, try it with the test buttons, and copy the link into your streaming app. See <a href=\"/overlays/\">all the overlays</a> and the <a href=\"/guides/alerts/\">alerts guide</a>.",
+      q: "Does Frills have alerts, a last gifts list, goals and top likers?",
+      a: "Yes, for TikTok LIVE, in beta. Alerts pop up for follows, gifts and shares with your own words, animation, effect, sound, image or GIF, and bigger gifts get a bigger alert. The last gifts list, the goals (followers, gifts or likes) and the top likers ranking work the same way: pick a look, try it with the test buttons, and copy the link into your streaming app. See <a href=\"/overlays/\">all the overlays</a> and the <a href=\"/guides/alerts/\">alerts guide</a>.",
     },
     {
       q: "How do I add it to my stream?",

@@ -21,9 +21,9 @@ import { Hub } from "./rooms.mjs";
 import { ALERT_KINDS } from "./map.mjs";
 import { DEMO_USER, DemoConnection } from "./demo.mjs";
 
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 /** What this program can do, so a page can tell an old one ("chat" only) from one that sends alerts. */
-const FEATURES = ["chat", "alerts"];
+const FEATURES = ["chat", "alerts", "info"];
 
 /** Makes a connection to TikTok for one account. The library is loaded only now, so everything else works (and is tested) without it. */
 export async function realFactory(user, { apiKey } = {}) {

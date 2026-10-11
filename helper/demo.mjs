@@ -32,6 +32,7 @@ export class DemoConnection extends EventEmitter {
     super();
     this.pace = pace;
     this.pretend = true; // the helper tells the page, so it never says "reading TikTok" about this
+    this.roomInfo = { data: { owner: { follow_info: { follower_count: 1280 } } } }; // like the details a real account gives
     this.timer = 0;
     this.gone = false;
     this.count = 0;

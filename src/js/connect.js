@@ -14,7 +14,7 @@ export const cleanName = (platform, input) => (platform === "tiktok" ? cleanTikT
  * Sends one account's chat into one or more feeds. Returns the connection: stop() ends it. For TikTok it first looks for where the chat
  * can come from (the helper on this PC, else the site's relay, `relay` being its address); with neither it says so.
  */
-export function connectTo(feeds, platform, name, onStatus, { relay = "", events = [], onAlert, onFound, onFirstMessage } = {}) {
+export function connectTo(feeds, platform, name, onStatus, { relay = "", events = [], onAlert, onInfo, onFound, onFirstMessage } = {}) {
   const list = Array.isArray(feeds) ? feeds : [feeds];
   let sawChat = false;
   const handlers = {
@@ -40,7 +40,7 @@ export function connectTo(feeds, platform, name, onStatus, { relay = "", events 
       onStatus?.({ state: "error", channel: login, platform: "tiktok", fatal: true, detail: relay ? "Couldn't reach TikTok chat. The free Frills relay isn't answering right now. Wait a minute and try again." : "TikTok chat needs the Frills helper running on this PC. It isn't answering here." });
       return;
     }
-    inner = connectTikTok({ user: name, base: found.base, events, onAlert, ...handlers });
+    inner = connectTikTok({ user: name, base: found.base, events, onAlert, onInfo, ...handlers });
   });
   return {
     stop() {

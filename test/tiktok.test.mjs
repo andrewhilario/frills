@@ -229,3 +229,16 @@ test("a bad TikTok name fails at once, without opening a connection", () => {
   assert.equal(status[0].state, "error");
   assert.equal(status[0].fatal, true);
 });
+
+test("the page side takes the account's follower count, and ignores a damaged one", () => {
+  const source = fakeEventSource();
+  const infos = [];
+  connectTikTok({ user: "pond.pal", eventSourceFactory: () => source, onInfo: (i) => infos.push(i) });
+  source.send("info", { followers: 81371 });
+  source.send("info", { followers: "lots" });
+  source.send("info", { followers: -5 });
+  source.send("info", { followers: 1e12 });
+  source.send("info", {});
+  source.send("info", "{ not json");
+  assert.deepEqual(infos, [{ followers: 81371 }]);
+});

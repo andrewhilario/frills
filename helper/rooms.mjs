@@ -33,6 +33,8 @@ export class Room {
     this.counts = { chat: 0, gift: 0, follow: 0, share: 0 };
     this.report = 0;
     this.likes = new Map(); // person -> likes counted in the current second
+    this.base = 0; // the account's follower count when we connected (0 when TikTok did not say)
+    this.followed = 0; // follows seen since then, so a page that joins later is told a current number
     this.likeTimer = 0;
   }
 
@@ -40,7 +42,25 @@ export class Room {
     clearTimeout(this.idleTimer);
     this.clients.add(client);
     client.send("status", this.status);
+    if (this.base > 0) client.send("info", this.info());
     if (!this.running) this.start();
+  }
+
+  /** What the room knows about the account itself. Only the follower count, and only when TikTok gave it. */
+  info() {
+    return { followers: this.base + this.followed };
+  }
+
+  /** Reads the follower count from the room details TikTok gave when we connected, and tells the pages. */
+  readInfo(conn) {
+    let followers = 0;
+    try {
+      const room = conn.roomInfo;
+      followers = Math.round(Number((room?.data ?? room)?.owner?.follow_info?.follower_count));
+    } catch { /* no details: pages keep the number the streamer typed */ }
+    this.base = Number.isFinite(followers) && followers > 0 && followers < 1e10 ? followers : 0;
+    this.followed = 0;
+    if (this.base > 0) this.broadcast("info", this.info());
   }
 
   remove(client) {
@@ -131,6 +151,7 @@ export class Room {
   alert(m) {
     if (!m || !this.fresh(m.id && `alert:${m.kind}:${m.id}`)) return;
     if (m.kind in this.counts) this.counts[m.kind] += 1;
+    if (m.kind === "follow") this.followed += 1;
     this.broadcast("alert", m);
   }
 
@@ -156,6 +177,7 @@ export class Room {
       this.letGo(conn);
       return { kind: "stopped" };
     }
+    this.readInfo(conn);
     this.setStatus("connected", conn.pretend ? "Practice chat made up by Frills. Nothing comes from TikTok." : "");
     const how = await ended;
     this.letGo(conn);

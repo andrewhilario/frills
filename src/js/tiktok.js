@@ -117,7 +117,7 @@ export async function findTikTokSource(relayBase = "") {
  * `events` (a list of "follow", "gift", "share") also asks for those alerts, which arrive at onAlert(alert).
  * States: connecting, connected, offline (not live yet), reconnecting, limited, helper-lost, error, stopped. Returns { stop() }.
  */
-export function connectTikTok({ user, base = "", onMessage, onRemove, onClear, onStatus, onAlert, events = [], eventSourceFactory } = {}) {
+export function connectTikTok({ user, base = "", onMessage, onRemove, onClear, onStatus, onAlert, onInfo, events = [], eventSourceFactory } = {}) {
   const name = cleanTikTokUser(user);
   const say = (state, detail, fatal = false, extra = {}) => onStatus && onStatus({ state, channel: name, detail, fatal, platform: "tiktok", ...extra });
   if (!name) {
@@ -137,6 +137,11 @@ export function connectTikTok({ user, base = "", onMessage, onRemove, onClear, o
   listen("status", (s) => say(String(s.state ?? ""), typeof s.detail === "string" ? s.detail : "", s.fatal === true, { position: Number(s.position) || 0, total: Number(s.total) || 0 }));
   listen("chat", (raw) => { const m = acceptMessage(raw); if (m && onMessage) onMessage(m); });
   listen("alert", (raw) => { const a = acceptAlert(raw); if (a && onAlert) onAlert(a); });
+  // What the account itself says (its follower count), sent once when the relay connects. Anything odd is ignored.
+  listen("info", (raw) => {
+    const followers = Math.round(Number(raw?.followers));
+    if (onInfo && Number.isFinite(followers) && followers > 0 && followers < 1e10) onInfo({ followers });
+  });
   listen("remove", ({ id }) => id && onRemove && onRemove({ id: String(id) }));
   listen("clear", ({ user: who }) => who && onClear && onClear({ user: String(who) }));
   source.onerror = () => {
