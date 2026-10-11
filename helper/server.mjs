@@ -50,7 +50,9 @@ export async function realFactory(user, { apiKey } = {}) {
 export function createHelper({ distDir, factory = realFactory, apiKey = "", log = () => {}, demoPace, relay = null, ...tuning } = {}) {
   // The one built-in account, frills_demo, never reaches TikTok: it makes up chat so the whole chain can be tested without a LIVE.
   const make = (user, options) => (user === DEMO_USER ? new DemoConnection({ pace: demoPace }) : factory(user, options));
-  const shared = relay ? { queue: true, idleStopMs: 60000, offlineWaitMs: 60000, maxRooms: relay.slots ?? 30 } : {};
+  // Each connect to TikTok costs a request to the free signing service (a few thousand a day at most), so a shared relay keeps an account
+  // for 10 minutes after its last page leaves (coming back is free), looks for an offline account every 3 minutes, and gives up after 30.
+  const shared = relay ? { queue: true, idleStopMs: 600000, offlineWaitMs: 180000, offlineGiveUpMs: 1800000, maxRooms: relay.slots ?? 30 } : {};
   const hub = new Hub({ factory: make, apiKey, log, ...shared, ...tuning });
   const nothing = (req, res) => {
     res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });

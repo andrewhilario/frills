@@ -209,19 +209,27 @@ export class Room {
       if (c.chat || c.gift || c.follow || c.share) this.hub.log(`@${this.user}: ${c.chat} chat, ${c.gift} gifts, ${c.follow} follows and ${c.share} shares in the last minute`);
       this.counts = { chat: 0, gift: 0, follow: 0, share: 0 };
     }, 60000);
-    const { offlineWaitMs, limitedWaitMs, backoffMs } = this.hub.opts;
+    const { offlineWaitMs, offlineGiveUpMs, limitedWaitMs, backoffMs } = this.hub.opts;
     let attempt = 0;
+    let offlineSince = 0; // when this wait for a LIVE began; each look at TikTok costs a request, so it does not go on for ever
     let quiet = false; // while waiting for a LIVE to start, keep saying so instead of flickering to "connecting" at every look
     while (!this.stopped) {
       if (!quiet) this.setStatus(attempt === 0 ? "connecting" : "reconnecting");
       const how = await this.once();
       if (this.stopped || how.kind === "stopped") break;
       if (how.wasConnected) attempt = 0;
+      if (how.kind !== "offline") offlineSince = 0;
       quiet = how.kind === "offline" || how.kind === "limited";
       if (how.kind === "fatal") {
         this.setStatus("error", how.detail, true);
         break;
       } else if (how.kind === "offline") {
+        offlineSince ||= Date.now();
+        if (offlineGiveUpMs > 0 && Date.now() - offlineSince >= offlineGiveUpMs) {
+          // Stop looking. A page that connects again (or the person pressing Connect) starts the wait afresh.
+          this.setStatus("offline", "Still not live after a long wait, so Frills stopped looking. Press Disconnect, then Connect again when you go LIVE.");
+          break;
+        }
         this.setStatus("offline", how.detail ?? "");
         await this.sleep(offlineWaitMs);
       } else if (how.kind === "limited") {
@@ -297,7 +305,7 @@ class Waiting {
 
 export class Hub {
   constructor(opts = {}) {
-    this.opts = { factory: null, apiKey: "", maxRooms: 3, queue: false, queueGraceMs: 20000, idleStopMs: 30000, offlineWaitMs: 20000, limitedWaitMs: 60000, backoffMs: [3000, 6000, 12000, 30000, 60000], ...opts };
+    this.opts = { factory: null, apiKey: "", maxRooms: 3, queue: false, queueGraceMs: 20000, idleStopMs: 30000, offlineWaitMs: 20000, limitedWaitMs: 60000, offlineGiveUpMs: 0, backoffMs: [3000, 6000, 12000, 30000, 60000], ...opts };
     this.log = opts.log ?? (() => {});
     this.rooms = new Map();
     this.waiting = new Map(); // accounts in line for a spot, oldest first

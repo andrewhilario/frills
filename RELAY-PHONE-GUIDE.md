@@ -198,6 +198,16 @@ Never put the key or the tunnel token in a link, a message or GitHub.
 
 ## Updating
 
+One command does it all (stop, get the new code, install, start, health check):
+
+```bash
+bash ~/frills/update-relay.sh
+```
+
+It starts the relay with 50 spots. For a different number: `RELAY_SLOTS=30 bash ~/frills/update-relay.sh`. The tunnel is not touched.
+
+The same steps by hand, if you ever need them:
+
 ```bash
 tmux kill-session -t relay
 ```
@@ -207,8 +217,15 @@ cd ~/frills && git pull && (cd helper && npm install)
 ```
 
 ```bash
-tmux new-session -d -s relay "RELAY_SLOTS=10 npm run relay"
+tmux new-session -d -s relay "cd ~/frills/helper && RELAY_SLOTS=50 npm run relay"
 ```
+
+## How it saves requests to the signing service
+
+Every time the relay connects to a TikTok account it uses a request to a free signing service, which allows only so many a day. So:
+
+- An account stays connected for **10 minutes** after its last page closes. Opening it again in that time costs nothing and connects at once.
+- An account that is **not live yet** is looked for every **3 minutes**, and Frills **stops looking after 30 minutes**. Pressing Disconnect and Connect on the page starts it again.
 
 ## If something goes wrong
 

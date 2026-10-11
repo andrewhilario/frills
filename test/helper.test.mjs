@@ -274,3 +274,23 @@ test("it only ever listens on this computer", async () => {
   assert.equal(helper.server.address().address, "127.0.0.1");
   await helper.close();
 });
+
+test("an account that never goes live is looked for only so long, and a new connection starts the wait again", async () => {
+  class UserOfflineError extends Error {}
+  const never = Array.from({ length: 40 }, () => ({ failWith: new UserOfflineError("not live") }));
+  const { factory, made } = scripted(...never);
+  await start(factory, { offlineWaitMs: 20, offlineGiveUpMs: 150 });
+  const page = listen("pond.pal");
+  await page.until(() => helper.hub.rooms.get("pond.pal")?.status.detail.startsWith("Still not live"), 3000);
+  const room = helper.hub.rooms.get("pond.pal");
+  const looks = made.length;
+  assert.ok(looks >= 2 && looks < 20, "it looked several times, then stopped: " + looks);
+  await sleep(150);
+  assert.equal(made.length, looks, "no more requests to TikTok once it gave up");
+  assert.equal(room.running, false);
+  await page.close();
+  const again = listen("pond.pal");
+  await again.until(() => made.length > looks, 3000);
+  await again.close();
+  await helper.close();
+});
