@@ -63,6 +63,20 @@ test("overlay: gifts from a TikTok LIVE are listed, newest at the bottom, the ol
   assert.deepEqual(await rows(), ["Cat → Panda", "Dan → Panda", "Eve → Panda"], "Ann was too small, Ben left to make room");
 });
 
+test("overlay: a new gift animates only itself, the rows already there stay still", { skip }, async () => {
+  const { base, made } = await withHelper();
+  await page.goto(`${base}/overlay/gifts/?channel=pond_cafe&platform=tiktok&max=5`, { settle: 800 });
+  await until(() => made.length === 1);
+  await sleep(150);
+  made[0].emit("gift", gift("g1", "Ann", "Panda", 100));
+  await until(async () => (await rows()).length === 1);
+  await sleep(900); // the first row has finished arriving
+  made[0].emit("gift", gift("g2", "Ben", "Panda", 100));
+  await until(async () => (await rows()).length === 2);
+  const moving = await page.evaluate(`document.querySelector(".gift").getAnimations().length`);
+  assert.equal(moving, 0, "the first row is not animated again when the second arrives");
+});
+
 test("overlay: new gifts go at the top when asked, and the value shows when asked", { skip }, async () => {
   const { base, made } = await withHelper();
   await page.goto(`${base}/overlay/gifts/?channel=pond_cafe&platform=tiktok&order=top&showDiamonds=1`, { settle: 800 });

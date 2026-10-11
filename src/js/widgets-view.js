@@ -27,6 +27,8 @@ export function createGiftsView(host) {
       words.append(piece.mark ? el("strong", { className: "gift__mark", textContent: piece.text }) : document.createTextNode(piece.text));
     }
     const node = el("div", { className: "gift gift--in" });
+    // The entrance is played once. Without this, anything that moves the row in the page (see render) would play it again.
+    node.addEventListener("animationend", () => node.classList.remove("gift--in"), { once: true });
     if (settings.avatar) {
       const av = el("span", { className: "gift__av", textContent: [...(item.name || "?")][0].toUpperCase() });
       av.setAttribute("aria-hidden", "true");
@@ -62,7 +64,14 @@ export function createGiftsView(host) {
         nodes.set(item.key, node);
         rows.append(node);
       }
-      for (const item of items) rows.append(nodes.get(item.key)); // keeps the rows in the list's order
+      // Keep the rows in the list's order, moving a row only when it is out of place: moving one makes the browser play its animations again.
+      let before = rows.firstChild;
+      for (const item of items) {
+        const node = nodes.get(item.key);
+        while (before && before !== node && before.classList.contains("gift--out")) before = before.nextSibling; // rows on their way out stay where they are
+        if (before === node) before = node.nextSibling;
+        else rows.insertBefore(node, before);
+      }
     },
     gone(item) {
       const node = nodes.get(item.key);
