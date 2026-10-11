@@ -142,7 +142,7 @@ test("overlays page: the live ones link to their editors, and the coming ones ar
   const { base } = await withHelper();
   await page.goto(base + "/overlays/", { settle: 600 });
   const links = await page.evaluate(`[...document.querySelectorAll(".tool:not(.tool--soon) a.btn")].map((a) => a.getAttribute("href"))`);
-  assert.deepEqual(links, ["/editor/", "/matcha/", "/alerts/", "/gifts/", "/goal/"]);
+  assert.deepEqual(links, ["/editor/", "/alerts/", "/gifts/", "/goal/"]);
   const soon = await page.evaluate(`[...document.querySelectorAll(".tool--soon")].map((t) => [t.querySelector(".subtitle").textContent, t.querySelectorAll("a").length])`);
   assert.deepEqual(soon.map((s) => s[0]), ["Free sound library", "Top likers", "TikTok and Twitch chat together", "Like and subscriber alerts"]);
   assert.ok(soon.every((s) => s[1] === 0), "a coming-soon card links nowhere");
