@@ -10,6 +10,9 @@ import { fontsReady, generalFaces } from "./look.js";
 
 const params = new URLSearchParams(location.search);
 const settings = GIFTS.sanitize(GIFTS.fromParams(params));
+// ?pace=1500 makes the practice (demo) events come about that many milliseconds apart: handy for trying a look, or for filming it
+const demoPace = Math.min(10000, Math.max(300, Number(params.get("pace")) || 0)) || 0;
+
 const note = document.getElementById("note");
 const say = (text) => { note.hidden = !text; note.textContent = text; };
 
@@ -20,7 +23,7 @@ const list = new GiftList(settings, { onChange: (items) => view.render(items), o
 const channel = channelFromParams(params);
 if (params.get("demo") === "1") {
   fontsReady(generalFaces(settings), 1000).then(() => {
-    const send = () => { list.add(fakeAlert("gift")); setTimeout(send, 1500 + Math.random() * 2500); };
+    const send = () => { list.add(fakeAlert("gift")); setTimeout(send, demoPace ? demoPace * (0.6 + Math.random() * 0.8) : 1500 + Math.random() * 2500); };
     send();
   });
 } else if (!channel) {

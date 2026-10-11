@@ -26,14 +26,18 @@ export function fakeAlert(kind, { size, name } = {}) {
 /** A crowd of follows (or shares) arriving together, to see them join. */
 export const fakeCrowd = (kind = "follow", size = 6) => Array.from({ length: size }, () => fakeAlert(kind));
 
-/** Sends practice alerts to `push` now and then, at a pace you can change. Returns { stop() }. */
-export function fakeAlertSource(push, getPace = () => [1800, 4200]) {
+/**
+ * Sends practice alerts to `push` now and then, at a pace you can change. `only` (a list of "follow", "share", "gift") keeps the practice
+ * to those kinds, with no crowds. Returns { stop() }.
+ */
+export function fakeAlertSource(push, getPace = () => [1800, 4200], only = []) {
   let stopped = false;
   let timer = 0;
   const loop = () => {
     if (stopped) return;
     const roll = Math.random();
-    if (roll < 0.08) fakeCrowd().forEach((a, i) => setTimeout(() => !stopped && push(a), i * 200));
+    if (only.length) push(fakeAlert(only[Math.floor(Math.random() * only.length)]));
+    else if (roll < 0.08) fakeCrowd().forEach((a, i) => setTimeout(() => !stopped && push(a), i * 200));
     else push(fakeAlert(roll < 0.45 ? "follow" : roll < 0.6 ? "share" : "gift"));
     const [lo, hi] = getPace();
     timer = setTimeout(loop, lo + Math.random() * (hi - lo));

@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 import { GIFTS, GiftList } from "../src/js/gifts.js";
 import { GOAL, GoalState, goalKey, loadGoal, saveGoal } from "../src/js/goal.js";
 import { LOOKS, coerce } from "../src/js/widget-settings.js";
-import { fakeAlert } from "../src/js/fake-alerts.js";
+import { fakeAlert, fakeAlertSource } from "../src/js/fake-alerts.js";
 
 function clock() {
   let now = 0;
@@ -107,6 +107,15 @@ test("making the list shorter drops the oldest at once, and clear empties it", (
   list.clear();
   assert.deepEqual(list.items, []);
   assert.equal(fakeAlert("gift", { size: 3 }).diamonds >= 1000, true, "the practice gifts have sizes");
+});
+
+test("the practice alerts can be kept to the kinds asked for", async () => {
+  const seen = [];
+  const source = fakeAlertSource((alert) => seen.push(alert.kind), () => [1, 2], ["follow", "gift"]);
+  for (let waited = 0; seen.length < 6 && waited < 5000; waited += 25) await new Promise((resolve) => setTimeout(resolve, 25));
+  source.stop();
+  assert.equal(seen.length > 5, true);
+  assert.equal(seen.every((kind) => kind === "follow" || kind === "gift"), true);
 });
 
 // ── the follower goal ───────────────────────────────────────────────────────────────────────────────────────────────

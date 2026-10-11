@@ -14,6 +14,11 @@ import { fontsReady, generalFaces } from "./look.js";
 
 const params = new URLSearchParams(location.search);
 const settings = sanitize(fromParams(params));
+// ?pace=1500 makes the practice (demo) events come about that many milliseconds apart: handy for trying a look, or for filming it
+const demoPace = Math.min(10000, Math.max(300, Number(params.get("pace")) || 0)) || 0;
+// ?only=follow,gift keeps the practice to those kinds
+const demoOnly = (params.get("only") ?? "").split(",").filter((kind) => ["follow", "share", "gift"].includes(kind));
+
 const note = document.getElementById("note");
 const say = (text) => { note.hidden = !text; note.textContent = text; };
 
@@ -38,7 +43,7 @@ const push = (event) => {
 
 const channel = cleanName("tiktok", params.get("channel"));
 if (params.get("demo") === "1") {
-  fontsReady(generalFaces(settings), 1000).then(() => fakeAlertSource(push));
+  fontsReady(generalFaces(settings), 1000).then(() => fakeAlertSource(push, demoPace ? () => [demoPace * 0.6, demoPace * 1.4] : undefined, demoOnly));
 } else if (!channel) {
   say("Add ?channel=yourname to this link.");
 } else {
