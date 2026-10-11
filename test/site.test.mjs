@@ -25,7 +25,7 @@ const assetOf = (html, kind) => (new RegExp(`${kind === "css" ? 'href="(/assets/
 
 test("the pages we expect are all there", () => {
   const urls = pages.map((p) => p.url).sort();
-  assert.deepEqual(urls, ["/", "/404.html", "/alerts/", "/editor/", "/feedback/", "/guides/alerts/", "/guides/obs/", "/guides/test/", "/guides/tiktok/", "/matcha/", "/overlay/", "/overlay/alerts/", "/privacy/"]);
+  assert.deepEqual(urls, ["/", "/404.html", "/alerts/", "/editor/", "/feedback/", "/gifts/", "/goal/", "/guides/alerts/", "/guides/obs/", "/guides/test/", "/guides/tiktok/", "/matcha/", "/overlay/", "/overlay/alerts/", "/overlay/gifts/", "/overlay/goal/", "/overlays/", "/privacy/"]);
 });
 
 test("every indexable page has its own title and description, a canonical address, share tags and one h1", () => {
@@ -65,7 +65,7 @@ test("the sitemap lists exactly the indexable pages", () => {
   const sitemap = read("sitemap.xml");
   const listed = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]).sort();
   assert.deepEqual(listed, indexable.filter((p) => p.url !== "/404.html").map((p) => site.url + p.url).sort());
-  assert.doesNotMatch(sitemap, /matcha|overlay|og-card/);
+  assert.doesNotMatch(sitemap, /matcha|\/overlay\/|og-card/); // (the /overlays/ page is a normal page; the overlay pages themselves are not listed)
 });
 
 test("robots.txt keeps training crawlers out, lets search and assistant crawlers in, and points at the sitemap", () => {

@@ -122,6 +122,11 @@ export function buildControl(control, value, onSet, { id = "c-" + control.key } 
     input.addEventListener("change", () => onSet(input.value));
     row.append(label(), input);
     write = (v) => { input.value = v; };
+  } else if (control.type === "number") {
+    const input = el("input", { type: "number", id, min: control.min, max: control.max, step: 1, inputMode: "numeric" });
+    input.addEventListener("input", () => { if (input.value !== "") onSet(Number(input.value)); });
+    row.append(label(), input);
+    write = (v) => { input.value = String(v); };
   } else if (control.type === "text") {
     row.classList.add("ctl--wide");
     const input = el("input", { type: "text", id, maxLength: control.max, autocomplete: "off", spellcheck: false });

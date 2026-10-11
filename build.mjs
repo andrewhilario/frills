@@ -55,8 +55,8 @@ mkdirSync(dist, { recursive: true });
 if (existsSync(join(root, "public"))) cpSync(join(root, "public"), dist, { recursive: true });
 
 const common = { absWorkingDir: root, bundle: true, minify: true, metafile: true, logLevel: "warning", outdir: join(dist, "assets"), entryNames: "[name]-[hash]", target: ["chrome100", "firefox100", "safari15"] };
-const jsEntries = { home: "src/js/home.js", editor: "src/js/editor.js", overlay: "src/js/overlay.js", matcha: "src/js/matcha-page.js", page: "src/js/page.js", feedback: "src/js/feedback.js", alerts: "src/js/alerts-editor.js", alertsOverlay: "src/js/alerts-overlay.js", ...(withOgCard && { og: "src/js/og.js" }) };
-const cssEntries = { home: "src/css/entry/home.css", page: "src/css/entry/page.css", editor: "src/css/entry/editor.css", matcha: "src/css/entry/matcha.css", overlay: "src/css/entry/overlay.css", alerts: "src/css/entry/alerts.css", alertsOverlay: "src/css/entry/alerts-overlay.css", ...(withOgCard && { og: "src/css/entry/og.css" }) };
+const jsEntries = { home: "src/js/home.js", editor: "src/js/editor.js", overlay: "src/js/overlay.js", matcha: "src/js/matcha-page.js", page: "src/js/page.js", feedback: "src/js/feedback.js", alerts: "src/js/alerts-editor.js", alertsOverlay: "src/js/alerts-overlay.js", gifts: "src/js/gifts-editor.js", goal: "src/js/goal-editor.js", giftsOverlay: "src/js/gifts-overlay.js", goalOverlay: "src/js/goal-overlay.js", ...(withOgCard && { og: "src/js/og.js" }) };
+const cssEntries = { home: "src/css/entry/home.css", page: "src/css/entry/page.css", editor: "src/css/entry/editor.css", matcha: "src/css/entry/matcha.css", overlay: "src/css/entry/overlay.css", alerts: "src/css/entry/alerts.css", alertsOverlay: "src/css/entry/alerts-overlay.css", widget: "src/css/entry/widget.css", widgetOverlay: "src/css/entry/widget-overlay.css", ...(withOgCard && { og: "src/css/entry/og.css" }) };
 const jsBuild = await esbuild({ ...common, entryPoints: jsEntries, format: "iife", legalComments: "none" });
 const cssBuild = await esbuild({ ...common, entryPoints: cssEntries, external: ["/fonts/*"], legalComments: "inline" });
 
@@ -141,6 +141,7 @@ const shared = {
   helperGet,
   relay: site.relayUrl,
   siteAddress: site.url,
+  privacyAlerts: relayOn ? `\n      <h2 class="subtitle">Alerts, last gifts and the follower goal</h2>\n      <p>These work like chat: follows, gifts and shares pass through the free Frills relay to your overlay and nobody keeps them. The list of gifts and the follower count live only in your overlay page\u2019s memory. If you turn on \u201cremember the count\u201d, it is kept in your own browser or streaming app and nowhere else.</p>\n      <p>Images, GIFs and sounds you upload for alerts are stored by Frills, in the same database as feedback, until you delete them with the delete code you were given or we remove them. Your link carries only a short code for each file, and the files are not listed anywhere. We do not store who uploaded them.</p>` : "",
   privacyFeedback: site.feedbackForm ? `\n      <h2 class="subtitle">If you send feedback</h2>\n      <p>The feedback form saves your message, the kind you pick, the streaming app you pick, your contact if you type one, and the date, in a database on Cloudflare. It does not save your address with the message. Only we read it, and we use it to improve Frills. Ask us to delete a message by sending another one that says which.</p>` : "",
   gscTag: site.googleSiteVerification ? `\n<meta name="google-site-verification" content="${esc(site.googleSiteVerification)}">` : "",
   tallyUrl: site.tally.url,
@@ -185,6 +186,7 @@ function renderPage(page, stats) {
     navTikTok: meta.navTikTok ? ' aria-current="page"' : "",
     navTest: meta.navTest ? ' aria-current="page"' : "",
     navFeedback: meta.navFeedback ? ' aria-current="page"' : "",
+    navOverlays: meta.navOverlays ? ' aria-current="page"' : "",
     faqItems: faqItems.map((i) => `        <details><summary>${esc(i.q)}</summary><div class="faq__answer"><p>${i.a}</p></div></details>`).join("\n"),
   };
   const where = relative(root, page.file);

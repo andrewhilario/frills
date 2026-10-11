@@ -203,3 +203,16 @@
 .article__body code { overflow-wrap: anywhere; }
 .linkbox { padding: var(--space-md); font-family: var(--font-label); font-size: var(--text-sm); overflow-wrap: anywhere; background: var(--color-paper-2); border: 2px dashed var(--color-rule-2); border-radius: var(--radius-input); }
 .article__foot { margin-top: var(--space-xl); }
+
+/* The overlays page: a card for each overlay, and dashed ones for what is coming. */
+.article__body .tools { padding-left: 0; }
+.tools { display: grid; gap: var(--space-lg); grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr)); margin: var(--space-md) 0 var(--space-xl); padding: 0; list-style: none; }
+.tool { display: grid; align-content: start; gap: var(--space-sm); padding: var(--space-lg); background: var(--color-paper); border: 2.5px solid var(--color-ink); border-radius: var(--radius-card); box-shadow: 0 5px 0 var(--color-ink); }
+.tool .subtitle { margin: 0; }
+.tool p { margin: 0; color: var(--color-ink-2); }
+.tool .btn { justify-self: start; margin-top: var(--space-xs); }
+.tool--soon { border-style: dashed; box-shadow: none; background: var(--color-paper-2); }
+.tool__badge { justify-self: start; padding: 2px 12px; border-radius: 999px; border: 2px solid var(--color-ink); font-family: var(--font-label); font-size: var(--text-xs); letter-spacing: 0.08em; text-transform: uppercase; }
+.tool__badge--live { background: var(--color-mint-tint); }
+.tool__badge--beta { background: var(--color-accent); }
+.tool__badge--soon { background: var(--color-lavender-tint); }
