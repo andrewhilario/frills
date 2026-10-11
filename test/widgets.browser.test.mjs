@@ -121,6 +121,16 @@ test("overlay: with remember turned on, the count survives a reload", { skip }, 
   assert.equal(await text(".goal__numbers"), "2 / 100", "remembered");
 });
 
+test("editor: the follower goal talks about follows, not chat, and a follow counts as reading", { skip }, async () => {
+  const { base, made } = await withHelper();
+  await page.goto(base + "/goal/?channel=pond_cafe", { settle: 800 });
+  await until(() => made.length === 1);
+  await until(async () => /^Connected to TikTok\. Waiting for follows\./.test((await text("#source-status")) ?? ""));
+  await sleep(150);
+  made[0].emit("follow", follow("f1", "Ann"));
+  await until(async () => (await text("#source-status")) === "Reading @pond_cafe's LIVE. Follows will show up here.");
+});
+
 test("editor: the gifts test buttons list gifts, and changing the words and the link work", { skip }, async () => {
   const { base } = await withHelper();
   await page.goto(base + "/gifts/", { settle: 800 });

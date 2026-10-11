@@ -56,9 +56,10 @@ const STATUS = {
   connecting: (s) => `Connecting to ${who(s)}…`,
   // Connected is not the same as reading: TikTok accepts a connection to an account that is not LIVE, and then nothing arrives. So for
   // TikTok it says what is true until the first message comes, and the page changes it to "Reading ..." when one does.
-  connected: (s) => s.detail || (s.platform === "tiktok" ? "Connected to TikTok. Waiting for the first chat message. Real chat only shows while you are LIVE." : `Reading chat from ${who(s)}`),
-  reading: (s) => `Reading ${who(s)}'s LIVE chat`,
-  silent: () => "Nothing has arrived yet. Are you LIVE? Real chat only shows while you are LIVE. If you just went LIVE, press Disconnect and then Connect again.",
+  // `wants` is set by the overlays that wait for events other than chat ("follows", "likes"): they say that, not "chat".
+  connected: (s) => s.detail || (s.wants ? `Connected to TikTok. Waiting for ${s.wants}. They only come while the account is LIVE.` : s.platform === "tiktok" ? "Connected to TikTok. Waiting for the first chat message. Real chat only shows while you are LIVE." : `Reading chat from ${who(s)}`),
+  reading: (s) => (s.wants ? `Reading ${who(s)}'s LIVE. ${s.wants[0].toUpperCase()}${s.wants.slice(1)} will show up here.` : `Reading ${who(s)}'s LIVE chat`),
+  silent: (s) => (s.wants ? `Nothing has arrived yet. Is the account LIVE right now? Real ${s.wants} only come while it is LIVE and someone does it. If you just went LIVE, press Disconnect and then Connect again.` : "Nothing has arrived yet. Are you LIVE? Real chat only shows while you are LIVE. If you just went LIVE, press Disconnect and then Connect again."),
   queued: (s) => (s.position ? `The free relay is full. Waiting for a spot: ${s.position} of ${s.total}…` : "The free relay is full. Waiting for a spot…"),
   offline: (s) => s.detail || `${who(s)} isn't live right now. Waiting for the LIVE to start…`,
   limited: (s) => s.detail || "TikTok's free connection is busy. Trying again in a minute…",

@@ -30,6 +30,10 @@ export function mountSource(host, { feeds, pace, channel = "", platform = "tikto
   let silence = 0; // the timer that says "nothing has arrived yet" // a click that is still waiting on the helper check gives way to a newer one
   const listeners = new Set();
   const changed = () => listeners.forEach((fn) => fn());
+  // What the page waits for besides chat, in words ("follows", "gifts and likes"), so the status says that and not "chat".
+  const WORDS = { follow: "follows", gift: "gifts", share: "shares", like: "likes" };
+  const names = events.map((kind) => WORDS[kind]).filter(Boolean);
+  const wants = names.length ? (names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0]) : "";
 
   const platformRow = el("div", { className: "chips" });
   platformRow.setAttribute("role", "group");
@@ -114,31 +118,33 @@ export function mountSource(host, { feeds, pace, channel = "", platform = "tikto
     let fatal = false; // the connection gave up for good (Twitch refused the guest login, TikTok name not accepted)
     clearTimeout(silence);
     let chatSeen = false;
+    const seen = () => {
+      chatSeen = true;
+      clearTimeout(silence);
+      if (current === "tiktok" && !pretend && status.dataset.state !== "error") setStatus("connected", statusText({ state: "reading", platform: current, channel: name, wants }));
+    };
     let pretend = false; // the practice account says so itself, and keeps saying it
     conn = connectTo(list, current, name, (s) => {
       onState?.(s.state);
       if (s.state === "connected" && s.detail) pretend = true;
       if (s.state === "connected" && chatSeen) return; // already reading: a status repeat does not take that back
-      setStatus(s.state, statusText(s));
+      setStatus(s.state, statusText({ ...s, wants }));
       // TikTok can accept a connection to an account that is not LIVE, and then nothing ever arrives. After a while of nothing, say so.
       clearTimeout(silence);
       if (s.platform === "tiktok" && s.state === "connected" && !s.detail) {
-        silence = setTimeout(() => { if (!chatSeen && conn) setStatus("silent", statusText({ state: "silent" })); }, 20000);
+        silence = setTimeout(() => { if (!chatSeen && conn) setStatus("silent", statusText({ state: "silent", wants })); }, 20000);
       }
       if (s.fatal) {
         fatal = true;
-        disconnect(statusText(s));
-        setStatus("error", statusText(s));
+        disconnect(statusText({ ...s, wants }));
+        setStatus("error", statusText({ ...s, wants }));
       }
     }, {
       relay,
       events,
-      onAlert,
-      onFirstMessage: () => {
-        chatSeen = true;
-        clearTimeout(silence);
-        if (current === "tiktok" && !pretend && status.dataset.state !== "error") setStatus("connected", statusText({ state: "reading", platform: current, channel: name }));
-      },
+      // Anything arriving proves the account is LIVE and we are reading it: a follow or a like counts, not only a chat message.
+      onAlert: onAlert && ((event) => { seen(); onAlert(event); }),
+      onFirstMessage: seen,
     });
     if (fatal) conn = null;
   }

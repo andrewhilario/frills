@@ -52,6 +52,9 @@ test("something else answering at the address is not mistaken for a helper or a 
 
 test("waiting in line reads as a place, and the number of people", () => {
   assert.equal(statusText({ state: "queued", platform: "tiktok", position: 3, total: 12 }), "The free relay is full. Waiting for a spot: 3 of 12…");
+  assert.match(statusText({ state: "connected", platform: "tiktok", wants: "likes" }), /^Connected to TikTok. Waiting for likes./, "the overlays that wait for likes do not talk about chat");
+  assert.doesNotMatch(statusText({ state: "silent", platform: "tiktok", wants: "follows" }), /chat/i);
+  assert.match(statusText({ state: "reading", platform: "tiktok", channel: "pond", wants: "follows" }), /^Reading @pond's LIVE. Follows will show up here.$/);
   assert.equal(statusText({ state: "queued", platform: "tiktok" }), "The free relay is full. Waiting for a spot…");
   assert.equal(statusText({ state: "helper-lost", platform: "tiktok", detail: "Lost the free Frills relay. This reconnects by itself." }), "Lost the free Frills relay. This reconnects by itself.");
 });
