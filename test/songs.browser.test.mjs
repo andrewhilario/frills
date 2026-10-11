@@ -179,7 +179,7 @@ test("overlay: layouts and what it shows come from the link", { skip }, async ()
   const probe = () => page.evaluate(`(() => {
     const now = document.querySelector(".song--now");
     const shown = (selector) => { const e = document.querySelector(selector); return Boolean(e) && e.getClientRects().length > 0; }; // drawn at all (a hidden parent counts)
-    return { layout: now?.dataset.layout ?? null, now: shown(".songs__now .song"), rows: shown(".songs__rows .song"), title: shown(".songs__title"), by: shown(".song--now .song__by"), label: shown(".song--now .song__label") };
+    return { layout: document.querySelector(".songs")?.dataset.layout ?? null, now: shown(".songs__now .song"), rows: shown(".songs__rows .song"), title: shown(".songs__title"), by: shown(".song--now .song__by"), label: shown(".song--now .song__label") };
   })()`);
   const open = async (query) => {
     await page.goto(`${base}/overlay/songs/?demo=1&pace=400&${query}`, { settle: 900 });
@@ -203,4 +203,35 @@ test("overlay: layouts and what it shows come from the link", { skip }, async ()
   await until(async () => (await probe()).rows, 8000);
   const queueOnly = await probe();
   assert.deepEqual([queueOnly.now, queueOnly.rows, queueOnly.title], [false, true, true]);
+});
+
+test("editor: changing how the song playing looks, and what the overlay shows, changes the preview at once", { skip }, async () => {
+  const { base } = await withHelper();
+  await page.goto(base + "/songs/", { settle: 800 });
+  await click('[data-test="three"]');
+  await until(async () => (await titles()).length >= 2, 6000);
+  const pick = (id, value) => page.evaluate(`(() => { const s = document.getElementById(${JSON.stringify(id)}); s.value = ${JSON.stringify(value)}; s.dispatchEvent(new Event("change", { bubbles: true })); s.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+  const look = () => page.evaluate(`(() => { const n = document.querySelector(".song--now"); const art = n.querySelector(".song__art"); const rows = document.querySelector(".songs__rows"); return { direction: getComputedStyle(n).flexDirection, round: getComputedStyle(art).borderRadius === "50%", byShown: n.querySelector(".song__by").getClientRects().length > 0, rowsShown: rows.getClientRects().length > 0, nowShown: n.getClientRects().length > 0 }; })()`);
+  assert.deepEqual(await look(), { direction: "row", round: false, byShown: true, rowsShown: true, nowShown: true });
+  await pick("c-layout", "stack");
+  assert.equal((await look()).direction, "column", "stack: the cover on top");
+  await pick("c-layout", "disc");
+  assert.equal((await look()).round, true, "disc: a round record");
+  await pick("c-layout", "strip");
+  assert.equal((await look()).byShown, false, "strip: one slim line, no asker");
+  await pick("c-layout", "card");
+  assert.deepEqual(await look(), { direction: "row", round: false, byShown: true, rowsShown: true, nowShown: true }, "and back");
+  await pick("c-show", "now");
+  assert.equal((await look()).rowsShown, false, "only the song playing");
+  await pick("c-show", "queue");
+  const queueOnly = await look();
+  assert.deepEqual([queueOnly.nowShown, queueOnly.rowsShown], [false, true], "only the queue");
+  await pick("c-show", "both");
+  assert.deepEqual([(await look()).nowShown, (await look()).rowsShown], [true, true]);
+  const link = await page.evaluate(`(() => { const i = document.getElementById("source-channel"); i.value = "pond.pal"; i.dispatchEvent(new Event("input", { bubbles: true })); return document.getElementById("link").value; })()`);
+  await pick("c-layout", "disc");
+  await pick("c-show", "now");
+  const url = new URL(await page.evaluate(`document.getElementById("link").value`));
+  assert.deepEqual([url.searchParams.get("layout"), url.searchParams.get("show")], ["disc", "now"], "the link carries the choice");
+  assert.ok(link.includes("channel=pond.pal"));
 });

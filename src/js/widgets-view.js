@@ -255,6 +255,7 @@ export function createSongsView(host) {
   let nowKey = "";
   let settings = null;
   let last = null;
+  let builtWith = "";
 
   function fill(parts, item) {
     parts.title.textContent = item.title;
@@ -272,7 +273,6 @@ export function createSongsView(host) {
 
   function build(item, big) {
     const node = el("div", { className: big ? "song song--now song--in" : "song song--in" });
-    node.dataset.layout = big ? settings.layout : "card";
     const art = el("span", { className: "song__art", textContent: "♪" });
     art.setAttribute("aria-hidden", "true");
     const img = el("img", { className: "song__img", alt: "", referrerPolicy: "no-referrer" });
@@ -337,7 +337,10 @@ export function createSongsView(host) {
 
   return {
     apply(next) {
-      const changed = settings && (standsOut(settings) !== standsOut(next) || settings.nowText !== next.nowText || settings.layout !== next.layout);
+      // (the editor changes one settings object in place, so what the first card was built from is remembered here, not read from `settings`)
+      const built = `${standsOut(next)}|${next.nowText}`;
+      const changed = builtWith !== "" && builtWith !== built;
+      builtWith = built;
       settings = next;
       root.dataset.layout = next.layout;
       root.dataset.show = next.show;

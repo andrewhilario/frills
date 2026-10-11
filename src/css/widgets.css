@@ -103,19 +103,19 @@
 
 /* how the song playing looks (the first song, when it stands out) */
 /* strip: one slim line, "♪ Title · Artist" */
-.song--now[data-layout="strip"] { padding: 0.3em 1em 0.3em 0.3em; font-size: 1em; }
-.song--now[data-layout="strip"] .song__art { width: 1.9em; height: 1.9em; }
-.song--now[data-layout="strip"] .song__text { flex-direction: row; align-items: baseline; gap: 0.5em; }
-.song--now[data-layout="strip"] .song__label, .song--now[data-layout="strip"] .song__by { display: none; }
-.song--now[data-layout="strip"] .song__artist::before { content: "\00b7"; margin-right: 0.5em; }
+.songs[data-layout="strip"] .song--now { padding: 0.3em 1em 0.3em 0.3em; font-size: 1em; }
+.songs[data-layout="strip"] .song--now .song__art { width: 1.9em; height: 1.9em; }
+.songs[data-layout="strip"] .song--now .song__text { flex-direction: row; align-items: baseline; gap: 0.5em; }
+.songs[data-layout="strip"] .song--now .song__label, .songs[data-layout="strip"] .song--now .song__by { display: none; }
+.songs[data-layout="strip"] .song--now .song__artist::before { content: "\00b7"; margin-right: 0.5em; }
 /* stack: a big cover with the words under it */
-.song--now[data-layout="stack"] { flex-direction: column; align-items: center; text-align: center; width: fit-content; max-width: 100%; padding: 0.6em 0.9em 0.7em; font-size: 1em; gap: 0.4em; }
-.song--now[data-layout="stack"] .song__art { width: 7em; height: 7em; }
-.song--now[data-layout="stack"] .song__text { align-items: center; max-width: 100%; }
+.songs[data-layout="stack"] .song--now { flex-direction: column; align-items: center; text-align: center; width: fit-content; max-width: 100%; padding: 0.6em 0.9em 0.7em; font-size: 1em; gap: 0.4em; }
+.songs[data-layout="stack"] .song--now .song__art { width: 7em; height: 7em; }
+.songs[data-layout="stack"] .song--now .song__text { align-items: center; max-width: 100%; }
 /* disc: the cover is a record that turns slowly, with a hole in the middle */
-.song--now[data-layout="disc"] .song__art { width: 3.6em; height: 3.6em; border-radius: 50%; animation: song-spin 9s linear infinite; }
-.song--now[data-layout="disc"] .song__art::after { content: ""; position: absolute; left: 50%; top: 50%; width: 0.7em; height: 0.7em; margin: -0.35em 0 0 -0.35em; border-radius: 50%; background: var(--a-bg, #fff); border: 2px solid var(--a-accent, #fc0); box-sizing: border-box; }
+.songs[data-layout="disc"] .song--now .song__art { width: 3.6em; height: 3.6em; border-radius: 50%; animation: song-spin 9s linear infinite; }
+.songs[data-layout="disc"] .song--now .song__art::after { content: ""; position: absolute; left: 50%; top: 50%; width: 0.7em; height: 0.7em; margin: -0.35em 0 0 -0.35em; border-radius: 50%; background: var(--a-bg, #fff); border: 2px solid var(--a-accent, #fc0); box-sizing: border-box; }
 @keyframes song-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .song--now[data-layout="disc"] .song__art { animation: none; } }
-.song--now[data-layout="strip"] .song__title { flex: 0 0 auto; max-width: 75%; }
-.song--now[data-layout="strip"] .song__artist { flex: 1 1 0; min-width: 0; }
+@media (prefers-reduced-motion: reduce) { .songs[data-layout="disc"] .song--now .song__art { animation: none; } }
+.songs[data-layout="strip"] .song--now .song__title { flex: 0 0 auto; max-width: 75%; }
+.songs[data-layout="strip"] .song--now .song__artist { flex: 1 1 0; min-width: 0; }
