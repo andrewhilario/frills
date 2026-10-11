@@ -4,6 +4,7 @@ import { SONGS, SongQueue, makeLookup } from "./songs.js";
 import { createSongsView } from "./widgets-view.js";
 import { startWidgetEditor } from "./widget-editor.js";
 import { fakeLookup, fakeRequest } from "./fake-alerts.js";
+import { spotifyLayer } from "./songs-spotify.js";
 
 startWidgetEditor({
   widget: SONGS,
@@ -15,12 +16,15 @@ startWidgetEditor({
   create(host, settings, ctx) {
     const view = createSongsView(host);
     const real = makeLookup(); // what chat asks for goes to the real catalog; the test buttons use the practice one
-    const queue = new SongQueue(settings, { lookup: real, onChange: (v) => view.render(v) });
+    let layer = null;
+    const queue = new SongQueue(settings, { lookup: real, onChange: () => layer?.render() });
+    layer = spotifyLayer({ queue, view });
     view.apply(settings);
-    view.render(queue.view);
-    setInterval(() => queue.tick(), 1000);
+    layer.apply(settings);
+    layer.render();
+    setInterval(() => { if (!layer.playing) queue.tick(); }, 1000);
     return {
-      apply(next) { view.apply(next); queue.setSettings(next); },
+      apply(next) { view.apply(next); queue.setSettings(next); layer.apply(next); },
       onChat: (message) => queue.handle(message, ctx.channel()),
       tests: {
         one: () => queue.request({ ...fakeRequest({ avoid: queue.items.map((i) => i.query), busy: queue.items.map((i) => i.name) }), via: fakeLookup }),

@@ -74,6 +74,18 @@
         <ul class="spotify__log" id="sp-log" role="log" aria-live="polite"></ul>
       </section>
 
+      <section class="spotify__card" aria-labelledby="sp-share" id="sp-share-card" hidden>
+        <h2 class="subtitle" id="sp-share">5. Show what is playing on your stream</h2>
+        <p class="ctl__hint">Frills passes the song (its name, artist, cover and position, never your Spotify login) to your Song requests overlay. Keep this page open in your browser while you stream.</p>
+        <label class="form__choice"><input type="checkbox" id="sp-sharing"> Share what is playing with my stream</label>
+        <p class="ctl__hint" id="sp-share-note" role="status"></p>
+        <div class="linkfield" id="sp-link-box" hidden>
+          <label class="ctl__label" for="sp-link">Your Song requests link</label>
+          <input type="text" id="sp-link" readonly spellcheck="false" autocomplete="off">
+          <p class="linkfield__hint">Add it as a Browser source in your streaming app, then pick how it looks in the <a href="/songs/">Song requests editor</a> and paste the same code there. The song playing comes from Spotify; chat requests wait below it.</p>
+        </div>
+      </section>
+
       <details class="spotify__details">
         <summary>Details, for checking</summary>
         <dl class="spotify__facts" id="sp-facts"></dl>

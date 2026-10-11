@@ -4,6 +4,7 @@
 import { handleFeedback } from "./feedback.mjs";
 import { handleMedia } from "./media.mjs";
 import { handleSongs } from "./songs.mjs";
+import { handleNowPlaying } from "./nowplaying.mjs";
 
 /** How long the edge keeps a file it has already read from the database. Short, so a deleted or reported file is gone within the hour. */
 const EDGE_SECONDS = 3600;
@@ -13,6 +14,7 @@ export default {
     const { pathname } = new URL(request.url);
     if (pathname === "/api/feedback") return handleFeedback(request, env);
     if (pathname === "/api/songs") return handleSongs(request, { ctx });
+    if (pathname.startsWith("/api/nowplaying/")) return handleNowPlaying(request, env);
     if (pathname.startsWith("/api/media")) {
       const cache = globalThis.caches?.default;
       const key = new Request(new URL(request.url).origin + pathname); // one entry per file, whatever else is on the address

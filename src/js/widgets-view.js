@@ -240,7 +240,7 @@ export function createLikersView(host) {
 const standsOut = (s) => s.showNow || s.show === "now";
 
 /** An album cover is drawn only from the catalog's picture server, or a picture a practice song carries itself. Anything else is left out. */
-const safeCover = (address) => (/^https:\/\/cdn-images\.dzcdn\.net\//.test(address) || /^data:image\/svg\+xml;base64,[A-Za-z0-9+/=]+$/.test(address) || /^\/api\/media\/[A-Za-z0-9_-]{16}$/.test(address) ? address : "");
+const safeCover = (address) => (/^https:\/\/cdn-images\.dzcdn\.net\//.test(address) || /^https:\/\/i\.scdn\.co\//.test(address) || /^data:image\/svg\+xml;base64,[A-Za-z0-9+/=]+$/.test(address) || /^\/api\/media\/[A-Za-z0-9_-]{16}$/.test(address) ? address : "");
 
 /**
  * The Song requests queue: the song being played stands out, the ones after it are listed below. Returns { apply(settings), render(view) }
@@ -278,7 +278,7 @@ export function createSongsView(host) {
   /** The progress bar starts when the song comes up and fills over the song's length, with nothing ticking: it is one CSS animation. */
   function progress(parts, item) {
     const seconds = item.seconds > 0 ? item.seconds : 0;
-    const mark = seconds ? item.key + ":" + seconds : "";
+    const mark = seconds ? [item.key, item.title, seconds, item.paused ? "paused" : Math.round((last?.startedAt ?? 0) / 1000)].join(":") : "";
     if (parts.timed === mark) return;
     parts.timed = mark;
     parts.node.classList.toggle("song--timed", Boolean(seconds));
@@ -288,6 +288,7 @@ export function createSongsView(host) {
     const elapsed = Math.max(0, Math.min(seconds, ((last?.at ?? 0) - (last?.startedAt ?? 0)) / 1000));
     fillBar.style.animationDuration = seconds + "s";
     fillBar.style.animationDelay = -elapsed + "s";
+    fillBar.style.animationPlayState = item.paused ? "paused" : "running";
     parts.bar.append(fillBar);
   }
 
@@ -295,7 +296,7 @@ export function createSongsView(host) {
     (parts.t ?? parts.title).textContent = item.title;
     parts.artist.textContent = item.state === "searching" ? "Looking it up…" : item.artist;
     parts.artist.hidden = !parts.artist.textContent;
-    parts.by.textContent = `asked by ${item.name}`;
+    parts.by.textContent = item.spotify ? "on Spotify" : `asked by ${item.name}`;
     parts.by.hidden = !settings.requester;
     parts.node.dataset.state = item.state;
     // the song playing can wear the streamer's own picture (a GIF loops, like a canvas) in place of the album cover

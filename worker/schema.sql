@@ -26,3 +26,11 @@ CREATE INDEX IF NOT EXISTS media_created ON media (created);
 
 -- To see what is stored (without the files):  SELECT id, kind, mime, size, created FROM media ORDER BY created DESC LIMIT 50;
 -- To remove one that was reported:             DELETE FROM media WHERE id = 'THE_ID';
+
+-- What is playing on a streamer's Spotify, passed from their browser tab to their overlay (see worker/nowplaying.mjs). Run this part once.
+CREATE TABLE IF NOT EXISTS nowplaying (
+  code TEXT PRIMARY KEY,    -- 16 random characters, in the overlay link
+  key_hash TEXT NOT NULL,   -- sha-256 of the key that may change it (the key itself is never stored)
+  data TEXT NOT NULL,       -- the song: title, artist, cover, position (JSON)
+  updated_at INTEGER NOT NULL -- milliseconds since 1970
+);

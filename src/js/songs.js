@@ -11,11 +11,12 @@ export const SONG_SHOWS = [["both", "The song playing and the queue"], ["now", "
 
 export const SONGS = defineWidget({
   defaults: {
-    show: "both", layout: "card", coverShape: "auto", coverMedia: "", coverGlow: false, coverBlur: false, progress: true, scrollTitle: true, idleCard: true, idleText: "Nothing playing. Type !{command} and a song name.", command: "sr", max: 5, limit: 20, perUser: 2, modsSkip: true, onlyFound: false, autoNext: false,
+    show: "both", layout: "card", spotify: "", coverShape: "auto", coverMedia: "", coverGlow: false, coverBlur: false, progress: true, scrollTitle: true, idleCard: true, idleText: "Nothing playing. Type !{command} and a song name.", command: "sr", max: 5, limit: 20, perUser: 2, modsSkip: true, onlyFound: false, autoNext: false,
     title: true, titleText: "Song requests", showNow: true, nowText: "Now playing", cover: true, requester: true, keep: false,
   },
   controls: [
     { section: "layout", ...selectOf("show", "What this overlay shows", SONG_SHOWS, "Add one overlay for the song playing and another for the queue if you want them in different places.") },
+    { section: "layout", ...text("spotify", "Spotify code", 16, "Shows what is playing on your Spotify as the song playing. The /spotify/ page makes it for you and gives you the whole link. Leave it empty to use only chat requests.") },
     { section: "layout", ...selectOf("layout", "How the song playing looks", SONG_LAYOUTS) },
     { section: "layout", ...selectOf("coverShape", "Cover shape", SONG_COVERS, "Separate from the layout, so any layout can have a square, round or spinning cover.") },
     { section: "layout", ...imageOf("coverMedia", "Your own cover, or an animated GIF", "Shown instead of the album cover on the song playing, like a looping canvas. A short GIF or animated WebP, up to 300 KB. Tick the box above first.") },
@@ -63,7 +64,7 @@ export function parseCommand(line, settings) {
 }
 
 /** The same song asked for in different ways looks the same: no case, no punctuation, one space. */
-const same = (text) => String(text ?? "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9À-￿]+/g, " ").trim();
+export const same = (text) => String(text ?? "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9À-￿]+/g, " ").trim();
 
 const CAP_TEXT = 200;
 

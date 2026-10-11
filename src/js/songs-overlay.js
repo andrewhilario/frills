@@ -6,6 +6,7 @@ import { SONGS, SongQueue, loadSongs, makeLookup, saveSongs } from "./songs.js";
 import { createSongsView } from "./widgets-view.js";
 import { channelFromParams, connectEvents } from "./widget-overlay.js";
 import { fakeLookup, fakeSongSource } from "./fake-alerts.js";
+import { spotifyLayer } from "./songs-spotify.js";
 import { fontsReady, generalFaces } from "./look.js";
 
 const params = new URLSearchParams(location.search);
@@ -21,16 +22,19 @@ const demo = params.get("demo") === "1";
 const view = createSongsView(document.getElementById("songs"));
 view.apply(settings);
 let saving = 0;
+let layer = null; // draws the queue, with what Spotify is playing on top when there is a Spotify code
 const queue = new SongQueue(settings, {
   lookup: demo ? fakeLookup : makeLookup(),
   entries: settings.keep && channel && !demo ? loadSongs(globalThis.localStorage, channel) : [],
-  onChange: (v) => {
-    view.render(v);
+  onChange: () => {
+    layer?.render();
     if (settings.keep && channel && !demo && !saving) saving = setTimeout(() => { saving = 0; saveSongs(globalThis.localStorage, channel, queue); }, 1000);
   },
 });
-view.render(queue.view);
-setInterval(() => queue.tick(), 1000);
+layer = spotifyLayer({ queue, view });
+layer.apply(settings);
+layer.render();
+setInterval(() => { if (!layer.playing) queue.tick(); }, 1000); // with Spotify playing, the song moves on by itself
 
 if (demo) {
   fontsReady(generalFaces(settings), 1000).then(() => {

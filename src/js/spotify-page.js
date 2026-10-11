@@ -5,6 +5,7 @@ import { REDIRECT_PATH, SpotifyClient } from "./spotify.js";
 import { SpotifyRequests } from "./spotify-requests.js";
 import { cleanName, connectTo, statusText } from "./connect.js";
 import { relayForPage } from "./tiktok.js";
+import { Publisher, bridgeIdentity } from "./spotify-bridge.js";
 
 const root = document.getElementById("spotify");
 const $ = (id) => document.getElementById(id);
@@ -32,6 +33,7 @@ function main() {
   const nowCard = $("sp-now-card");
   const findCard = $("sp-find-card");
   const chatCard = $("sp-chat-card");
+  const shareCard = $("sp-share-card");
   let timer = 0;
   let listening = null; // the connection to the chat, while it is on
 
@@ -54,9 +56,32 @@ function main() {
     }));
   };
 
+  // ── passing what is playing to the overlay ──────────────────────────────────────────────────────────────────────────────
+  const identity = bridgeIdentity();
+  const publisher = new Publisher({ code: identity.code, key: identity.key, onError: (status) => say($("sp-share-note"), status === 0 ? "Could not reach Frills to share the song. It will try again." : `Frills could not take the song (error ${status}). It will try again.`, true) });
+  const sharing = () => $("sp-sharing").checked;
+  function publish(now) {
+    if (!sharing() || now.error) return;
+    publisher.send(now.title ? { playing: now.playing, title: now.title, artist: now.artist, cover: now.cover, progressMs: now.progressMs, durationMs: now.durationMs } : { playing: false, title: "", artist: "", cover: "", progressMs: 0, durationMs: 0 });
+  }
+  function showLink() {
+    const on = sharing();
+    $("sp-link-box").hidden = !on;
+    try { localStorage.setItem("frills:spotify:sharing", on ? "1" : "0"); } catch { /* storage can be blocked */ }
+    if (!on) { say($("sp-share-note"), "Not sharing."); return; }
+    const channel = cleanName("tiktok", channelInput.value);
+    $("sp-link").value = `${location.origin}/overlay/songs/?channel=${channel || "yourname"}&platform=tiktok&spotify=${identity.code}`;
+    say($("sp-share-note"), "Sharing. Add the link below to your stream.");
+    publisher.sent = null; // send the current song at once
+  }
+  try { $("sp-sharing").checked = localStorage.getItem("frills:spotify:sharing") === "1"; } catch { /* storage can be blocked */ }
+  $("sp-sharing").addEventListener("change", showLink);
+  $("sp-link").addEventListener("focus", (event) => event.target.select());
+
   async function refreshNow() {
     if (document.hidden) return;
     const now = await client.nowPlaying();
+    publish(now);
     const note = $("sp-now-note");
     if (now.error) { say(note, now.error, true); facts(); return; }
     say(note, "");
@@ -84,6 +109,7 @@ function main() {
     nowCard.hidden = !on;
     findCard.hidden = !on;
     chatCard.hidden = !on;
+    shareCard.hidden = !on;
     clearInterval(timer);
     if (!clientId) { say(status, "This site has no Spotify app set up yet.", true); facts(); return; }
     if (!on) { say(status, "Not logged in. Press the button and say yes on Spotify's page."); facts(); return; }
@@ -181,6 +207,8 @@ function main() {
     input.value = "";
   });
 
+  channelInput.addEventListener("input", () => { if (sharing()) showLink(); });
+  if (sharing()) showLink();
   show();
 }
 
