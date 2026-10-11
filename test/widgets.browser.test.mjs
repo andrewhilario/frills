@@ -142,9 +142,47 @@ test("overlays page: the live ones link to their editors, and the coming ones ar
   const { base } = await withHelper();
   await page.goto(base + "/overlays/", { settle: 600 });
   const links = await page.evaluate(`[...document.querySelectorAll(".tool:not(.tool--soon) a.btn")].map((a) => a.getAttribute("href"))`);
-  assert.deepEqual(links, ["/editor/", "/alerts/", "/gifts/", "/goal/"]);
+  assert.deepEqual(links, ["/editor/", "/alerts/", "/gifts/", "/goal/", "/likers/"]);
   const soon = await page.evaluate(`[...document.querySelectorAll(".tool--soon")].map((t) => [t.querySelector(".subtitle").textContent, t.querySelectorAll("a").length])`);
-  assert.deepEqual(soon.map((s) => s[0]), ["Free sound library", "Top likers", "TikTok and Twitch chat together", "Like and subscriber alerts"]);
+  assert.deepEqual(soon.map((s) => s[0]), ["Free sound library", "Song requests", "Spotify player", "TikTok and Twitch chat together", "Like and subscriber alerts"]);
   assert.ok(soon.every((s) => s[1] === 0), "a coming-soon card links nowhere");
-  assert.equal(await page.evaluate(`document.querySelectorAll(".tool__badge--soon").length`), 4);
+  assert.equal(await page.evaluate(`document.querySelectorAll(".tool__badge--soon").length`), 5);
+});
+
+const like = (id, name, likeCount, totalLikeCount = 0) => ({ common: { msgId: id }, user: person(name.toLowerCase(), name), likeCount, totalLikeCount });
+const ranking = () => page.evaluate(`[...document.querySelectorAll(".liker:not(.liker--out)")].sort((a, b) => Number(a.dataset.rank) - Number(b.dataset.rank)).map((r) => r.dataset.rank + ":" + r.querySelector(".liker__name").textContent + ":" + r.querySelector(".liker__count").textContent)`);
+
+test("overlay: likes from a TikTok LIVE are added up per person and the ranking re-orders as people overtake", { skip }, async () => {
+  const { base, made } = await withHelper();
+  await page.goto(`${base}/overlay/likers/?channel=pond_cafe&platform=tiktok&max=3&titleText=Best+tappers`, { settle: 800 });
+  await until(() => made.length === 1);
+  await sleep(150);
+  assert.equal(await text(".likers__title"), "Best tappers");
+  made[0].emit("like", like("1", "Ann", 5)); made[0].emit("like", like("2", "Ben", 9)); made[0].emit("like", like("3", "Cat", 2)); made[0].emit("like", like("4", "Dan", 1));
+  await until(async () => (await ranking()).length === 3, 4000);
+  assert.deepEqual(await ranking(), ["1:Ben:9", "2:Ann:5", "3:Cat:2"], "Dan is not in the top 3");
+  made[0].emit("like", like("5", "Cat", 30));
+  await until(async () => (await ranking())[0] === "1:Cat:32", 4000);
+  assert.deepEqual(await ranking(), ["1:Cat:32", "2:Ben:9", "3:Ann:5"]);
+  const y = await page.evaluate(`[...document.querySelectorAll(".liker")].map((r) => r.style.transform)`);
+  assert.equal(new Set(y).size, y.length, "each person has their own place");
+});
+
+test("editor: the likers test buttons fill and re-order the ranking, and the link carries the changes", { skip }, async () => {
+  const { base } = await withHelper();
+  await page.goto(base + "/likers/", { settle: 800 });
+  await type("#c-max", "5");
+  await click('[data-test="crowd"]');
+  await until(async () => (await ranking()).length === 5, 8000);
+  const before = (await ranking())[0];
+  await click('[data-test="overtake"]');
+  await sleep(300);
+  assert.ok((await ranking()).length === 5);
+  await click('[data-test="clear"]');
+  await until(async () => (await ranking()).length === 0, 3000);
+  await type("#source-channel", "pond.pal");
+  const url = new URL(await page.evaluate(`document.getElementById("link").value`));
+  assert.equal(url.pathname, "/overlay/likers/");
+  assert.equal(url.searchParams.get("max"), "5");
+  assert.ok(before);
 });

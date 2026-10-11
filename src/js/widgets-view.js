@@ -138,3 +138,87 @@ export function createGoalView(host) {
     },
   };
 }
+
+/** The Top Likers ranking. Rows slide to their new places when the order changes. Returns { apply(settings), render(top), clear() }. */
+export function createLikersView(host) {
+  const root = el("div", { className: "likers" });
+  host.append(root);
+  const title = el("p", { className: "likers__title" });
+  const rows = el("div", { className: "likers__rows" });
+  root.append(title, rows);
+  const nodes = new Map(); // person -> { node, count }
+  let settings = null;
+  let last = [];
+
+  /** Puts each row at its place: a row is placed by its rank, so changing the order is just changing the numbers. */
+  function layout() {
+    const first = rows.firstElementChild;
+    if (!first) { rows.style.height = "0"; return; }
+    const gap = parseFloat(getComputedStyle(rows).fontSize) * 0.5;
+    const step = first.offsetHeight + gap;
+    last.forEach((p, i) => { const n = nodes.get(p.key); if (n) n.node.style.transform = `translateY(${Math.round(i * step)}px)`; });
+    rows.style.height = Math.max(0, Math.round(last.length * step - gap)) + "px";
+  }
+
+  function build(person) {
+    const node = el("div", { className: "liker liker--in" });
+    const rank = el("span", { className: "liker__rank" });
+    node.append(rank);
+    if (settings.avatar) {
+      const av = el("span", { className: "liker__av", textContent: [...(person.name || "?")][0].toUpperCase() });
+      av.setAttribute("aria-hidden", "true");
+      if (person.avatar) {
+        const img = el("img", { className: "gift__avimg", src: person.avatar, alt: "", referrerPolicy: "no-referrer" });
+        img.addEventListener("load", () => av.classList.add("liker__av--pic"));
+        img.addEventListener("error", () => img.remove());
+        av.append(img);
+      }
+      node.append(av);
+    }
+    node.append(el("span", { className: "liker__name", textContent: person.name }));
+    const count = el("span", { className: "liker__count" });
+    count.hidden = !settings.showCounts;
+    node.append(count);
+    rows.append(node);
+    return { node, rank, count, shown: -1 };
+  }
+
+  return {
+    apply(next) {
+      settings = next;
+      applyLook(root, next);
+      root.dataset.medals = String(next.medals);
+      title.hidden = !next.title;
+      title.textContent = next.titleText;
+      for (const n of nodes.values()) n.count.hidden = !next.showCounts;
+      layout();
+    },
+    render(top) {
+      if (!settings) return;
+      last = top;
+      const keep = new Set(top.map((p) => p.key));
+      for (const [key, n] of [...nodes]) {
+        if (keep.has(key)) continue;
+        nodes.delete(key);
+        n.node.classList.remove("liker--in");
+        n.node.classList.add("liker--out");
+        setTimeout(() => n.node.remove(), 450);
+      }
+      for (const person of top) {
+        const n = nodes.get(person.key) ?? (() => { const made = build(person); nodes.set(person.key, made); return made; })();
+        n.node.dataset.rank = String(person.rank);
+        n.rank.textContent = String(person.rank);
+        n.count.textContent = person.count.toLocaleString("en-US");
+        if (n.shown !== -1 && n.shown !== person.count) { n.count.classList.remove("liker__count--bump"); void n.count.offsetWidth; n.count.classList.add("liker__count--bump"); }
+        n.shown = person.count;
+      }
+      layout();
+    },
+    clear() {
+      for (const n of nodes.values()) n.node.remove();
+      nodes.clear();
+      last = [];
+      layout();
+    },
+  };
+}

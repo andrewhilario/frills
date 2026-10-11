@@ -72,8 +72,16 @@ export class DemoConnection extends EventEmitter {
     // Alerts come on a fixed rhythm so each kind turns up regularly: a crowd every 23rd tick, a share every 11th, a follow every 7th and a
     // gift every 5th. The rest is chat, and now and then a moderator deleting a message.
     const n = this.count;
-    const roll = n % 23 === 10 ? 0 : n % 11 === 4 ? 0.15 : n % 7 === 3 ? 0.1 : n % 5 === 2 ? 0.25 : 0.4 + Math.random() * 0.6;
-    if (roll < 0.04) {
+    const roll = n % 23 === 10 ? 0 : n % 11 === 4 ? 0.15 : n % 7 === 3 ? 0.1 : n % 5 === 2 ? 0.25 : n % 3 === 1 ? -1 : 0.4 + Math.random() * 0.6;
+    if (roll < 0) {
+      // a few people tapping: each event carries a batch of likes, like TikTok's
+      this.total ??= 0;
+      for (let i = 0; i < 1 + Math.floor(Math.random() * 3); i++) {
+        const likes = 1 + Math.floor(Math.random() * 14);
+        this.total += likes;
+        this.emit("like", { common: { msgId: `${id}-l${i}` }, user: this.fan(Math.floor(Math.random() * 7)), likeCount: likes, totalLikeCount: this.total });
+      }
+    } else if (roll < 0.04) {
       // A crowd of follows at once, to see them merge.
       for (let i = 0; i < 6; i++) setTimeout(() => !this.gone && this.emit("follow", { common: { msgId: `${id}-f${i}` }, user: this.fan(i + this.count) }), i * 250);
     } else if (roll < 0.14) {

@@ -41,3 +41,29 @@ export function fakeAlertSource(push, getPace = () => [1800, 4200]) {
   timer = setTimeout(loop, 400);
   return { stop() { stopped = true; clearTimeout(timer); } };
 }
+
+const LIKERS = ["Pond Pal", "Mochi Bun", "frogfan 🐸", "Mattcha", "Little Lily", "Croaker", "Nori Neko", "Sunny Side", "Bubbletea", "Kero-chan", "Leafy", "Tadpole Tim", "Matcha Mia", "Toad Tom"];
+
+/** One made-up line of likes from a person (a number of taps), in the shape the relay sends. */
+export function fakeLike({ name, count } = {}) {
+  const who = name ?? pick(LIKERS);
+  return { kind: "like", id: "", user: who, name: who, avatar: "", count: count ?? 1 + Math.floor(Math.random() * 15), total: 0 };
+}
+
+/** Sends practice likes to `push` every moment, from a handful of people, so a ranking fills and changes. Returns { stop() }. */
+export function fakeLikeSource(push, getPace = () => [350, 900]) {
+  let stopped = false;
+  let timer = 0;
+  const weights = LIKERS.map((_, i) => 1 + (LIKERS.length - i) * 0.4); // the first few tap more, so the order settles but still changes
+  const loop = () => {
+    if (stopped) return;
+    let roll = Math.random() * weights.reduce((a, b) => a + b, 0);
+    let at = 0;
+    while (at < weights.length - 1 && (roll -= weights[at]) > 0) at += 1;
+    push(fakeLike({ name: LIKERS[at] }));
+    const [lo, hi] = getPace();
+    timer = setTimeout(loop, lo + Math.random() * (hi - lo));
+  };
+  timer = setTimeout(loop, 300);
+  return { stop() { stopped = true; clearTimeout(timer); } };
+}

@@ -55,7 +55,7 @@ export function acceptMessage(raw) {
   };
 }
 
-const ALERT_KINDS = ["follow", "gift", "share"];
+const ALERT_KINDS = ["follow", "gift", "share", "like"];
 const num = (value, max) => Math.max(0, Math.min(max, Math.round(Number(value) || 0)));
 
 /** One alert from the helper or relay -> the plain object the alerts draw, with every field checked. Null if there is nothing to draw. */
@@ -70,6 +70,10 @@ export function acceptAlert(raw) {
     name,
     avatar: isAvatarUrl(raw.avatar) ? raw.avatar : "",
   };
+  if (raw.kind === "like") {
+    alert.count = Math.max(1, num(raw.count, 100000));
+    alert.total = num(raw.total, 1000000000);
+  }
   if (raw.kind === "gift") {
     Object.assign(alert, {
       gift: String(raw.gift ?? "").replace(/[\u0000-\u001f\u007f]+/g, " ").trim().slice(0, 40) || "a gift",

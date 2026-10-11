@@ -2,7 +2,7 @@
 // listening, and keeps trying again by itself (the account may not be live yet, TikTok may drop us, the free connection may be busy).
 // The Hub keeps the rooms, so two pages watching the same account (the editor's preview and OBS) share one connection.
 
-import { mapChat, mapDelete, mapFollow, mapGift, mapGiftAlert, mapShare } from "./map.mjs";
+import { mapChat, mapDelete, mapFollow, mapGift, mapGiftAlert, mapLike, mapShare } from "./map.mjs";
 
 /** What went wrong when connecting, in the three ways that need different handling. */
 export function classify(err) {
@@ -32,6 +32,8 @@ export class Room {
     this.seen = new Set(); // ids of the latest messages, so a message is never shown twice
     this.counts = { chat: 0, gift: 0, follow: 0, share: 0 };
     this.report = 0;
+    this.likes = new Map(); // person -> likes counted in the current second
+    this.likeTimer = 0;
   }
 
   add(client) {
@@ -90,6 +92,7 @@ export class Room {
       }
       this.alert(mapGiftAlert(d));
     });
+    conn.on("like", (d) => this.like(mapLike(d)));
     conn.on("follow", (d) => this.alert(mapFollow(d)));
     conn.on("share", (d) => this.alert(mapShare(d)));
     conn.on("imDelete", (d) => {
@@ -100,6 +103,28 @@ export class Room {
     conn.on("streamEnd", () => finish({ kind: "offline", detail: "The LIVE ended. Waiting for the next one…", wasConnected: true }));
     conn.on("disconnected", () => finish({ kind: "dropped", wasConnected: true }));
     conn.on("error", (err) => this.hub.log(`@${this.user}: ${String(err?.constructor?.name ?? "error")} ${String(err?.message ?? "").slice(0, 120)}`));
+  }
+
+  /**
+   * A like. Likes arrive in large numbers, so they are added up per person and sent once a second as one line each ({ kind: "like",
+   * count }), and only while some page has asked for likes. A busy LIVE sends a line per liker per second, not one per tap.
+   */
+  like(m) {
+    if (!m || ![...this.clients].some((c) => c.events?.has("like"))) return;
+    if (m.id && !this.fresh("alert:like:" + m.id)) return;
+    const held = this.likes.get(m.user);
+    if (held) { held.count += m.count; held.total = Math.max(held.total, m.total); }
+    else this.likes.set(m.user, { ...m });
+    if (this.likes.size > 500) this.flushLikes(); // never hold a crowd for long
+    if (!this.likeTimer) this.likeTimer = setTimeout(() => this.flushLikes(), 1000);
+  }
+
+  flushLikes() {
+    clearTimeout(this.likeTimer);
+    this.likeTimer = 0;
+    const held = [...this.likes.values()];
+    this.likes.clear();
+    for (const line of held) this.broadcast("alert", { ...line, id: "" });
   }
 
   /** An alert event for the pages that asked for it. Its id is kept apart from chat ids, so a gift is both a chat line and an alert. */
@@ -191,6 +216,7 @@ export class Room {
     this.stopped = true;
     clearTimeout(this.idleTimer);
     clearInterval(this.report);
+    clearTimeout(this.likeTimer);
     this.sleeper?.();
     if (this.conn) this.letGo(this.conn);
   }

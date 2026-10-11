@@ -72,7 +72,7 @@ export function mapDelete(d) {
 // ── Alerts: the events a page asks for with ?events=follow,gift,share ────────────────────────────────────────────────────────────
 // One SSE event named "alert", whose data says what it is (`kind`). Pages only get the kinds they asked for.
 
-export const ALERT_KINDS = ["follow", "gift", "share"];
+export const ALERT_KINDS = ["follow", "gift", "share", "like"];
 
 const person = (d) => {
   const u = d?.user;
@@ -119,4 +119,16 @@ export function mapGiftAlert(d) {
   const count = Math.max(1, Math.min(9999, Math.round(Number(d.repeatCount) || Number(d.groupCount) || 1)));
   const diamonds = Math.max(0, Math.min(1000000, Math.round(Number(gift.diamondCount ?? gift.diamond_count ?? d.diamondCount) || 0)));
   return { kind: "gift", ...p, gift: clean(gift.name ?? gift.giftName ?? d.giftName, 40) || "a gift", picture: giftPicture(gift), diamonds, count, total: diamonds * count };
+}
+
+/**
+ * A like event -> { kind: "like", id, user, name, avatar, count, total }, or null. `count` is how many taps this one event carries (TikTok
+ * batches them) and `total` is the room's running total. The Room adds them up per person before they leave the relay.
+ */
+export function mapLike(d) {
+  const p = person(d);
+  if (!p) return null;
+  const count = Math.max(0, Math.min(100000, Math.round(Number(d.likeCount ?? d.count) || 0)));
+  if (!count) return null;
+  return { kind: "like", ...p, count, total: Math.max(0, Math.round(Number(d.totalLikeCount ?? d.total) || 0)) };
 }

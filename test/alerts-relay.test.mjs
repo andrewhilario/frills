@@ -132,7 +132,7 @@ test("the ping says the program can send alerts, so a page can tell an old one",
   await start();
   const body = await new Promise((resolve) => http.get({ host: "127.0.0.1", port, path: "/tiktok/ping", headers: { Host: `127.0.0.1:${port}` } }, (res) => { let t = ""; res.on("data", (c) => { t += c; }); res.on("end", () => resolve(JSON.parse(t))); }));
   assert.deepEqual(body.features, ["chat", "alerts"]);
-  assert.deepEqual(ALERT_KINDS, ["follow", "gift", "share"]);
+  assert.deepEqual(ALERT_KINDS, ["follow", "gift", "share", "like"]);
 });
 
 test("the practice account makes every kind of alert, with gifts of different sizes and pictures", async () => {
@@ -143,5 +143,48 @@ test("the practice account makes every kind of alert, with gifts of different si
   const gifts = a.alerts().filter((x) => x.kind === "gift");
   assert.ok(gifts.every((g) => g.diamonds > 0 && g.count >= 1 && g.total === g.diamonds * g.count && g.picture.startsWith("data:image/svg+xml;base64,")), "every gift has a size and a drawn picture");
   assert.ok(a.alerts().every((x) => x.name && x.avatar), "every alert has a person with a picture");
+  a.close();
+});
+
+// ── likes ───────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+import { mapLike } from "../helper/map.mjs";
+
+test("a like event becomes a line with how many taps it carries, and nothing without a person or a count", () => {
+  assert.deepEqual(mapLike({ common: { msgId: "l1" }, user: user(), likeCount: 5, totalLikeCount: 1234 }), { kind: "like", id: "l1", user: "42", name: "Pond Pal", avatar: "https://p16.tiktokcdn.com/a.jpeg", count: 5, total: 1234 });
+  assert.equal(mapLike({ common: { msgId: "l2" }, user: user(), likeCount: 0 }), null);
+  assert.equal(mapLike({ likeCount: 3 }), null);
+  assert.equal(mapLike({ user: user(), likeCount: 9e9 }).count, 100000, "absurd numbers are clamped");
+});
+
+test("likes are added up per person for a second and sent as one line each, only to pages that asked for likes", async () => {
+  await helper?.close();
+  const made = await start();
+  const likers = listen("pond_cafe", "like");
+  const quiet = listen("pond_cafe", "follow");
+  await likers.until(() => likers.seen.some((e) => e.name === "status" && e.data.state === "connected"));
+  const conn = made[0];
+  const tap = (id, who, n, total) => conn.emit("like", { common: { msgId: id }, user: user({ id: who, displayId: who, nickname: who }), likeCount: n, totalLikeCount: total });
+  tap("a", "ann", 3, 10); tap("b", "ben", 1, 11); tap("c", "ann", 4, 15); tap("c", "ann", 4, 15); tap("d", "ann", 2, 17); // one of them twice: counted once
+  await likers.until(() => likers.alerts().length >= 2, 3000);
+  await sleep(100);
+  const lines = likers.alerts();
+  assert.equal(lines.length, 2, "one line per person");
+  assert.deepEqual(lines.map((l) => [l.name, l.count]).sort(), [["ann", 9], ["ben", 1]], "ann's 3 + 4 + 2, the repeat ignored");
+  assert.equal(Math.max(...lines.map((l) => l.total)), 17);
+  assert.deepEqual(quiet.alerts(), [], "a page that did not ask for likes gets none");
+  tap("e", "ann", 5, 22);
+  await likers.until(() => likers.alerts().length >= 3, 3000);
+  assert.equal(likers.alerts().at(-1).count, 5, "the next second starts again from zero");
+  likers.close(); quiet.close();
+});
+
+test("nobody asking for likes means none are even held", async () => {
+  await helper?.close();
+  const made = await start();
+  const a = listen("pond_cafe", "follow");
+  await a.until(() => a.seen.some((e) => e.name === "status" && e.data.state === "connected"));
+  made[0].emit("like", { common: { msgId: "x" }, user: user(), likeCount: 3, totalLikeCount: 3 });
+  assert.equal(helper.hub.rooms.get("pond_cafe")?.likes.size ?? 0, 0);
   a.close();
 });
