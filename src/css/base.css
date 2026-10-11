@@ -108,7 +108,7 @@ code, kbd { font-family: var(--font-label); font-size: 0.9em; }
 .btn--lg { padding: var(--space-md) var(--space-lg); font-size: var(--text-md); }
 @media (pointer: coarse) { .btn--sm { min-height: 44px; } }
 
-/* Soft: a flat lift, no coloured edge. Outline: a hairline that fills on hover. */
+/* Soft: a flat lift, no colored edge. Outline: a hairline that fills on hover. */
 .btn--soft { --btn-face: var(--color-paper); --btn-ink: var(--color-ink); box-shadow: 0 0 0 1px var(--color-rule-2), 0 6px 14px -8px var(--color-ink-cast); }
 @media (hover: hover) { .btn--soft:hover { box-shadow: 0 0 0 1px var(--color-ink), 0 12px 22px -10px var(--color-ink-cast); } }
 .btn--soft:active { box-shadow: 0 0 0 1px var(--color-ink), 0 2px 6px -4px var(--color-ink-cast); }

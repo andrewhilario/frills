@@ -1,4 +1,4 @@
-// Reads colours from tokens.css (they are OKLCH) and gives them back as hex, for the few places that can't use OKLCH:
+// Reads colors from tokens.css (they are OKLCH) and gives them back as hex, for the few places that can't use OKLCH:
 // the browser's theme-color, the favicon file, and the images the asset script draws.
 
 import { readFileSync } from "node:fs";

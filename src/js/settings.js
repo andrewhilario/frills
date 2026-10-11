@@ -60,14 +60,14 @@ const list = (...pairs) => pairs.map(([id, name]) => ({ id, name }));
 // One entry per control. The same list builds the editor's panel, checks anything that is loaded or arrives in a link, and writes
 // the link. `where` says whether it sits up front or under "More options".
 export const CONTROLS = [
-  { key: "accent", where: "main", type: "color", label: "Accent colour" },
-  { key: "bg", where: "main", type: "color", label: "Box colour" },
+  { key: "accent", where: "main", type: "color", label: "Accent color" },
+  { key: "bg", where: "main", type: "color", label: "Box color" },
   { key: "bgAlpha", where: "main", type: "range", label: "Box opacity", min: 0, max: 100, step: 1, unit: "%" },
   { key: "radius", where: "main", type: "range", label: "Roundness", min: 0, max: 32, step: 1, unit: " px" },
   { key: "font", where: "main", type: "select", label: "Font", options: Object.keys(FONTS).map((f) => ({ id: f, name: f })) },
   { key: "size", where: "main", type: "range", label: "Text size", min: 12, max: 34, step: 1, unit: " px" },
-  { key: "text", where: "more", type: "color", label: "Text colour" },
-  { key: "pop", where: "more", type: "color", label: "Gift colour" },
+  { key: "text", where: "more", type: "color", label: "Text color" },
+  { key: "pop", where: "more", type: "color", label: "Gift color" },
   { key: "shape", where: "more", type: "chips", label: "Box", options: list(["filled", "Filled"], ["outline", "Outline"], ["none", "Text only"]) },
   { key: "borderW", where: "more", type: "range", label: "Edge thickness", min: 0, max: 6, step: 1, unit: " px" },
   { key: "shadow", where: "more", type: "chips", label: "Shadow", options: list(["none", "None"], ["soft", "Soft"], ["hard", "Hard"], ["glow", "Glow"]) },
@@ -80,7 +80,7 @@ export const CONTROLS = [
   { key: "max", where: "more", type: "range", label: "Messages on screen", min: 2, max: 12, step: 1, unit: "" },
   { key: "life", where: "more", type: "range", label: "Time on screen", min: 0, max: 60, step: 1, unit: " s", zero: "stays" },
   { key: "space", where: "more", type: "range", label: "Spacing", min: 0, max: 24, step: 1, unit: " px" },
-  { key: "colors", where: "more", type: "toggle", label: "Viewers' own name colours" },
+  { key: "colors", where: "more", type: "toggle", label: "Viewers' own name colors" },
   { key: "emotes", where: "more", type: "toggle", label: "Show emotes" },
 ];
 
@@ -144,7 +144,7 @@ export function currentPreset(settings) {
 
 /**
  * Settings -> what the page needs to draw them: CSS variables for the chat's stage, two data attributes, and the feed's options.
- * Colours are plain hex and rgba() so even old OBS browsers draw them.
+ * Colors are plain hex and rgba() so even old OBS browsers draw them.
  */
 export function lookVars(s) {
   const filled = s.shape === "filled";

@@ -45,25 +45,25 @@ const fresh = async () => {
   await page.evaluate(`document.querySelector(".matcha-more").open = true`);
 };
 
-test("matcha: More options is there, closed at first, and holds the colours and everything the editor offers", { skip }, async () => {
+test("matcha: More options is there, closed at first, and holds the colors and everything the editor offers", { skip }, async () => {
   await page.goto(base + "/matcha/", { settle: 500 });
   await page.evaluate("localStorage.clear()");
   await page.goto(base + "/matcha/", { settle: 900 });
   assert.equal(await page.evaluate(`document.querySelector(".matcha-more").open`), false);
   assert.equal(await page.evaluate(`document.querySelector(".matcha-more > summary").textContent.trim()`), "More options");
   const labels = await page.evaluate(`[...document.querySelectorAll("#more-controls .ctl__label")].map((l) => l.textContent.trim())`);
-  for (const wanted of ["Matcha green", "Deep green", "Cream", "Soft green", "Text colour", "Gift colour", "Text size", "Font", "Roundness", "Box opacity", "Entrance", "Entrance speed", "Show picture", "Use profile pictures", "Messages on screen", "Time on screen", "Spacing", "Viewers' own name colours", "Show emotes"]) {
+  for (const wanted of ["Matcha green", "Deep green", "Cream", "Soft green", "Text color", "Gift color", "Text size", "Font", "Roundness", "Box opacity", "Entrance", "Entrance speed", "Show picture", "Use profile pictures", "Messages on screen", "Time on screen", "Spacing", "Viewers' own name colors", "Show emotes"]) {
     assert.ok(labels.includes(wanted), `${wanted} is missing; there is ${labels.join(", ")}`);
   }
   assert.deepEqual(page.problems, [], page.problems.join(" | "));
 });
 
-test("matcha: a colour, the size, the corners, the font and the entrance change all six styles at once", { skip }, async () => {
+test("matcha: a color, the size, the corners, the font and the entrance change all six styles at once", { skip }, async () => {
   await fresh();
   assert.deepEqual(new Set(await stages("--matcha")), new Set([MATCHA_PALETTES.latte.matcha]));
   await set("m-matcha", "#e0629a");
   assert.deepEqual(new Set(await stages("--matcha")), new Set(["#e0629a"]));
-  assert.equal(await page.evaluate(`document.querySelectorAll("#palettes .chip[aria-pressed=true]").length`), 0, "no palette looks pressed once a colour is changed");
+  assert.equal(await page.evaluate(`document.querySelectorAll("#palettes .chip[aria-pressed=true]").length`), 0, "no palette looks pressed once a color is changed");
 
   await set("m-scale", "150");
   assert.deepEqual(new Set(await stages("--m-scale")), new Set(["1.5"]));
@@ -108,11 +108,11 @@ test("matcha: box opacity, spacing, the round picture and profile pictures can e
   await page.waitFor(`document.querySelectorAll("#stage-latte .m:not(.leaving)").length <= 3`);
 });
 
-test("matcha: a palette sets all six colours again, and the options sit on top of it", { skip }, async () => {
+test("matcha: a palette sets all six colors again, and the options sit on top of it", { skip }, async () => {
   await fresh();
   await set("m-matcha", "#e0629a");
   await click("#palettes .chip", "Forest");
-  assert.equal(await page.evaluate(`document.getElementById("m-matcha").value`), MATCHA_PALETTES.forest.matcha, "the colour picker shows the palette's colour again");
+  assert.equal(await page.evaluate(`document.getElementById("m-matcha").value`), MATCHA_PALETTES.forest.matcha, "the color picker shows the palette's color again");
   assert.deepEqual(new Set(await stages("--matcha")), new Set([MATCHA_PALETTES.forest.matcha]));
   assert.equal(await page.evaluate(`document.querySelector("#palettes .chip[aria-pressed=true]").textContent.trim()`), "Forest");
   await set("m-pop", "#101010");
@@ -140,7 +140,7 @@ test("matcha: the link carries only what changed, and the overlay paints the sam
   assert.equal(q.get("font"), "Fredoka");
   assert.equal(q.get("anim"), "pop");
   assert.equal(q.get("pictures"), "0");
-  assert.equal(q.has("deep"), false, "colours that still match the palette stay out of the link");
+  assert.equal(q.has("deep"), false, "colors that still match the palette stay out of the link");
   assert.equal(q.has("round"), false);
 
   await page.goto(base + link.pathname + link.search + "&demo=1", { settle: 900 });
@@ -173,7 +173,7 @@ test("matcha: the choices are remembered, a link wins over them, and Reset puts 
   await page.evaluate(`document.querySelector(".matcha-more").open = true`);
   await click("#more-reset");
   assert.equal(await page.evaluate(`document.getElementById("m-scale").value`), "100");
-  assert.equal(await page.evaluate(`document.getElementById("m-matcha").value`), MATCHA_PALETTES.sakura.matcha, "colours go back to the palette picked");
+  assert.equal(await page.evaluate(`document.getElementById("m-matcha").value`), MATCHA_PALETTES.sakura.matcha, "colors go back to the palette picked");
   assert.equal(await page.evaluate(`document.querySelector(".matcha-card[data-picked=true] h2").textContent`), "6 · Night Matcha", "the style stays");
   assert.equal(await page.evaluate(`document.querySelector("#palettes .chip[aria-pressed=true]").textContent.trim()`), "Sakura");
   await page.evaluate("localStorage.clear()");

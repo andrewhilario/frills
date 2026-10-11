@@ -176,10 +176,10 @@ Open   http://127.0.0.1:8765/matcha/
 TikTok is selected there too. Type the @name, press Connect, and the same chat appears in all six
 matcha styles side by side. Pick a palette and a style, then copy the link for OBS.
 
-Open "More options" to change things further: each of the six colours on its own, text size, font,
+Open "More options" to change things further: each of the six colors on its own, text size, font,
 how round the boxes are, how see-through they are, the entrance and its speed, spacing, how many
 messages show and for how long, and the switches for the round picture, profile pictures, name
-colours and emotes. Every change shows in all six styles at once, "Reset these options" puts them
+colors and emotes. Every change shows in all six styles at once, "Reset these options" puts them
 back, and the page remembers what you chose. The link for OBS carries only what you changed.
 
 
@@ -236,9 +236,9 @@ back, and the page remembers what you chose. The link for OBS carries only what 
     Packaging it into one download for everyone is a later step.
   - It is an unofficial connection. TikTok can change something and it stops working. When that
     happens the helper shows an error instead of chat.
-  - Licence: the TikTok connector it uses has a modified AGPL licence. Testing on your own PC is
+  - License: the TikTok connector it uses has a modified AGPL license. Testing on your own PC is
     fine. Before you give the helper to other people, charge for anything with it or run it as a
-    hosted service, we must settle the licence first. See  helper\README.md.
+    hosted service, we must settle the license first. See  helper\README.md.
 
 
 12. What to tell me after you test
@@ -246,4 +246,4 @@ back, and the page remembers what you chose. The link for OBS carries only what 
   - Which tests you did (0, A, B, C, D, E) and whether the chat appeared in each.
   - The line shown under the Connect button, word for word, if it was not "Reading ...".
   - The last lines of the helper window if something failed.
-  - Anything that looked wrong: spacing, colours, missing icons, delays.
+  - Anything that looked wrong: spacing, colors, missing icons, delays.

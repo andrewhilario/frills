@@ -21,7 +21,7 @@
   .nav__toggle, .nav__sheet { display: none; }
 }
 
-/* ── The frill: a band of colour whose lower edge is scalloped, hanging over the next section ───────────────────────────── */
+/* ── The frill: a band of color whose lower edge is scalloped, hanging over the next section ───────────────────────────── */
 .band { --band: var(--color-paper); position: relative; background: var(--band); padding-block: var(--section-gap); }
 .band::after {
   content: "";

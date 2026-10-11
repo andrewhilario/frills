@@ -55,7 +55,7 @@ Event shapes sent to pages (all strings cleaned, lengths capped):
 
 ## 4. Page-side code (`src/js/`)
 
-Each widget is a small separate bundle (the chat overlay is held to 20 KB; each widget gets its own test budget). Plain hex/rgba colours only and no CSS nesting, so old OBS browsers draw it.
+Each widget is a small separate bundle (the chat overlay is held to 20 KB; each widget gets its own test budget). Plain hex/rgba colors only and no CSS nesting, so old OBS browsers draw it.
 
 | File | Job |
 | --- | --- |
@@ -102,7 +102,7 @@ State: in memory, saved to `localStorage` (keyed by account and widget) when "ke
 
 **Legal and privacy**
 - Names and pictures of viewers are shown on stream and held in the overlay's memory (and optionally the streamer's own browser storage). Frills' servers keep nothing, and the privacy page needs one more sentence saying so.
-- The connector is under a modified AGPL licence and Frills is AGPL, as settled before.
+- The connector is under a modified AGPL license and Frills is AGPL, as settled before.
 
 ## 7. Build order, with what "done" means
 
@@ -126,7 +126,7 @@ The user says most TikTok streamers use TikTok LIVE Studio, and some use Streaml
 - One vendor reports that LIVE Studio sometimes loads link sources at **0 x 0**, and that the embedded browser can **freeze** with **no refresh button** (their workaround: change a query parameter and save). Another says its embedded browser is an **older engine**.
 - Transparency in LIVE Studio is **unconfirmed**: a forum post says a transparent background came out black for window capture.
 - Audio from a link source is **unconfirmed**. No source covers it.
-- Streamlabs Desktop has an OBS-style **Browser Source** (URL, width, height, custom CSS, "shutdown when not visible", "refresh when scene becomes active"), so OBS behaviour should carry over, but that is not tested either.
+- Streamlabs Desktop has an OBS-style **Browser Source** (URL, width, height, custom CSS, "shutdown when not visible", "refresh when scene becomes active"), so OBS behavior should carry over, but that is not tested either.
 
 What this changes in the plan:
 1. **Test first.** Before building, the user opens one test link in LIVE Studio (and Streamlabs) and answers: is the background transparent, what size does it open at, does it keep updating for 10 minutes. This decides the rest.

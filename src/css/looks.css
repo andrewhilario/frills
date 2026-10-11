@@ -1,5 +1,5 @@
 /* The general look: every part of it is a setting (the page sets the --g-* variables from the controls). The matcha styles are in
-   looks-matcha.css. Plain colours only (see chat.css): the page hands over finished hex and rgba() values. */
+   looks-matcha.css. Plain colors only (see chat.css): the page hands over finished hex and rgba() values. */
 
 :root {
   --look-shadow: rgba(0, 0, 0, 0.45);

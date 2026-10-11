@@ -12,7 +12,7 @@ const PRIORITY = (item) => (item.kind === "gift" ? item.tier : 0); // gifts outr
 
 /**
  * A text with {name}, {gift}, {count}, {diamonds}, {total} and {others} in it -> pieces to draw: [{ text, mark }]. `mark` is true for the
- * parts that were filled in with a name or a gift, so the view can colour them. A placeholder we don't know is dropped. The words are
+ * parts that were filled in with a name or a gift, so the view can color them. A placeholder we don't know is dropped. The words are
  * somebody else's, so they are only ever drawn as text, never as HTML.
  */
 export function fillTemplate(template, vars) {

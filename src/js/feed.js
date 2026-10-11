@@ -9,7 +9,7 @@ export const el = (tag, props = {}, ...kids) => {
   return node;
 };
 
-// Moderator icons. Static strings drawn in the look's colours: currentColor, with --icon-ink for the mark on top.
+// Moderator icons. Static strings drawn in the look's colors: currentColor, with --icon-ink for the mark on top.
 export const ICONS = {
   shield:
     '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z" fill="currentColor"/><path d="m8.4 12 2.5 2.5L15.7 9.6" fill="none" stroke="var(--icon-ink)" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg>',
@@ -69,7 +69,7 @@ export class Feed {
     this.max = 6; // messages on screen at once
     this.life = 15000; // how long one stays, in ms; 0 means it never leaves by itself
     this.modIcon = "shield"; // shield, star, leaf, frog, or none
-    this.colors = false; // use each viewer's own name colour when the source gives one
+    this.colors = false; // use each viewer's own name color when the source gives one
     this.emotes = true;
     this.pictures = true; // a chatter's own profile picture in the round badge, when the source has one (TikTok does, Twitch doesn't)
     this.glide = true; // older messages slide up when a new one arrives

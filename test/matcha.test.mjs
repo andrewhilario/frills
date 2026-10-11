@@ -33,7 +33,7 @@ test("a matcha link round-trips and stays short", () => {
   assert.equal(matchaOverlayUrl("https://x/o/", { settings: MATCHA_DEFAULTS }), "https://x/o/?style=latte");
 });
 
-test("palette variables are plain colours with no color-mix needed", () => {
+test("palette variables are plain colors with no color-mix needed", () => {
   for (const id of Object.keys(MATCHA_PALETTES)) {
     const vars = matchaVars(id);
     for (const key of ["--bg", "--ink", "--soft", "--matcha", "--deep", "--pop", "--matcha-lift", "--matcha-a70", "--matcha-a55", "--night-body", "--night-av"]) {
@@ -44,14 +44,14 @@ test("palette variables are plain colours with no color-mix needed", () => {
   assert.equal(matchaVars("nope")["--bg"], MATCHA_PALETTES.latte.bg);
 });
 
-test("a palette gives the six colours, and any colour that comes with it wins", () => {
+test("a palette gives the six colors, and any color that comes with it wins", () => {
   assert.deepEqual(paletteColors("forest"), { bg: "#eef2de", ink: "#1e3524", soft: "#cfddb0", matcha: "#6e9650", deep: "#2f5233", pop: "#f2a65a" });
   assert.deepEqual(paletteColors("nope"), paletteColors("latte"));
   const plain = sanitizeMatcha({ palette: "forest" });
   for (const key of COLOR_KEYS) assert.equal(plain[key], MATCHA_PALETTES.forest[key]);
   const own = sanitizeMatcha({ palette: "forest", matcha: "#FF00AA", pop: "red", deep: "#12" });
-  assert.equal(own.matcha, "#ff00aa", "a good colour is kept, in lower case");
-  assert.equal(own.pop, MATCHA_PALETTES.forest.pop, "a bad colour falls back to the palette's");
+  assert.equal(own.matcha, "#ff00aa", "a good color is kept, in lower case");
+  assert.equal(own.pop, MATCHA_PALETTES.forest.pop, "a bad color falls back to the palette's");
   assert.equal(own.deep, MATCHA_PALETTES.forest.deep);
   assert.equal(own.palette, "forest");
 });
@@ -65,10 +65,10 @@ test("a name that is not a palette, even one every object has, is ignored", () =
   assert.deepEqual(paletteColors("__proto__"), paletteColors("latte"));
 });
 
-test("currentPalette names the palette until a colour is changed", () => {
+test("currentPalette names the palette until a color is changed", () => {
   assert.equal(currentPalette(sanitizeMatcha({ palette: "sakura" })), "sakura");
   assert.equal(currentPalette(sanitizeMatcha({ palette: "sakura", matcha: "#123456" })), null);
-  assert.equal(currentPalette({ ...MATCHA_DEFAULTS, ...paletteColors("night"), palette: "latte" }), "night", "colours that match another palette are named for it");
+  assert.equal(currentPalette({ ...MATCHA_DEFAULTS, ...paletteColors("night"), palette: "latte" }), "night", "colors that match another palette are named for it");
 });
 
 test("everything under More options is checked, clamped and falls back to how the style was designed", () => {
@@ -90,31 +90,31 @@ test("everything under More options is checked, clamped and falls back to how th
   for (const control of MATCHA_CONTROLS) assert.ok(control.key in MATCHA_DEFAULTS, control.key + " has a default");
 });
 
-test("a link carries only what was changed, and a changed colour is measured against the palette picked", () => {
+test("a link carries only what was changed, and a changed color is measured against the palette picked", () => {
   const base = "https://x.test/overlay/";
   assert.equal(matchaOverlayUrl(base, { settings: sanitizeMatcha({ palette: "forest" }) }), base + "?style=latte&palette=forest", "a plain palette adds nothing else");
   const mine = sanitizeMatcha({ style: "pixel", palette: "forest", matcha: "#ff00aa", scale: 125, font: "Fredoka", anim: "pop", speed: 380, pictures: false });
   const url = new URL(matchaOverlayUrl(base, { channel: "pond.pal", platform: "tiktok", settings: mine }));
   assert.equal(url.searchParams.get("matcha"), "#ff00aa");
-  assert.equal(url.searchParams.has("deep"), false, "a colour that still matches the palette is left out");
+  assert.equal(url.searchParams.has("deep"), false, "a color that still matches the palette is left out");
   assert.equal(url.searchParams.get("scale"), "125");
   assert.equal(url.searchParams.get("font"), "Fredoka");
   assert.equal(url.searchParams.get("anim"), "pop");
   assert.equal(url.searchParams.get("pictures"), "0");
   assert.equal(url.searchParams.has("round"), false);
   assert.deepEqual(sanitizeMatcha(matchaFromParams(url.searchParams)), mine, "reading the link gives the same settings back");
-  // Changing colours on the default palette needs no palette part.
+  // Changing colors on the default palette needs no palette part.
   const latte = new URL(matchaOverlayUrl(base, { settings: sanitizeMatcha({ pop: "#101010" }) }));
   assert.equal(latte.searchParams.has("palette"), false);
   assert.equal(latte.searchParams.get("pop"), "#101010");
-  // A link can't smuggle in a word where a colour belongs.
+  // A link can't smuggle in a word where a color belongs.
   assert.equal(sanitizeMatcha(matchaFromParams(new URLSearchParams("style=night&matcha=javascript:alert(1)&bg=%23fff"))).matcha, MATCHA_PALETTES.latte.matcha);
 });
 
-test("the variables follow the settings: sizes, corners, box opacity and the colours that were changed", () => {
+test("the variables follow the settings: sizes, corners, box opacity and the colors that were changed", () => {
   const vars = matchaVars(sanitizeMatcha({ palette: "latte", matcha: "#ff00aa", scale: 150, round: 50, opacity: 50, space: 12 }));
   assert.equal(vars["--matcha"], "#ff00aa");
-  assert.equal(vars["--matcha-lift"].startsWith("#"), true, "the blends are worked out from the changed colour");
+  assert.equal(vars["--matcha-lift"].startsWith("#"), true, "the blends are worked out from the changed color");
   assert.equal(vars["--m-scale"], "1.5");
   assert.equal(vars["--m-round"], "0.5");
   assert.equal(vars["--g-space"], "12px");

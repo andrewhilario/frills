@@ -1,4 +1,4 @@
-// Small colour helpers. The overlay can run in older OBS browsers, so colours are worked out here and handed to the page as plain
+// Small color helpers. The overlay can run in older OBS browsers, so colors are worked out here and handed to the page as plain
 // hex or rgba() values, never as color-mix() or oklch() (those need a newer browser engine than some OBS installs ship).
 
 export const HEX = /^#[0-9a-f]{6}$/i;
@@ -16,10 +16,10 @@ export function luminance(hex) {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
-/** Text colour that stays readable on `hex`: dark on a light colour, white on a dark one. */
+/** Text color that stays readable on `hex`: dark on a light color, white on a dark one. */
 export const inkFor = (hex) => (luminance(hex) > 0.18 ? "#10141a" : "#ffffff");
 
-/** Blends two colours. `share` is how much of `a` there is (0 to 1). */
+/** Blends two colors. `share` is how much of `a` there is (0 to 1). */
 export function mix(a, b, share) {
   const [ar, ag, ab] = rgb(a);
   const [br, bg, bb] = rgb(b);

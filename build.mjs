@@ -93,7 +93,7 @@ const looksGrid = [
   `        <li class="look-card look-card--own">
           <div>
             <h3 class="look-card__name">Build your own</h3>
-            <p>Change every colour, font and corner until it’s yours.</p>
+            <p>Change every color, font and corner until it’s yours.</p>
           </div>
           <a class="look-card__link" href="/editor/">Open the editor <span class="btn__arrow" aria-hidden="true">→</span></a>
         </li>`,

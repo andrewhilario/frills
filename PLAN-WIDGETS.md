@@ -32,7 +32,7 @@ Things I have NOT verified and will check first on a real LIVE:
 
 **1. Last Gifts** (build first, it is the smallest)
 - A chat-style list of the most recent gifts: picture of the chatter, name, "sent Rose ×3", and the gift picture.
-- Options: how many to show (1 to 20, default 10), new at top or bottom, how long each stays (or stays), show diamond value, minimum diamonds to show, collapse streaks into one line (on by default), same colours, fonts, roundness and entrance as the chat looks.
+- Options: how many to show (1 to 20, default 10), new at top or bottom, how long each stays (or stays), show diamond value, minimum diamonds to show, collapse streaks into one line (on by default), same colors, fonts, roundness and entrance as the chat looks.
 
 **2. Top Likers** (Top 1 to Top 10)
 - A ranked list: rank number, round picture, name, like count. The top 3 get a small crown (the frog crown for the matcha looks). When someone passes someone else the rows slide into their new places.
@@ -43,7 +43,7 @@ Things I have NOT verified and will check first on a real LIVE:
 - A progress bar: "Followers 37 / 50", with a label you can rename.
 - Starts from the streamer's current followers if TikTok gives that number, otherwise from a number they type, or from zero ("gained this LIVE"). Each follow adds one. Unfollows are not seen.
 - When the goal is reached: a small celebration, then an optional "next goal" (add a step, for example +25).
-- Options: target, step, label, bar shape and colours, show numbers or percent.
+- Options: target, step, label, bar shape and colors, show numbers or percent.
 - The same bar can later count likes or gifts instead of followers with almost no extra work.
 
 **4. Alerts**

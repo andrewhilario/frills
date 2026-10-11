@@ -55,7 +55,7 @@ test("a link with a long, unusual set of texts still stays a sensible length", (
   assert.ok(alertsUrl("https://frills.valwidgets.live/overlay/alerts/", { channel: "a_long_tiktok_name", settings: long }).length < 1500);
 });
 
-test("the starting looks are recognised until something is changed", () => {
+test("the starting looks are recognized until something is changed", () => {
   assert.equal(currentLook({ ...DEFAULTS }), "sticker");
   assert.equal(currentLook({ ...DEFAULTS, ...LOOKS.matcha }), "matcha");
   assert.equal(currentLook({ ...DEFAULTS, accent: "#000000" }), null);
@@ -63,7 +63,7 @@ test("the starting looks are recognised until something is changed", () => {
 
 test("the look becomes plain CSS variables", () => {
   const vars = alertVars(DEFAULTS);
-  for (const value of Object.values(vars)) assert.ok(!/oklch|color-mix/.test(value), "no modern colour functions: old streaming browsers cannot draw them");
+  for (const value of Object.values(vars)) assert.ok(!/oklch|color-mix/.test(value), "no modern color functions: old streaming browsers cannot draw them");
   assert.equal(vars["--a-speed"], "500ms");
   assert.match(vars["--a-shadow"], /5px 5px 0 #ffd23f/);
 });

@@ -20,7 +20,7 @@ test("the defaults are a complete, valid set of settings", () => {
 
 test("sanitize drops what it doesn't understand and clamps numbers", () => {
   const s = sanitize({ accent: "red", bg: "#ABCDEF", radius: 9999, size: -3, font: "Comic Sans", avatar: "yes", modIcon: "<img>", max: "7.4", life: "", evil: "<script>", shape: "filled" });
-  assert.equal(s.accent, DEFAULTS.accent); // not a hex colour
+  assert.equal(s.accent, DEFAULTS.accent); // not a hex color
   assert.equal(s.bg, "#abcdef"); // lower-cased
   assert.equal(s.radius, 32); // clamped to the top of its range
   assert.equal(s.size, 12); // clamped to the bottom
@@ -69,7 +69,7 @@ test("currentPreset names the look until something changes", () => {
   assert.equal(currentPreset(DEFAULTS), "blueberry");
 });
 
-test("lookVars gives plain colours an old OBS browser can draw", () => {
+test("lookVars gives plain colors an old OBS browser can draw", () => {
   for (const [name, preset] of Object.entries(PRESETS)) {
     const { vars, attrs, feed } = lookVars(sanitize(preset));
     for (const [key, value] of Object.entries(vars)) {
@@ -92,7 +92,7 @@ test("lookVars reflects the shape: no box means no fill, edge or shadow", () => 
   assert.equal(lookVars(sanitize(PRESETS.blueberry)).vars["--g-bf"], "none"); // no filter at all when off
 });
 
-test("colour helpers", () => {
+test("color helpers", () => {
   assert.ok(HEX.test("#a1B2c3") && !HEX.test("#abc") && !HEX.test("red"));
   assert.equal(inkFor("#ffe066"), "#10141a"); // dark text on light yellow
   assert.equal(inkFor("#10131a"), "#ffffff"); // white text on near-black

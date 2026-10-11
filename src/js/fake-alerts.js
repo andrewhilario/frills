@@ -6,9 +6,9 @@ const GIFTS = [["Rose", 1, "#ff5f86"], ["Finger Heart", 5, "#ffb347"], ["Heart",
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 let counter = 0;
 
-/** A small round gift picture drawn in a colour, as an address that carries its own drawing. */
-const giftPicture = (colour) =>
-  "data:image/svg+xml;base64," + btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="${colour}"/><path d="M32 18l4.6 9.4 10.4 1.5-7.5 7.3 1.8 10.3L32 41.6l-9.3 4.9 1.8-10.3-7.5-7.3 10.4-1.5z" fill="#fff"/></svg>`);
+/** A small round gift picture drawn in a color, as an address that carries its own drawing. */
+const giftPicture = (color) =>
+  "data:image/svg+xml;base64," + btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="${color}"/><path d="M32 18l4.6 9.4 10.4 1.5-7.5 7.3 1.8 10.3L32 41.6l-9.3 4.9 1.8-10.3-7.5-7.3 10.4-1.5z" fill="#fff"/></svg>`);
 
 /**
  * One made-up alert of a kind: "follow", "share", or "gift" (`size` 1 small, 2 medium, 3 big, or leave it out for any). Names that are
@@ -18,9 +18,9 @@ export function fakeAlert(kind, { size, name } = {}) {
   const who = name ?? pick(NAMES);
   const base = { kind, id: `practice-${++counter}`, user: who, name: who, avatar: "" };
   if (kind !== "gift") return base;
-  const [gift, diamonds, colour] = pick(GIFTS.filter((_, i) => !size || (size === 1 ? i < 3 : size === 2 ? i === 3 : i >= 4)));
+  const [gift, diamonds, color] = pick(GIFTS.filter((_, i) => !size || (size === 1 ? i < 3 : size === 2 ? i === 3 : i >= 4)));
   const count = diamonds >= 100 ? 1 : 1 + Math.floor(Math.random() * 5);
-  return { ...base, gift, picture: giftPicture(colour), diamonds, count, total: diamonds * count };
+  return { ...base, gift, picture: giftPicture(color), diamonds, count, total: diamonds * count };
 }
 
 /** A crowd of follows (or shares) arriving together, to see them join. */

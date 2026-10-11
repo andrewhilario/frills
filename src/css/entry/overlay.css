@@ -1,5 +1,5 @@
 /* The overlay page: only the chat, on a see-through page, for a browser source in OBS.
-   Plain colours only, because OBS can ship an older browser engine than your own. */
+   Plain colors only, because OBS can ship an older browser engine than your own. */
 @import "../../../tokens.css";
 @import "../fonts.css";
 @import "../chat.css";

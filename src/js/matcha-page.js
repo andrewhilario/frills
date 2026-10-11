@@ -65,7 +65,7 @@ const paletteChips = chips(
   currentPalette(settings),
   (item) => {
     settings.palette = item.id;
-    Object.assign(settings, paletteColors(item.id)); // a palette sets all six colours; they can be changed one by one under More options
+    Object.assign(settings, paletteColors(item.id)); // a palette sets all six colors; they can be changed one by one under More options
     syncControls();
     refresh();
   },
@@ -88,7 +88,7 @@ chips(
 const writers = {};
 function change(key, value) {
   settings[key] = value;
-  paletteChips.set(currentPalette(settings)); // no palette looks pressed once a colour has been changed
+  paletteChips.set(currentPalette(settings)); // no palette looks pressed once a color has been changed
   if (key === "font") fontsReady(matchaFaces(settings), 600).then(refresh);
   else refresh();
 }

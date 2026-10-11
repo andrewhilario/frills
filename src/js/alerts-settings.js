@@ -72,10 +72,10 @@ const chipsOf = (key, label, options) => ({ key, type: "chips", label, options }
  */
 export const CONTROLS = [
   // look
-  { section: "look", key: "accent", type: "color", label: "Accent colour" },
-  { section: "look", key: "bg", type: "color", label: "Card colour" },
-  { section: "look", key: "text", type: "color", label: "Text colour" },
-  { section: "look", key: "pop", type: "color", label: "Highlight colour", hint: "The colour of the name and the gift." },
+  { section: "look", key: "accent", type: "color", label: "Accent color" },
+  { section: "look", key: "bg", type: "color", label: "Card color" },
+  { section: "look", key: "text", type: "color", label: "Text color" },
+  { section: "look", key: "pop", type: "color", label: "Highlight color", hint: "The color of the name and the gift." },
   { section: "look", key: "font", type: "select", label: "Font", options: Object.keys(FONTS).map((f) => ({ id: f, name: f })) },
   { section: "look", ...range("size", "Text size", 16, 96, 1, " px", { hint: "In pixels of the page your streaming app shows. A vertical LIVE is 1080 wide." }) },
   { section: "look", ...range("radius", "Roundness", 0, 60, 1, " px") },
@@ -187,7 +187,7 @@ export function alertsUrl(base, { channel = "", settings = DEFAULTS } = {}) {
 /** The name of the starting look these settings still match exactly, or null once they've been changed. */
 export const currentLook = (settings) => Object.keys(LOOKS).find((id) => LOOK_KEYS.every((k) => settings[k] === LOOKS[id][k])) ?? null;
 
-/** The overlay's look as CSS variables (plain colours, so even an old browser draws them). */
+/** The overlay's look as CSS variables (plain colors, so even an old browser draws them). */
 export function alertVars(s) {
   const shadows = { none: "none", soft: "0 6px 14px -6px rgba(0,0,0,.55)", hard: `5px 5px 0 ${s.accent}`, glow: `0 0 18px -2px ${s.accent}` };
   return {

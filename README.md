@@ -33,9 +33,9 @@ npm run tiktok:setup    # once: downloads the TikTok connector (about 25 MB)
 npm run tiktok          # builds the site, starts the helper, opens the editor
 ```
 
-Or double-click `Start-TikTok-Helper.bat`. Type `frills_demo` as the TikTok name to get made-up chat through the whole real path when nobody is live. **[TIKTOK-TEST-GUIDE.txt](TIKTOK-TEST-GUIDE.txt) is the step-by-step guide** (tests in the editor, OBS, TikTok LIVE Studio and the matcha page, troubleshooting, what isn't finished). How the helper works, its limits and the licence warning are in [helper/README.md](helper/README.md).
+Or double-click `Start-TikTok-Helper.bat`. Type `frills_demo` as the TikTok name to get made-up chat through the whole real path when nobody is live. **[TIKTOK-TEST-GUIDE.txt](TIKTOK-TEST-GUIDE.txt) is the step-by-step guide** (tests in the editor, OBS, TikTok LIVE Studio and the matcha page, troubleshooting, what isn't finished). How the helper works, its limits and the license warning are in [helper/README.md](helper/README.md).
 
-Read the licence part before giving the helper to anyone: the connector it uses is under a modified AGPL that restricts commercial or hosted use.
+Read the license part before giving the helper to anyone: the connector it uses is under a modified AGPL that restricts commercial or hosted use.
 
 TikTok chatters' profile pictures show in the round badge (a setting, "Use profile pictures", on by default). They load from TikTok's picture servers, which the Content-Security-Policy lists (`*.tiktokcdn.com`, `-us` and `-eu`); the page only accepts addresses on those, or a drawn picture inside the address for the pretend account. Twitch gives no pictures with chat, so Twitch chatters keep the letter.
 
@@ -52,7 +52,7 @@ src/js/           feed.js (the chat), twitch.js and tiktok.js (the two chat sour
 src/css/          chat.css + looks*.css are the overlay; site.css, base.css and the rest are the site
 helper/           the Frills helper: server.mjs (serves the site, answers the pages), rooms.mjs (one TikTok connection per account),
                   map.mjs (TikTok's events -> Frills messages). Its own package.json: the site's build never installs it.
-tokens.css        every colour, font, size and space on the site (Hallmark "Hum", tuned for Frills)
+tokens.css        every color, font, size and space on the site (Hallmark "Hum", tuned for Frills)
 public/           fonts, icons, the social card: copied into dist/ as they are
 build.mjs         bundles with esbuild, renders the pages, writes sitemap, robots.txt and _headers
 scripts/          the local server, the dev loop, the brand-image maker
@@ -68,9 +68,9 @@ Things the build does for you:
 
 ## Rules worth keeping
 
-- **The overlay must work in an old OBS.** `chat.css`, `looks.css`, `looks-matcha.css` and the overlay script use plain hex and rgba only: no `color-mix()`, `oklch()`, `:has()` or CSS nesting. Colours that need maths are worked out in `src/js/color.js`. The overlay page is held to 20 KB by a test.
+- **The overlay must work in an old OBS.** `chat.css`, `looks.css`, `looks-matcha.css` and the overlay script use plain hex and rgba only: no `color-mix()`, `oklch()`, `:has()` or CSS nesting. Colors that need maths are worked out in `src/js/color.js`. The overlay page is held to 20 KB by a test.
 - **Chat text is somebody else's words.** It only goes into the page with `textContent` and text nodes, never as HTML. Emote ids are checked before they become an image address.
-- **The site CSS uses tokens.** No raw colours or font names outside `tokens.css` (the overlay files above are the one exception, for the reason above).
+- **The site CSS uses tokens.** No raw colors or font names outside `tokens.css` (the overlay files above are the one exception, for the reason above).
 - **No tracking.** Nothing is stored on a server and there is no analytics script. The privacy page promises it, so change the page first if that ever changes.
 
 ## Settings you will want to change
@@ -84,7 +84,7 @@ Things the build does for you:
 - `url` is the address everything is built around: canonical links, the sitemap and the social card. Change it together with the route in `wrangler.jsonc`, and run `node scripts/make-assets.mjs` again, because the share image prints the address.
 - `feedbackUrl` is a link to wherever feedback should go (a form, a Discord invite). Empty means no Feedback link is shown.
 - `waitlistUrl` is a link to a form for people who want to hear when the TikTok helper can be downloaded. Empty means the FAQ, the TikTok guide and the note under the chat box have no such link.
-- `helperUrl` is where the TikTok helper can be downloaded. While it is empty, the FAQ and the TikTok guide say there is no download yet (and offer the waitlist if there is one). Once it is set, both show a "Get the helper" link instead. Set it only when the download exists, and settle the licence question in `helper/README.md` first.
+- `helperUrl` is where the TikTok helper can be downloaded. While it is empty, the FAQ and the TikTok guide say there is no download yet (and offer the waitlist if there is one). Once it is set, both show a "Get the helper" link instead. Set it only when the download exists, and settle the license question in `helper/README.md` first.
 
 Any of them can be overridden for one build with `SITE_URL`, `FEEDBACK_URL`, `WAITLIST_URL` and `HELPER_URL` in the environment.
 
@@ -129,7 +129,7 @@ node scripts/make-assets.mjs
 
 ## Fonts
 
-The fonts are self-hosted from `public/fonts` (the site never calls Google Fonts, and the Content-Security-Policy would block it). They came from the open-source Fontsource packages and are under the SIL Open Font License; each licence is in `public/fonts/licenses`.
+The fonts are self-hosted from `public/fonts` (the site never calls Google Fonts, and the Content-Security-Policy would block it). They came from the open-source Fontsource packages and are under the SIL Open Font License; each license is in `public/fonts/licenses`.
 
 ## Things to know
 
@@ -142,9 +142,9 @@ The fonts are self-hosted from `public/fonts` (the site never calls Google Fonts
 
 `npm run relay` runs the same program as the helper, but as a shared service: it answers the Frills website from another address (`RELAY_ORIGINS`), has a limited number of spots (`RELAY_SLOTS`) and a line for them, limits streams per visitor address (`RELAY_PER_IP`), keeps no chat and serves no site of its own. Set `relayUrl` in `site.config.json` (or `RELAY_URL`) to its public address and the site's pages, FAQ, privacy page and security policy follow. [RELAY-PHONE-GUIDE.md](RELAY-PHONE-GUIDE.md) sets it up on an Android phone with Termux and a Cloudflare Tunnel. The local helper stays the choice for anyone who wants no waiting.
 
-## Licence
+## License
 
-Frills is free software under the GNU Affero General Public License v3 (see `LICENSE`). The TikTok helper and relay use `tiktok-live-connector`, which has its own modified AGPL licence; see `helper/README.md`. If you run a modified copy of the relay as a service for other people, the AGPL asks you to share your changes.
+Frills is free software under the GNU Affero General Public License v3 (see `LICENSE`). The TikTok helper and relay use `tiktok-live-connector`, which has its own modified AGPL license; see `helper/README.md`. If you run a modified copy of the relay as a service for other people, the AGPL asks you to share your changes.
 
 ## Feedback form
 

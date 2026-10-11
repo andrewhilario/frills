@@ -17,14 +17,14 @@ const LINES = [
 ];
 // Gifts with what they cost in diamonds, so the alerts can be tried at every size.
 const GIFTS = [["Rose", 1, "#ff5f86"], ["Finger Heart", 5, "#ffb347"], ["Heart", 20, "#ff4d6d"], ["Panda", 100, "#6c7a89"], ["Galaxy", 1000, "#7b61ff"]];
-const giftIcon = (colour) => `data:image/svg+xml;base64,${Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="${colour}"/><path d="M32 18l4.6 9.4 10.4 1.5-7.5 7.3 1.8 10.3L32 41.6l-9.3 4.9 1.8-10.3-7.5-7.3 10.4-1.5z" fill="#fff"/></svg>`).toString("base64")}`;
+const giftIcon = (color) => `data:image/svg+xml;base64,${Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="${color}"/><path d="M32 18l4.6 9.4 10.4 1.5-7.5 7.3 1.8 10.3L32 41.6l-9.3 4.9 1.8-10.3-7.5-7.3 10.4-1.5z" fill="#fff"/></svg>`).toString("base64")}`;
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 
 // Each made-up chatter gets a small drawn face as a profile picture, so a look can be judged with pictures in it. Real TikTok pictures
 // arrive as addresses on TikTok's servers; these carry the drawing inside the address, so nothing is fetched from anywhere.
 const FACES = [["#bfe3a8", "#2f5d34"], ["#ffd6e0", "#8a3b57"], ["#cfe4ff", "#2d4f86"], ["#fff1b8", "#6b5a12"], ["#e6d6ff", "#51308f"], ["#ffd9b8", "#8a4a1a"]];
 const face = ([paper, ink]) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="${paper}"/><circle cx="22" cy="28" r="4.5" fill="${ink}"/><circle cx="42" cy="28" r="4.5" fill="${ink}"/><path d="M20 42q12 12 24 0" fill="none" stroke="${ink}" stroke-width="4" stroke-linecap="round"/></svg>`;
-const PICTURES = FACES.map((colours) => `data:image/svg+xml;base64,${Buffer.from(face(colours)).toString("base64")}`);
+const PICTURES = FACES.map((colors) => `data:image/svg+xml;base64,${Buffer.from(face(colors)).toString("base64")}`);
 
 export class DemoConnection extends EventEmitter {
   /** `pace` is the [shortest, longest] wait in ms between made-up events. */
@@ -82,8 +82,8 @@ export class DemoConnection extends EventEmitter {
       this.emit("share", { common: { msgId: id }, user });
     } else if (roll < 0.3) {
       // A gift. The ones that can be sent in a streak arrive twice, as they do from TikTok: counting, then the final count.
-      const [name, diamondCount, colour] = pick(GIFTS);
-      const gift = { name, type: 1, diamondCount, image: { urlList: [giftIcon(colour)] } };
+      const [name, diamondCount, color] = pick(GIFTS);
+      const gift = { name, type: 1, diamondCount, image: { urlList: [giftIcon(color)] } };
       const count = 1 + Math.floor(Math.random() * 5);
       this.emit("gift", { common: { msgId: id + "-a" }, user, gift, repeatCount: Math.max(1, count - 1), repeatEnd: 0 });
       setTimeout(() => !this.gone && this.emit("gift", { common: { msgId: id + "-b" }, user, gift, repeatCount: count, repeatEnd: 1 }), 700);

@@ -5,7 +5,7 @@
      --m-font    a font instead of the style's own
      --m-anim --m-speed --m-ease   an entrance instead of the style's own
      --bg-fill --soft-fill --night-body-fill --glass-fill   the boxes' fills, which carry the box opacity
-   Only the overlay page and the matcha page load this file. Plain colours only, as in chat.css. */
+   Only the overlay page and the matcha page load this file. Plain colors only, as in chat.css. */
 
 /* ── Matcha Latte: soft cream bubbles that hop in, with a ripple under each new message ───────────────────────────────── */
 .look-latte { --ico: var(--matcha); --ico-ink: var(--bg); }

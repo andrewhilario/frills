@@ -39,7 +39,7 @@ test("a message from the helper is checked field by field before it is drawn", (
   assert.equal(sneaky.mod, false, "only a real true counts");
   assert.equal(sneaky.gift, false);
   assert.deepEqual(sneaky.emotes, []);
-  assert.equal(sneaky.color, null, "TikTok has no name colours");
+  assert.equal(sneaky.color, null, "TikTok has no name colors");
 });
 
 // What tiktok-live-connector 2.5.0 really sends (shape taken from a live room on 2026-10-07; the words here are made up).

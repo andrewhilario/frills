@@ -1,5 +1,5 @@
 // Draws the brand images from the design tokens:  node scripts/make-assets.mjs
-//   public/favicon.svg, favicon.ico, apple-touch-icon.png   the mark, in the site's own colours
+//   public/favicon.svg, favicon.ico, apple-touch-icon.png   the mark, in the site's own colors
 //   public/og.png                                           the 1200 x 630 card shown when a link is shared
 // It needs a Chrome or Edge on this computer. Run it again after changing the tokens or the headline.
 

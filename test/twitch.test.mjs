@@ -73,7 +73,7 @@ test("moderator comes from the mod tag or the badge; the broadcaster is not a mo
   assert.equal(vip.mod, false);
 });
 
-test("a name falls back to the login, and a bad colour is dropped", () => {
+test("a name falls back to the login, and a bad color is dropped", () => {
   const m = Twitch.toChatMessage(Twitch.parseIrc("@color=red;display-name= :LoginName!x@x PRIVMSG #c :hi"));
   assert.equal(m.name, "loginname");
   assert.equal(m.user, "loginname");

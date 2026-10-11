@@ -34,11 +34,11 @@ Or double-click `Start-TikTok-Helper.bat` in the project folder. The full test g
 
 The pages ask `GET /tiktok/stream?user=NAME` and receive Server-Sent Events: `status` (`connecting`, `connected`, `offline`, `reconnecting`, `limited`, `error`), `chat` (a Frills message), `remove` and `clear` (a moderator deleted a message or banned someone). `GET /tiktok/ping` says whether the helper is there; the hosted site has a static file at the same address that says it isn't.
 
-## Licence: read this before sharing the helper
+## License: read this before sharing the helper
 
 The helper uses `tiktok-live-connector` 2.5.0, which is under a **modified AGPL-3.0** (its LICENSE adds sections 18 to 21). As read on 2026-10-07 (not legal advice): a free tool that links the library is allowed, but the extra terms take that permission away if the library powers a *commercial, closed-source or hosted SaaS* platform, such as a relay server, unless the whole server source is published under AGPL-3.0. TikFinity and Euler Stream are named as exceptions. Versions up to 2.4.0 were MIT.
 
-So: using the helper on your own PC for testing is fine. Before giving it to other people, selling anything with it, or running it as a hosted service, settle the licence question first.
+So: using the helper on your own PC for testing is fine. Before giving it to other people, selling anything with it, or running it as a hosted service, settle the license question first.
 
 ## Tests
 

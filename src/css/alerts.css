@@ -1,5 +1,5 @@
 /* The alerts: a card with the person's picture, the words and sometimes the gift, a burst of little shapes around it, and an entrance,
-   an idle movement and an exit chosen in the settings. Plain colours and transforms only, so even an old streaming browser draws it.
+   an idle movement and an exit chosen in the settings. Plain colors and transforms only, so even an old streaming browser draws it.
    The look comes in as variables on .alerts: --a-font --a-size --a-text --a-accent --a-pop --a-bg --a-border --a-radius --a-shadow
    --a-speed --a-offset --a-dir (see alertVars in alerts-settings.js). */
 

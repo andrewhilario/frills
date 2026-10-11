@@ -1,5 +1,5 @@
 /* The alerts overlay page: only the alerts, on a see-through page, for a browser source in a streaming app.
-   Plain colours only, because some streaming apps ship an older browser engine than your own. */
+   Plain colors only, because some streaming apps ship an older browser engine than your own. */
 @import "../../../tokens.css";
 @import "../fonts.css";
 @import "../alerts.css";
