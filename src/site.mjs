@@ -19,6 +19,8 @@ export const site = {
   relayUrl: pick("RELAY_URL", "relayUrl").replace(/\/+$/, ""),
   // The code Google Search Console asks for to prove the site is yours (a public tag, not a secret). Empty means no tag.
   googleSiteVerification: pick("GOOGLE_SITE_VERIFICATION", "googleSiteVerification"),
+  // The Client ID of the Spotify app used by the private /spotify/ test page. It is public by design (the login uses no secret). Empty means no Spotify.
+  spotifyClientId: pick("SPOTIFY_CLIENT_ID", "spotifyClientId"),
   tagline: "Free chat overlays with all the frills.",
   description: "Free, customizable chat overlays for live streams. Pick a cute look, tweak every detail, and paste one link into your streaming app. Works with TikTok LIVE and Twitch.",
   tally: { url: "https://valwidgets.live", blurb: "free Valorant rank overlays" },
@@ -34,6 +36,7 @@ export function checkSite() {
   const problems = [];
   if (!/^https:\/\/[^/\s]+$/.test(site.url) || /localhost|127\.0\.0\.1/.test(site.url)) problems.push(`the site address "${site.url}" must be a plain https address`);
   if (site.googleSiteVerification && !/^[A-Za-z0-9_-]{20,100}$/.test(site.googleSiteVerification)) problems.push("googleSiteVerification must be just the code from Google Search Console (letters, numbers, - and _)");
+  if (site.spotifyClientId && !/^[a-f0-9]{32}$/.test(site.spotifyClientId)) problems.push("spotifyClientId must be the 32-character Client ID from the Spotify dashboard");
   for (const [name, value] of [["feedbackUrl", site.feedbackForm ? "" : site.feedbackUrl], ["waitlistUrl", site.waitlistUrl], ["helperUrl", site.helperUrl], ["relayUrl", site.relayUrl]]) {
     if (value && !/^https:\/\//.test(value)) problems.push(`${name} must start with https://`);
   }

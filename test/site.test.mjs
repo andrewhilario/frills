@@ -25,7 +25,7 @@ const assetOf = (html, kind) => (new RegExp(`${kind === "css" ? 'href="(/assets/
 
 test("the pages we expect are all there", () => {
   const urls = pages.map((p) => p.url).sort();
-  assert.deepEqual(urls, ["/", "/404.html", "/alerts/", "/editor/", "/feedback/", "/gifts/", "/goal/", "/guides/alerts/", "/guides/obs/", "/guides/test/", "/guides/tiktok/", "/likers/", "/matcha/", "/overlay/", "/overlay/alerts/", "/overlay/gifts/", "/overlay/goal/", "/overlay/likers/", "/overlay/songs/", "/overlays/", "/privacy/", "/songs/"]);
+  assert.deepEqual(urls, ["/", "/404.html", "/alerts/", "/editor/", "/feedback/", "/gifts/", "/goal/", "/guides/alerts/", "/guides/obs/", "/guides/test/", "/guides/tiktok/", "/likers/", "/matcha/", "/overlay/", "/overlay/alerts/", "/overlay/gifts/", "/overlay/goal/", "/overlay/likers/", "/overlay/songs/", "/overlays/", "/privacy/", "/songs/", "/spotify/", "/spotify/callback/"]);
 });
 
 test("every indexable page has its own title and description, a canonical address, share tags and one h1", () => {
@@ -111,7 +111,7 @@ test("nothing the security policy would block: no inline styles, inline scripts 
 
 test("the security headers are in place", () => {
   const headers = read("_headers");
-  for (const rule of ["default-src 'self'", "script-src 'self'", "style-src 'self'", "font-src 'self'", "connect-src 'self' wss://irc-ws.chat.twitch.tv", "img-src 'self' data: https://static-cdn.jtvnw.net https://cdn-images.dzcdn.net https://*.tiktokcdn.com https://*.tiktokcdn-us.com https://*.tiktokcdn-eu.com", "frame-ancestors 'none'", "object-src 'none'", "base-uri 'self'", "form-action 'self'"]) {
+  for (const rule of ["default-src 'self'", "script-src 'self'", "style-src 'self'", "font-src 'self'", "connect-src 'self' wss://irc-ws.chat.twitch.tv", "img-src 'self' data: https://static-cdn.jtvnw.net https://cdn-images.dzcdn.net https://i.scdn.co https://*.tiktokcdn.com https://*.tiktokcdn-us.com https://*.tiktokcdn-eu.com", "frame-ancestors 'none'", "object-src 'none'", "base-uri 'self'", "form-action 'self'"]) {
     assert.ok(headers.includes(rule), `the policy lacks ${rule}`);
   }
   assert.match(headers, /X-Content-Type-Options: nosniff/);
@@ -122,7 +122,7 @@ test("the security headers are in place", () => {
 
 test("the only outside addresses are Twitch, the site itself, Tally and the standards", () => {
   const relayHost = site.relayUrl ? new URL(site.relayUrl).host : "no-relay.invalid";
-  const allowed = [new RegExp(`^${relayHost.replace(/\./g, "\\.")}$`), /^static-cdn\.jtvnw\.net$/, /^irc-ws\.chat\.twitch\.tv$/, new RegExp(`^${new URL(site.url).host.replace(/\./g, "\\.")}$`), new RegExp(`^${new URL(site.tally.url).host.replace(/\./g, "\\.")}$`), /^schema\.org$/, /^www\.w3\.org$/, /^www\.sitemaps\.org$/];
+  const allowed = [new RegExp(`^${relayHost.replace(/\./g, "\\.")}$`), /^static-cdn\.jtvnw\.net$/, /^irc-ws\.chat\.twitch\.tv$/, /^accounts\.spotify\.com$/, /^api\.spotify\.com$/, /^i\.scdn\.co$/, new RegExp(`^${new URL(site.url).host.replace(/\./g, "\\.")}$`), new RegExp(`^${new URL(site.tally.url).host.replace(/\./g, "\\.")}$`), /^schema\.org$/, /^www\.w3\.org$/, /^www\.sitemaps\.org$/];
   for (const file of files.filter((f) => /\.(html|js|css|xml|txt)$/.test(f) && !f.startsWith("fonts/licenses/"))) {
     for (const m of read(file).matchAll(/(?:https?|wss?):\/\/([a-z0-9.-]+)/gi)) {
       assert.ok(allowed.some((re) => re.test(m[1])), `${file} talks to ${m[1]}`);

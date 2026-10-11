@@ -1,0 +1,65 @@
+<!--
+{
+  "title": "Spotify connection test | Frills",
+  "description": "A private test page for connecting Frills to Spotify. Not part of the public site yet.",
+  "path": "/spotify/",
+  "css": "page",
+  "js": "spotify",
+  "bodyClass": "page-guide",
+  "chrome": "nav",
+  "footer": true,
+  "noindex": true,
+  "listed": false
+}
+-->
+<main id="main">
+  <article class="article shell spotify" id="spotify" data-client="{{spotifyClientId}}">
+    <header class="article__head">
+      <h1 class="display">Spotify connection test</h1>
+      <p class="lede">A private page to check that Frills can talk to your Spotify. It shows what is playing, finds songs and adds one to your queue. Nothing here is public yet.</p>
+    </header>
+
+    <div class="article__body">
+      <p class="note note--warm" role="note"><strong>Before you start.</strong> Open Spotify on your phone or computer and play any song, because Spotify only lets Frills add to the queue while a device is active. You need Spotify Premium for that, and your Spotify email must be on the app’s allowlist.</p>
+
+      <section class="spotify__card" aria-labelledby="sp-login">
+        <h2 class="subtitle" id="sp-login">1. Log in</h2>
+        <p class="spotify__status" id="sp-status" role="status">Checking…</p>
+        <div class="spotify__row">
+          <button class="btn" type="button" id="sp-login-btn">Log in with Spotify</button>
+          <button class="btn btn--soft" type="button" id="sp-logout-btn" hidden>Log out</button>
+        </div>
+      </section>
+
+      <section class="spotify__card" aria-labelledby="sp-now" id="sp-now-card" hidden>
+        <h2 class="subtitle" id="sp-now">2. What is playing</h2>
+        <div class="spotify__now" id="sp-now-body">
+          <img class="spotify__cover" id="sp-cover" alt="" width="96" height="96" hidden>
+          <div class="spotify__words">
+            <p class="spotify__title" id="sp-title">Nothing yet</p>
+            <p class="spotify__artist" id="sp-artist"></p>
+            <div class="spotify__bar" aria-hidden="true"><i id="sp-bar"></i></div>
+            <p class="spotify__time" id="sp-time"></p>
+          </div>
+        </div>
+        <p class="ctl__hint" id="sp-now-note" role="status"></p>
+      </section>
+
+      <section class="spotify__card" aria-labelledby="sp-find" id="sp-find-card" hidden>
+        <h2 class="subtitle" id="sp-find">3. Find a song and add it to your queue</h2>
+        <form class="spotify__row" id="sp-form" novalidate>
+          <label class="visually-hidden" for="sp-q">Song name</label>
+          <input type="text" id="sp-q" placeholder="blinding lights the weeknd" autocomplete="off" spellcheck="false">
+          <button class="btn" type="submit">Search</button>
+        </form>
+        <ul class="spotify__results" id="sp-results" role="list"></ul>
+        <p class="ctl__hint" id="sp-find-note" role="status"></p>
+      </section>
+
+      <details class="spotify__details">
+        <summary>Details, for checking</summary>
+        <dl class="spotify__facts" id="sp-facts"></dl>
+      </details>
+    </div>
+  </article>
+</main>

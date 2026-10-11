@@ -340,3 +340,21 @@ test("overlay: before the first request a card says how to ask, in the streamer'
   await page.goto(`${base}/overlay/songs/?channel=pond_two&platform=tiktok&idleText=Ask+with+%21{command}`, { settle: 900 });
   assert.equal(await idle(), "Ask with !sr", "its own words");
 });
+
+test("spotify test pages: they load under the security policy, say what to do, and the callback explains a visit that did not come from Spotify", { skip }, async () => {
+  const { base } = await withHelper();
+  await page.goto(base + "/spotify/", { settle: 900 });
+  assert.deepEqual(page.problems, [], page.problems.join(" | "));
+  assert.match(await text("#sp-status"), /Not logged in/);
+  assert.equal(await page.evaluate('document.getElementById("sp-login-btn").hidden'), false);
+  assert.equal(await page.evaluate('document.getElementById("sp-now-card").hidden'), true, "the player parts wait for a login");
+  const facts = await page.evaluate('[...document.querySelectorAll("#sp-facts dd")].map((e) => e.textContent)');
+  assert.ok(facts[0].startsWith("48c133"), "it says which Spotify app it uses");
+  assert.ok(facts[1].endsWith("/spotify/callback/"), "and the redirect address to register: " + facts[1]);
+  assert.equal(await page.evaluate('document.querySelector("meta[name=robots]")?.content'), "noindex, nofollow");
+  await page.goto(base + "/spotify/callback/", { settle: 900 });
+  assert.deepEqual(page.problems, [], page.problems.join(" | "));
+  assert.match(await text("#sp-status"), /needs to be opened by Spotify/);
+  await page.goto(base + "/spotify/callback/?error=access_denied&state=x", { settle: 900 });
+  assert.match(await text("#sp-status"), /said no/);
+});
