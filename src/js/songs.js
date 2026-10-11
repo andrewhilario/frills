@@ -3,7 +3,7 @@
 // each song wherever they like, and "!next" (from the streamer's own account, or a moderator) moves the queue on. No page and no clock of
 // its own (the lookup and the time are given to it), so it is tested on its own.
 
-import { defineWidget, number, range, selectOf, text, toggle } from "./widget-settings.js";
+import { defineWidget, imageOf, number, range, selectOf, text, toggle } from "./widget-settings.js";
 
 export const SONG_LAYOUTS = [["card", "Card"], ["strip", "Strip: one slim line"], ["stack", "Stack: big cover on top"], ["disc", "Disc: a spinning record"], ["glass", "Glass: a blurred cover behind the card"], ["equalizer", "Equalizer: bouncing bars"], ["capsule", "Capsule: a pill with a spinning disc"], ["poster", "Poster: a tall card with a big cover"], ["boxy", "Boxy: the cover and the words in two boxes"], ["minimal", "Minimal: just the words, no card"]];
 export const SONG_COVERS = [["auto", "The layout\u2019s own"], ["square", "Square"], ["round", "Round"], ["vinyl", "Vinyl: round and spinning"]];
@@ -11,13 +11,14 @@ export const SONG_SHOWS = [["both", "The song playing and the queue"], ["now", "
 
 export const SONGS = defineWidget({
   defaults: {
-    show: "both", layout: "card", coverShape: "auto", coverGlow: false, coverBlur: false, progress: true, scrollTitle: true, idleCard: true, idleText: "Nothing playing. Type !{command} and a song name.", command: "sr", max: 5, limit: 20, perUser: 2, modsSkip: true, onlyFound: false, autoNext: false,
+    show: "both", layout: "card", coverShape: "auto", coverMedia: "", coverGlow: false, coverBlur: false, progress: true, scrollTitle: true, idleCard: true, idleText: "Nothing playing. Type !{command} and a song name.", command: "sr", max: 5, limit: 20, perUser: 2, modsSkip: true, onlyFound: false, autoNext: false,
     title: true, titleText: "Song requests", showNow: true, nowText: "Now playing", cover: true, requester: true, keep: false,
   },
   controls: [
     { section: "layout", ...selectOf("show", "What this overlay shows", SONG_SHOWS, "Add one overlay for the song playing and another for the queue if you want them in different places.") },
     { section: "layout", ...selectOf("layout", "How the song playing looks", SONG_LAYOUTS) },
     { section: "layout", ...selectOf("coverShape", "Cover shape", SONG_COVERS, "Separate from the layout, so any layout can have a square, round or spinning cover.") },
+    { section: "layout", ...imageOf("coverMedia", "Your own cover, or an animated GIF", "Shown instead of the album cover on the song playing, like a looping canvas. A short GIF or animated WebP, up to 300 KB. Tick the box above first.") },
     { section: "layout", ...toggle("coverGlow", "Cover glow", "A soft glow around the cover in your accent color.") },
     { section: "layout", ...toggle("coverBlur", "Cover blur", "A blurred copy of the cover as the card\u2019s background.") },
     { section: "layout", ...toggle("progress", "Show a progress bar", "Fills over the song\u2019s length from the catalog, so it needs the song to be found. Not shown in the strip.") },

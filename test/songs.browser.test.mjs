@@ -358,3 +358,28 @@ test("spotify test pages: they load under the security policy, say what to do, a
   await page.goto(base + "/spotify/callback/?error=access_denied&state=x", { settle: 900 });
   assert.match(await text("#sp-status"), /said no/);
 });
+
+test("spotify test page: the chat section is part of the page and waits for a login like the rest", { skip }, async () => {
+  const { base } = await withHelper();
+  await page.goto(base + "/spotify/", { settle: 900 });
+  assert.equal(await page.evaluate('document.getElementById("sp-chat-card").hidden'), true, "hidden until logged in");
+  for (const id of ["sp-channel", "sp-listen", "sp-real", "sp-fake", "sp-log"]) assert.equal(await page.evaluate(`Boolean(document.getElementById(${JSON.stringify(id)}))`), true, id);
+  assert.equal(await page.evaluate('document.getElementById("sp-real").checked'), false, "it never touches the real queue unless asked");
+});
+
+test("overlay: the song playing wears the uploaded picture in place of the album cover, and the queue keeps album covers", { skip }, async () => {
+  const { base } = await withHelper();
+  const id = "AbCdEfGhIjKlMnOp";
+  await page.goto(`${base}/overlay/songs/?demo=1&pace=400&coverMedia=${id}`, { settle: 900 });
+  await until(async () => (await titles()).length >= 3, 9000);
+  const srcs = await page.evaluate(`({ now: document.querySelector(".song--now .song__img")?.getAttribute("src"), nowBg: document.querySelector(".song--now .song__bg")?.getAttribute("src"), row: document.querySelector(".songs__rows .song .song__img")?.getAttribute("src") })`);
+  assert.equal(srcs.now, "/api/media/" + id, "the song playing: the uploaded picture");
+  assert.equal(srcs.nowBg, "/api/media/" + id, "and the blur behind it, when that is on, is the same picture");
+  assert.match(srcs.row, /^data:image\/svg\+xml/, "the songs waiting keep their own covers");
+  await page.goto(`${base}/overlay/songs/?demo=1&pace=400&coverMedia=not-a-real-id`, { settle: 900 });
+  await until(async () => (await titles()).length >= 2, 9000);
+  assert.match(await page.evaluate('document.querySelector(".song--now .song__img").getAttribute("src")'), /^data:image\/svg\+xml/, "a made-up id is ignored");
+  await page.goto(base + "/songs/", { settle: 900 });
+  assert.equal(await page.evaluate('Boolean(document.getElementById("media-ok"))'), true, "the box to tick");
+  assert.equal(await page.evaluate('[...document.querySelectorAll("#opt-controls .media__choose")].length'), 1, "and one place to choose a picture");
+});

@@ -311,3 +311,15 @@ test("the cover is its own choice, apart from the layout, with a glow and a blur
   const back = SONGS.sanitize(SONGS.fromParams(p));
   assert.deepEqual([back.coverShape, back.coverGlow, back.coverBlur, back.idleCard], ["vinyl", true, true, false]);
 });
+
+test("the song playing can wear the streamer's own picture: only a real uploaded file's id is accepted, and it rides in the link", () => {
+  const ok = "AbCdEfGhIjKlMnOp";
+  assert.equal(SONGS.defaults.coverMedia, "", "none by default: the album cover");
+  assert.equal(SONGS.sanitize({ coverMedia: ok }).coverMedia, ok);
+  for (const bad of ["short", "has space 16 chars", "../../etc/passwd!!!", "https://evil.example/x.gif", 5, null]) assert.equal(SONGS.sanitize({ coverMedia: bad }).coverMedia, "", String(bad));
+  const link = SONGS.url("https://x.example/o/", { settings: SONGS.sanitize({ coverMedia: ok }) });
+  assert.equal(new URL(link).searchParams.get("coverMedia"), ok);
+  assert.equal(SONGS.sanitize(SONGS.fromParams(new URL(link).searchParams)).coverMedia, ok);
+  assert.ok(SONGS.controls.some((c) => c.key === "coverMedia" && c.type === "media" && c.media === "image"), "the editor shows an upload control for it");
+  assert.equal(new URL(SONGS.url("https://x.example/o/")).searchParams.has("coverMedia"), false, "not written into the link when there is none");
+});

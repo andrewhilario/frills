@@ -2,6 +2,9 @@
 // pages are not listed, and nothing is sent anywhere but Spotify. The login stays in this browser only.
 
 import { REDIRECT_PATH, SpotifyClient } from "./spotify.js";
+import { SpotifyRequests } from "./spotify-requests.js";
+import { cleanName, connectTo, statusText } from "./connect.js";
+import { relayForPage } from "./tiktok.js";
 
 const root = document.getElementById("spotify");
 const $ = (id) => document.getElementById(id);
@@ -28,7 +31,9 @@ function main() {
   const logoutBtn = $("sp-logout-btn");
   const nowCard = $("sp-now-card");
   const findCard = $("sp-find-card");
+  const chatCard = $("sp-chat-card");
   let timer = 0;
+  let listening = null; // the connection to the chat, while it is on
 
   const facts = () => {
     const t = client.tokens;
@@ -78,6 +83,7 @@ function main() {
     logoutBtn.hidden = !on;
     nowCard.hidden = !on;
     findCard.hidden = !on;
+    chatCard.hidden = !on;
     clearInterval(timer);
     if (!clientId) { say(status, "This site has no Spotify app set up yet.", true); facts(); return; }
     if (!on) { say(status, "Not logged in. Press the button and say yes on Spotify's page."); facts(); return; }
@@ -132,6 +138,47 @@ function main() {
       list.append(li);
     }
     facts();
+  });
+
+  // ── song requests from chat, into the Spotify queue ───────────────────────────────────────────────────────────────────
+  const log = $("sp-log");
+  const channelInput = $("sp-channel");
+  try { channelInput.value = localStorage.getItem("frills:spotify:channel") ?? ""; } catch { /* storage can be blocked */ }
+  const requests = new SpotifyRequests(client, {
+    onLog: ({ state, text }) => {
+      const li = document.createElement("li");
+      li.dataset.state = state;
+      li.textContent = text;
+      log.prepend(li);
+      while (log.children.length > 30) log.lastElementChild.remove();
+    },
+  });
+  $("sp-real").addEventListener("change", (event) => { requests.real = event.target.checked; });
+  const handle = (message) => requests.handle({ ...message, login: message.login ?? "" });
+
+  $("sp-chat-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const note = $("sp-chat-note");
+    const button = $("sp-listen");
+    if (listening) { listening.stop(); listening = null; button.textContent = "Start listening"; say(note, "Stopped."); return; }
+    const name = cleanName("tiktok", channelInput.value);
+    if (!name) { say(note, "Type your TikTok name first.", true); return; }
+    try { localStorage.setItem("frills:spotify:channel", name); } catch { /* storage can be blocked */ }
+    requests.channel = name;
+    button.textContent = "Stop listening";
+    const feed = { add: (message) => { handle(message); }, removeById() {}, removeUser() {}, clear() {} };
+    listening = connectTo([feed], "tiktok", name, (state) => say(note, statusText({ ...state })), { relay: relayForPage() });
+  });
+
+  $("sp-fake-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const input = $("sp-fake");
+    const text = input.value.trim();
+    if (!text) return;
+    requests.channel = cleanName("tiktok", channelInput.value) || "you";
+    // typed here, so it is the streamer's own message: "!next" works too
+    handle({ id: "", user: "pretend-" + Date.now(), name: "Pretend viewer", text, host: ["!next", "!skip"].some((word) => text.trimStart().toLowerCase().startsWith(word)), mod: false });
+    input.value = "";
   });
 
   show();

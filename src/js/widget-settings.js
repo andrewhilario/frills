@@ -3,7 +3,7 @@
 // link), and writes the link. Pure code, so it is tested without a page.
 
 import { HEX } from "./color.js";
-import { CONTROLS as ALERT_CONTROLS, DEFAULTS as ALERT_DEFAULTS, LOOKS, LOOK_KEYS } from "./alerts-settings.js";
+import { CONTROLS as ALERT_CONTROLS, DEFAULTS as ALERT_DEFAULTS, LOOKS, LOOK_KEYS, MEDIA_ID } from "./alerts-settings.js";
 
 export { LOOKS, LOOK_NAMES, alertVars as lookVars, currentLook } from "./alerts-settings.js";
 
@@ -16,6 +16,8 @@ export const range = (key, label, min, max, step, unit, extra = {}) => ({ key, t
 export const number = (key, label, min, max, extra = {}) => ({ key, type: "number", label, min, max, ...extra });
 export const toggle = (key, label, hint) => ({ key, type: "toggle", label, hint });
 export const text = (key, label, max = 80, hint) => ({ key, type: "text", label, max, hint });
+/** A picture the streamer uploads (the setting holds only its id, "" for none). */
+export const imageOf = (key, label, hint) => ({ key, type: "media", media: "image", label, hint });
 export const chipsOf = (key, label, options) => ({ key, type: "chips", label, options: options.map(([id, name]) => ({ id, name })) });
 export const selectOf = (key, label, options, hint) => ({ key, type: "select", label, options: options.map(([id, name]) => ({ id, name })), hint });
 
@@ -31,6 +33,7 @@ export function coerce(control, value) {
     return Number.isFinite(n) ? Math.min(control.max, Math.max(control.min, Math.round(n))) : undefined;
   }
   if (control.type === "toggle") return typeof value === "boolean" ? value : undefined;
+  if (control.type === "media") return value === "" || (typeof value === "string" && MEDIA_ID.test(value)) ? value : undefined;
   if (control.type === "text") return typeof value === "string" ? value.replace(/[\u0000-\u001f\u007f]+/g, " ").slice(0, control.max) : undefined;
   return control.options.some((o) => o.id === value) ? value : undefined;
 }

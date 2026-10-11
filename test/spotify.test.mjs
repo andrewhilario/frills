@@ -177,3 +177,86 @@ test("logging out forgets everything, and storage that is blocked never breaks a
   assert.match((await blocked.nowPlaying()).error, /login ran out/);
   blocked.logout();
 });
+
+// ── song requests from chat into the Spotify queue ──────────────────────────────────────────────────────────────────
+
+import { SpotifyRequests } from "../src/js/spotify-requests.js";
+
+const song = (n, title = "Song " + n, artist = "Artist") => ({ id: String(n), uri: "spotify:track:" + String(n).padStart(22, "a"), title, artist, cover: "", seconds: 100 });
+function chatRig(over = {}, catalog = {}) {
+  const queued = [];
+  let skipped = 0;
+  const client = {
+    search: async (q) => (catalog[q.toLowerCase()] === "error" ? { error: "Your Spotify login ran out." } : { results: catalog[q.toLowerCase()] ?? [] }),
+    addToQueue: async (uri) => (over.queueError ? { error: over.queueError } : (queued.push(uri), { ok: true })),
+    skip: async () => (over.skipError ? { error: over.skipError } : (skipped++, { ok: true })),
+  };
+  const lines = [];
+  let time = 1000;
+  const requests = new SpotifyRequests(client, { real: true, channel: "pond_cafe", now: () => time, onLog: (e) => lines.push(e), ...over.options });
+  return { requests, queued, lines, skipped: () => skipped, advance: (ms) => { time += ms; } };
+}
+const say = (text, over = {}) => ({ id: "", user: "u1", name: "Ann", text, mod: false, host: false, login: "ann", ...over });
+
+test("a viewer's !sr puts the first matching song at the end of the Spotify queue, and says so", async () => {
+  const { requests, queued, lines } = chatRig({}, { "blinding lights": [song(1, "Blinding Lights", "The Weeknd"), song(2)] });
+  const entry = await requests.handle(say("!sr blinding lights"));
+  assert.deepEqual(queued, [song(1).uri], "the first match, only");
+  assert.equal(entry.state, "ok");
+  assert.match(entry.text, /Ann: “Blinding Lights” · The Weeknd was added to your Spotify queue/);
+  assert.equal(lines.length, 1);
+  assert.equal(await requests.handle(say("hello there")), null, "ordinary chat is not a command");
+});
+
+test("practice mode shows what would be added and sends nothing to the queue or the player", async () => {
+  const { requests, queued, skipped, lines } = chatRig({ options: { real: false } }, { "levitating": [song(3, "Levitating", "Dua Lipa")] });
+  await requests.handle(say("!sr levitating"));
+  assert.deepEqual(queued, []);
+  assert.match(lines[0].text, /Practice: not added to your queue/);
+  await requests.handle(say("!next", { id: "n", host: true }));
+  assert.equal(skipped(), 0);
+  assert.match(lines[1].text, /Practice: nothing was skipped/);
+});
+
+test("the rules: one request every 15 seconds per person, one song not queued twice, and a message handled once", async () => {
+  const { requests, queued, advance, lines } = chatRig({}, { "aa": [song(1)], "bb": [song(2)] });
+  await requests.handle(say("!sr aa", { id: "m1" }));
+  assert.match((await requests.handle(say("!sr bb", { id: "m2" }))).text, /too soon/);
+  assert.equal(await requests.handle(say("!sr aa", { id: "m1" })), null, "the same message delivered twice");
+  advance(16000);
+  assert.match((await requests.handle(say("!sr aa", { id: "m3" }))).text, /queued a moment ago/, "the same song again");
+  assert.equal((await requests.handle(say("!sr bb", { id: "m4", user: "u2", name: "Ben" }))).state, "ok");
+  assert.deepEqual(queued, [song(1).uri, song(2).uri]);
+  advance(11 * 60 * 1000);
+  assert.equal((await requests.handle(say("!sr aa", { id: "m5" }))).state, "ok", "after ten minutes the song can be asked for again");
+  assert.equal(lines.length, 5);
+});
+
+test("when Spotify cannot do it, the log says why in words and nothing else happens", async () => {
+  const none = chatRig({}, {});
+  assert.match((await none.requests.handle(say("!sr zzzz"))).text, /Spotify found nothing/);
+  const down = chatRig({}, { "x y": "error" });
+  const a = await down.requests.handle(say("!sr x y"));
+  assert.deepEqual([a.state, /login ran out/.test(a.text)], ["error", true]);
+  const noDevice = chatRig({ queueError: "Spotify has no device to play on. Open Spotify on your phone or computer and start any song, then try again." }, { "a b": [song(1)] });
+  const b = await noDevice.requests.handle(say("!sr a b"));
+  assert.deepEqual([b.state, /no device/.test(b.text)], ["error", true]);
+  assert.equal(noDevice.queued.length, 0);
+  assert.equal(await noDevice.requests.handle(say("!wrongsong")), null, "Spotify's queue cannot take a song back, so that command is left to the on-screen queue");
+});
+
+test("!next skips for the streamer (their own account or TikTok's host flag) and a moderator, and not for a viewer", async () => {
+  const { requests, skipped, lines } = chatRig({});
+  assert.match((await requests.handle(say("!next", { id: "1" }))).text, /only you and your moderators/);
+  assert.equal(skipped(), 0);
+  assert.match((await requests.handle(say("!next", { id: "2", login: "Pond_Cafe" }))).text, /skipped to the next song/);
+  assert.match((await requests.handle(say("!skip", { id: "3", host: true }))).text, /skipped/);
+  assert.match((await requests.handle(say("!next", { id: "4", mod: true }))).text, /skipped/);
+  assert.equal(skipped(), 3);
+  requests.settings = { ...requests.settings, modsSkip: false };
+  assert.match((await requests.handle(say("!next", { id: "5", mod: true }))).text, /only you/);
+  const failing = chatRig({ skipError: "Spotify has no device to play on." });
+  const entry = await failing.requests.handle(say("!next", { id: "6", host: true }));
+  assert.deepEqual([entry.state, /no device/.test(entry.text)], ["error", true]);
+  assert.equal(lines.length, 5);
+});

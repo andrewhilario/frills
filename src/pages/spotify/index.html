@@ -56,6 +56,24 @@
         <p class="ctl__hint" id="sp-find-note" role="status"></p>
       </section>
 
+      <section class="spotify__card" aria-labelledby="sp-chat" id="sp-chat-card" hidden>
+        <h2 class="subtitle" id="sp-chat">4. Song requests from your chat</h2>
+        <p class="ctl__hint">Viewers type <code>!sr song name</code> in your TikTok LIVE chat and the first match goes to the end of your Spotify queue. You or a moderator type <code>!next</code> to skip. Leave this page open while you stream.</p>
+        <form class="spotify__row" id="sp-chat-form" novalidate>
+          <label class="visually-hidden" for="sp-channel">Your TikTok name</label>
+          <input type="text" id="sp-channel" placeholder="your TikTok name, or frills_demo to practice" autocomplete="off" spellcheck="false">
+          <button class="btn" type="submit" id="sp-listen">Start listening</button>
+        </form>
+        <label class="form__choice"><input type="checkbox" id="sp-real"> Really add to my Spotify queue (off: it only shows what it would add)</label>
+        <p class="ctl__hint" id="sp-chat-note" role="status"></p>
+        <form class="spotify__row" id="sp-fake-form" novalidate>
+          <label class="visually-hidden" for="sp-fake">Pretend a viewer types</label>
+          <input type="text" id="sp-fake" placeholder="pretend a viewer types: !sr levitating dua lipa" autocomplete="off" spellcheck="false">
+          <button class="btn btn--soft" type="submit">Try it</button>
+        </form>
+        <ul class="spotify__log" id="sp-log" role="log" aria-live="polite"></ul>
+      </section>
+
       <details class="spotify__details">
         <summary>Details, for checking</summary>
         <dl class="spotify__facts" id="sp-facts"></dl>

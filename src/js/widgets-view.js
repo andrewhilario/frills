@@ -4,6 +4,7 @@
 import { el } from "./feed.js";
 import { GOAL_TYPES } from "./goal.js";
 import { commandWord } from "./songs.js";
+import { MEDIA_ID, mediaUrl } from "./alerts-settings.js";
 import { fillTemplate } from "./alerts.js";
 import { lookVars } from "./widget-settings.js";
 
@@ -239,7 +240,7 @@ export function createLikersView(host) {
 const standsOut = (s) => s.showNow || s.show === "now";
 
 /** An album cover is drawn only from the catalog's picture server, or a picture a practice song carries itself. Anything else is left out. */
-const safeCover = (address) => (/^https:\/\/cdn-images\.dzcdn\.net\//.test(address) || /^data:image\/svg\+xml;base64,[A-Za-z0-9+/=]+$/.test(address) ? address : "");
+const safeCover = (address) => (/^https:\/\/cdn-images\.dzcdn\.net\//.test(address) || /^data:image\/svg\+xml;base64,[A-Za-z0-9+/=]+$/.test(address) || /^\/api\/media\/[A-Za-z0-9_-]{16}$/.test(address) ? address : "");
 
 /**
  * The Song requests queue: the song being played stands out, the ones after it are listed below. Returns { apply(settings), render(view) }
@@ -297,7 +298,9 @@ export function createSongsView(host) {
     parts.by.textContent = `asked by ${item.name}`;
     parts.by.hidden = !settings.requester;
     parts.node.dataset.state = item.state;
-    const cover = settings.cover ? safeCover(item.cover) : "";
+    // the song playing can wear the streamer's own picture (a GIF loops, like a canvas) in place of the album cover
+    const own = parts.t && MEDIA_ID.test(settings.coverMedia ?? "") ? mediaUrl(settings.coverMedia) : "";
+    const cover = settings.cover ? safeCover(own || item.cover) : "";
     if (parts.img.getAttribute("src") !== cover) {
       if (cover) { parts.img.src = cover; parts.img.hidden = false; } else { parts.img.removeAttribute("src"); parts.img.hidden = true; }
     }

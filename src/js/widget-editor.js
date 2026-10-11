@@ -6,6 +6,7 @@ import { buildControl, chips, copyButton } from "./ui.js";
 import { mountSource } from "./source.js";
 import { fontsReady, generalFaces } from "./look.js";
 import { luminance } from "./color.js";
+import { mountMediaPicker } from "./alerts-media.js";
 
 const $ = (id) => document.getElementById(id);
 const CANVASES = { vertical: [1080, 1920], landscape: [1920, 1080], square: [1080, 1080] };
@@ -54,7 +55,9 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
     { dot: true },
   );
   for (const control of widget.controls) {
-    const { row, write } = buildControl(control, settings[control.key], (value) => change(control.key, value));
+    const { row, write } = control.type === "media" && $("media-ok")
+      ? mountMediaPicker({ consentBox: $("media-ok"), kind: control.media, label: control.label, hint: control.hint, value: settings[control.key], onSet: (value) => change(control.key, value) })
+      : buildControl(control, settings[control.key], (value) => change(control.key, value));
     writers[control.key] = write;
     $(control.section === "look" ? "look-controls" : "opt-controls").append(row);
   }

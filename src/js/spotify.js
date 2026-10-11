@@ -162,6 +162,12 @@ export class SpotifyClient {
     return r.error ? { error: r.error } : { results: (r.data?.tracks?.items ?? []).map(tidyTrack).filter((t) => t.uri) };
   }
 
+  /** Skips to the next song: { ok: true } or { error }. */
+  async skip() {
+    const r = await this.call("POST", "/me/player/next");
+    return r.error ? { error: r.error } : { ok: true };
+  }
+
   /** Puts a song at the end of the person's queue: { ok: true } or { error }. */
   async addToQueue(uri) {
     if (!/^spotify:track:[A-Za-z0-9]{22}$/.test(String(uri))) return { error: "That is not a Spotify song." };
