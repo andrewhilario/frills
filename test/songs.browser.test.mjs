@@ -290,3 +290,53 @@ test("overlay: a title that does not fit slides instead of being cut, and a shor
   await sleep(300);
   assert.equal(await page.evaluate('getComputedStyle(document.querySelector(".song--now .song__t")).animationName'), "none", "switched off: it is cut as before");
 });
+
+test("overlay: the cover shape, glow and blur work on any layout, and boxy and minimal look like themselves", { skip }, async () => {
+  const { base } = await withHelper();
+  const open = async (query) => {
+    await page.goto(`${base}/overlay/songs/?demo=1&pace=400&${query}`, { settle: 900 });
+    await until(async () => (await titles()).length >= 2, 9000);
+  };
+  const art = (prop) => page.evaluate(`getComputedStyle(document.querySelector(".song--now .song__art"))[${JSON.stringify(prop)}]`);
+  await open("layout=card&coverShape=round");
+  assert.equal(await art("borderRadius"), "50%", "round, on a card");
+  assert.equal(await art("animationName"), "none");
+  await open("layout=card&coverShape=vinyl");
+  assert.equal(await art("animationName"), "song-spin", "vinyl: it turns");
+  await open("layout=disc&coverShape=square");
+  assert.equal(await art("borderRadius"), "0px", "square wins over the disc layout's round cover");
+  await open("layout=card&coverGlow=1");
+  assert.notEqual(await art("boxShadow"), "none", "glow");
+  await open("layout=card");
+  assert.equal(await art("boxShadow"), "none");
+  await open("layout=card&coverBlur=1");
+  assert.equal(await page.evaluate('document.querySelector(".song--now .song__bg").getClientRects().length > 0'), true, "blur on a card");
+  await open("layout=card");
+  assert.equal(await page.evaluate('document.querySelector(".song--now .song__bg").getClientRects().length > 0'), false, "and not unless asked");
+  await open("layout=boxy");
+  const boxy = await page.evaluate(`(() => { const n = document.querySelector(".song--now"); const art = getComputedStyle(n.querySelector(".song__art")); const text = getComputedStyle(n.querySelector(".song__text")); return { card: getComputedStyle(n).backgroundColor, artBorder: parseFloat(art.borderTopWidth), textBorder: parseFloat(text.borderTopWidth), textBg: text.backgroundColor }; })()`);
+  assert.equal(boxy.card, "rgba(0, 0, 0, 0)", "boxy: no card behind the two boxes");
+  assert.ok(boxy.artBorder > 0 && boxy.textBorder > 0 && boxy.textBg !== "rgba(0, 0, 0, 0)", "the cover and the words each in a box of their own");
+  await open("layout=minimal");
+  const minimal = await page.evaluate(`(() => { const n = document.querySelector(".song--now"); const cs = getComputedStyle(n); return { bg: cs.backgroundColor, border: parseFloat(cs.borderTopWidth), art: n.querySelector(".song__art").getClientRects().length, shadow: getComputedStyle(n.querySelector(".song__text")).textShadow !== "none" }; })()`);
+  assert.deepEqual(minimal, { bg: "rgba(0, 0, 0, 0)", border: 0, art: 0, shadow: true }, "minimal: just the words, with a shadow so they read on any picture");
+});
+
+test("overlay: before the first request a card says how to ask, in the streamer's own command word, and it can be switched off", { skip }, async () => {
+  const { base, made } = await withHelper();
+  const idle = () => page.evaluate(`(() => { const e = document.querySelector(".songs__idle"); return e && e.getClientRects().length > 0 ? e.querySelector(".songs__idletext").textContent.trim() : null; })()`);
+  await page.goto(`${base}/overlay/songs/?channel=pond_cafe&platform=tiktok`, { settle: 900 });
+  await until(() => made.length === 1);
+  assert.match(await idle(), /Nothing playing. Type !sr and a song name./);
+  made[0].emit("chat", say("!sr first song", { name: "Ann" }));
+  await until(async () => (await titles()).length === 1);
+  assert.equal(await idle(), null, "gone as soon as there is a song");
+  await page.goto(`${base}/overlay/songs/?channel=pond_two&platform=tiktok&command=play`, { settle: 900 });
+  assert.match(await idle(), /Type !play and a song name/, "it follows the command word");
+  await page.goto(`${base}/overlay/songs/?channel=pond_two&platform=tiktok&idleCard=0`, { settle: 900 });
+  assert.equal(await idle(), null, "switched off");
+  await page.goto(`${base}/overlay/songs/?channel=pond_two&platform=tiktok&show=queue`, { settle: 900 });
+  assert.equal(await idle(), null, "the queue-only overlay has no card of its own");
+  await page.goto(`${base}/overlay/songs/?channel=pond_two&platform=tiktok&idleText=Ask+with+%21{command}`, { settle: 900 });
+  assert.equal(await idle(), "Ask with !sr", "its own words");
+});

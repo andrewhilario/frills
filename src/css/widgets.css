@@ -172,3 +172,38 @@
 .songs[data-layout="poster"] .song--now .song__label { margin-bottom: 0.1em; }
 .song__label { white-space: nowrap; }
 .songs[data-layout="poster"] .song--now { font-size: 0.9em; }
+
+/* ── Song requests: more layouts, the cover on its own, and the card for when nothing is playing ─────────────────── */
+
+/* boxy: the cover and the words each in a box of their own */
+.songs[data-layout="boxy"] .song--now { background: none; border: 0; box-shadow: none; padding: 0; gap: 0.5em; align-items: stretch; font-size: 1.05em; }
+.songs[data-layout="boxy"] .song--now .song__art { width: 3.6em; height: 3.6em; border: var(--a-border, 2px) solid var(--a-accent, #fc0); border-radius: var(--a-radius, 20px); box-shadow: var(--a-shadow, none); box-sizing: border-box; }
+.songs[data-layout="boxy"] .song--now .song__text { justify-content: center; padding: 0.4em 1em; background: var(--a-bg, #fff); border: var(--a-border, 2px) solid var(--a-accent, #fc0); border-radius: var(--a-radius, 20px); box-shadow: var(--a-shadow, none); }
+.songs[data-layout="boxy"] .song--now .song__progress { margin-top: 0.3em; }
+
+/* minimal: just the words, no card, readable on any picture behind them */
+.songs[data-layout="minimal"] .song--now { background: none; border: 0; box-shadow: none; padding: 0; gap: 0.6em; font-size: 1.05em; }
+.songs[data-layout="minimal"] .song--now .song__art { display: none; }
+.songs[data-layout="minimal"] .song--now .song__text { color: var(--a-text, #222); text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55), 0 0 10px rgba(0, 0, 0, 0.45); }
+.songs[data-layout="minimal"] .song--now .song__label { color: var(--a-pop, #f48); }
+
+/* cover blur on any layout: a blurred copy of the cover behind the card (glass has it always) */
+.songs[data-blur="true"] .song--now { position: relative; overflow: hidden; }
+.songs[data-blur="true"] .song--now .song__bg { display: block; position: absolute; left: -15%; top: -40%; width: 130%; height: 180%; object-fit: cover; filter: blur(18px) saturate(1.3); opacity: 0.9; }
+.songs[data-blur="true"] .song--now::before { content: ""; position: absolute; left: 0; top: 0; right: 0; bottom: 0; background: var(--a-bg, #fff); opacity: 0.6; }
+.songs[data-blur="true"] .song--now > :not(.song__bg) { position: relative; }
+
+/* the cover on its own: these come last, so they win over what a layout does to the cover */
+.songs[data-cover="square"] .song--now .song__art { border-radius: 0; }
+.songs[data-cover="round"] .song--now .song__art { border-radius: 50%; animation: none; }
+.songs[data-cover="vinyl"] .song--now .song__art { border-radius: 50%; animation: song-spin 9s linear infinite; }
+.songs[data-cover="vinyl"] .song--now .song__art::after { content: ""; position: absolute; left: 50%; top: 50%; width: 0.7em; height: 0.7em; margin: -0.35em 0 0 -0.35em; border-radius: 50%; background: var(--a-bg, #fff); border: 2px solid var(--a-accent, #fc0); box-sizing: border-box; }
+.songs[data-glow="true"] .song--now .song__art { box-shadow: 0 0 1.1em 0.15em var(--a-accent, #fc0); }
+@media (prefers-reduced-motion: reduce) { .songs[data-cover="vinyl"] .song--now .song__art { animation: none; } }
+
+/* nothing playing: a card that says how to ask, so the overlay is never an empty space */
+.songs__idle { display: none; align-items: center; gap: 0.6em; box-sizing: border-box; max-width: 100%; padding: 0.45em 1em 0.45em 0.45em; color: var(--a-text, #222); background: var(--a-bg, #fff); border: var(--a-border, 2px) solid var(--a-accent, #fc0); border-radius: var(--a-radius, 20px); box-shadow: var(--a-shadow, none); font-weight: 700; line-height: 1.2; }
+.songs[data-empty="true"][data-idle="true"] .songs__idle { display: flex; }
+.songs[data-show="queue"][data-empty="true"][data-idle="true"] .songs__idle { display: none; }
+.songs__idleicon { flex: none; display: grid; place-items: center; width: 2em; height: 2em; border-radius: calc(var(--a-radius, 20px) * 0.5); background: var(--a-accent, #fc0); color: var(--a-bg, #fff); font-weight: 800; }
+.songs__idletext { min-width: 0; overflow-wrap: anywhere; }

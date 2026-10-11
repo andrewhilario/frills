@@ -5,17 +5,21 @@
 
 import { defineWidget, number, range, selectOf, text, toggle } from "./widget-settings.js";
 
-export const SONG_LAYOUTS = [["card", "Card"], ["strip", "Strip: one slim line"], ["stack", "Stack: big cover on top"], ["disc", "Disc: a spinning record"], ["glass", "Glass: a blurred cover behind the card"], ["equalizer", "Equalizer: bouncing bars"], ["capsule", "Capsule: a pill with a spinning disc"], ["poster", "Poster: a tall card with a big cover"]];
+export const SONG_LAYOUTS = [["card", "Card"], ["strip", "Strip: one slim line"], ["stack", "Stack: big cover on top"], ["disc", "Disc: a spinning record"], ["glass", "Glass: a blurred cover behind the card"], ["equalizer", "Equalizer: bouncing bars"], ["capsule", "Capsule: a pill with a spinning disc"], ["poster", "Poster: a tall card with a big cover"], ["boxy", "Boxy: the cover and the words in two boxes"], ["minimal", "Minimal: just the words, no card"]];
+export const SONG_COVERS = [["auto", "The layout\u2019s own"], ["square", "Square"], ["round", "Round"], ["vinyl", "Vinyl: round and spinning"]];
 export const SONG_SHOWS = [["both", "The song playing and the queue"], ["now", "Only the song playing"], ["queue", "Only the queue"]];
 
 export const SONGS = defineWidget({
   defaults: {
-    show: "both", layout: "card", progress: true, scrollTitle: true, command: "sr", max: 5, limit: 20, perUser: 2, modsSkip: true, onlyFound: false, autoNext: false,
+    show: "both", layout: "card", coverShape: "auto", coverGlow: false, coverBlur: false, progress: true, scrollTitle: true, idleCard: true, idleText: "Nothing playing. Type !{command} and a song name.", command: "sr", max: 5, limit: 20, perUser: 2, modsSkip: true, onlyFound: false, autoNext: false,
     title: true, titleText: "Song requests", showNow: true, nowText: "Now playing", cover: true, requester: true, keep: false,
   },
   controls: [
     { section: "layout", ...selectOf("show", "What this overlay shows", SONG_SHOWS, "Add one overlay for the song playing and another for the queue if you want them in different places.") },
     { section: "layout", ...selectOf("layout", "How the song playing looks", SONG_LAYOUTS) },
+    { section: "layout", ...selectOf("coverShape", "Cover shape", SONG_COVERS, "Separate from the layout, so any layout can have a square, round or spinning cover.") },
+    { section: "layout", ...toggle("coverGlow", "Cover glow", "A soft glow around the cover in your accent color.") },
+    { section: "layout", ...toggle("coverBlur", "Cover blur", "A blurred copy of the cover as the card\u2019s background.") },
     { section: "layout", ...toggle("progress", "Show a progress bar", "Fills over the song\u2019s length from the catalog, so it needs the song to be found. Not shown in the strip.") },
     { section: "layout", ...toggle("scrollTitle", "Slide a long title instead of cutting it") },
     { section: "rules", ...text("command", "The word viewers type after !", 16, "Viewers type !sr song name. Letters and numbers only. !songrequest always works too.") },
@@ -27,6 +31,8 @@ export const SONGS = defineWidget({
     { section: "list", ...range("max", "Songs shown", 2, 8, 1, "") },
     { section: "list", ...toggle("title", "Show a title above the list") },
     { section: "list", ...text("titleText", "Title", 40) },
+    { section: "list", ...toggle("idleCard", "Show a card when nothing is playing", "So the overlay is not empty before the first request, and viewers see how to ask.") },
+    { section: "list", ...text("idleText", "Words on that card", 80, "{command} becomes your command word.") },
     { section: "list", ...toggle("showNow", "Make the first song stand out") },
     { section: "list", ...text("nowText", "Words above the first song", 30) },
     { section: "list", ...toggle("cover", "Show the album cover") },

@@ -3,6 +3,7 @@
 
 import { el } from "./feed.js";
 import { GOAL_TYPES } from "./goal.js";
+import { commandWord } from "./songs.js";
 import { fillTemplate } from "./alerts.js";
 import { lookVars } from "./widget-settings.js";
 
@@ -253,7 +254,12 @@ export function createSongsView(host) {
   const title = el("p", { className: "songs__title" });
   const nowHost = el("div", { className: "songs__now" });
   const rows = el("div", { className: "songs__rows" });
-  root.append(title, nowHost, rows);
+  const idle = el("div", { className: "songs__idle" });
+  const idleIcon = el("span", { className: "songs__idleicon", textContent: "\u266a" });
+  idleIcon.setAttribute("aria-hidden", "true");
+  const idleText = el("span", { className: "songs__idletext" });
+  idle.append(idleIcon, idleText);
+  root.append(title, idle, nowHost, rows);
   const nodes = new Map(); // item key -> parts
   let nowKey = "";
   let settings = null;
@@ -394,6 +400,11 @@ export function createSongsView(host) {
       root.dataset.show = next.show;
       root.dataset.progress = String(next.progress);
       root.dataset.scroll = String(next.scrollTitle);
+      root.dataset.cover = next.coverShape;
+      root.dataset.glow = String(next.coverGlow);
+      root.dataset.blur = String(next.coverBlur);
+      root.dataset.idle = String(next.idleCard);
+      idleText.textContent = String(next.idleText).split("{command}").join(commandWord(next));
       title.hidden = !next.title;
       title.textContent = next.titleText;
       if (changed) { nowHost.replaceChildren(); nodes.delete(nowKey); nowKey = ""; }
