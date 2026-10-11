@@ -76,7 +76,7 @@ test("the upload needs the rights tick and comes from this site's own page", asy
   assert.equal(env.DB.raw.prepare("SELECT COUNT(*) AS n FROM media").get().n, 0);
 });
 
-test("the file comes back exactly as it went in, with safe headers and a year of caching", async () => {
+test("the file comes back exactly as it went in, with safe headers and a day of caching", async () => {
   const env = fresh();
   const { body } = await upload(FILES.gif, env);
   assert.match(body.id, MEDIA.idPattern);
@@ -84,7 +84,7 @@ test("the file comes back exactly as it went in, with safe headers and a year of
   assert.equal(res.status, 200);
   assert.deepEqual(new Uint8Array(await res.arrayBuffer()), FILES.gif);
   assert.equal(res.headers.get("content-type"), "image/gif");
-  assert.match(res.headers.get("cache-control"), /max-age=31536000, immutable/);
+  assert.equal(res.headers.get("cache-control"), "public, max-age=86400", "visitors keep it a day, no longer");
   assert.equal(res.headers.get("x-content-type-options"), "nosniff");
   assert.match(res.headers.get("content-security-policy"), /default-src 'none'; sandbox/);
   assert.equal((await get("AAAAAAAAAAAAAAAA", env)).status, 404, "an id that does not exist");
@@ -151,4 +151,35 @@ test("the Worker serves media, and hands everything else on", async () => {
   assert.equal(await (await worker.fetch(new Request(`${SITE}/privacy/`), env, {})).text(), "asset /privacy/");
   assert.equal(handleMedia(new Request(`${SITE}/api/other`), env), null);
   assert.equal((await handleMedia(new Request(`${SITE}/api/media`, { method: "GET" }), env)).status, 405);
+});
+
+test("the edge keeps a file for an hour only, and a delete clears it at once", async () => {
+  const stored = new Map();
+  const pending = [];
+  const real = Object.getOwnPropertyDescriptor(globalThis, "caches");
+  Object.defineProperty(globalThis, "caches", { configurable: true, value: { default: {
+    match: async (req) => stored.get(req.url)?.clone(),
+    put: async (req, res) => { stored.set(req.url, res); },
+    delete: async (req) => stored.delete(req.url),
+  } } });
+  try {
+    const env = { ...fresh(), ASSETS: { fetch: async () => new Response("asset") } };
+    const ctx = { waitUntil: (p) => pending.push(p) };
+    const up = await worker.fetch(new Request(`${SITE}/api/media`, { method: "POST", headers: { origin: SITE, "x-consent": "yes" }, body: FILES.png }), env, ctx);
+    const { id, deleteCode } = await up.json();
+    const first = await worker.fetch(new Request(`${SITE}/api/media/${id}?x=1`), env, ctx);
+    assert.equal(first.headers.get("cache-control"), "public, max-age=86400", "the visitor gets a day");
+    await Promise.all(pending);
+    assert.equal(stored.size, 1, "one entry for the file");
+    assert.equal([...stored.values()][0].headers.get("cache-control"), "public, max-age=3600", "the edge copy lives an hour");
+    env.DB.raw.prepare("UPDATE media SET data = ? WHERE id = ?").run("AAAA", id);
+    assert.deepEqual(new Uint8Array(await (await worker.fetch(new Request(`${SITE}/api/media/${id}`), env, ctx)).arrayBuffer()), FILES.png, "the second read comes from the edge, not the database");
+    const del = await worker.fetch(new Request(`${SITE}/api/media/${id}`, { method: "DELETE", headers: { origin: SITE, "x-delete-code": deleteCode } }), env, ctx);
+    assert.equal(del.status, 200);
+    await Promise.all(pending);
+    assert.equal(stored.size, 0, "the delete cleared the edge copy");
+    assert.equal((await worker.fetch(new Request(`${SITE}/api/media/${id}`), env, ctx)).status, 404);
+  } finally {
+    if (real) Object.defineProperty(globalThis, "caches", real); else delete globalThis.caches;
+  }
 });

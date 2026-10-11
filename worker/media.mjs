@@ -76,7 +76,7 @@ export async function uploadMedia(request, env, { now = Date.now() } = {}) {
   }
 }
 
-/** GET /api/media/<id>: the file, cached for a year (an id never changes what it points to). */
+/** GET /api/media/<id>: the file. Visitors keep it a day; the edge keeps its copy only an hour (see index.mjs), so a deleted file really goes. */
 export async function getMedia(id, env) {
   if (!MEDIA.idPattern.test(id) || !env?.DB) return json(404, { ok: false, error: "not_found" });
   try {
@@ -86,7 +86,7 @@ export async function getMedia(id, env) {
       status: 200,
       headers: {
         "content-type": row.mime,
-        "cache-control": "public, max-age=31536000, immutable",
+        "cache-control": "public, max-age=86400",
         "x-content-type-options": "nosniff",
         "content-security-policy": "default-src 'none'; sandbox",
         "content-disposition": "inline",
