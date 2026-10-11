@@ -8,8 +8,9 @@ import { relayForPage } from "./tiktok.js";
  * Connects and calls `onAlert(event)` for each event of the `events` kinds. `say(text)` shows a note on the page ("" clears it).
  * Returns { stop() }.
  */
-export function connectEvents({ channel, events, onAlert, onInfo, say }) {
-  const noFeed = { add() {}, removeById() {}, removeUser() {}, clear() {} }; // chat is not shown here
+export function connectEvents({ channel, events, onAlert, onInfo, onChat, say }) {
+  // Chat is not shown here, but an overlay that reads commands from it (song requests) is given each message.
+  const noFeed = { add: (m) => onChat?.(m), removeById() {}, removeUser() {}, clear() {} };
   let old = false; // the relay we found can only send chat: say so, and keep saying it
   return connectTo([noFeed], "tiktok", channel, (status) => {
     if (old) return;

@@ -1,0 +1,45 @@
+// The Song requests overlay: what a streaming app opens. A see-through page with the queue of songs viewers asked for in the LIVE chat.
+//   /overlay/songs/?channel=yourname&platform=tiktok&command=sr&max=5&keep=1      your account
+//   add &demo=1 to see practice requests instead of a real account
+
+import { SONGS, SongQueue, loadSongs, makeLookup, saveSongs } from "./songs.js";
+import { createSongsView } from "./widgets-view.js";
+import { channelFromParams, connectEvents } from "./widget-overlay.js";
+import { fakeLookup, fakeSongSource } from "./fake-alerts.js";
+import { fontsReady, generalFaces } from "./look.js";
+
+const params = new URLSearchParams(location.search);
+const settings = SONGS.sanitize(SONGS.fromParams(params));
+// ?pace=1500 makes the practice (demo) requests come about that many milliseconds apart: handy for trying a look, or for filming it
+const demoPace = Math.min(10000, Math.max(300, Number(params.get("pace")) || 0)) || 0;
+
+const note = document.getElementById("note");
+const say = (text) => { note.hidden = !text; note.textContent = text; };
+const channel = channelFromParams(params);
+const demo = params.get("demo") === "1";
+
+const view = createSongsView(document.getElementById("songs"));
+view.apply(settings);
+let saving = 0;
+const queue = new SongQueue(settings, {
+  lookup: demo ? fakeLookup : makeLookup(),
+  entries: settings.keep && channel && !demo ? loadSongs(globalThis.localStorage, channel) : [],
+  onChange: (v) => {
+    view.render(v);
+    if (settings.keep && channel && !demo && !saving) saving = setTimeout(() => { saving = 0; saveSongs(globalThis.localStorage, channel, queue); }, 1000);
+  },
+});
+view.render(queue.view);
+setInterval(() => queue.tick(), 1000);
+
+if (demo) {
+  fontsReady(generalFaces(settings), 1000).then(() => {
+    fakeSongSource((request) => queue.request(request), demoPace ? () => [demoPace * 0.6, demoPace * 1.4] : undefined);
+    // the practice also plays songs through: the first one is done every so often
+    setInterval(() => queue.next(), Math.max(6000, (demoPace || 4000) * 3));
+  });
+} else if (!channel) {
+  say("Add ?channel=yourname to this link.");
+} else {
+  fontsReady(generalFaces(settings), 1000).then(() => connectEvents({ channel, events: [], onChat: (message) => queue.handle(message, channel), say }));
+}

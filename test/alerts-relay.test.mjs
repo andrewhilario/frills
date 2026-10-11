@@ -131,7 +131,7 @@ test("the ping says the program can send alerts, so a page can tell an old one",
   await helper?.close();
   await start();
   const body = await new Promise((resolve) => http.get({ host: "127.0.0.1", port, path: "/tiktok/ping", headers: { Host: `127.0.0.1:${port}` } }, (res) => { let t = ""; res.on("data", (c) => { t += c; }); res.on("end", () => resolve(JSON.parse(t))); }));
-  assert.deepEqual(body.features, ["chat", "alerts", "info"]);
+  assert.deepEqual(body.features, ["chat", "alerts", "info", "roles"]);
   assert.deepEqual(ALERT_KINDS, ["follow", "gift", "share", "like"]);
 });
 

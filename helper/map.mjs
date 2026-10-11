@@ -35,6 +35,9 @@ export function mapChat(d) {
     gifter: who.isGiftGiverOfAnchor === true,
     gift: false,
     avatar: avatarUrl(u),
+    // Who it is: their @name, and whether TikTok says they are the streamer. Song requests use these so "!next" can be the streamer's.
+    login: handle,
+    host: who.isAnchor === true,
   };
 }
 

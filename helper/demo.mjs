@@ -11,6 +11,7 @@ const NAMES = [
   ["croaker", "Croaker"], ["nori_neko", "Nori Neko"], ["sunny_side", "Sunny Side"], ["bubbletea", "Bubbletea"], ["kero_chan", "Kero-chan"],
 ];
 const LINES = [
+  "!sr blinding lights", "!sr levitating dua lipa", "!sr golden hour jvke", "!sr espresso sabrina carpenter",
   "hi everyone!!", "that was so cute", "LET'S GOOO", "first time here, hi!", "gg", "the overlay looks so pretty", "can you say hi to me?",
   "this is my comfort stream", "ahhh clutch!!", "love the vibe today", "how long have you been live", "so good", "😂😂", "wait what",
   "you're so funny", "sending love from everywhere", "こんにちは！", "best chat box ever", "okay that jump scared me",

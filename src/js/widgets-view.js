@@ -233,3 +233,114 @@ export function createLikersView(host) {
     },
   };
 }
+
+/** An album cover is drawn only from the catalog's picture server, or a picture a practice song carries itself. Anything else is left out. */
+const safeCover = (address) => (/^https:\/\/cdn-images\.dzcdn\.net\//.test(address) || /^data:image\/svg\+xml;base64,[A-Za-z0-9+/=]+$/.test(address) ? address : "");
+
+/**
+ * The Song requests queue: the song being played stands out, the ones after it are listed below. Returns { apply(settings), render(view) }
+ * where view is { now, next } from SongQueue. A row is made once and only changed in place after that, so only a new request animates.
+ */
+export function createSongsView(host) {
+  const root = el("div", { className: "songs" });
+  host.append(root);
+  const title = el("p", { className: "songs__title" });
+  const nowHost = el("div", { className: "songs__now" });
+  const rows = el("div", { className: "songs__rows" });
+  root.append(title, nowHost, rows);
+  const nodes = new Map(); // item key -> { node, parts }
+  let nowKey = "";
+  let settings = null;
+  let last = null;
+
+  function fill(parts, item) {
+    parts.title.textContent = item.title;
+    parts.artist.textContent = item.state === "searching" ? "Looking it up…" : item.artist;
+    parts.artist.hidden = !parts.artist.textContent;
+    parts.by.textContent = `asked by ${item.name}`;
+    parts.by.hidden = !settings.requester;
+    parts.node.dataset.state = item.state;
+    const cover = settings.cover ? safeCover(item.cover) : "";
+    if (parts.img.getAttribute("src") !== cover) {
+      if (cover) { parts.img.src = cover; parts.img.hidden = false; } else { parts.img.removeAttribute("src"); parts.img.hidden = true; }
+    }
+    parts.art.hidden = !settings.cover;
+  }
+
+  function build(item, big) {
+    const node = el("div", { className: big ? "song song--now song--in" : "song song--in" });
+    const art = el("span", { className: "song__art", textContent: "♪" });
+    art.setAttribute("aria-hidden", "true");
+    const img = el("img", { className: "song__img", alt: "", referrerPolicy: "no-referrer" });
+    img.hidden = true;
+    img.addEventListener("error", () => { img.hidden = true; });
+    art.append(img);
+    const text = el("span", { className: "song__text" });
+    const label = el("span", { className: "song__label" });
+    const name = el("span", { className: "song__title" });
+    const artist = el("span", { className: "song__artist" });
+    const by = el("span", { className: "song__by" });
+    text.append(label, name, artist, by);
+    node.append(art, text);
+    node.addEventListener("animationend", () => node.classList.remove("song--in"), { once: true }); // played once, never again when the row is moved
+    const parts = { node, art, img, label, title: name, artist, by };
+    parts.label.textContent = big ? settings.nowText : "";
+    parts.label.hidden = !big || !settings.nowText;
+    fill(parts, item);
+    return parts;
+  }
+
+  function show() {
+    if (!settings || !last) return;
+    const { now, next } = last;
+    // the first song: its own card (or an ordinary row when "make the first song stand out" is off)
+    const wantedNow = now ? now.key : "";
+    if (wantedNow !== nowKey) {
+      nowHost.replaceChildren();
+      nodes.delete(nowKey);
+      nowKey = wantedNow;
+      if (now) {
+        nodes.get(now.key)?.node.remove(); // it was a row in the list a moment ago: it becomes the card
+        const parts = build(now, settings.showNow);
+        nodes.set(now.key, parts);
+        nowHost.append(parts.node);
+      }
+    } else if (now) {
+      fill(nodes.get(now.key), now);
+    }
+    const keep = new Set(next.map((i) => i.key));
+    for (const [key, parts] of [...nodes]) {
+      if (key === nowKey || keep.has(key)) continue;
+      nodes.delete(key);
+      parts.node.classList.remove("song--in");
+      parts.node.classList.add("song--out");
+      setTimeout(() => parts.node.remove(), 420);
+    }
+    for (const item of next) {
+      let parts = nodes.get(item.key);
+      if (!parts) { parts = build(item, false); nodes.set(item.key, parts); rows.append(parts.node); } else fill(parts, item);
+    }
+    // keep the rows in order, moving a row only when it is out of place (moving one makes the browser play its animations again)
+    let before = rows.firstChild;
+    for (const item of next) {
+      const node = nodes.get(item.key).node;
+      while (before && before !== node && before.classList.contains("song--out")) before = before.nextSibling;
+      if (before === node) before = node.nextSibling;
+      else rows.insertBefore(node, before);
+    }
+    root.dataset.empty = String(!now);
+  }
+
+  return {
+    apply(next) {
+      const changed = settings && (settings.showNow !== next.showNow || settings.nowText !== next.nowText);
+      settings = next;
+      applyLook(root, next);
+      title.hidden = !next.title;
+      title.textContent = next.titleText;
+      if (changed) { nowHost.replaceChildren(); nodes.delete(nowKey); nowKey = ""; }
+      show();
+    },
+    render(view) { last = view; show(); },
+  };
+}

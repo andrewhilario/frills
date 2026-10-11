@@ -50,6 +50,8 @@ export function acceptMessage(raw) {
     gift: raw.gift === true,
     gifter: raw.gifter === true,
     avatar: isAvatarUrl(raw.avatar) ? raw.avatar : "",
+    login: String(raw.login ?? "").slice(0, 40),
+    host: raw.host === true,
     emotes: [],
     source: "tiktok",
   };

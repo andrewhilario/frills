@@ -71,3 +71,46 @@ export function fakeLikeSource(push, getPace = () => [350, 900]) {
   timer = setTimeout(loop, 300);
   return { stop() { stopped = true; clearTimeout(timer); } };
 }
+
+// ── practice song requests ──────────────────────────────────────────────────────────────────────────────────────────
+
+const SONGS = [
+  ["Blinding Lights", "The Weeknd", 200, "#e0483e"], ["Levitating", "Dua Lipa", 203, "#7b61ff"], ["Golden Hour", "JVKE", 209, "#e8a33d"],
+  ["Espresso", "Sabrina Carpenter", 175, "#d98a5f"], ["Good 4 U", "Olivia Rodrigo", 178, "#9b4dca"], ["Stay", "The Kid LAROI, Justin Bieber", 141, "#3d8fd6"],
+  ["As It Was", "Harry Styles", 167, "#e87aa0"], ["Heat Waves", "Glass Animals", 238, "#4caf7d"],
+];
+
+const songPicture = (color) =>
+  "data:image/svg+xml;base64," + btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" fill="${color}"/><circle cx="32" cy="32" r="18" fill="#00000033"/><circle cx="32" cy="32" r="6" fill="#fff"/></svg>`);
+
+/** The practice catalog: the made-up list above, found by any word of the title or artist; anything else becomes a song of its own name. */
+export async function fakeLookup(query) {
+  const words = String(query).toLowerCase().split(/\s+/).filter((w) => w.length > 2);
+  const hit = SONGS.find(([title, artist]) => words.some((w) => `${title} ${artist}`.toLowerCase().includes(w)));
+  if (hit) return { id: `practice-${hit[0]}`, title: hit[0], artist: hit[1], cover: songPicture(hit[3]), seconds: hit[2], link: "" };
+  const title = String(query).replace(/\b\w/g, (c) => c.toUpperCase());
+  return { id: `practice-${query}`, title, artist: "Practice Band", cover: songPicture("#6c7a89"), seconds: 180, link: "" };
+}
+
+/** A made-up request ({ user, name, avatar, query }) for the queue's request(). */
+export function fakeRequest({ name, avoid = [] } = {}) {
+  const asked = new Set(avoid.map((q) => String(q).toLowerCase()));
+  const fresh = SONGS.filter(([title, artist]) => !asked.has(`${title} ${artist.split(",")[0]}`.toLowerCase()));
+  const [title, artist] = pick(fresh.length ? fresh : SONGS); // a song not in the queue already, so a test button always adds one
+  const who = name ?? pick(NAMES);
+  return { user: `practice-${who}`, name: who, avatar: "", query: `${title} ${artist.split(",")[0]}` };
+}
+
+/** Sends practice requests to `push` now and then. Returns { stop() }. */
+export function fakeSongSource(push, getPace = () => [2500, 5000]) {
+  let stopped = false;
+  let timer = 0;
+  const loop = () => {
+    if (stopped) return;
+    push(fakeRequest());
+    const [lo, hi] = getPace();
+    timer = setTimeout(loop, lo + Math.random() * (hi - lo));
+  };
+  timer = setTimeout(loop, 300);
+  return { stop() { stopped = true; clearTimeout(timer); } };
+}

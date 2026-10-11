@@ -14,14 +14,14 @@ const CANVASES = { vertical: [1080, 1920], landscape: [1920, 1080], square: [108
  * `widget` is the settings (GIFTS or GOAL). `create(host, settings)` makes the overlay's view and returns
  * { apply(settings), onEvent(event), tests: { id: () => void } }. `events` are the TikTok event kinds it wants.
  */
-export function startWidgetEditor({ widget, storeKey, overlayPath, events, onInfo, create, idleHint }) {
+export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs = "alerts", create, idleHint }) {
   const params = new URLSearchParams(location.search);
   const load = () => { try { return JSON.parse(localStorage.getItem(storeKey) ?? "null"); } catch { return null; } };
   const saved = load();
   let settings = widget.sanitize({ ...saved?.settings, ...widget.fromParams(params) });
   let source = null;
   // `ctx.restart()` reconnects (for an overlay whose settings change what it waits for); `ctx.info(fn)` is for what the account says.
-  const api = create($("widget"), settings, { restart: () => source?.restart() });
+  const api = create($("widget"), settings, { restart: () => source?.restart(), channel: () => source?.cleanChannel() ?? "", features: () => source?.features ?? null });
 
   // ── the look and the options ────────────────────────────────────────────────────────────────────────────────────
   const swatch = (p) => (luminance(p.accent) < 0.08 ? p.bg : p.accent);
@@ -72,7 +72,9 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, onInf
   // ── the account ─────────────────────────────────────────────────────────────────────────────────────────────────
   const channelFromLink = params.get("channel") ?? "";
   source = mountSource($("source"), {
-    feeds: [],
+    // chat is not drawn here, but an overlay that reads commands from it (song requests) is given each message; connecting or
+    // disconnecting never empties it (clear does nothing)
+    feeds: [{ add: (m) => api.onChat?.(m), removeById() {}, removeUser() {}, clear() {} }],
     pace: () => [2000, 4000],
     channel: channelFromLink || saved?.channel || "",
     platform: "tiktok",
@@ -86,7 +88,8 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, onInf
     onAlert: (event) => api.onEvent(event),
     onFound: (found) => {
       $("relay-note").textContent = !found ? ""
-        : found.features.includes("alerts") ? ""
+        : found.features.includes(needs) ? ""
+        : needs === "roles" ? "The relay is an older version, so !next from your own account will not work yet (moderators can still use it). It needs an update."
         : "The relay is an older version that can only send chat. It needs an update before this overlay can get live events.";
     },
   });

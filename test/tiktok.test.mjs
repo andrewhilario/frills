@@ -25,8 +25,8 @@ test("cleanName picks the rules of the chosen platform", () => {
 });
 
 test("a message from the helper is checked field by field before it is drawn", () => {
-  assert.deepEqual(acceptMessage({ id: "1", user: "9", name: "Mochi", text: "hi!", mod: true, gifter: true, extra: "<img>" }), {
-    id: "1", user: "9", name: "Mochi", text: "hi!", color: null, mod: true, gift: false, gifter: true, avatar: "", emotes: [], source: "tiktok",
+  assert.deepEqual(acceptMessage({ id: "1", user: "9", name: "Mochi", text: "hi!", mod: true, gifter: true, login: "mochi", host: true, extra: "<img>" }), {
+    id: "1", user: "9", name: "Mochi", text: "hi!", color: null, mod: true, gift: false, gifter: true, avatar: "", login: "mochi", host: true, emotes: [], source: "tiktok",
   });
   assert.equal(acceptMessage({ id: "1", name: "Mochi", text: "   " }), null);
   assert.equal(acceptMessage({ id: "1", name: "", text: "hi" }), null);
@@ -53,10 +53,11 @@ const chat = (over = {}) => ({
 });
 
 test("a TikTok chat event becomes a Frills message", () => {
-  assert.deepEqual(mapChat(chat()), { id: "7000000000000000001", user: "6800000000000000001", name: "Pond Pal", text: "hello from the pond", mod: false, gifter: false, gift: false, avatar: "" });
+  assert.deepEqual(mapChat(chat()), { id: "7000000000000000001", user: "6800000000000000001", name: "Pond Pal", text: "hello from the pond", mod: false, gifter: false, gift: false, avatar: "", login: "pond.pal", host: false });
   const mod = mapChat(chat({ userIdentity: { isModeratorOfAnchor: true, isGiftGiverOfAnchor: true } }));
   assert.equal(mod.mod, true);
   assert.equal(mod.gifter, true);
+  assert.equal(mapChat(chat({ userIdentity: { isAnchor: true } })).host, true, "TikTok says who the streamer is");
 });
 
 test("a chat event with no text or no person is skipped, and odd text is tidied to one line", () => {
@@ -71,7 +72,7 @@ test("a chat event with no text or no person is skipped, and odd text is tidied 
 test("a name falls back to the @name, and older library shapes still work", () => {
   assert.equal(mapChat(chat({ user: { id: "1", displayId: "pond.pal", nickname: "" } })).name, "pond.pal");
   const old = mapChat({ comment: "old shape", msgId: "5", user: { userId: "77", uniqueId: "someone", nickname: "Someone" } });
-  assert.deepEqual(old, { id: "5", user: "77", name: "Someone", text: "old shape", mod: false, gifter: false, gift: false, avatar: "" });
+  assert.deepEqual(old, { id: "5", user: "77", name: "Someone", text: "old shape", mod: false, gifter: false, gift: false, avatar: "", login: "someone", host: false });
 });
 
 const PICTURE = "https://p16-common-sign.tiktokcdn-us.com/tos-useast5-avt-0068-tx/abc~tplv-tiktokx-cropcenter:100:100.webp?dr=1&x-expires=1790000000&x-signature=zzz";

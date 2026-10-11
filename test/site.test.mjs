@@ -25,7 +25,7 @@ const assetOf = (html, kind) => (new RegExp(`${kind === "css" ? 'href="(/assets/
 
 test("the pages we expect are all there", () => {
   const urls = pages.map((p) => p.url).sort();
-  assert.deepEqual(urls, ["/", "/404.html", "/alerts/", "/editor/", "/feedback/", "/gifts/", "/goal/", "/guides/alerts/", "/guides/obs/", "/guides/test/", "/guides/tiktok/", "/likers/", "/matcha/", "/overlay/", "/overlay/alerts/", "/overlay/gifts/", "/overlay/goal/", "/overlay/likers/", "/overlays/", "/privacy/"]);
+  assert.deepEqual(urls, ["/", "/404.html", "/alerts/", "/editor/", "/feedback/", "/gifts/", "/goal/", "/guides/alerts/", "/guides/obs/", "/guides/test/", "/guides/tiktok/", "/likers/", "/matcha/", "/overlay/", "/overlay/alerts/", "/overlay/gifts/", "/overlay/goal/", "/overlay/likers/", "/overlay/songs/", "/overlays/", "/privacy/", "/songs/"]);
 });
 
 test("every indexable page has its own title and description, a canonical address, share tags and one h1", () => {
@@ -111,7 +111,7 @@ test("nothing the security policy would block: no inline styles, inline scripts 
 
 test("the security headers are in place", () => {
   const headers = read("_headers");
-  for (const rule of ["default-src 'self'", "script-src 'self'", "style-src 'self'", "font-src 'self'", "connect-src 'self' wss://irc-ws.chat.twitch.tv", "img-src 'self' data: https://static-cdn.jtvnw.net https://*.tiktokcdn.com https://*.tiktokcdn-us.com https://*.tiktokcdn-eu.com", "frame-ancestors 'none'", "object-src 'none'", "base-uri 'self'", "form-action 'self'"]) {
+  for (const rule of ["default-src 'self'", "script-src 'self'", "style-src 'self'", "font-src 'self'", "connect-src 'self' wss://irc-ws.chat.twitch.tv", "img-src 'self' data: https://static-cdn.jtvnw.net https://cdn-images.dzcdn.net https://*.tiktokcdn.com https://*.tiktokcdn-us.com https://*.tiktokcdn-eu.com", "frame-ancestors 'none'", "object-src 'none'", "base-uri 'self'", "form-action 'self'"]) {
     assert.ok(headers.includes(rule), `the policy lacks ${rule}`);
   }
   assert.match(headers, /X-Content-Type-Options: nosniff/);
