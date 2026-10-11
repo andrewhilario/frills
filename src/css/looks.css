@@ -20,7 +20,7 @@
 
 /* ── General: every part is a setting ───────────────────────────────────────────────────────────────────────────────── */
 .look-general { --ico: var(--g-accent); --ico-ink: var(--g-accent-ink); }
-.look-general .m { font-family: var(--g-font); font-size: var(--g-size); font-weight: 500; gap: 0.55em; animation-name: var(--g-anim); animation-duration: var(--g-speed); animation-timing-function: var(--g-ease); }
+.look-general .m { font-family: var(--g-font); font-size: var(--g-size); letter-spacing: var(--g-letter, 0px); font-weight: 500; gap: 0.55em; animation-name: var(--g-anim); animation-duration: var(--g-speed); animation-timing-function: var(--g-ease); }
 .look-general .body { min-width: 0; color: var(--g-text); background: var(--g-bg); border: var(--g-bw) solid var(--g-accent); border-radius: var(--g-radius); padding: 0.45em 0.85em 0.55em; box-shadow: var(--g-shadow); -webkit-backdrop-filter: var(--g-bf); backdrop-filter: var(--g-bf); }
 .look-general .name { color: var(--g-accent); font-size: 0.85em; font-weight: 700; }
 .look-general .av { background: var(--g-accent); color: var(--g-accent-ink); }

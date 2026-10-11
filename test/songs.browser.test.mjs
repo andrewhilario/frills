@@ -150,3 +150,26 @@ test("editor: connected to a LIVE, chat commands fill the preview and the stream
   made[0].emit("chat", say("!next", { name: "Pond_Cafe", login: "pond_cafe" }));
   await until(async () => !(await titles()).includes("a real request"));
 });
+
+test("overlay: letter spacing from the link spaces the letters, and the default leaves them alone", { skip }, async () => {
+  const { base } = await withHelper();
+  const spacing = (selector) => page.evaluate(`getComputedStyle(document.querySelector(${JSON.stringify(selector)})).letterSpacing`);
+  await page.goto(`${base}/overlay/songs/?demo=1&pace=400&letterSpacing=3.5`, { settle: 900 });
+  await until(async () => (await titles()).length >= 1);
+  assert.equal(await spacing(".song__title"), "3.5px");
+  for (const path of ["/overlay/gifts/?demo=1&letterSpacing=2", "/overlay/goal/?demo=1&letterSpacing=2", "/overlay/likers/?demo=1&letterSpacing=2", "/overlay/alerts/?demo=1&letterSpacing=2"]) {
+    await page.goto(base + path, { settle: 900 });
+    const root = await page.evaluate("[...document.querySelectorAll('.giftlist, .goal, .likers, .alerts')].map((e) => getComputedStyle(e).letterSpacing)");
+    assert.deepEqual(root, ["2px"], path);
+  }
+  await page.goto(`${base}/overlay/songs/?demo=1&pace=400`, { settle: 900 });
+  await until(async () => (await titles()).length >= 1);
+  assert.ok(["normal", "0px"].includes(await spacing(".song__title")), "the default leaves the font's own spacing");
+  const { base: chatBase, made } = await withHelper();
+  await page.goto(`${chatBase}/overlay/?channel=pond_cafe&platform=tiktok&letter=4`, { settle: 900 });
+  await until(() => made.length === 1);
+  await sleep(200);
+  made[0].emit("chat", say("hello there"));
+  await until(async () => (await page.evaluate("document.querySelectorAll('.m').length")) === 1);
+  assert.equal(await page.evaluate("getComputedStyle(document.querySelector('.m')).letterSpacing"), "4px", "the chat overlay too");
+});

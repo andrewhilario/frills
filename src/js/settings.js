@@ -53,7 +53,7 @@ export const LOOK_KEYS = Object.keys(PRESETS.blueberry);
 
 export const MOD_ICONS = ["shield", "star", "leaf", "frog", "none"];
 
-export const DEFAULTS = { ...PRESETS.blueberry, modIcon: "shield", max: 6, life: 15, space: 8, colors: false, emotes: true, pictures: true };
+export const DEFAULTS = { ...PRESETS.blueberry, letter: 0, modIcon: "shield", max: 6, life: 15, space: 8, colors: false, emotes: true, pictures: true };
 
 const list = (...pairs) => pairs.map(([id, name]) => ({ id, name }));
 
@@ -66,6 +66,7 @@ export const CONTROLS = [
   { key: "radius", where: "main", type: "range", label: "Roundness", min: 0, max: 32, step: 1, unit: " px" },
   { key: "font", where: "main", type: "select", label: "Font", options: Object.keys(FONTS).map((f) => ({ id: f, name: f })) },
   { key: "size", where: "main", type: "range", label: "Text size", min: 12, max: 34, step: 1, unit: " px" },
+  { key: "letter", where: "main", type: "range", label: "Letter spacing", min: -2, max: 8, step: 0.5, unit: " px" },
   { key: "text", where: "more", type: "color", label: "Text color" },
   { key: "pop", where: "more", type: "color", label: "Gift color" },
   { key: "shape", where: "more", type: "chips", label: "Box", options: list(["filled", "Filled"], ["outline", "Outline"], ["none", "Text only"]) },
@@ -151,6 +152,7 @@ export function lookVars(s) {
   const vars = {
     "--g-font": FONTS[s.font],
     "--g-size": s.size + "px",
+    "--g-letter": s.letter + "px",
     "--g-text": s.text,
     "--g-accent": s.accent,
     "--g-accent-ink": inkFor(s.accent),

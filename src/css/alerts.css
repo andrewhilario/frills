@@ -5,7 +5,7 @@
 
 .alerts {
   position: absolute; inset: 0; display: flex; flex-direction: column; gap: 0.7em; padding: var(--a-offset, 8%);
-  pointer-events: none; overflow: hidden; font-family: var(--a-font, sans-serif); font-size: var(--a-size, 24px);
+  pointer-events: none; overflow: hidden; font-family: var(--a-font, sans-serif); font-size: var(--a-size, 24px); letter-spacing: var(--a-letter, 0px);
 }
 .alerts[data-vpos="top"] { justify-content: flex-start; }
 .alerts[data-vpos="middle"] { justify-content: center; }

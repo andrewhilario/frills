@@ -101,3 +101,18 @@ test("color helpers", () => {
   assert.equal(mix("#ffffff", "#000000", 0.5), "#808080");
   assert.equal(mix("#ff0000", "#0000ff", 1), "#ff0000");
 });
+
+test("chat letter spacing: 0 by default, in half pixels, kept between -2 and 8, and carried in the link", () => {
+  assert.equal(DEFAULTS.letter, 0);
+  assert.equal(lookVars(sanitize({})).vars["--g-letter"], "0px");
+  assert.equal(sanitize({ letter: 1.5 }).letter, 1.5);
+  assert.equal(sanitize({ letter: 1.3 }).letter, 1.5, "rounded to the nearest half pixel");
+  assert.equal(sanitize({ letter: -50 }).letter, -2);
+  assert.equal(sanitize({ letter: 99 }).letter, 8);
+  assert.equal(sanitize({ letter: "wide" }).letter, 0, "nonsense falls back");
+  assert.equal(lookVars(sanitize({ letter: 2.5 })).vars["--g-letter"], "2.5px");
+  const params = toParams(sanitize({ letter: 2 }));
+  assert.equal(params.get("letter"), "2");
+  assert.equal(sanitize(fromParams(params)).letter, 2);
+  assert.equal(toParams(sanitize({})).has("letter"), false, "the default is not written into the link");
+});

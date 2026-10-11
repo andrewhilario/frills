@@ -51,6 +51,8 @@ export const PLACEHOLDERS = ["name", "gift", "count", "diamonds", "total", "othe
 
 export const DEFAULTS = {
   ...LOOKS.sticker,
+  // the space between letters, in pixels (negative pulls them closer)
+  letterSpacing: 0,
   // where it sits
   vpos: "top", hpos: "center", offset: 8,
   // how it moves
@@ -83,6 +85,7 @@ export const CONTROLS = [
   { section: "look", key: "pop", type: "color", label: "Highlight color", hint: "The color of the name and the gift." },
   { section: "look", key: "font", type: "select", label: "Font", options: Object.keys(FONTS).map((f) => ({ id: f, name: f })) },
   { section: "look", ...range("size", "Text size", 16, 96, 1, " px", { hint: "In pixels of the page your streaming app shows. A vertical LIVE is 1080 wide." }) },
+  { section: "look", ...range("letterSpacing", "Letter spacing", -2, 10, 0.5, " px", { hint: "The space between letters. 0 is the font's own spacing; a little more reads easier from far away, a little less fits more in." }) },
   { section: "look", ...range("radius", "Roundness", 0, 60, 1, " px") },
   { section: "look", ...range("border", "Edge thickness", 0, 12, 1, " px") },
   { section: "look", ...chipsOf("shadow", "Shadow", list(["none", "None"], ["soft", "Soft"], ["hard", "Hard"], ["glow", "Glow"])) },
@@ -208,6 +211,7 @@ export function alertVars(s) {
   return {
     "--a-font": FONTS[s.font],
     "--a-size": s.size + "px",
+    "--a-letter": s.letterSpacing + "px",
     "--a-text": s.text,
     "--a-accent": s.accent,
     "--a-pop": s.pop,

@@ -2,7 +2,7 @@
    --a-bg --a-border --a-radius --a-shadow (see lookVars in widget-settings.js). Plain colours and transforms only, for old streaming browsers. */
 
 /* ── Last Gifts ─────────────────────────────────────────────────────────────────────────────────────────────────────── */
-.giftlist { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 0.5em; padding: 2%; overflow: hidden; pointer-events: none; font-family: var(--a-font, sans-serif); font-size: var(--a-size, 24px); }
+.giftlist { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 0.5em; padding: 2%; overflow: hidden; pointer-events: none; font-family: var(--a-font, sans-serif); font-size: var(--a-size, 24px); letter-spacing: var(--a-letter, 0px); }
 /* Words that sit on the stream itself (not on a card) go in a card of their own, so they read on any backdrop. */
 .giftlist__title { align-self: flex-start; margin: 0 0 0.2em; padding: 0.2em 0.8em; font-weight: 800; color: var(--a-text, #222); background: var(--a-bg, #fff); border: var(--a-border, 2px) solid var(--a-accent, #fc0); border-radius: var(--a-radius, 20px); }
 .giftlist__title[hidden] { display: none; }
@@ -32,7 +32,7 @@
 @keyframes w-out { from { opacity: 1; } to { opacity: 0; transform: scale(0.9); } }
 
 /* ── The Follower Goal ──────────────────────────────────────────────────────────────────────────────────────────────── */
-.goal { position: absolute; left: 4%; right: 4%; top: 50%; transform: translateY(-50%); font-family: var(--a-font, sans-serif); font-size: var(--a-size, 24px); color: var(--a-text, #fff); pointer-events: none; }
+.goal { position: absolute; left: 4%; right: 4%; top: 50%; transform: translateY(-50%); font-family: var(--a-font, sans-serif); font-size: var(--a-size, 24px); letter-spacing: var(--a-letter, 0px); color: var(--a-text, #fff); pointer-events: none; }
 .goal__head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6em; margin-bottom: 0.4em; padding: 0.2em 0.8em; font-weight: 800; color: var(--a-text, #222); background: var(--a-bg, #fff); border: var(--a-border, 2px) solid var(--a-accent, #fc0); border-radius: var(--a-radius, 20px); }
 .goal__numbers { font-variant-numeric: tabular-nums; white-space: pre; }
 .goal__track { height: 1.6em; box-sizing: border-box; overflow: hidden; background: var(--a-bg, #fff); border: var(--a-border, 2px) solid var(--a-accent, #fc0); border-radius: var(--a-radius, 20px); box-shadow: var(--a-shadow, none); }
@@ -45,7 +45,7 @@
 .goal__fx { top: 50%; z-index: 2; }
 
 /* ── Top Likers ─────────────────────────────────────────────────────────────────────────────────────────────────────── */
-.likers { position: absolute; inset: 0; padding: 2%; overflow: hidden; pointer-events: none; font-family: var(--a-font, sans-serif); font-size: var(--a-size, 24px); }
+.likers { position: absolute; inset: 0; padding: 2%; overflow: hidden; pointer-events: none; font-family: var(--a-font, sans-serif); font-size: var(--a-size, 24px); letter-spacing: var(--a-letter, 0px); }
 .likers__title { display: block; width: fit-content; margin: 0 0 0.5em; padding: 0.2em 0.8em; font-weight: 800; color: var(--a-text, #222); background: var(--a-bg, #fff); border: var(--a-border, 2px) solid var(--a-accent, #fc0); border-radius: var(--a-radius, 20px); }
 .likers__title[hidden] { display: none; }
 .likers__rows { position: relative; }
@@ -69,7 +69,7 @@
 @keyframes seen-bump { 0% { transform: scale(1); } 40% { transform: scale(1.3); } 100% { transform: scale(1); } }
 
 /* ── Song requests ──────────────────────────────────────────────────────────────────────────────────────────────────── */
-.songs { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 0.5em; padding: 2%; overflow: hidden; pointer-events: none; font-family: var(--a-font, sans-serif); font-size: var(--a-size, 24px); }
+.songs { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 0.5em; padding: 2%; overflow: hidden; pointer-events: none; font-family: var(--a-font, sans-serif); font-size: var(--a-size, 24px); letter-spacing: var(--a-letter, 0px); }
 .songs__title { align-self: flex-start; margin: 0 0 0.1em; padding: 0.2em 0.8em; font-weight: 800; color: var(--a-text, #222); background: var(--a-bg, #fff); border: var(--a-border, 2px) solid var(--a-accent, #fc0); border-radius: var(--a-radius, 20px); }
 .songs__title[hidden] { display: none; }
 .songs__now { display: flex; flex-direction: column; }

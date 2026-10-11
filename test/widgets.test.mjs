@@ -286,3 +286,22 @@ test("with remember on, the best people are kept in the browser's storage and re
   assert.deepEqual(loadLikers({ getItem() { throw new Error("blocked"); } }, "x"), []);
   assert.equal(fakeLike({ name: "Z", count: 3 }).count, 3);
 });
+
+test("letter spacing is a look option every overlay shares: alerts, gifts, goals, likers and song requests", async () => {
+  const { alertVars, DEFAULTS: ALERT_DEFAULTS, sanitize: sanitizeAlerts } = await import("../src/js/alerts-settings.js");
+  assert.equal(ALERT_DEFAULTS.letterSpacing, 0);
+  assert.equal(alertVars(ALERT_DEFAULTS)["--a-letter"], "0px");
+  assert.equal(alertVars(sanitizeAlerts({ letterSpacing: 3 }))["--a-letter"], "3px");
+  assert.equal(sanitizeAlerts({ letterSpacing: 40 }).letterSpacing, 10);
+  assert.equal(sanitizeAlerts({ letterSpacing: -9 }).letterSpacing, -2);
+  const { SONGS } = await import("../src/js/songs.js");
+  for (const widget of [GIFTS, GOAL, SONGS]) {
+    assert.equal(widget.defaults.letterSpacing, 0);
+    assert.equal(widget.sanitize({ letterSpacing: 2.5 }).letterSpacing, 2.5);
+    assert.equal(widget.sanitize({ letterSpacing: 99 }).letterSpacing, 10);
+    assert.ok(widget.controls.some((c) => c.key === "letterSpacing" && c.section === "look"), "it is in the editor's look section");
+    const link = widget.url("https://x.example/o/", { settings: widget.sanitize({ letterSpacing: 4 }) });
+    assert.equal(new URL(link).searchParams.get("letterSpacing"), "4");
+    assert.equal(widget.sanitize(widget.fromParams(new URL(link).searchParams)).letterSpacing, 4);
+  }
+});
