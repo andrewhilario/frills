@@ -44,7 +44,7 @@ startWidgetEditor({
         if (moved) { labelTests(type); ctx.restart(); } // it now waits for a different kind of event
       },
       onEvent: (event) => { const n = goalAmount(type, event); if (n) state.add(n); },
-      onInfo: (info) => { if (type === "follow" && state.settings.fromLive) state.setLive(info.followers); },
+      onInfo: (info) => { if (info.followers && type === "follow" && state.settings.fromLive) state.setLive(info.followers); },
       tests: {
         one: () => state.add(GOAL_TYPES[type].small),
         ten: () => state.add(GOAL_TYPES[type].big),

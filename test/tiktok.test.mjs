@@ -240,5 +240,9 @@ test("the page side takes the account's follower count, and ignores a damaged on
   source.send("info", { followers: 1e12 });
   source.send("info", {});
   source.send("info", "{ not json");
-  assert.deepEqual(infos, [{ followers: 81371 }]);
+  assert.deepEqual(infos, [{ live: false, followers: 81371 }]);
+  source.send("info", { live: true });
+  source.send("info", { live: "yes" });
+  assert.deepEqual(infos.at(-1), { live: true, followers: 0 }, "the room being LIVE is passed on on its own");
+  assert.equal(infos.length, 2);
 });

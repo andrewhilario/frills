@@ -33,6 +33,7 @@ export class Room {
     this.counts = { chat: 0, gift: 0, follow: 0, share: 0 };
     this.report = 0;
     this.likes = new Map(); // person -> likes counted in the current second
+    this.live = false; // TikTok's own room details say the LIVE is on (a quiet chat does not mean it is not)
     this.base = 0; // the account's follower count when we connected (0 when TikTok did not say)
     this.followed = 0; // follows seen since then, so a page that joins later is told a current number
     this.likeTimer = 0;
@@ -42,25 +43,28 @@ export class Room {
     clearTimeout(this.idleTimer);
     this.clients.add(client);
     client.send("status", this.status);
-    if (this.base > 0) client.send("info", this.info());
+    if (this.base > 0 || this.live) client.send("info", this.info());
     if (!this.running) this.start();
   }
 
-  /** What the room knows about the account itself. Only the follower count, and only when TikTok gave it. */
+  /** What the room knows about the account itself: whether it is LIVE, and its follower count when TikTok gave one (0 when not). */
   info() {
-    return { followers: this.base + this.followed };
+    return { live: this.live, followers: this.base > 0 ? this.base + this.followed : 0 };
   }
 
   /** Reads the follower count from the room details TikTok gave when we connected, and tells the pages. */
   readInfo(conn) {
     let followers = 0;
+    let status = 0;
     try {
-      const room = conn.roomInfo;
-      followers = Math.round(Number((room?.data ?? room)?.owner?.follow_info?.follower_count));
+      const room = (conn.roomInfo?.data ?? conn.roomInfo) ?? {};
+      followers = Math.round(Number(room.owner?.follow_info?.follower_count));
+      status = Number(room.status);
     } catch { /* no details: pages keep the number the streamer typed */ }
     this.base = Number.isFinite(followers) && followers > 0 && followers < 1e10 ? followers : 0;
+    this.live = status === 2;
     this.followed = 0;
-    if (this.base > 0) this.broadcast("info", this.info());
+    if (this.base > 0 || this.live) this.broadcast("info", this.info());
   }
 
   remove(client) {

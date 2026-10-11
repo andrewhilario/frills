@@ -20,9 +20,9 @@ class FakeConnection extends EventEmitter {
   disconnect() { this.emit("disconnected"); }
 }
 const opened = [];
-async function withHelper({ followers } = {}) {
+async function withHelper({ followers, status } = {}) {
   const made = [];
-  const helper = createHelper({ distDir: dist, factory: async () => { const c = new FakeConnection(); if (followers) c.roomInfo = { data: { owner: { follow_info: { follower_count: followers } } } }; made.push(c); return c; }, idleStopMs: 200, offlineWaitMs: 5000 });
+  const helper = createHelper({ distDir: dist, factory: async () => { const c = new FakeConnection(); if (followers || status) c.roomInfo = { data: { status, owner: { follow_info: { follower_count: followers } } } }; made.push(c); return c; }, idleStopMs: 200, offlineWaitMs: 5000 });
   const port = await helper.listen(0);
   opened.push(helper);
   return { base: `http://127.0.0.1:${port}`, made };
@@ -147,6 +147,14 @@ test("overlay: the goal starts from the account's real follower count, and a gif
   made[made.length - 1].emit("gift", gift("g1", "Ann", "Panda", 100, 3));
   made[made.length - 1].emit("follow", follow("f9", "Ben")); // not counted by a gift goal
   await until(async () => (await text(".goal__numbers")) === "300 / 1,000 diamonds");
+});
+
+test("editor: when TikTok says the room is LIVE it reads at once, even if nobody says or does anything", { skip }, async () => {
+  const { base } = await withHelper({ status: 2 });
+  await page.goto(base + "/gifts/?channel=pond_cafe", { settle: 800 });
+  await until(async () => (await text("#source-status")) === "Reading @pond_cafe's LIVE. Gifts will show up here.");
+  await sleep(1500);
+  assert.equal(await text("#source-status"), "Reading @pond_cafe's LIVE. Gifts will show up here.", "and it stays that way");
 });
 
 test("editor: the gifts test buttons list gifts, and changing the words and the link work", { skip }, async () => {

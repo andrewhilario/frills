@@ -137,10 +137,12 @@ export function connectTikTok({ user, base = "", onMessage, onRemove, onClear, o
   listen("status", (s) => say(String(s.state ?? ""), typeof s.detail === "string" ? s.detail : "", s.fatal === true, { position: Number(s.position) || 0, total: Number(s.total) || 0 }));
   listen("chat", (raw) => { const m = acceptMessage(raw); if (m && onMessage) onMessage(m); });
   listen("alert", (raw) => { const a = acceptAlert(raw); if (a && onAlert) onAlert(a); });
-  // What the account itself says (its follower count), sent once when the relay connects. Anything odd is ignored.
+  // What the account itself says, sent once when the relay connects: whether it is LIVE and its follower count. Anything odd is ignored.
   listen("info", (raw) => {
-    const followers = Math.round(Number(raw?.followers));
-    if (onInfo && Number.isFinite(followers) && followers > 0 && followers < 1e10) onInfo({ followers });
+    const n = Math.round(Number(raw?.followers));
+    const followers = Number.isFinite(n) && n > 0 && n < 1e10 ? n : 0;
+    const live = raw?.live === true;
+    if (onInfo && (followers || live)) onInfo({ live, followers });
   });
   listen("remove", ({ id }) => id && onRemove && onRemove({ id: String(id) }));
   listen("clear", ({ user: who }) => who && onClear && onClear({ user: String(who) }));

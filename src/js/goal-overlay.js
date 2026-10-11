@@ -48,7 +48,7 @@ if (demo) {
     events: [GOAL_TYPES[settings.type].kind],
     onAlert: (event) => { const n = goalAmount(settings.type, event); if (n) state.add(n); },
     // The account's real follower count: the bar starts from it instead of from the number typed in the editor.
-    onInfo: (info) => { if (settings.type === "follow" && settings.fromLive) state.setLive(info.followers); },
+    onInfo: (info) => { if (info.followers && settings.type === "follow" && settings.fromLive) state.setLive(info.followers); },
     say,
   }));
 }
