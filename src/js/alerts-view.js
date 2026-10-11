@@ -4,7 +4,7 @@
 
 import { el } from "./feed.js";
 import { wording } from "./alerts.js";
-import { alertVars } from "./alerts-settings.js";
+import { MEDIA_ID, alertVars, mediaUrl } from "./alerts-settings.js";
 
 const BURST = [10, 18, 30]; // particles for a small, medium and big alert
 const reducedMotion = () => globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
@@ -69,10 +69,15 @@ export function createAlertView(host) {
       words.append(piece.mark ? el("strong", { className: "alert__mark", textContent: piece.text }) : document.createTextNode(piece.text));
     }
     const card = el("div", { className: "alert__card" });
-    if (config.avatar) card.append(avatar(item));
+    const custom = item.image && MEDIA_ID.test(item.image) ? el("img", { className: `alert__custom alert__custom--${config.imageMode}`, src: mediaUrl(item.image), alt: "", referrerPolicy: "no-referrer" }) : null;
+    if (custom) custom.addEventListener("error", () => custom.remove()); // a file that was deleted just leaves the alert without it
+    if (custom && config.imageMode === "avatar") card.append(custom);
+    else if (config.avatar) card.append(avatar(item));
     card.append(words);
+    if (custom && config.imageMode === "beside") card.append(custom);
     if (config.giftPicture && item.picture) card.append(el("img", { className: "alert__gift", src: item.picture, alt: "", referrerPolicy: "no-referrer" }));
     const node = el("div", { className: "alert alert--in" }, burst(item), card);
+    if (custom && config.imageMode === "sticker") node.append(custom);
     node.dataset.kind = item.kind;
     node.dataset.tier = String(item.tier);
     node.setAttribute("role", "status");

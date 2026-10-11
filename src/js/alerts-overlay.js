@@ -5,7 +5,7 @@
 
 import { AlertQueue, makeAlert } from "./alerts.js";
 import { createAlertView } from "./alerts-view.js";
-import { fromParams, sanitize } from "./alerts-settings.js";
+import { fromParams, mediaUrl, sanitize } from "./alerts-settings.js";
 import { createSounds } from "./sounds.js";
 import { cleanName, connectTo, statusText } from "./connect.js";
 import { relayForPage } from "./tiktok.js";
@@ -20,12 +20,14 @@ const say = (text) => { note.hidden = !text; note.textContent = text; };
 const view = createAlertView(document.getElementById("alerts"));
 view.apply(settings);
 const sounds = createSounds();
+for (const key of Object.keys(settings)) if (key.endsWith("MySound") && settings[key]) sounds.preload(mediaUrl(settings[key])); // fetched ahead, so the first alert is not late
 sounds.unlock(); // an app that lets a page make sound by itself (OBS does) lets this through; one that doesn't leaves it silent
 
 const queue = new AlertQueue(settings, {
   onShow: (item) => {
     view.show(item);
-    sounds.play(item.sound, { volume: settings.volume, tier: item.tier });
+    if (item.mySound) sounds.playUrl(mediaUrl(item.mySound), { volume: settings.volume, tier: item.tier });
+    else sounds.play(item.sound, { volume: settings.volume, tier: item.tier });
   },
   onHide: (item) => view.hide(item),
 });

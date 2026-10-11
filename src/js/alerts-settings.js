@@ -4,6 +4,10 @@
 import { HEX } from "./color.js";
 import { FONTS } from "./settings.js";
 
+/** An uploaded file is named by 16 random characters (made by the Worker); "" means none. */
+export const MEDIA_ID = /^[A-Za-z0-9_-]{16}$/;
+export const mediaUrl = (id) => `/api/media/${id}`;
+
 export const KINDS = ["follow", "gift", "share"];
 export const KIND_NAMES = { follow: "Follow", gift: "Gift", share: "Share" };
 
@@ -54,11 +58,11 @@ export const DEFAULTS = {
   // how many, and how a crowd is handled
   maxShown: 2, maxWaiting: 8, merge: true,
   // sound and pictures
-  volume: 70, avatar: true, giftPicture: true,
+  volume: 70, avatar: true, giftPicture: true, imageMode: "beside",
   // each kind
-  followOn: true, followText: "{name} just followed!", followCrowd: "{name} and {others} others followed!", followSound: "chime", followTime: 4, followFx: "hearts",
-  giftOn: true, giftText: "{name} sent {gift} ×{count}", giftBigText: "{name} sent {gift} ×{count}!!", giftSound: "coin", giftTime: 5, giftFx: "confetti", giftMid: 100, giftBig: 1000, giftMin: 0,
-  shareOn: true, shareText: "{name} shared the LIVE!", shareCrowd: "{name} and {others} others shared!", shareSound: "pop", shareTime: 4, shareFx: "sparkles",
+  followOn: true, followText: "{name} just followed!", followCrowd: "{name} and {others} others followed!", followSound: "chime", followTime: 4, followFx: "hearts", followImage: "", followMySound: "",
+  giftOn: true, giftText: "{name} sent {gift} ×{count}", giftBigText: "{name} sent {gift} ×{count}!!", giftSound: "coin", giftTime: 5, giftFx: "confetti", giftMid: 100, giftBig: 1000, giftMin: 0, giftImage: "", giftMySound: "", giftBigImage: "", giftBigMySound: "",
+  shareOn: true, shareText: "{name} shared the LIVE!", shareCrowd: "{name} and {others} others shared!", shareSound: "pop", shareTime: 4, shareFx: "sparkles", shareImage: "", shareMySound: "",
 };
 
 const text = (key, label, hint) => ({ key, type: "text", label, max: 80, hint });
@@ -66,6 +70,7 @@ const range = (key, label, min, max, step, unit, extra = {}) => ({ key, type: "r
 const toggle = (key, label, hint) => ({ key, type: "toggle", label, hint });
 const select = (key, label, options, hint) => ({ key, type: "select", label, options, hint });
 const chipsOf = (key, label, options) => ({ key, type: "chips", label, options });
+const media = (key, label, what, hint) => ({ key, type: "media", media: what, label, hint });
 
 /**
  * One entry per option. `section` says where the editor puts it: look, move, queue, or the kind it belongs to (follow, gift, share).
@@ -83,6 +88,7 @@ export const CONTROLS = [
   { section: "look", ...chipsOf("shadow", "Shadow", list(["none", "None"], ["soft", "Soft"], ["hard", "Hard"], ["glow", "Glow"])) },
   { section: "look", ...toggle("avatar", "Show the person's picture") },
   { section: "look", ...toggle("giftPicture", "Show the gift's picture") },
+  { section: "look", ...select("imageMode", "Where your own image goes", list(["beside", "Beside the words"], ["avatar", "In place of the person's picture"], ["sticker", "A big sticker on the corner"]), "Used when you upload an image for an alert below.") },
   // where and how it moves
   { section: "move", ...chipsOf("vpos", "Up and down", list(["top", "Top"], ["middle", "Middle"], ["bottom", "Bottom"])) },
   { section: "move", ...chipsOf("hpos", "Left and right", list(["left", "Left"], ["center", "Middle"], ["right", "Right"])) },
@@ -103,6 +109,8 @@ export const CONTROLS = [
   { section: "follow", ...select("followSound", "Sound", SOUNDS.map(({ id, name }) => [id, name])) },
   { section: "follow", ...select("followFx", "Effect", FX.map(({ id, name }) => [id, name])) },
   { section: "follow", ...range("followTime", "Seconds on screen", 2, 15, 1, " s") },
+  { section: "follow", ...media("followImage", "Your own image or GIF", "image") },
+  { section: "follow", ...media("followMySound", "Your own sound", "sound", "Plays instead of the sound above.") },
   // gift
   { section: "gift", ...toggle("giftOn", "Show gifts") },
   { section: "gift", ...text("giftText", "Text") },
@@ -110,6 +118,10 @@ export const CONTROLS = [
   { section: "gift", ...select("giftSound", "Sound", SOUNDS.map(({ id, name }) => [id, name])) },
   { section: "gift", ...select("giftFx", "Effect", FX.map(({ id, name }) => [id, name])) },
   { section: "gift", ...range("giftTime", "Seconds on screen", 2, 15, 1, " s") },
+  { section: "gift", ...media("giftImage", "Your own image or GIF", "image") },
+  { section: "gift", ...media("giftMySound", "Your own sound", "sound", "Plays instead of the sound above.") },
+  { section: "gift", ...media("giftBigImage", "Your own image for a big gift", "image", "Used for big gifts instead of the one above.") },
+  { section: "gift", ...media("giftBigMySound", "Your own sound for a big gift", "sound", "Used for big gifts instead of the one above.") },
   { section: "gift", ...range("giftMin", "Smallest gift to show", 0, 1000, 1, " diamonds", { zero: "every gift" }) },
   { section: "gift", ...range("giftMid", "A medium gift is at least", 1, 5000, 1, " diamonds", { hint: "Medium gifts stay longer, get a bigger effect and a higher sound." }) },
   { section: "gift", ...range("giftBig", "A big gift is at least", 1, 50000, 1, " diamonds", { hint: "Big gifts get the biggest effect, the longest time and the big-gift text." }) },
@@ -120,6 +132,8 @@ export const CONTROLS = [
   { section: "share", ...select("shareSound", "Sound", SOUNDS.map(({ id, name }) => [id, name])) },
   { section: "share", ...select("shareFx", "Effect", FX.map(({ id, name }) => [id, name])) },
   { section: "share", ...range("shareTime", "Seconds on screen", 2, 15, 1, " s") },
+  { section: "share", ...media("shareImage", "Your own image or GIF", "image") },
+  { section: "share", ...media("shareMySound", "Your own sound", "sound", "Plays instead of the sound above.") },
 ].map((c) => (Array.isArray(c.options) && Array.isArray(c.options[0]) ? { ...c, options: list(...c.options) } : c));
 
 const byKey = Object.fromEntries(CONTROLS.map((c) => [c.key, c]));
@@ -132,6 +146,7 @@ export function coerce(control, value) {
     return Number.isFinite(n) ? Math.min(control.max, Math.max(control.min, Math.round(n / control.step) * control.step)) : undefined;
   }
   if (control.type === "toggle") return typeof value === "boolean" ? value : undefined;
+  if (control.type === "media") return value === "" || (typeof value === "string" && MEDIA_ID.test(value)) ? value : undefined;
   if (control.type === "text") {
     if (typeof value !== "string") return undefined;
     return value.replace(/[\u0000-\u001f\u007f]+/g, " ").slice(0, control.max);

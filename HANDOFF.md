@@ -32,5 +32,5 @@ Only dev dependency: esbuild. Helper/relay dependency (separate, in `helper/`): 
 1. Owner tests alerts on a real stream (sound and transparency in TikTok LIVE Studio unknown).
 2. A step-by-step tutorial page, and a tutorial video (storyboard + voiceover in `promo/audio/tutorial-*`).
 3. Curated CC0 sound library with an in-page search.
-4. Uploads of own images, GIFs (about 300 KB) and sounds (mp3/ogg/wav, about 300 KB) stored in the existing D1 database, served from `/api/media/<id>`, with a "you have the right to use this" checkbox, a delete code and a report route through the feedback form.
+4. DONE locally 2026-10-11, not pushed: uploads of own images, GIFs and sounds (300 KB) in the D1 `media` table (`worker/media.mjs`, run the new part of `worker/schema.sql` in the D1 Console first), served from `/api/media/<id>`, one rights checkbox, delete code kept in the browser, picker `src/js/alerts-media.js`, tests `media.test.mjs`, `media.browser.test.mjs`, `alerts-media.test.mjs`. Before making Alerts public: add a sentence about stored uploads to the privacy page.
 5. Auto-treat a silent TikTok connection as "not live yet" and retry: wait until it can be tried on a real LIVE.

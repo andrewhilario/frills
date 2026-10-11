@@ -67,6 +67,9 @@ export function makeAlert(event, config) {
     time: Math.round(config[`${kind}Time`] * 1000 * TIME_FACTOR[tier - 1]),
     sound: config[`${kind}Sound`],
     fx: config[`${kind}Fx`],
+    // the person's own uploaded image and sound (ids), and for a big gift the ones set for big gifts when there are any
+    image: (kind === "gift" && tier === 3 && config.giftBigImage) || config[`${kind}Image`] || "",
+    mySound: (kind === "gift" && tier === 3 && config.giftBigMySound) || config[`${kind}MySound`] || "",
   };
 }
 

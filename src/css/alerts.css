@@ -93,3 +93,10 @@
 
 /* ── Where the editor shows them: over the preview stage ────────────────────────────────────────────────────────────── */
 .alertstage { position: relative; }
+
+/* ── The person's own image or GIF ──────────────────────────────────────────────────────────────────────────────────── */
+.alert__custom { flex: none; object-fit: contain; }
+.alert__custom--beside { height: 2.8em; max-width: 5em; margin-left: 0.2em; }
+.alert__custom--avatar { width: 2.3em; height: 2.3em; border-radius: 50%; object-fit: cover; }
+.alert__custom--sticker { position: absolute; z-index: 3; left: -0.5em; top: -2.6em; height: 4.6em; max-width: 6em; animation: a-sticker 1.4s var(--a-delay, 0ms) ease-out both; }
+@keyframes a-sticker { 0% { opacity: 0; transform: scale(0.3) rotate(-18deg); } 55% { opacity: 1; transform: scale(1.15) rotate(8deg); } 100% { opacity: 1; transform: scale(1) rotate(-6deg); } }

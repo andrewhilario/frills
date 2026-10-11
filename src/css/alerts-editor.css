@@ -16,3 +16,18 @@
 
 /* The alerts' area is the real page (1080 x 1920 and so on), centerd and scaled down to fit by alerts-editor.js, with its edge drawn. */
 .page-alerts #alerts { inset: auto; left: 50%; top: 50%; transform-origin: center; outline: 6px dashed rgba(255, 255, 255, 0.22); background: rgba(255, 255, 255, 0.03); }
+
+/* The upload picker: your own image, GIF or sound. */
+.media { gap: var(--space-xs); }
+.media__preview { grid-column: 1 / -1; }
+.media__preview img { max-height: 5rem; max-width: 100%; border-radius: var(--radius-card); border: 2px solid var(--color-rule-2); background: var(--color-paper-2); }
+.media__preview audio { width: 100%; max-width: 20rem; }
+.media__tools { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs); }
+.media__tools input[type="file"] { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; }
+.media__choose { cursor: pointer; }
+.media__choose.is-off { opacity: 0.45; cursor: not-allowed; }
+.media__consent { display: flex; align-items: center; gap: var(--space-xs); font-size: var(--text-sm); min-height: 44px; }
+.media__consent input { width: 20px; height: 20px; accent-color: var(--color-ink); }
+.media__status { grid-column: 1 / -1; margin: 0; min-height: 1lh; font-size: var(--text-sm); color: var(--color-ink-2); overflow-wrap: anywhere; }
+.media__status[data-state="error"] { color: var(--color-error); }
+.media [hidden] { display: none; }

@@ -32,7 +32,43 @@ export function createSounds(contextClass = globalThis.AudioContext ?? globalThi
     return ctx;
   };
 
+  const decoded = new Map(); // address -> a promise of the decoded sound, so each file is fetched and decoded once
+  const load = (url) => {
+    if (!decoded.has(url)) {
+      const pending = fetch(url).then((res) => { if (!res.ok) throw new Error("no file"); return res.arrayBuffer(); }).then((data) => ctx.decodeAudioData(data));
+      pending.catch(() => decoded.delete(url));
+      decoded.set(url, pending);
+    }
+    return decoded.get(url);
+  };
+  const RATE = { 1: 1, 2: 1.12, 3: 1.26 }; // a bigger gift plays the same file a little higher and faster
+
   return {
+    /** Fetches and decodes an uploaded sound ahead of time, so the first alert is not late. Never throws. */
+    preload(url) {
+      if (make()) load(url).catch(() => {});
+    },
+    /** Plays an uploaded sound (an address on this site). Resolves to whether it played. */
+    async playUrl(url, { volume = 70, tier = 1 } = {}) {
+      const c = make();
+      if (!c || volume <= 0) return false;
+      if (c.state === "suspended") { try { c.resume(); } catch { /* wait for a click */ } }
+      if (c.state !== "running") return false;
+      try {
+        const buffer = await load(url);
+        const source = c.createBufferSource();
+        const gain = c.createGain();
+        source.buffer = buffer;
+        source.playbackRate.value = RATE[tier] ?? 1;
+        gain.gain.value = Math.min(1, volume / 100);
+        source.connect(gain);
+        gain.connect(c.destination);
+        source.start();
+        return true;
+      } catch {
+        return false;
+      }
+    },
     /** Call from a click or key press. Resolves to true when the page is allowed to make sound. */
     async unlock() {
       const c = make();

@@ -2,7 +2,8 @@
 
 import { AlertQueue, makeAlert } from "./alerts.js";
 import { createAlertView } from "./alerts-view.js";
-import { CONTROLS, DEFAULTS, LOOKS, LOOK_NAMES, alertsUrl, currentLook, fromParams, sanitize } from "./alerts-settings.js";
+import { CONTROLS, DEFAULTS, LOOKS, LOOK_NAMES, alertsUrl, currentLook, fromParams, mediaUrl, sanitize } from "./alerts-settings.js";
+import { mountMediaPicker } from "./alerts-media.js";
 import { createSounds } from "./sounds.js";
 import { fakeAlert, fakeCrowd } from "./fake-alerts.js";
 import { buildControl, chips, copyButton } from "./ui.js";
@@ -26,7 +27,9 @@ const sounds = createSounds();
 const queue = new AlertQueue(settings, {
   onShow: (item) => {
     view.show(item);
-    sounds.play(item.sound, { volume: settings.volume, tier: item.tier });
+    // the person's own sound when there is one, else the built-in one
+    if (item.mySound) sounds.playUrl(mediaUrl(item.mySound), { volume: settings.volume, tier: item.tier });
+    else sounds.play(item.sound, { volume: settings.volume, tier: item.tier });
     showSoundState();
   },
   onHide: (item) => view.hide(item),
@@ -48,7 +51,9 @@ function showSoundState() {
 const swatch = (p) => (luminance(p.accent) < 0.08 ? p.bg : p.accent);
 const writers = {};
 let lookChips;
-const paint = () => { view.apply(settings); queue.setConfig(settings); };
+/** Fetch the uploaded sounds ahead of time, so the first alert is not late. */
+const preloadSounds = () => { for (const key of Object.keys(settings)) if (key.endsWith("MySound") && settings[key]) sounds.preload(mediaUrl(settings[key])); };
+const paint = () => { view.apply(settings); queue.setConfig(settings); preloadSounds(); };
 
 function change(key, value) {
   settings[key] = value;
@@ -80,7 +85,9 @@ lookChips = chips(
 
 const HOLDERS = { look: "look-controls", move: "move-controls", queue: "queue-controls", follow: "follow-controls", gift: "gift-controls", share: "share-controls" };
 for (const control of CONTROLS) {
-  const { row, write } = buildControl(control, settings[control.key], (value) => change(control.key, value));
+  const { row, write } = control.type === "media"
+    ? mountMediaPicker({ consentBox: $("media-ok"), kind: control.media, label: control.label, hint: control.hint, value: settings[control.key], onSet: (value) => change(control.key, value) })
+    : buildControl(control, settings[control.key], (value) => change(control.key, value));
   writers[control.key] = write;
   $(HOLDERS[control.section]).append(row);
 }

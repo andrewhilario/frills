@@ -11,3 +11,18 @@ CREATE INDEX IF NOT EXISTS feedback_created ON feedback (created);
 
 -- To read the newest 50:  SELECT id, created, kind, app, message, contact FROM feedback ORDER BY id DESC LIMIT 50;
 -- To delete one:          DELETE FROM feedback WHERE id = 12;
+
+-- Uploaded images, GIFs and sounds for alerts (see worker/media.mjs). Run this part again whenever it is new.
+CREATE TABLE IF NOT EXISTS media (
+  id TEXT PRIMARY KEY,     -- 16 random characters, in the alert link
+  kind TEXT NOT NULL,      -- image or sound
+  mime TEXT NOT NULL,
+  size INTEGER NOT NULL,   -- bytes
+  data TEXT NOT NULL,      -- the file, as base64
+  created TEXT NOT NULL,   -- UTC, ISO 8601
+  delete_hash TEXT NOT NULL -- sha-256 of the delete code (the code itself is never stored)
+);
+CREATE INDEX IF NOT EXISTS media_created ON media (created);
+
+-- To see what is stored (without the files):  SELECT id, kind, mime, size, created FROM media ORDER BY created DESC LIMIT 50;
+-- To remove one that was reported:             DELETE FROM media WHERE id = 'THE_ID';
