@@ -5,17 +5,19 @@
 
 import { defineWidget, number, range, selectOf, text, toggle } from "./widget-settings.js";
 
-export const SONG_LAYOUTS = [["card", "Card"], ["strip", "Strip: one slim line"], ["stack", "Stack: big cover on top"], ["disc", "Disc: a spinning record"]];
+export const SONG_LAYOUTS = [["card", "Card"], ["strip", "Strip: one slim line"], ["stack", "Stack: big cover on top"], ["disc", "Disc: a spinning record"], ["glass", "Glass: a blurred cover behind the card"], ["equalizer", "Equalizer: bouncing bars"], ["capsule", "Capsule: a pill with a spinning disc"], ["poster", "Poster: a tall card with a big cover"]];
 export const SONG_SHOWS = [["both", "The song playing and the queue"], ["now", "Only the song playing"], ["queue", "Only the queue"]];
 
 export const SONGS = defineWidget({
   defaults: {
-    show: "both", layout: "card", command: "sr", max: 5, limit: 20, perUser: 2, modsSkip: true, onlyFound: false, autoNext: false,
+    show: "both", layout: "card", progress: true, scrollTitle: true, command: "sr", max: 5, limit: 20, perUser: 2, modsSkip: true, onlyFound: false, autoNext: false,
     title: true, titleText: "Song requests", showNow: true, nowText: "Now playing", cover: true, requester: true, keep: false,
   },
   controls: [
     { section: "layout", ...selectOf("show", "What this overlay shows", SONG_SHOWS, "Add one overlay for the song playing and another for the queue if you want them in different places.") },
     { section: "layout", ...selectOf("layout", "How the song playing looks", SONG_LAYOUTS) },
+    { section: "layout", ...toggle("progress", "Show a progress bar", "Fills over the song\u2019s length from the catalog, so it needs the song to be found. Not shown in the strip.") },
+    { section: "layout", ...toggle("scrollTitle", "Slide a long title instead of cutting it") },
     { section: "rules", ...text("command", "The word viewers type after !", 16, "Viewers type !sr song name. Letters and numbers only. !songrequest always works too.") },
     { section: "rules", ...number("limit", "Most requests waiting", 3, 50) },
     { section: "rules", ...number("perUser", "Most per person waiting", 1, 5) },
@@ -84,7 +86,7 @@ export class SongQueue {
 
   get view() {
     const { max } = this.settings;
-    return { now: this.items[0] ?? null, next: this.items.slice(1, max), total: this.items.length };
+    return { now: this.items[0] ?? null, next: this.items.slice(1, max), total: this.items.length, startedAt: this.startedAt, at: this.clock() };
   }
 
   /** Waiting items grow past a smaller limit when the person lowers it: the newest go. */

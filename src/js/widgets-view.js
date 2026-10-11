@@ -242,7 +242,10 @@ const safeCover = (address) => (/^https:\/\/cdn-images\.dzcdn\.net\//.test(addre
 
 /**
  * The Song requests queue: the song being played stands out, the ones after it are listed below. Returns { apply(settings), render(view) }
- * where view is { now, next } from SongQueue. A row is made once and only changed in place after that, so only a new request animates.
+ * where view is { now, next, startedAt, at } from SongQueue. A row is made once and only changed in place after that, so only a new request
+ * animates. The look of the song playing (card, strip, stack, disc, glass, equalizer, capsule, poster) is all CSS on the overlay's own
+ * data-layout, so changing it in the editor changes the preview at once; the card carries every part any layout may want and each layout
+ * shows the ones it needs.
  */
 export function createSongsView(host) {
   const root = el("div", { className: "songs" });
@@ -251,14 +254,38 @@ export function createSongsView(host) {
   const nowHost = el("div", { className: "songs__now" });
   const rows = el("div", { className: "songs__rows" });
   root.append(title, nowHost, rows);
-  const nodes = new Map(); // item key -> { node, parts }
+  const nodes = new Map(); // item key -> parts
   let nowKey = "";
   let settings = null;
   let last = null;
   let builtWith = "";
 
+  /** A long title that does not fit slides to its end and back, instead of being cut with ... (only the song playing). */
+  function measure(parts) {
+    if (!parts.t) return;
+    const over = parts.title.clientWidth > 0 ? parts.t.scrollWidth - parts.title.clientWidth : 0;
+    parts.title.classList.toggle("is-long", over > 2);
+    parts.title.style.setProperty("--shift", -Math.max(0, over) + "px");
+  }
+
+  /** The progress bar starts when the song comes up and fills over the song's length, with nothing ticking: it is one CSS animation. */
+  function progress(parts, item) {
+    const seconds = item.seconds > 0 ? item.seconds : 0;
+    const mark = seconds ? item.key + ":" + seconds : "";
+    if (parts.timed === mark) return;
+    parts.timed = mark;
+    parts.node.classList.toggle("song--timed", Boolean(seconds));
+    parts.bar.replaceChildren();
+    if (!seconds) return;
+    const fillBar = el("i");
+    const elapsed = Math.max(0, Math.min(seconds, ((last?.at ?? 0) - (last?.startedAt ?? 0)) / 1000));
+    fillBar.style.animationDuration = seconds + "s";
+    fillBar.style.animationDelay = -elapsed + "s";
+    parts.bar.append(fillBar);
+  }
+
   function fill(parts, item) {
-    parts.title.textContent = item.title;
+    (parts.t ?? parts.title).textContent = item.title;
     parts.artist.textContent = item.state === "searching" ? "Looking it up…" : item.artist;
     parts.artist.hidden = !parts.artist.textContent;
     parts.by.textContent = `asked by ${item.name}`;
@@ -268,7 +295,12 @@ export function createSongsView(host) {
     if (parts.img.getAttribute("src") !== cover) {
       if (cover) { parts.img.src = cover; parts.img.hidden = false; } else { parts.img.removeAttribute("src"); parts.img.hidden = true; }
     }
+    if (parts.bg && (parts.bg.getAttribute("src") ?? "") !== cover) {
+      if (cover) parts.bg.src = cover; else parts.bg.removeAttribute("src");
+    }
     parts.art.hidden = !settings.cover;
+    if (parts.bar) progress(parts, item);
+    if (parts.t) requestAnimationFrame(() => measure(parts));
   }
 
   function build(item, big) {
@@ -285,9 +317,24 @@ export function createSongsView(host) {
     const artist = el("span", { className: "song__artist" });
     const by = el("span", { className: "song__by" });
     text.append(label, name, artist, by);
-    node.append(art, text);
-    node.addEventListener("animationend", () => node.classList.remove("song--in"), { once: true }); // played once, never again when the row is moved
     const parts = { node, art, img, label, title: name, artist, by };
+    if (big) {
+      // the parts only some layouts show: a blurred copy of the cover, the sliding title, the equalizer bars and the progress bar
+      parts.bg = el("img", { className: "song__bg", alt: "", referrerPolicy: "no-referrer" });
+      parts.bg.setAttribute("aria-hidden", "true");
+      parts.t = el("span", { className: "song__t" });
+      name.append(parts.t);
+      parts.bar = el("span", { className: "song__progress" });
+      parts.bar.setAttribute("aria-hidden", "true");
+      text.append(parts.bar);
+      const bars = el("span", { className: "song__bars" });
+      bars.setAttribute("aria-hidden", "true");
+      for (let i = 0; i < 4; i++) bars.append(el("i"));
+      node.append(parts.bg, art, text, bars);
+    } else {
+      node.append(art, text);
+    }
+    node.addEventListener("animationend", (e) => { if (e.target === node) node.classList.remove("song--in"); }); // played once, never again when the row is moved
     parts.label.textContent = big ? settings.nowText : "";
     parts.label.hidden = !big || !settings.nowText;
     fill(parts, item);
@@ -342,13 +389,16 @@ export function createSongsView(host) {
       const changed = builtWith !== "" && builtWith !== built;
       builtWith = built;
       settings = next;
+      applyLook(root, next);
       root.dataset.layout = next.layout;
       root.dataset.show = next.show;
-      applyLook(root, next);
+      root.dataset.progress = String(next.progress);
+      root.dataset.scroll = String(next.scrollTitle);
       title.hidden = !next.title;
       title.textContent = next.titleText;
       if (changed) { nowHost.replaceChildren(); nodes.delete(nowKey); nowKey = ""; }
       show();
+      if (nowKey && nodes.get(nowKey)?.t) requestAnimationFrame(() => measure(nodes.get(nowKey)));
     },
     render(view) { last = view; show(); },
   };

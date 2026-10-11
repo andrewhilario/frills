@@ -235,3 +235,58 @@ test("editor: changing how the song playing looks, and what the overlay shows, c
   assert.deepEqual([url.searchParams.get("layout"), url.searchParams.get("show")], ["disc", "now"], "the link carries the choice");
   assert.ok(link.includes("channel=pond.pal"));
 });
+
+test("overlay: glass, equalizer, capsule and poster each show their own parts, and the progress bar fills over the song", { skip }, async () => {
+  const { base } = await withHelper();
+  const probe = () => page.evaluate(`(() => {
+    const now = document.querySelector(".song--now");
+    const drawn = (selector) => { const e = now.querySelector(selector); return Boolean(e) && e.getClientRects().length > 0; };
+    const cs = (selector, prop) => getComputedStyle(selector ? now.querySelector(selector) : now)[prop];
+    return { bg: drawn(".song__bg"), bars: drawn(".song__bars"), progress: drawn(".song__progress"), radius: cs("", "borderRadius"), dir: cs("", "flexDirection"), artRound: cs(".song__art", "borderRadius") === "50%", by: drawn(".song__by"), label: drawn(".song__label") };
+  })()`);
+  const open = async (query) => {
+    await page.goto(`${base}/overlay/songs/?demo=1&pace=400&${query}`, { settle: 900 });
+    await until(async () => (await titles()).length >= 2, 9000);
+    await until(async () => await page.evaluate('document.querySelector(".song--now")?.classList.contains("song--timed")'), 5000);
+  };
+  await open("layout=glass");
+  const glass = await probe();
+  assert.deepEqual([glass.bg, glass.bars, glass.progress], [true, false, true], "glass: a blurred cover and a progress bar");
+  await open("layout=equalizer");
+  const eq = await probe();
+  assert.deepEqual([eq.bg, eq.bars, eq.progress], [false, true, true], "equalizer: bouncing bars");
+  await open("layout=capsule");
+  const capsule = await probe();
+  assert.equal(capsule.artRound, true, "capsule: a round disc");
+  assert.ok(parseFloat(capsule.radius) > 100, "capsule: a pill");
+  assert.deepEqual([capsule.by, capsule.label], [false, false]);
+  await open("layout=poster");
+  const poster = await probe();
+  assert.equal(poster.dir, "column", "poster: the cover on top");
+  assert.equal(poster.bars, false);
+  await open("layout=glass&progress=0");
+  assert.equal((await probe()).progress, false, "the progress bar can be switched off");
+  await open("layout=strip");
+  assert.equal((await probe()).progress, false, "a strip is one slim line: no bar");
+  await open("layout=card");
+  const bar = await page.evaluate(`(() => { const i = document.querySelector(".song--now .song__progress i"); const cs = getComputedStyle(i); return { duration: parseFloat(cs.animationDuration), name: cs.animationName }; })()`);
+  assert.equal(bar.name, "song-progress");
+  assert.ok(bar.duration >= 100, "the bar fills over the song's own length: " + bar.duration);
+});
+
+test("overlay: a title that does not fit slides instead of being cut, and a short one stays still", { skip }, async () => {
+  const { base, made } = await withHelper();
+  await page.goto(`${base}/overlay/songs/?channel=pond_cafe&platform=tiktok&size=40`, { settle: 800 });
+  await until(() => made.length === 1);
+  await sleep(150);
+  made[0].emit("chat", say("!sr " + "a very long song title that will never fit in the card ".repeat(2), { name: "Ann" }));
+  await until(async () => (await titles()).length === 1);
+  await until(async () => await page.evaluate('document.querySelector(".song--now .song__title").classList.contains("is-long")'), 4000);
+  assert.equal(await page.evaluate('getComputedStyle(document.querySelector(".song--now .song__t")).animationName'), "song-slide");
+  await page.goto(`${base}/overlay/songs/?channel=pond_cafe&platform=tiktok&scrollTitle=0`, { settle: 800 });
+  await until(() => made.length >= 1);
+  made.at(-1).emit("chat", say("!sr " + "a very long song title that will never fit in the card ".repeat(2), { name: "Ann", id: 9991 }));
+  await until(async () => (await titles()).length === 1);
+  await sleep(300);
+  assert.equal(await page.evaluate('getComputedStyle(document.querySelector(".song--now .song__t")).animationName'), "none", "switched off: it is cut as before");
+});

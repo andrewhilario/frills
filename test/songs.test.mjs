@@ -255,10 +255,11 @@ test("a song asked for before is answered from the edge's memory, and nothing fo
 
 test("layouts: the song playing can be a card, a strip, a stack or a disc, and an overlay can show only the song or only the queue", async () => {
   const { SONG_LAYOUTS, SONG_SHOWS } = await import("../src/js/songs.js");
-  assert.deepEqual(SONG_LAYOUTS.map((l) => l[0]), ["card", "strip", "stack", "disc"]);
+  assert.deepEqual(SONG_LAYOUTS.map((l) => l[0]), ["card", "strip", "stack", "disc", "glass", "equalizer", "capsule", "poster"]);
   assert.deepEqual(SONG_SHOWS.map((l) => l[0]), ["both", "now", "queue"]);
   assert.deepEqual([SONGS.defaults.layout, SONGS.defaults.show], ["card", "both"], "what it was before: a card, and both");
-  for (const layout of ["card", "strip", "stack", "disc"]) assert.equal(SONGS.sanitize({ layout }).layout, layout);
+  for (const layout of ["card", "strip", "stack", "disc", "glass", "equalizer", "capsule", "poster"]) assert.equal(SONGS.sanitize({ layout }).layout, layout);
+  assert.deepEqual([SONGS.defaults.progress, SONGS.defaults.scrollTitle], [true, true]);
   assert.equal(SONGS.sanitize({ layout: "<script>" }).layout, "card", "anything else falls back");
   assert.equal(SONGS.sanitize({ show: "now" }).show, "now");
   assert.equal(SONGS.sanitize({ show: "everything" }).show, "both");
@@ -281,4 +282,17 @@ test("the practice catalog finds each practice song by its own words, not by a w
   assert.equal(found.size, 8, "and each one is found as its own song");
   assert.equal((await fakeLookup("Stay The Kid LAROI")).title, "Stay", "\"The\" in The Weeknd does not win");
   assert.equal((await fakeLookup("zzzz nothing here")).artist, "Practice Band");
+});
+
+test("the queue's view says when the first song came up, so the progress bar can start in the right place", async () => {
+  const { queue, advance, last } = rig({}, { "a song": track("1", "A Song", "X", 120) });
+  queue.request({ user: "a", name: "A", query: "a song" });
+  const first = last().startedAt;
+  assert.equal(last().at, first);
+  advance(30000);
+  queue.request({ user: "b", name: "B", query: "b song" });
+  assert.equal(last().startedAt, first, "a request joining the queue does not restart the song playing");
+  assert.equal(last().at - last().startedAt, 30000, "30 seconds in");
+  queue.next();
+  assert.equal(last().startedAt, first + 30000, "the next song starts when it comes up");
 });

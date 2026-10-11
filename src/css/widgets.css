@@ -119,3 +119,56 @@
 @media (prefers-reduced-motion: reduce) { .songs[data-layout="disc"] .song--now .song__art { animation: none; } }
 .songs[data-layout="strip"] .song--now .song__title { flex: 0 0 auto; max-width: 75%; }
 .songs[data-layout="strip"] .song--now .song__artist { flex: 1 1 0; min-width: 0; }
+
+/* ── Song requests: the parts of the song playing that only some layouts show ─────────────────────────────────────── */
+.song__bg, .song__bars { display: none; }
+.song__progress { display: none; height: 0.28em; margin-top: 0.35em; border-radius: 999px; overflow: hidden; background: rgba(128, 128, 128, 0.3); }
+.song__progress i { display: block; height: 100%; border-radius: inherit; background: var(--a-pop, #f48); transform-origin: 0 50%; animation: song-progress 1s linear both; }
+@keyframes song-progress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+/* the bar shows when it is switched on, the song's length is known, and the layout has room for it (not the strip) */
+.songs[data-progress="true"] .song--timed .song__progress { display: block; }
+.songs[data-layout="strip"] .song--now .song__progress { display: none; }
+.song__t { display: inline-block; white-space: nowrap; }
+/* a long title slides to its end and back (only when it does not fit, and only when asked for) */
+.songs[data-scroll="true"] .song--now .song__title.is-long { text-overflow: clip; }
+.songs[data-scroll="true"] .song--now .song__title.is-long .song__t { animation: song-slide 9s ease-in-out infinite alternate; }
+@keyframes song-slide { 0%, 18% { transform: translateX(0); } 82%, 100% { transform: translateX(var(--shift, 0px)); } }
+@keyframes song-eq { 0%, 100% { transform: scaleY(0.25); } 50% { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .songs .song__t, .songs .song__bars i { animation: none !important; }
+}
+
+/* glass: a blurred copy of the cover behind a frosted card, with a big cover and a progress bar */
+.songs[data-layout="glass"] .song--now { position: relative; overflow: hidden; padding: 0.7em 1em 0.7em 0.7em; gap: 0.75em; font-size: 1.1em; }
+.songs[data-layout="glass"] .song--now .song__bg { display: block; position: absolute; left: -15%; top: -40%; width: 130%; height: 180%; object-fit: cover; filter: blur(18px) saturate(1.3); opacity: 0.9; }
+.songs[data-layout="glass"] .song--now::before { content: ""; position: absolute; left: 0; top: 0; right: 0; bottom: 0; background: var(--a-bg, #fff); opacity: 0.6; }
+.songs[data-layout="glass"] .song--now > :not(.song__bg) { position: relative; }
+.songs[data-layout="glass"] .song--now .song__art { width: 3.9em; height: 3.9em; border-radius: calc(var(--a-radius, 20px) * 0.55); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35); }
+.songs[data-layout="glass"] .song--now .song__progress { background: rgba(255, 255, 255, 0.45); }
+
+/* equalizer: the card with four bars that bounce beside the title */
+.songs[data-layout="equalizer"] .song--now .song__bars { display: flex; align-items: flex-end; gap: 0.14em; flex: none; height: 1.7em; margin-left: 0.2em; }
+.songs[data-layout="equalizer"] .song--now .song__bars i { display: block; width: 0.28em; height: 100%; border-radius: 0.14em; background: var(--a-pop, #f48); transform-origin: 50% 100%; animation: song-eq 900ms ease-in-out infinite; }
+.songs[data-layout="equalizer"] .song--now .song__bars i:nth-child(2) { animation-duration: 700ms; animation-delay: -250ms; }
+.songs[data-layout="equalizer"] .song--now .song__bars i:nth-child(3) { animation-duration: 1100ms; animation-delay: -500ms; }
+.songs[data-layout="equalizer"] .song--now .song__bars i:nth-child(4) { animation-duration: 800ms; animation-delay: -150ms; }
+
+/* capsule: a pill with a small spinning disc and the song on one line, the progress along its bottom */
+.songs[data-layout="capsule"] .song--now { position: relative; overflow: hidden; border-radius: 999px; padding: 0.35em 1.3em 0.5em 0.35em; font-size: 1em; }
+.songs[data-layout="capsule"] .song--now .song__art { width: 2.3em; height: 2.3em; border-radius: 50%; animation: song-spin 9s linear infinite; }
+.songs[data-layout="capsule"] .song--now .song__art::after { content: ""; position: absolute; left: 50%; top: 50%; width: 0.5em; height: 0.5em; margin: -0.25em 0 0 -0.25em; border-radius: 50%; background: var(--a-bg, #fff); border: 2px solid var(--a-accent, #fc0); box-sizing: border-box; }
+.songs[data-layout="capsule"] .song--now .song__text { flex-direction: row; align-items: baseline; gap: 0.5em; }
+.songs[data-layout="capsule"] .song--now .song__label, .songs[data-layout="capsule"] .song--now .song__by { display: none; }
+.songs[data-layout="capsule"] .song--now .song__title { flex: 0 1 auto; min-width: 0; max-width: 70%; }
+.songs[data-layout="capsule"] .song--now .song__artist { flex: 1 1 0; min-width: 0; }
+.songs[data-layout="capsule"] .song--now .song__artist::before { content: "\00b7"; margin-right: 0.5em; }
+.songs[data-layout="capsule"] .song--now .song__progress { position: absolute; left: 1.6em; right: 1.6em; bottom: 0.18em; height: 0.2em; margin: 0; }
+@media (prefers-reduced-motion: reduce) { .songs[data-layout="capsule"] .song--now .song__art { animation: none; } }
+
+/* poster: a tall card, the cover across the top and the words under it */
+.songs[data-layout="poster"] .song--now { flex-direction: column; align-items: stretch; gap: 0; width: 11em; max-width: 100%; padding: 0; overflow: hidden; font-size: 1.1em; }
+.songs[data-layout="poster"] .song--now .song__art { width: 100%; height: auto; aspect-ratio: 1; border-radius: 0; font-size: 3em; }
+.songs[data-layout="poster"] .song--now .song__text { padding: 0.55em 0.8em 0.7em; }
+.songs[data-layout="poster"] .song--now .song__label { margin-bottom: 0.1em; }
+.song__label { white-space: nowrap; }
+.songs[data-layout="poster"] .song--now { font-size: 0.9em; }
