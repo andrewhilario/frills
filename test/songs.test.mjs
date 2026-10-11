@@ -252,3 +252,33 @@ test("a song asked for before is answered from the edge's memory, and nothing fo
   await ask("zzzz", empty, emptyCache);
   assert.equal(empties, 2, "nothing found is not kept, so a song added to the catalog later is found");
 });
+
+test("layouts: the song playing can be a card, a strip, a stack or a disc, and an overlay can show only the song or only the queue", async () => {
+  const { SONG_LAYOUTS, SONG_SHOWS } = await import("../src/js/songs.js");
+  assert.deepEqual(SONG_LAYOUTS.map((l) => l[0]), ["card", "strip", "stack", "disc"]);
+  assert.deepEqual(SONG_SHOWS.map((l) => l[0]), ["both", "now", "queue"]);
+  assert.deepEqual([SONGS.defaults.layout, SONGS.defaults.show], ["card", "both"], "what it was before: a card, and both");
+  for (const layout of ["card", "strip", "stack", "disc"]) assert.equal(SONGS.sanitize({ layout }).layout, layout);
+  assert.equal(SONGS.sanitize({ layout: "<script>" }).layout, "card", "anything else falls back");
+  assert.equal(SONGS.sanitize({ show: "now" }).show, "now");
+  assert.equal(SONGS.sanitize({ show: "everything" }).show, "both");
+  const link = SONGS.url("https://x.example/o/", { settings: SONGS.sanitize({ layout: "disc", show: "now" }) });
+  const params = new URL(link).searchParams;
+  assert.deepEqual([params.get("layout"), params.get("show")], ["disc", "now"]);
+  assert.equal(new URL(SONGS.url("https://x.example/o/")).searchParams.has("layout"), false, "the defaults are not written into the link");
+});
+
+test("the practice catalog finds each practice song by its own words, not by a word they share", async () => {
+  const { fakeLookup, fakeRequest } = await import("../src/js/fake-alerts.js");
+  const asked = new Set();
+  const found = new Set();
+  for (let i = 0; i < 8; i++) {
+    const request = fakeRequest({ avoid: [...asked] });
+    asked.add(request.query);
+    found.add((await fakeLookup(request.query)).title);
+  }
+  assert.equal(asked.size, 8, "eight different requests, none asked twice");
+  assert.equal(found.size, 8, "and each one is found as its own song");
+  assert.equal((await fakeLookup("Stay The Kid LAROI")).title, "Stay", "\"The\" in The Weeknd does not win");
+  assert.equal((await fakeLookup("zzzz nothing here")).artist, "Practice Band");
+});

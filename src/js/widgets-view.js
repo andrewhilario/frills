@@ -234,6 +234,9 @@ export function createLikersView(host) {
   };
 }
 
+/** Whether the first song gets its own card: when asked for, and always when the overlay shows only that song. */
+const standsOut = (s) => s.showNow || s.show === "now";
+
 /** An album cover is drawn only from the catalog's picture server, or a picture a practice song carries itself. Anything else is left out. */
 const safeCover = (address) => (/^https:\/\/cdn-images\.dzcdn\.net\//.test(address) || /^data:image\/svg\+xml;base64,[A-Za-z0-9+/=]+$/.test(address) ? address : "");
 
@@ -269,6 +272,7 @@ export function createSongsView(host) {
 
   function build(item, big) {
     const node = el("div", { className: big ? "song song--now song--in" : "song song--in" });
+    node.dataset.layout = big ? settings.layout : "card";
     const art = el("span", { className: "song__art", textContent: "♪" });
     art.setAttribute("aria-hidden", "true");
     const img = el("img", { className: "song__img", alt: "", referrerPolicy: "no-referrer" });
@@ -301,7 +305,7 @@ export function createSongsView(host) {
       nowKey = wantedNow;
       if (now) {
         nodes.get(now.key)?.node.remove(); // it was a row in the list a moment ago: it becomes the card
-        const parts = build(now, settings.showNow);
+        const parts = build(now, standsOut(settings));
         nodes.set(now.key, parts);
         nowHost.append(parts.node);
       }
@@ -333,8 +337,10 @@ export function createSongsView(host) {
 
   return {
     apply(next) {
-      const changed = settings && (settings.showNow !== next.showNow || settings.nowText !== next.nowText);
+      const changed = settings && (standsOut(settings) !== standsOut(next) || settings.nowText !== next.nowText || settings.layout !== next.layout);
       settings = next;
+      root.dataset.layout = next.layout;
+      root.dataset.show = next.show;
       applyLook(root, next);
       title.hidden = !next.title;
       title.textContent = next.titleText;

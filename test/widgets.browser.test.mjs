@@ -192,11 +192,11 @@ test("overlays page: the live ones link to their editors, and the coming ones ar
   const { base } = await withHelper();
   await page.goto(base + "/overlays/", { settle: 600 });
   const links = await page.evaluate(`[...document.querySelectorAll(".tool:not(.tool--soon) a.btn")].map((a) => a.getAttribute("href"))`);
-  assert.deepEqual(links, ["/editor/", "/alerts/", "/gifts/", "/goal/", "/likers/", "/songs/"]);
+  assert.deepEqual(links, ["/editor/", "/alerts/", "/gifts/", "/goal/", "/likers/"]);
   const soon = await page.evaluate(`[...document.querySelectorAll(".tool--soon")].map((t) => [t.querySelector(".subtitle").textContent, t.querySelectorAll("a").length])`);
-  assert.deepEqual(soon.map((s) => s[0]), ["Free sound library", "Spotify player", "TikTok and Twitch chat together", "Like and subscriber alerts"]);
+  assert.deepEqual(soon.map((s) => s[0]), ["Free sound library", "Song requests", "Spotify player", "TikTok and Twitch chat together", "Like and subscriber alerts"]);
   assert.ok(soon.every((s) => s[1] === 0), "a coming-soon card links nowhere");
-  assert.equal(await page.evaluate(`document.querySelectorAll(".tool__badge--soon").length`), 4);
+  assert.equal(await page.evaluate(`document.querySelectorAll(".tool__badge--soon").length`), 5);
 });
 
 const like = (id, name, likeCount, totalLikeCount = 0) => ({ common: { msgId: id }, user: person(name.toLowerCase(), name), likeCount, totalLikeCount });

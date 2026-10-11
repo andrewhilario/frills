@@ -3,14 +3,19 @@
 // each song wherever they like, and "!next" (from the streamer's own account, or a moderator) moves the queue on. No page and no clock of
 // its own (the lookup and the time are given to it), so it is tested on its own.
 
-import { defineWidget, number, range, text, toggle } from "./widget-settings.js";
+import { defineWidget, number, range, selectOf, text, toggle } from "./widget-settings.js";
+
+export const SONG_LAYOUTS = [["card", "Card"], ["strip", "Strip: one slim line"], ["stack", "Stack: big cover on top"], ["disc", "Disc: a spinning record"]];
+export const SONG_SHOWS = [["both", "The song playing and the queue"], ["now", "Only the song playing"], ["queue", "Only the queue"]];
 
 export const SONGS = defineWidget({
   defaults: {
-    command: "sr", max: 5, limit: 20, perUser: 2, modsSkip: true, onlyFound: false, autoNext: false,
+    show: "both", layout: "card", command: "sr", max: 5, limit: 20, perUser: 2, modsSkip: true, onlyFound: false, autoNext: false,
     title: true, titleText: "Song requests", showNow: true, nowText: "Now playing", cover: true, requester: true, keep: false,
   },
   controls: [
+    { section: "layout", ...selectOf("show", "What this overlay shows", SONG_SHOWS, "Add one overlay for the song playing and another for the queue if you want them in different places.") },
+    { section: "layout", ...selectOf("layout", "How the song playing looks", SONG_LAYOUTS) },
     { section: "rules", ...text("command", "The word viewers type after !", 16, "Viewers type !sr song name. Letters and numbers only. !songrequest always works too.") },
     { section: "rules", ...number("limit", "Most requests waiting", 3, 50) },
     { section: "rules", ...number("perUser", "Most per person waiting", 1, 5) },

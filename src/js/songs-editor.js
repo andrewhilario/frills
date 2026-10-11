@@ -23,8 +23,8 @@ startWidgetEditor({
       apply(next) { view.apply(next); queue.setSettings(next); },
       onChat: (message) => queue.handle(message, ctx.channel()),
       tests: {
-        one: () => queue.request({ ...fakeRequest({ avoid: queue.items.map((i) => i.query) }), via: fakeLookup }),
-        three: () => { for (let i = 0; i < 3; i++) setTimeout(() => queue.request({ ...fakeRequest({ avoid: queue.items.map((item) => item.query) }), via: fakeLookup }), i * 350); },
+        one: () => queue.request({ ...fakeRequest({ avoid: queue.items.map((i) => i.query), busy: queue.items.map((i) => i.name) }), via: fakeLookup }),
+        three: () => { for (let i = 0; i < 3; i++) setTimeout(() => queue.request({ ...fakeRequest({ avoid: queue.items.map((item) => item.query), busy: queue.items.map((item) => item.name) }), via: fakeLookup }), i * 350); },
         next: () => queue.next(),
         clear: () => queue.clear(),
       },

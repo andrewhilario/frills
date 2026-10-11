@@ -86,18 +86,22 @@ const songPicture = (color) =>
 /** The practice catalog: the made-up list above, found by any word of the title or artist; anything else becomes a song of its own name. */
 export async function fakeLookup(query) {
   const words = String(query).toLowerCase().split(/\s+/).filter((w) => w.length > 2);
-  const hit = SONGS.find(([title, artist]) => words.some((w) => `${title} ${artist}`.toLowerCase().includes(w)));
+  // the song with the most of the typed words in its title and artist (so "The" in one artist's name does not pull in another song)
+  const score = ([title, artist]) => words.filter((w) => ` ${title} ${artist} `.toLowerCase().includes(` ${w}`)).length;
+  const best = SONGS.map((song) => [song, score(song)]).sort((x, y) => y[1] - x[1])[0];
+  const hit = best && best[1] > 0 ? best[0] : null;
   if (hit) return { id: `practice-${hit[0]}`, title: hit[0], artist: hit[1], cover: songPicture(hit[3]), seconds: hit[2], link: "" };
   const title = String(query).replace(/\b\w/g, (c) => c.toUpperCase());
   return { id: `practice-${query}`, title, artist: "Practice Band", cover: songPicture("#6c7a89"), seconds: 180, link: "" };
 }
 
 /** A made-up request ({ user, name, avatar, query }) for the queue's request(). */
-export function fakeRequest({ name, avoid = [] } = {}) {
+export function fakeRequest({ name, avoid = [], busy = [] } = {}) {
   const asked = new Set(avoid.map((q) => String(q).toLowerCase()));
   const fresh = SONGS.filter(([title, artist]) => !asked.has(`${title} ${artist.split(",")[0]}`.toLowerCase()));
   const [title, artist] = pick(fresh.length ? fresh : SONGS); // a song not in the queue already, so a test button always adds one
-  const who = name ?? pick(NAMES);
+  const idle = NAMES.filter((n) => !busy.includes(n)); // somebody not waiting already, so a person is never over the limit
+  const who = name ?? pick(idle.length ? idle : NAMES);
   return { user: `practice-${who}`, name: who, avatar: "", query: `${title} ${artist.split(",")[0]}` };
 }
 

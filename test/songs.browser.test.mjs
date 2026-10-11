@@ -126,8 +126,8 @@ test("editor: the test buttons add requests and move on, and the link carries th
   await click('[data-test="one"]');
   await until(async () => (await titles()).length === 1);
   await click('[data-test="three"]');
-  await until(async () => (await titles()).length >= 3, 6000);
-  const before = (await titles()).length;
+  await until(async () => (await titles()).length === 4, 6000); // the one from before and the three, which arrive a moment apart
+  const before = 4;
   const first = await text(".song--now .song__title");
   await click('[data-test="next"]');
   await until(async () => (await titles()).length === before - 1);
@@ -172,4 +172,35 @@ test("overlay: letter spacing from the link spaces the letters, and the default 
   made[0].emit("chat", say("hello there"));
   await until(async () => (await page.evaluate("document.querySelectorAll('.m').length")) === 1);
   assert.equal(await page.evaluate("getComputedStyle(document.querySelector('.m')).letterSpacing"), "4px", "the chat overlay too");
+});
+
+test("overlay: layouts and what it shows come from the link", { skip }, async () => {
+  const { base, made } = await withHelper();
+  const probe = () => page.evaluate(`(() => {
+    const now = document.querySelector(".song--now");
+    const shown = (selector) => { const e = document.querySelector(selector); return Boolean(e) && e.getClientRects().length > 0; }; // drawn at all (a hidden parent counts)
+    return { layout: now?.dataset.layout ?? null, now: shown(".songs__now .song"), rows: shown(".songs__rows .song"), title: shown(".songs__title"), by: shown(".song--now .song__by"), label: shown(".song--now .song__label") };
+  })()`);
+  const open = async (query) => {
+    await page.goto(`${base}/overlay/songs/?demo=1&pace=400&${query}`, { settle: 900 });
+    await until(async () => (await titles()).length >= 3, 9000);
+  };
+  await open("layout=card");
+  assert.deepEqual(await probe(), { layout: "card", now: true, rows: true, title: true, by: true, label: true });
+  await open("layout=strip");
+  const strip = await probe();
+  assert.equal(strip.layout, "strip");
+  assert.deepEqual([strip.by, strip.label], [false, false], "a strip is one slim line: no label, no asker");
+  await open("layout=disc");
+  assert.equal((await probe()).layout, "disc");
+  assert.equal(await page.evaluate(`getComputedStyle(document.querySelector(".song--now .song__art")).borderRadius`), "50%", "the cover is round");
+  await open("layout=stack");
+  assert.equal(await page.evaluate(`getComputedStyle(document.querySelector(".song--now")).flexDirection`), "column");
+  await page.goto(`${base}/overlay/songs/?demo=1&pace=400&show=now`, { settle: 900 });
+  await until(async () => (await probe()).now, 8000);
+  assert.deepEqual(await probe(), { layout: "card", now: true, rows: false, title: false, by: true, label: true }, "only the song playing, even with 'make the first song stand out' off or on");
+  await page.goto(`${base}/overlay/songs/?demo=1&pace=400&show=queue`, { settle: 900 });
+  await until(async () => (await probe()).rows, 8000);
+  const queueOnly = await probe();
+  assert.deepEqual([queueOnly.now, queueOnly.rows, queueOnly.title], [false, true, true]);
 });
