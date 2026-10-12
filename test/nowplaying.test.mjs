@@ -200,3 +200,25 @@ test("the layer draws the queue until Spotify says something, then Spotify's son
   layer.apply({ spotify: "not valid" });
   assert.deepEqual(stops, [CODE, "ZyXwVuTsRqPoNmLk"]);
 });
+
+// ── the code is hidden from the editor and filled in by itself ─────────────────────────────────────────────────────
+
+import { sharedCode } from "../src/js/spotify-bridge.js";
+import { SONGS } from "../src/js/songs.js";
+
+test("the overlay link gets the Spotify code by itself, only while this browser is sharing, and the setting is still understood but not shown", () => {
+  const data = new Map();
+  const storage = { getItem: (k) => data.get(k) ?? null, setItem: (k, v) => data.set(k, v) };
+  assert.equal(sharedCode(storage), "", "not sharing, no code");
+  const { code } = bridgeIdentity(storage);
+  assert.equal(sharedCode(storage), "", "a code exists but sharing is off");
+  data.set("frills:spotify:sharing", "1");
+  assert.equal(sharedCode(storage), code);
+  data.set("frills:spotify:sharing", "0");
+  assert.equal(sharedCode(storage), "");
+  assert.equal(sharedCode({ getItem: () => { throw new Error("blocked"); } }), "", "blocked storage is just no code");
+  const control = SONGS.controls.find((c) => c.key === "spotify");
+  assert.equal(control.hidden, true, "the editor does not show a box for it");
+  assert.equal(SONGS.sanitize({ spotify: CODE }).spotify, CODE, "but an overlay link that has it is still read");
+  assert.equal(new URL(SONGS.url("https://x.example/o/", { settings: SONGS.sanitize({ spotify: CODE }) })).searchParams.get("spotify"), CODE);
+});

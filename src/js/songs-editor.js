@@ -5,6 +5,21 @@ import { createSongsView } from "./widgets-view.js";
 import { startWidgetEditor } from "./widget-editor.js";
 import { fakeLookup, fakeRequest } from "./fake-alerts.js";
 import { spotifyLayer } from "./songs-spotify.js";
+import { sharedCode } from "./spotify-bridge.js";
+
+// Adopt the streamer's Spotify code if they enabled sharing on the /spotify/ page
+try {
+  const params = new URLSearchParams(location.search);
+  if (!params.has("spotify")) {
+    const sharing = localStorage.getItem("frills:spotify:sharing") === "1";
+    const bridge = JSON.parse(localStorage.getItem("frills:spotify:bridge") ?? "null");
+    const saved = JSON.parse(localStorage.getItem("frills:songs:v1") ?? "null");
+    if (sharing && bridge?.code && !saved?.settings?.spotify) {
+      params.set("spotify", bridge.code);
+      history.replaceState(null, "", "?" + params.toString());
+    }
+  }
+} catch { /* storage can be blocked */ }
 
 startWidgetEditor({
   widget: SONGS,
@@ -16,6 +31,7 @@ startWidgetEditor({
   create(host, settings, ctx) {
     const view = createSongsView(host);
     const real = makeLookup(); // what chat asks for goes to the real catalog; the test buttons use the practice one
+    settings.spotify = sharedCode(); // sharing what is playing is turned on in the Spotify step; its code rides in the link by itself
     let layer = null;
     const queue = new SongQueue(settings, { lookup: real, onChange: () => layer?.render() });
     layer = spotifyLayer({ queue, view });
@@ -24,7 +40,7 @@ startWidgetEditor({
     layer.render();
     setInterval(() => { if (!layer.playing) queue.tick(); }, 1000);
     return {
-      apply(next) { view.apply(next); queue.setSettings(next); layer.apply(next); },
+      apply(next) { next.spotify = sharedCode(); view.apply(next); queue.setSettings(next); layer.apply(next); },
       onChat: (message) => queue.handle(message, ctx.channel()),
       tests: {
         one: () => queue.request({ ...fakeRequest({ avoid: queue.items.map((i) => i.query), busy: queue.items.map((i) => i.name) }), via: fakeLookup }),

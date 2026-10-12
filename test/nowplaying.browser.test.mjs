@@ -89,3 +89,25 @@ test("the Spotify page has the share step, hidden until logged in, and it never 
   assert.equal(await page.evaluate('document.getElementById("sp-sharing").checked'), false);
   assert.equal(await page.evaluate('document.getElementById("sp-link-box").hidden'), true);
 });
+
+test("the Song requests editor puts the Spotify code in the link by itself while sharing is on, shows no box for it, and leaves it out otherwise", { skip }, async () => {
+  await page.goto(`${base}/songs/`, { settle: 900 });
+  await page.evaluate(`localStorage.setItem("frills:spotify:bridge", ${JSON.stringify(JSON.stringify({ code: CODE, key: KEY }))}); localStorage.setItem("frills:spotify:sharing", "1")`);
+  await page.goto(`${base}/songs/`, { settle: 900 });
+  await page.evaluate(`(() => { const i = document.getElementById("source-channel"); i.value = "pond_cafe"; i.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+  assert.equal(new URL(await page.evaluate('document.getElementById("link").value')).searchParams.get("spotify"), CODE, "the code rides in the link");
+  assert.equal(await page.evaluate('document.getElementById("c-spotify") === null'), true, "and there is no box to type it in");
+  await page.evaluate(`localStorage.setItem("frills:spotify:sharing", "0")`);
+  await page.goto(`${base}/songs/`, { settle: 900 });
+  await page.evaluate(`(() => { const i = document.getElementById("source-channel"); i.value = "pond_cafe"; i.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+  assert.equal(new URL(await page.evaluate('document.getElementById("link").value')).searchParams.has("spotify"), false, "not sharing: no code");
+});
+
+test("the Spotify page's clock comes from a worker, and it keeps ticking", { skip }, async () => {
+  await page.goto(`${base}/spotify/`, { settle: 900 });
+  const url = await page.evaluate('document.getElementById("spotify").dataset.ticker');
+  assert.match(url, /^\/assets\/ticker-[A-Z0-9]+\.js$/);
+  const ticks = await page.evaluate(`new Promise((resolve) => { const w = new Worker(${JSON.stringify(url)}); let n = 0; w.onmessage = () => { n += 1; if (n === 3) { w.terminate(); resolve(n); } }; w.postMessage({ every: 100 }); setTimeout(() => resolve(n), 3000); })`);
+  assert.equal(ticks, 3, "three ticks, each from the worker's own clock");
+  assert.deepEqual(page.problems, [], page.problems.join(" | "));
+});

@@ -16,7 +16,7 @@ export const SONGS = defineWidget({
   },
   controls: [
     { section: "layout", ...selectOf("show", "What this overlay shows", SONG_SHOWS, "Add one overlay for the song playing and another for the queue if you want them in different places.") },
-    { section: "layout", ...text("spotify", "Spotify code", 16, "Shows what is playing on your Spotify as the song playing. The /spotify/ page makes it for you and gives you the whole link. Leave it empty to use only chat requests.") },
+    { section: "layout", ...text("spotify", "Spotify code", 16), hidden: true }, // filled in by itself when sharing is on; kept as a setting so a link that has it still works
     { section: "layout", ...selectOf("layout", "How the song playing looks", SONG_LAYOUTS) },
     { section: "layout", ...selectOf("coverShape", "Cover shape", SONG_COVERS, "Separate from the layout, so any layout can have a square, round or spinning cover.") },
     { section: "layout", ...imageOf("coverMedia", "Your own cover, or an animated GIF", "Shown instead of the album cover on the song playing, like a looping canvas. A short GIF or animated WebP, up to 300 KB. Tick the box above first.") },

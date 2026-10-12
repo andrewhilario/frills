@@ -35,6 +35,7 @@ function main() {
   const chatCard = $("sp-chat-card");
   const shareCard = $("sp-share-card");
   let timer = 0;
+  let clock = null; // what keeps refreshing the song, even with this tab in the background
   let listening = null; // the connection to the chat, while it is on
 
   const facts = () => {
@@ -71,6 +72,8 @@ function main() {
     if (!on) { say($("sp-share-note"), "Not sharing."); return; }
     const channel = cleanName("tiktok", channelInput.value);
     $("sp-link").value = `${location.origin}/overlay/songs/?channel=${channel || "yourname"}&platform=tiktok&spotify=${identity.code}`;
+    const editorLink = $("sp-editor-link");
+    if (editorLink) editorLink.href = `/songs/?spotify=${identity.code}`;
     say($("sp-share-note"), "Sharing. Add the link below to your stream.");
     publisher.sent = null; // send the current song at once
   }
@@ -78,8 +81,21 @@ function main() {
   $("sp-sharing").addEventListener("change", showLink);
   $("sp-link").addEventListener("focus", (event) => event.target.select());
 
+  /** A clock from a worker, which browsers do not slow down in a background tab; the page's own timer is the fallback. */
+  function startClock(fn, every) {
+    try {
+      const worker = new Worker(root.dataset.ticker);
+      worker.onmessage = fn;
+      worker.postMessage({ every });
+      return { stop: () => worker.terminate() };
+    } catch {
+      const id = setInterval(fn, every);
+      return { stop: () => clearInterval(id) };
+    }
+  }
+  const stopClock = () => { clock?.stop(); clock = null; };
+
   async function refreshNow() {
-    if (document.hidden) return;
     const now = await client.nowPlaying();
     publish(now);
     const note = $("sp-now-note");
@@ -111,12 +127,14 @@ function main() {
     chatCard.hidden = !on;
     shareCard.hidden = !on;
     clearInterval(timer);
+    stopClock();
     if (!clientId) { say(status, "This site has no Spotify app set up yet.", true); facts(); return; }
     if (!on) { say(status, "Not logged in. Press the button and say yes on Spotify's page."); facts(); return; }
     const me = await client.me();
     if (me.error) say(status, me.error, true); else say(status, `Logged in as ${me.name || "your Spotify account"}.`);
     await refreshNow();
-    timer = setInterval(refreshNow, 3000);
+    stopClock();
+    clock = startClock(refreshNow, 3000);
   }
 
   loginBtn.addEventListener("click", async () => {

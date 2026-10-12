@@ -13,7 +13,7 @@
 }
 -->
 <main id="main">
-  <article class="article shell spotify" id="spotify" data-client="{{spotifyClientId}}">
+  <article class="article shell spotify" id="spotify" data-client="{{spotifyClientId}}" data-ticker="{{tickerJs}}">
     <header class="article__head">
       <h1 class="display">Spotify connection test</h1>
       <p class="lede">A private page to check that Frills can talk to your Spotify. It shows what is playing, finds songs and adds one to your queue. Nothing here is public yet.</p>
@@ -82,7 +82,7 @@
         <div class="linkfield" id="sp-link-box" hidden>
           <label class="ctl__label" for="sp-link">Your Song requests link</label>
           <input type="text" id="sp-link" readonly spellcheck="false" autocomplete="off">
-          <p class="linkfield__hint">Add it as a Browser source in your streaming app, then pick how it looks in the <a href="/songs/">Song requests editor</a> and paste the same code there. The song playing comes from Spotify; chat requests wait below it.</p>
+          <p class="linkfield__hint">Add it as a Browser source in your streaming app, then pick how it looks in the <a href="/songs/" id="sp-editor-link">Song requests editor</a> and paste the same code there. The song playing comes from Spotify; chat requests wait below it.</p>
         </div>
       </section>
 

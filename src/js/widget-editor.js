@@ -38,7 +38,7 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
     save();
   }
   function syncControls() {
-    for (const control of widget.controls) writers[control.key](settings[control.key]);
+    for (const control of widget.controls) writers[control.key]?.(settings[control.key]);
     lookChips.set(currentLook({ ...settings }));
   }
   lookChips = chips(
@@ -55,6 +55,7 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
     { dot: true },
   );
   for (const control of widget.controls) {
+    if (control.hidden) continue; // a setting the page fills in itself
     const { row, write } = control.type === "media" && $("media-ok")
       ? mountMediaPicker({ consentBox: $("media-ok"), kind: control.media, label: control.label, hint: control.hint, value: settings[control.key], onSet: (value) => change(control.key, value) })
       : buildControl(control, settings[control.key], (value) => change(control.key, value));

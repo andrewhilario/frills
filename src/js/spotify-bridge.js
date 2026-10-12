@@ -26,6 +26,17 @@ export function bridgeIdentity(storage = globalThis.localStorage, random) {
   return made;
 }
 
+/** The code to put in the overlay link, when this browser is sharing what is playing (turned on in the Spotify step), else "". */
+export function sharedCode(storage = globalThis.localStorage) {
+  try {
+    if (storage.getItem("frills:spotify:sharing") !== "1") return "";
+    const saved = JSON.parse(storage.getItem(STORE) ?? "null");
+    return saved && CODE.test(saved.code) ? saved.code : "";
+  } catch {
+    return "";
+  }
+}
+
 /**
  * The tab's end. `send(now)` is called with each reading of what is playing ({ playing, title, artist, cover, progressMs, durationMs } or
  * null for nothing) and puts it in the post box only when something changed: a new song, play or pause, a jump in the position, or every

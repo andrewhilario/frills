@@ -1,36 +1,82 @@
-# Handoff: Frills, for whoever continues (a person or another coding tool)
+# Handoff: Frills (updated 2026-10-12), for whoever continues (a person or another coding tool)
 
-Frills is a free site of chat overlays for live streamers (TikTok LIVE first, Twitch too): pick a look, connect a name, copy one link into a streaming app's browser source. Live at https://frills.valwidgets.live. Repo: github.com/andrewhilario/frills (main deploys by itself). The owner is a non-developer streamer: keep explanations plain, ask before big choices, and never push or run anything outward-facing without being asked.
+Repo: github.com/andrewhilario/frills (the `main` branch deploys by itself to https://frills.valwidgets.live through Cloudflare). The owner is a non-developer TikTok/Valorant streamer: keep explanations plain, ask before big choices, and never push, publish or run anything outward-facing unless they say so ("push it" is their word for a push).
 
-## Run it
-```
-npm test            # builds, then runs ~209 tests (Node 22, no install needed; a Chrome/Edge makes the browser tests run)
-npm run dev         # build + local server at http://localhost:3020 (also answers the feedback form over SQLite)
-npm run deploy      # build + wrangler deploy (normally Cloudflare builds from GitHub instead)
-```
-Only dev dependency: esbuild. Helper/relay dependency (separate, in `helper/`): tiktok-live-connector 2.5.0 (`npm run tiktok:setup`).
+## 1. Goal
 
-## How it fits together
-- **Site:** static files built by `build.mjs` (own tiny template engine: `{{x}}` escaped, `{{{x}}}` raw, `{{>partial}}`) from `src/pages`, `src/partials`, `src/js`, `src/css`; Hallmark "Hum" tokens in `tokens.css`. Cloudflare Workers static assets (`wrangler.jsonc`), custom domain frills.valwidgets.live. Security policy (CSP) is generated into `_headers`.
-- **Worker (`worker/`):** only for `/api/*` (feedback form). Saves to a Cloudflare D1 database (binding `DB`, schema `worker/schema.sql`). Pure logic in `worker/feedback.mjs`, tested over SQLite (`scripts/lib/d1-sqlite.mjs`).
-- **TikTok has no official chat API.** `helper/` reads it with the unofficial connector and serves pages to the browser as Server-Sent Events (`/tiktok/stream?user=NAME`; events `status`, `chat`, `remove`, `clear`, and `alert` with `?events=follow,gift,share`). It runs as a local helper (`npm run tiktok`) or as the shared **relay** (`npm run relay`, `RELAY_SLOTS`, `RELAY_PER_IP`, ...). The live relay runs on the owner's Android phone in Termux (tmux sessions `relay` and `tunnel`) behind a Cloudflare Tunnel at https://relay.valwidgets.live. See `RELAY-PHONE-GUIDE.md`. Updating it: `tmux kill-session -t relay`, `cd ~/frills && git pull && (cd helper && npm install)`, start it again with the same `RELAY_SLOTS`. The relay must be updated before pages that need new relay features (`/health` lists `features`).
-- **Practice account:** TikTok name `frills_demo` makes up chat, gifts, follows and shares without touching TikTok.
-- **Overlay pages** (`/overlay/`, `/overlay/alerts/`) must work in old streaming browsers: plain hex/rgba colors only, no `oklch()`, `color-mix()`, `:has()` or CSS nesting. The chat overlay page is held to 20 KB gzipped by a test.
+Frills is a **free** site of overlays for live streamers (TikTok LIVE first, Twitch for chat): pick a look, connect a name, copy one link into a streaming app's Browser source. No account, nothing to install, nothing sold. It must look made by a person (Hallmark "Hum" design tokens in `tokens.css`) and must not need a paid service.
 
-## House rules (tests enforce several)
-- Site copy: typographic apostrophes (’), no "...", no " -- ", no marketing filler, never the literal `localhost`/`127.0.0.1` in built pages. Say "streaming app" and "Browser source (or web page or link source)", not only OBS. Page descriptions 70 to 170 characters; titles up to 70.
-- Never print, commit or ask for secrets: the Cloudflare tunnel token, `EULER_API_KEY`, `.env*`. Never ask for or accept TikTok or Riot passwords.
-- Honesty: say what was tested and what was not. Not yet verified by anyone: OBS itself, TikTok LIVE Studio and Streamlabs behavior (transparency, size, sound), gifts/follows/mods on a real LIVE, the relay under real load.
-- Commit and push only when the owner says so; commit messages end with the `Co-Authored-By` line the tool uses. `promo/` (video pipeline) is deliberately not committed.
+The overlays: chat, alerts, last gifts, goals (followers, gift diamonds, likes), top likers, and **Song requests** (the current focus). Song requests lets viewers type `!sr song name` in the LIVE chat; the queue shows on the stream with album covers, and the owner wants it to also (a) show **what is playing on their Spotify** as the "now playing" card and (b) add requested songs to their **Spotify queue**. The owner's latest asks, in their words: Spotify "should be around the editor, not a separate page", "make the setup more user friendly rather than very technical", "for the SR it doesn't work", and "make our tester more interactive rather than pretending".
 
-## State (2026-10-10)
-- Live: chat editor, matcha page, TikTok guide, test guide (`/guides/test/`), feedback form, Search Console tag, honest TikTok status messages and a before-you-start checklist.
-- **Alerts are built but hidden** (committed, `noindex`, unlisted, unlinked): `/alerts/` (editor), `/overlay/alerts/`, `/guides/alerts/`. To publish: remove `noindex`/`listed:false` from those two page files, re-add the links (nav, footer, FAQ entry), after the phone relay is on 0.2.0 and the owner has tried it on a real stream.
-- Plans: `PLAN-WIDGETS.md` and `TECH-PLAN-WIDGETS.md` (Top Likers, Last Gifts, Follower Goal, Alerts).
+Hard rules: honest copy (say what was tested and what was not), American spelling, typographic apostrophes in site copy, never print or commit secrets (Cloudflare tunnel token, `EULER_API_KEY`, `.env*`, any Spotify token), plain hex/rgba colors in overlay CSS (old OBS browsers), site pages use only tokens from `tokens.css`.
 
-## Next, in the owner's order
-1. Owner tests alerts on a real stream (sound and transparency in TikTok LIVE Studio unknown).
-2. A step-by-step tutorial page, and a tutorial video (storyboard + voiceover in `promo/audio/tutorial-*`).
-3. Curated CC0 sound library with an in-page search.
-4. DONE locally 2026-10-11, not pushed: uploads of own images, GIFs and sounds (300 KB) in the D1 `media` table (`worker/media.mjs`, run the new part of `worker/schema.sql` in the D1 Console first), served from `/api/media/<id>`, one rights checkbox, delete code kept in the browser, picker `src/js/alerts-media.js`, tests `media.test.mjs`, `media.browser.test.mjs`, `alerts-media.test.mjs`. Before making Alerts public: add a sentence about stored uploads to the privacy page.
-5. Auto-treat a silent TikTok connection as "not live yet" and retry: wait until it can be tried on a real LIVE.
+## 2. Current State
+
+**Live and pushed (last push `1ce13c5`, 339 tests passed at that point):**
+- Site: home, editor (chat), matcha page, alerts, gifts, goal(s), likers, overlays hub, guides, feedback form (D1), privacy. Overlays hub lists Song requests as **Coming soon** (owner's choice); `/songs/` and `/overlay/songs/` exist but are `noindex`, unlisted and unlinked.
+- Relay on the owner's phone (Termux, Cloudflare Tunnel `relay.valwidgets.live`): version **0.4.0** (`/health` shows `features: chat, alerts, info, roles`). Update with `bash ~/frills/update-relay.sh`. Holds an account 10 minutes after its last page leaves, looks for a not-yet-live account every 3 minutes and gives up after 30 (the free signing service allows about 2,500 requests a day).
+- Cloudflare Worker (`worker/`): `/api/feedback`, `/api/media` (uploads, D1 `media`), `/api/songs` (Deezer song lookup, cached at the edge), `/api/nowplaying/<code>` (D1 `nowplaying`, created by the owner on 2026-10-11).
+- Spotify (private, owner has Premium, dev-mode app allows at most 5 allowlisted people; Client ID `48c1334a8c3e4f4bab4405f85e7ddadc` is public by design and lives in `site.config.json`): `/spotify/` is a **private test page** (login with PKCE, now playing, search and add to queue, chat `!sr` into the Spotify queue, step 5 "share what is playing"). The owner logged in and confirmed it works. Redirect URI registered in their Spotify dashboard: `https://frills.valwidgets.live/spotify/callback/` (must not change).
+- Song requests overlay: 10+ layouts, cover shape/glow/blur, idle card, progress bar, sliding title, own GIF cover, letter spacing, `show` (song / queue / both), and with `spotify=<code>` in the link the song playing comes from Spotify (read from the post box).
+
+**On disk, NOT committed, NOT pushed (tests were running when this was written):**
+- Mine (the "minimum" the owner approved on 2026-10-12): background-tab fix (new `src/js/ticker.js` worker clock, `document.hidden` skip removed in `src/js/spotify-page.js`, `tickerJs` var in `build.mjs`, `data-ticker` on the Spotify page) and the hidden Spotify code (`sharedCode()` in `src/js/spotify-bridge.js`, `hidden: true` control in `src/js/songs.js`, hidden controls skipped in `src/js/widget-editor.js`, auto-fill in `src/js/songs-editor.js`), with tests in `test/nowplaying*.test.mjs`.
+- **Not mine, found in the working tree on 2026-10-12** (another tool or person edited in parallel; treat it as deliberate, but review before committing): `src/js/songs.js` adds layouts `compact`, `macos`, `shell`, `discord` and cover shape `none`; `src/css/widgets.css` redesigns `glass` with `backdrop-filter` and adds styles for those layouts; `test/songs.test.mjs` is updated to match. Concerns: `macos`, `shell`, `discord` draw fake window chrome and imitate another product (the Hallmark rules and an earlier decision with the owner said not to copy 6K Labs' macOS/Shell/Discord skins), and `backdrop-filter` may not work in old OBS browsers (overlay CSS must stay plain).
+
+**Not verified by anyone:** the overlays inside OBS, TikTok LIVE Studio or Streamlabs (transparency, size, sound); gifts, likes, follows and `!next` (host flag) on a real LIVE; the relay under real load; the Spotify queue add from real chat; the share step end to end on the live site (the post box itself was tested live with a throwaway code).
+
+**How to run:** `npm test` builds and runs everything but hangs or flakes when all test files run at once with Chrome; use `node build.mjs` then `node --test --test-concurrency=2 "test/**/*.test.mjs"` (about 340 tests, Chrome or Edge needed for the browser ones). `npm run dev` builds, serves http://localhost:3020 and rebuilds on every edit: **stop it before running builds or tests** (it rebuilds `dist/` underneath them). Only dev dependency: esbuild. Relay dependency (separate, `helper/`): tiktok-live-connector 2.5.0.
+
+## 3. Active Files
+
+Song requests and Spotify:
+- `src/js/songs.js`: settings (`SONGS`, layouts, covers, hidden `spotify` code), chat commands (`parseCommand`), the queue (`SongQueue`), `makeLookup` (calls `/api/songs`).
+- `src/js/widgets-view.js`: `createSongsView` (all layouts are CSS keyed on `.songs[data-layout=...]`; the song playing carries every part, layouts show what they need).
+- `src/css/widgets.css`: the overlay styles (plain colors only).
+- `src/js/songs-overlay.js`, `src/js/songs-editor.js`, `src/pages/songs/index.html`, `src/pages/overlay/songs/index.html`: the overlay page and the editor.
+- `src/js/songs-spotify.js`: mixes Spotify's song with the chat queue (`spotifyLayer`, `withSpotify`).
+- `src/js/spotify.js`: Spotify client (PKCE login, token renewal, now playing, search, queue, skip, plain-words errors).
+- `src/js/spotify-requests.js`: chat `!sr` / `!next` into the Spotify queue (`SpotifyRequests`, practice mode when `real` is off).
+- `src/js/spotify-bridge.js`: `bridgeIdentity` (code + key in localStorage), `sharedCode`, `Publisher` (tab side), `watchSpotify` (overlay side).
+- `src/js/spotify-page.js`, `src/pages/spotify/index.html`, `src/pages/spotify/callback/index.html`, `src/js/ticker.js`: the private test page, its callback, and the background-safe clock.
+- `worker/nowplaying.mjs`, `worker/songs.mjs`, `worker/media.mjs`, `worker/index.mjs`, `worker/schema.sql`, `scripts/serve.mjs`, `scripts/lib/d1-sqlite.mjs`: the Worker routes, the schema, and the local server with a SQLite stand-in for D1.
+- `src/js/widget-editor.js`, `src/js/widget-settings.js`, `src/js/alerts-media.js`: shared editor and settings code (a control with `hidden: true` is skipped by the editor; `type: "media"` uses the upload picker).
+- `build.mjs`, `src/site.mjs`, `site.config.json`: build, site settings (`spotifyClientId`, `relayUrl`), and the security policy (CSP) written into `dist/_headers` (allows Spotify's login, player and picture servers, Deezer's cover server, the relay).
+- Tests: `test/songs.test.mjs`, `test/songs.browser.test.mjs`, `test/spotify.test.mjs`, `test/nowplaying.test.mjs`, `test/nowplaying.browser.test.mjs`, `test/site.test.mjs`, `test/site-relay.test.mjs`, `test/widgets*.test.mjs`.
+- Relay: `helper/` (`rooms.mjs`, `server.mjs`, `map.mjs`, `demo.mjs`), `update-relay.sh`, `RELAY-PHONE-GUIDE.md`.
+- Notes and plans: this file; `PLAN-WIDGETS.md`; `TECH-PLAN-WIDGETS.md`; the owner's memory notes in `C:\Users\drodo\.claude\projects\G--Personal-Project\memory\` (`project-frills-site.md` has a 2026-10-11 section with the same state). `promo/` (video pipeline, teaser and tutorial videos, voiceover scripts) is deliberately **not committed**.
+
+## 4. Changes Made
+
+2026-10-07 to 10-10 (earlier sessions): chat overlay site, matcha page, feedback form, relay switched on, alerts (hidden until published), tutorial and ad videos.
+
+2026-10-11 (all pushed, in this order): honest TikTok status messages and a before-you-start checklist; uploads of own images/GIFs/sounds (D1 `media`); Last gifts (and the fix so only the new gift animates); Follower goal, then **Goals** (follower, gift diamonds, like; follower goal can start from the account's real follower count, sent by relay 0.3); Top likers (relay adds up likes per person per second); overlays hub with "Coming soon" cards; teaser video (`promo/`); relay 0.4.0 (chat lines carry `login` and `host`, a "room is LIVE" flag so quiet chat is not called silence, 10-minute hold, slower offline retry) and `update-relay.sh`; letter spacing on every overlay; **Song requests** (commands, queue, Deezer lookup Worker, 10 layouts, cover shape/glow/blur, idle card, progress bar, sliding title, own GIF cover, show song/queue/both); Song requests set back to "Coming soon" and its pages unlisted; Spotify private test page, chat requests into the Spotify queue, and the now-playing post box (`1ce13c5`, after the owner created the D1 table `nowplaying`).
+
+2026-10-12 (uncommitted): the minimum fix described in section 2.
+
+Audit and research done: a Hallmark audit of the site (2026-10-11) found 0 critical, 3 major, 5 minor (section 6, step 6). Spotify rules checked in the docs: dev-mode apps are limited to 5 allowlisted users and need an owner with Premium; the search limit is 10; Canvas videos are not in the API.
+
+## 5. Failed Attempts
+
+- **Editing through the shell.** Large `node -e` and heredoc commands with backslashes or quotes silently corrupted edits (lost `\s` and `\b` in a regex, cut a heredoc short). Use the editor tools or a script file, and check the result by reading it back.
+- **Layout choice in the Song requests editor did nothing** at first: styles were keyed to an attribute on the first card, which is built once, while the editor changes one settings object in place. Fixed by keying the CSS on the overlay's own `data-layout`. Lesson: test a setting by changing it in the editor, not only through a link.
+- **"Nothing has arrived yet. Is the account LIVE?"** was a false alarm on quiet LIVEs: silence is not proof of "not live". Fixed with TikTok's own LIVE flag from the room details.
+- **Running every test file at once** hangs or flakes (many Chrome windows). Use `--test-concurrency=2`. A run that overlaps with an edit or a build gives false failures too.
+- **`npm run dev` running during builds and tests** makes `build.mjs` fail (`ENOTEMPTY`, `ENOENT`, `EPIPE` on `dist/`). Stop it first.
+- **The C: drive filled up** (leftover browser profile folders in `%TEMP%`: `frills-chrome-*`, `frills-promo-*`, `tally-promo-*`), which made the site build and tests fail with `ENOSPC`. Delete those folders if it happens again.
+- **Cover colors from the album art** are not possible in a browser (a page cannot read another site's picture without its permission), so Glass and cover blur use a blurred copy of the cover instead.
+- **Spotify Canvas (looping cover video)** is not in Spotify's API; the only routes are unofficial and need a session cookie, so it was not built. The animated cover is the owner's own GIF/WebP upload instead.
+- **Copying 6K Labs' macOS, Shell and Discord skins** was rejected earlier (copying another product's branding; fake window chrome is forbidden by the Hallmark rules). They have appeared again in the working tree from another editor (section 2).
+- **A pretend-viewer box as the tester** (the `/spotify/` step 4) was judged "not interactive enough" by the owner, and "for the SR it doesn't work" is still unexplained. Likeliest cause, now fixed in the uncommitted change: the page stopped sharing whenever its tab was in the background, so the overlay went empty after 90 seconds.
+- **Spotify search from the relay or a server** was avoided on purpose: the login must stay in the owner's browser; only title, artist, cover and position go through the post box.
+
+## 6. Specific next steps
+
+1. **Settle the uncommitted work.** Ask the owner whether the other editor's changes (layouts `compact`, `macos`, `shell`, `discord`, cover `none`, the `glass` redesign) should stay. If not, restore them with `git diff` as the guide. Then `node build.mjs`, `node --test --test-concurrency=2 "test/**/*.test.mjs"`, commit the minimum fix (files in section 2), and push only when the owner says "push it". Say plainly in the commit message what each part is.
+2. **Merge Spotify into the Song requests editor** (the owner's main ask). In `src/pages/songs/index.html` add a "Connect Spotify (optional)" step between "Connect your TikTok" and "Add it to your stream": a **Log in with Spotify** button, "Connected as NAME" with a Disconnect button, a switch "Show what's playing on my stream" (sets `frills:spotify:sharing` to "1"), and a switch "Add songs my viewers ask for to my Spotify queue". Reuse `SpotifyClient`, `Publisher` and `startClock` (move `startClock` from `spotify-page.js` into a shared module). Make `/spotify/callback/` send people back to where they started: store the return path (for example `/songs/`) in `localStorage` before login and use it in `callback()` in `spotify-page.js` instead of the fixed `/spotify/`. Keep `/spotify/callback/` at the same address (it is the registered redirect URI). Keep `/spotify/` as a hidden diagnostics page.
+3. **Interactive tester** in the editor: a "Try it as a viewer" panel (pick a viewer name, type a message such as `!sr levitating dua lipa`, Send) that goes through the real `SongQueue` and, when the switch is on, the real Spotify queue (`SpotifyRequests` with `real: true`), with a plain-words live log.
+4. **Friendlier wording**: no "Client ID", "redirect", "code" or "bridge" in the UI; errors already come from `describe()` in `src/js/spotify.js`; move technical facts into a collapsed "Having trouble?" section.
+5. **Test it with the owner**: play a song, share, open the overlay link in another browser, pause and skip, send `!sr` from a real chat or the new tester with the queue switch on. Check the overlay also in TikTok LIVE Studio or OBS if possible.
+6. **Hallmark audit fixes** (3 major): the overlays hub is five identical cards in a 2-column grid (make it rows with one featured row and a single "Beta" note); the editor's step 2 is one long unlabeled stack (group it as Layout, Rules, List; let long selects use the full width); the app bar wraps onto two rows on phones (collapse it into a Menu button). Minors: step numbers read "1.0, 2.0, 3.0", the home nav has 7 links, "How to test" is a 76x18 px tap target, look chips wrap 2/2/1, the six editors repeat one template.
+7. **Owner-side housekeeping** (cannot be done by a tool): real-LIVE tests of gifts, likes, follows and `!next`; submit the sitemap in Google Search Console; allow search crawlers in Cloudflare (PerplexityBot was blocked) and optionally switch off the Web Analytics beacon; delete the "TEST from Claude" row in the D1 `feedback` table; keep the phone on the charger with Termux wake lock and run `bash ~/frills/update-relay.sh` after relay changes.
+8. **Later ideas**: YouTube Live chat with "bring your own API key" (the shared quota is 10,000 units a day, 5 per chat read, about 3 hours of one stream for everyone); a written step-by-step tutorial page; a curated CC0 sound library (ask before downloading packs); TikTok and Twitch chat together; like and subscriber alerts; a Now playing overlay that is separate from the queue (the `show=now` option already does this); a licensed lyrics source (Musixmatch) only if the owner accepts the risk.
