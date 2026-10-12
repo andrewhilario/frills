@@ -234,6 +234,7 @@ export class Room {
         await this.sleep(offlineWaitMs);
       } else if (how.kind === "limited") {
         this.setStatus("limited");
+        this.hub.opts.onLimited?.();
         await this.sleep(limitedWaitMs);
       } else {
         if (how.kind === "failed") this.setStatus("error", how.detail);

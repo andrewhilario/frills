@@ -111,7 +111,7 @@ test("it answers a ping, serves the built site with its security headers, and sa
   await start(scripted().factory);
   const ping = await raw("/tiktok/ping");
   assert.equal(ping.status, 200);
-  assert.deepEqual(JSON.parse(ping.body), { ok: true, name: "frills-helper", version: "0.4.0", features: ["chat", "alerts", "info", "roles"] });
+  assert.deepEqual(JSON.parse(ping.body), { ok: true, name: "frills-helper", version: "0.5.0", features: ["chat", "alerts", "info", "roles", "status"] });
   const editor = await raw("/editor/");
   assert.equal(editor.status, 200);
   assert.match(editor.body, /Connect your chat/);

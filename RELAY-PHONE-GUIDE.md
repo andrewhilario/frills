@@ -234,3 +234,14 @@ Every time the relay connects to a TikTok account it uses a request to a free si
 - **Chat stops after the screen turns off:** Android killed Termux. Redo step 5 and check the lock.
 - **Everyone gets "TikTok's free connection is busy":** the signing service is limiting your home address. Lower `RELAY_SLOTS`, or set a free `EULER_API_KEY`.
 - **Nothing appears for a real account but `frills_demo` works:** the problem is between the phone and TikTok (offline account, blocked address), not in Frills. Tell me the status line you see.
+
+## The status page and the warning (relay 0.5.0)
+
+Open the relay's address in a browser (`https://relay.valwidgets.live/health`, or `http://127.0.0.1:8765/health` on the phone) and you get a page, not just numbers: a big count of **free spots**, a bar, people waiting in line, how long it has been running, whether TikTok's free signing service is busy, and a guess of how many accounts this device could hold. It refreshes by itself every 5 seconds. On the phone itself it also shows the device's own numbers (cores, memory, how much the relay uses); through the tunnel only the public numbers are shown.
+
+**The warning.** By default it speaks when **10 spots or fewer** are left, when someone starts waiting in line, and when the signing service says "busy". Each warning is once per change, so it does not nag.
+- On the status page: a red bar, a short sound, and (if you press "Turn on notifications") a browser notification. Keep the page open. You can change the number on the page.
+- On the phone itself: a Termux notification. One time only, install the free **Termux:API** app from the same place you got Termux (F-Droid), then run `pkg install termux-api`. Without it, the warning is only written in the relay's window.
+- To change the number or turn it off, start the relay with `RELAY_ALERT_SPOTS=15` (or `RELAY_ALERTS=0`). `update-relay.sh` accepts the same variables: `RELAY_ALERT_SPOTS=15 bash ~/frills/update-relay.sh`.
+
+**How many can it handle?** The "About N accounts" number is a guess from the free memory and how much of one core each open account uses. It gets better once a few accounts are open. The real limit is usually your home internet and TikTok's free signing service (about 2,500 requests a day), so raise `RELAY_SLOTS` a little at a time and watch the page.

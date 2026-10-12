@@ -11,6 +11,7 @@
 // limited number of spots and a line for them, and keeps no chat (see createHelper's `relay` option).
 
 import http from "node:http";
+import os from "node:os";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
@@ -20,10 +21,12 @@ import { cleanTikTokUser } from "../src/js/tiktok.js";
 import { Hub } from "./rooms.mjs";
 import { ALERT_KINDS } from "./map.mjs";
 import { DEMO_USER, DemoConnection } from "./demo.mjs";
+import { ALERT_AT, Signing, capacity, deviceFacts, snapshot, statusPage } from "./status.mjs";
+import { SlotAlerts, termuxNotifier } from "./alerts.mjs";
 
-const VERSION = "0.4.0";
+const VERSION = "0.5.0";
 /** What this program can do, so a page can tell an old one ("chat" only) from one that sends alerts. */
-const FEATURES = ["chat", "alerts", "info", "roles"];
+const FEATURES = ["chat", "alerts", "info", "roles", "status"];
 
 /** Makes a connection to TikTok for one account. The library is loaded only now, so everything else works (and is tested) without it. */
 export async function realFactory(user, { apiKey } = {}) {
@@ -53,7 +56,27 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
   // Each connect to TikTok costs a request to the free signing service (a few thousand a day at most), so a shared relay keeps an account
   // for 10 minutes after its last page leaves (coming back is free), looks for an offline account every 3 minutes, and gives up after 30.
   const shared = relay ? { queue: true, idleStopMs: 600000, offlineWaitMs: 180000, offlineGiveUpMs: 1800000, maxRooms: relay.slots ?? 30 } : {};
-  const hub = new Hub({ factory: make, apiKey, log, ...shared, ...tuning });
+  const signing = new Signing();
+  const startedAt = Date.now();
+  const hub = new Hub({ factory: make, apiKey, log, onLimited: () => signing.note(), ...shared, ...tuning });
+  // what this program costs the device, measured now and then, for the capacity guess on the status page
+  const baseRss = process.memoryUsage().rss;
+  let cpuFraction = 0;
+  let lastCpu = { at: Date.now(), used: process.cpuUsage() };
+  const sample = () => {
+    const at = Date.now();
+    const used = process.cpuUsage();
+    const wall = (at - lastCpu.at) * 1000; // microseconds
+    if (wall > 0) cpuFraction = Math.min(1, ((used.user - lastCpu.used.user) + (used.system - lastCpu.used.system)) / wall);
+    lastCpu = { at, used };
+  };
+  const sampler = setInterval(sample, 10000);
+  sampler.unref?.();
+  const numbers = (local) => {
+    const stats = hub.stats();
+    const estimate = capacity({ freeMem: os.freemem(), rss: process.memoryUsage().rss, baseRss, rooms: stats.used, cpuFraction });
+    return snapshot({ stats, startedAt, now: Date.now(), version: VERSION, features: FEATURES, signing, estimate, alertAt: relay?.alertAt ?? ALERT_AT, device: local ? deviceFacts(cpuFraction) : null });
+  };
   const nothing = (req, res) => {
     res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
     res.end("Not found.");
@@ -93,9 +116,17 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
       if (!hosts.has(String(req.headers.host ?? "").toLowerCase())) return text(res, 421, "Open this from the address the Frills helper printed.");
       if (req.headers.origin && !origins.has(req.headers.origin)) return text(res, 403, "Not allowed.");
     }
-    if (url.pathname === "/tiktok/ping" || (relay && url.pathname === "/health")) {
+    // The relay's own address in a browser is a readable page; a program (or the page itself, asking again) gets the numbers as JSON.
+    const accept = String(req.headers.accept ?? "");
+    const wantsPage = Boolean(relay) && (url.pathname === "/" || url.pathname === "/health") && accept.includes("text/html") && !accept.includes("application/json");
+    // Device details (cores, memory) only for someone on the device itself, never through the tunnel.
+    const onDevice = !req.headers["cf-connecting-ip"] && !req.headers["x-forwarded-for"];
+    if (wantsPage) {
+      res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'" });
+      res.end(statusPage(numbers(onDevice)));
+    } else if (url.pathname === "/tiktok/ping" || (relay && url.pathname === "/health")) {
       res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", ...cors });
-      res.end(JSON.stringify(relay ? { ok: true, name: "frills-relay", version: VERSION, features: FEATURES, slots: hub.stats() } : { ok: true, name: "frills-helper", version: VERSION, features: FEATURES }));
+      res.end(JSON.stringify(relay && url.pathname === "/health" ? numbers(onDevice) : relay ? { ok: true, name: "frills-relay", version: VERSION, features: FEATURES, slots: hub.stats() } : { ok: true, name: "frills-helper", version: VERSION, features: FEATURES }));
     } else if (url.pathname === "/tiktok/stream") {
       stream(req, res, url, cors);
     } else {
@@ -137,6 +168,7 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
   return {
     server,
     hub,
+    signing,
     /** Starts listening, on this computer only unless a relay is told to bind elsewhere. Resolves with the port. */
     listen(port = 8765, bind = "127.0.0.1") {
       return new Promise((resolve, reject) => {
@@ -173,7 +205,8 @@ async function mainRelay() {
   const numberOr = (value, fallback) => (Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : fallback);
   const origins = (process.env.RELAY_ORIGINS ?? "https://frills.valwidgets.live").split(",").map((o) => o.trim()).filter(Boolean);
   const slots = numberOr(process.env.RELAY_SLOTS, 30);
-  const relay = { origins, slots, maxPerIp: numberOr(process.env.RELAY_PER_IP, 8), trustProxy: process.env.RELAY_TRUST_PROXY !== "0" };
+  const alertAt = Number.isFinite(Number(process.env.RELAY_ALERT_SPOTS)) && process.env.RELAY_ALERT_SPOTS !== undefined && process.env.RELAY_ALERT_SPOTS !== "" ? Math.max(0, Number(process.env.RELAY_ALERT_SPOTS)) : 10;
+  const relay = { origins, slots, alertAt, maxPerIp: numberOr(process.env.RELAY_PER_IP, 8), trustProxy: process.env.RELAY_TRUST_PROXY !== "0" };
   const port = numberOr(process.argv.find((a) => a.startsWith("--port="))?.slice(7) ?? process.env.PORT, 8765);
   const bind = process.env.RELAY_BIND ?? "127.0.0.1"; // behind a tunnel nothing else may reach it
   const helper = createHelper({ relay, apiKey: (process.env.EULER_API_KEY ?? "").trim(), log: say });
@@ -183,7 +216,11 @@ async function mainRelay() {
     console.error(error.code === "EADDRINUSE" ? `Port ${port} is already in use. Is the relay already running?` : `Couldn't start: ${error.message}`);
     process.exit(1);
   }
-  console.log(`\nFrills relay ${VERSION} is running on ${bind}:${port}.\n  Spots: ${slots}. Allowed website addresses: ${origins.join(", ")}.\n  Health: http://${bind}:${port}/health\n`);
+  console.log(`\nFrills relay ${VERSION} is running on ${bind}:${port}.\n  Spots: ${slots}. Allowed website addresses: ${origins.join(", ")}.\n  Status page: http://${bind}:${port}/health (open it in a browser)\n  Warns you when ${alertAt} spots or fewer are left${process.env.RELAY_ALERTS === "0" ? " (alerts are off)" : ""}.\n`);
+  if (process.env.RELAY_ALERTS !== "0") {
+    const alerts = new SlotAlerts({ stats: () => helper.hub.stats(), signing: helper.signing, alertAt, notify: termuxNotifier({ log: say }), log: say });
+    alerts.start();
+  }
   setInterval(() => {
     const s = helper.hub.stats();
     say(`spots ${s.used}/${s.max}, ${s.waiting} waiting`);
