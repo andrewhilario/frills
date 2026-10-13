@@ -35,23 +35,18 @@
 
 /* The little extras on a bubble's top edge (feed.js puts one in; ears.js has the drawings). They sit on the edge and leave room above, so the
    message before is never covered. --ear and --ear-in are the two colors, --ear-scale the size. */
-.m .ears { position: absolute; z-index: 1; bottom: calc(100% - 1px); left: 0.7em; width: calc(3.6em * var(--ear-scale, 1)); pointer-events: none; }
-.look-general .m .ears { bottom: calc(100% + var(--g-bw, 0px) - 2px); }
-.m .ears svg { display: block; width: 100%; height: auto; transform-origin: 50% 100%; }
+.m .ears { position: absolute; z-index: 1; bottom: calc(100% - 1px + var(--ear-y, 0px)); left: calc((100% - 3.6em * var(--ear-scale, 1)) * var(--ear-x, 0.1)); width: calc(3.6em * var(--ear-scale, 1)); pointer-events: none; }
+.look-general .m .ears { bottom: calc(100% + var(--g-bw, 0px) - 2px + var(--ear-y, 0px)); }
+.m .ears svg { display: block; width: 100%; height: auto; transform-origin: 50% 100%; transform: rotate(var(--ear-tilt, 0deg)); }
 .m .ears .o { fill: var(--ear, #ff9db8); stroke: var(--ear, #ff9db8); stroke-width: 3; stroke-linejoin: round; }
 .m .ears .i { fill: var(--ear-in, #ffd6e2); }
 .m .ears .r { fill: none; stroke: var(--ear, #ff9db8); stroke-width: 4; }
-.look[data-ear-spot="middle"] .m .ears { left: 50%; margin-left: calc(-1.8em * var(--ear-scale, 1)); }
-.look[data-ear-spot="right"] .m .ears { left: auto; right: 0.7em; }
 /* room for the ears above the bubble, by how tall each design stands (3.6em wide) */
-.m.has-ears { margin-top: calc(1.9em * var(--ear-scale, 1)); }
-.look[data-ears="bunny"] .m.has-ears { margin-top: calc(2.9em * var(--ear-scale, 1)); }
-.look[data-ears="fox"] .m.has-ears { margin-top: calc(2.25em * var(--ear-scale, 1)); }
-.look[data-ears="horns"] .m.has-ears, .look[data-ears="bow"] .m.has-ears { margin-top: calc(1.7em * var(--ear-scale, 1)); }
-.look[data-ears="bear"] .m.has-ears, .look[data-ears="halo"] .m.has-ears { margin-top: calc(0.95em * var(--ear-scale, 1)); }
-/* a quick twitch once the message has arrived */
-.look[data-ear-wiggle="on"] .m .ears svg { animation: earwig 800ms 420ms ease-in-out 1 both; }
-@keyframes earwig { 0%, 100% { transform: rotate(0deg); } 25% { transform: rotate(-7deg); } 50% { transform: rotate(6deg); } 75% { transform: rotate(-3deg); } }
+.m.has-ears { margin-top: calc(1.9em * var(--ear-scale, 1) + var(--ear-room, 0px)); }
+.look[data-ears="bunny"] .m.has-ears { margin-top: calc(2.9em * var(--ear-scale, 1) + var(--ear-room, 0px)); }
+.look[data-ears="fox"] .m.has-ears { margin-top: calc(2.25em * var(--ear-scale, 1) + var(--ear-room, 0px)); }
+.look[data-ears="horns"] .m.has-ears, .look[data-ears="bow"] .m.has-ears { margin-top: calc(1.7em * var(--ear-scale, 1) + var(--ear-room, 0px)); }
+.look[data-ears="bear"] .m.has-ears, .look[data-ears="halo"] .m.has-ears { margin-top: calc(0.95em * var(--ear-scale, 1) + var(--ear-room, 0px)); }
 
 /* A message leaves by fading up, then it is removed from the page. */
 .m.leaving { animation: out 300ms var(--ease-in) forwards !important; }
@@ -60,7 +55,6 @@
 /* Previews with no motion at all */
 .is-static .m { animation: none !important; }
 .is-static .m::after { display: none; }
-.is-static .m .ears svg { animation: none !important; }
 
 /* How a message arrives. A look picks one. */
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
@@ -72,5 +66,5 @@
 @keyframes ripple { 0% { opacity: 0.7; transform: scale(0.5); } 100% { opacity: 0; transform: scale(1.9); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .m, .m::after, .m .ears svg { animation-duration: 1ms !important; animation-delay: 0s !important; }
+  .m, .m::after { animation-duration: 1ms !important; animation-delay: 0s !important; }
 }

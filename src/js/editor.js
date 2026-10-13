@@ -32,6 +32,7 @@ function change(key, value) {
   settings[key] = value;
   if (key === "font") fontsReady(generalFaces(settings), 600).then(paint);
   else paint();
+  if (key === "ears") showNeeded();
   presetChips.set(currentPreset(settings));
   refreshLink();
   save();
@@ -39,6 +40,7 @@ function change(key, value) {
 
 function syncControls() {
   for (const control of CONTROLS) writers[control.key](settings[control.key]);
+  showNeeded();
   presetChips.set(currentPreset(settings));
 }
 
@@ -56,11 +58,18 @@ presetChips = chips(
   { dot: true },
 );
 
+const rows = {};
 for (const control of CONTROLS) {
   const { row, write } = buildControl(control, settings[control.key], (value) => change(control.key, value));
   writers[control.key] = write;
+  rows[control.key] = row;
   $(control.where === "main" ? "main-controls" : "more-controls").append(row);
 }
+/** The settings that only matter once something is picked (the ears' size and place) are hidden until it is. */
+function showNeeded() {
+  for (const control of CONTROLS) if (control.needs) rows[control.key].style.display = settings[control.needs] === "none" ? "none" : "";
+}
+showNeeded();
 
 $("reset").addEventListener("click", () => {
   settings = { ...DEFAULTS };

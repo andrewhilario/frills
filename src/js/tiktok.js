@@ -139,38 +139,89 @@ export function connectTikTok({ user, base = "", onMessage, onRemove, onClear, o
     return { stop() {} };
   }
   let stopped = false;
+  let source = null;
+  let heard = false; // something has come from this stream at least once, so it is known to be the relay or helper and worth coming back to
+  let beatAt = 0; // when the last "beat" came (a relay sends one every 15 seconds; an older one never does, and is then not watched)
+  let tries = 0; // failed attempts in a row, which sets how long to wait before the next
+  let again = 0;
+  let watcher = 0;
   say("connecting");
   const wanted = events.filter((kind) => ALERT_KINDS.includes(kind));
-  const source = (eventSourceFactory ?? ((url) => new EventSource(url)))(`${base}/tiktok/stream?user=${encodeURIComponent(name)}${wanted.length ? `&events=${wanted.join(",")}` : ""}`);
-  const listen = (event, fn) => source.addEventListener(event, (e) => {
-    if (stopped) return;
-    let data;
-    try { data = JSON.parse(e.data); } catch { return; } // a damaged event is skipped, never fatal
-    fn(data);
-  });
-  listen("status", (s) => say(String(s.state ?? ""), typeof s.detail === "string" ? s.detail : "", s.fatal === true, { position: Number(s.position) || 0, total: Number(s.total) || 0 }));
-  listen("chat", (raw) => { const m = acceptMessage(raw); if (m && onMessage) onMessage(m); });
-  listen("alert", (raw) => { const a = acceptAlert(raw); if (a && onAlert) onAlert(a); });
-  // What the account itself says, sent once when the relay connects: whether it is LIVE and its follower count. Anything odd is ignored.
-  listen("info", (raw) => {
-    const n = Math.round(Number(raw?.followers));
-    const followers = Number.isFinite(n) && n > 0 && n < 1e10 ? n : 0;
-    const live = raw?.live === true;
-    if (onInfo && (followers || live)) onInfo({ live, followers });
-  });
-  listen("remove", ({ id }) => id && onRemove && onRemove({ id: String(id) }));
-  listen("clear", ({ user: who }) => who && onClear && onClear({ user: String(who) }));
-  source.onerror = () => {
-    if (stopped) return;
-    // readyState 2 means the browser gave up: whatever answered at this address isn't the helper (the hosted site has no such page).
-    // Anything else, the browser is trying again by itself.
-    if (source.readyState === 2) say("error", base ? "The free Frills relay turned the connection down. It may be busy, or too many pages are open from your address." : "The Frills helper isn't answering here. TikTok chat needs it running on this PC.", true);
-    else say("helper-lost", base ? "Lost the free Frills relay. This reconnects by itself." : "");
-  };
+  const address = `${base}/tiktok/stream?user=${encodeURIComponent(name)}${wanted.length ? `&events=${wanted.join(",")}` : ""}`;
+
+  /** Opens the stream and listens. Called again to come back after the relay was restarted or went away. */
+  function open() {
+    const mine = (eventSourceFactory ?? ((url) => new EventSource(url)))(address);
+    source = mine;
+    const listen = (event, fn) => mine.addEventListener(event, (e) => {
+      if (stopped || mine !== source) return;
+      heard = true;
+      tries = 0;
+      let data;
+      try { data = JSON.parse(e.data); } catch { return; } // a damaged event is skipped, never fatal
+      fn(data);
+    });
+    listen("status", (s) => say(String(s.state ?? ""), typeof s.detail === "string" ? s.detail : "", s.fatal === true, { position: Number(s.position) || 0, total: Number(s.total) || 0 }));
+    listen("chat", (raw) => { const m = acceptMessage(raw); if (m && onMessage) onMessage(m); });
+    listen("alert", (raw) => { const a = acceptAlert(raw); if (a && onAlert) onAlert(a); });
+    // What the account itself says, sent once when the relay connects: whether it is LIVE and its follower count. Anything odd is ignored.
+    listen("info", (raw) => {
+      const n = Math.round(Number(raw?.followers));
+      const followers = Number.isFinite(n) && n > 0 && n < 1e10 ? n : 0;
+      const live = raw?.live === true;
+      if (onInfo && (followers || live)) onInfo({ live, followers });
+    });
+    listen("remove", ({ id }) => id && onRemove && onRemove({ id: String(id) }));
+    listen("clear", ({ user: who }) => who && onClear && onClear({ user: String(who) }));
+    listen("beat", () => { beatAt = Date.now(); });
+    mine.onerror = () => {
+      if (stopped || mine !== source) return;
+      // readyState 2 means the browser gave up. A browser only gives up for good on an answer that is not an event stream, and that is
+      // what a relay says while it is being restarted (the tunnel is up, the relay behind it is not yet). So after a stream that had
+      // worked we try again ourselves, for as long as it takes; a stream that never worked is not the relay (the hosted site has no
+      // such page), or the relay turned us down, and that is said once.
+      if (mine.readyState === 2) {
+        if (!heard) {
+          say("error", base ? "The free Frills relay turned the connection down. It may be busy, or too many pages are open from your address." : "The Frills helper isn't answering here. TikTok chat needs it running on this PC.", true);
+          return;
+        }
+        say("helper-lost", base ? "Lost the free Frills relay. This reconnects by itself." : "");
+        comeBack();
+      } else {
+        // the browser is trying again by itself
+        say("helper-lost", base ? "Lost the free Frills relay. This reconnects by itself." : "");
+      }
+    };
+  }
+
+  /** Closes the stream we have and opens a new one after a wait that grows (2, 4, 8, 15 then 30 seconds, with a little jitter). */
+  function comeBack(now = false) {
+    clearTimeout(again);
+    try { source?.close(); } catch { /* already closed */ }
+    source = null;
+    beatAt = 0;
+    const wait = now ? 0 : Math.min(30000, 2000 * 2 ** Math.min(tries, 4)) * (0.8 + Math.random() * 0.4);
+    tries += 1;
+    again = setTimeout(() => { if (!stopped) open(); }, wait);
+  }
+
+  // A relay says "beat" every 15 seconds. Once one has been heard, a long silence means the connection is dead even though the browser
+  // does not know it (a tunnel that restarted can leave it hanging), so it is replaced.
+  watcher = setInterval(() => {
+    if (!stopped && beatAt && Date.now() - beatAt > 50000) {
+      say("helper-lost", base ? "Lost the free Frills relay. This reconnects by itself." : "");
+      comeBack(true);
+    }
+  }, 10000);
+
+  watcher?.unref?.(); // in a program (the tests) a waiting timer must not keep it from ending
+  open();
   return {
     stop() {
       stopped = true;
-      source.close();
+      clearTimeout(again);
+      clearInterval(watcher);
+      try { source?.close(); } catch { /* already closed */ }
       say("stopped");
     },
   };

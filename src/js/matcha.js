@@ -63,12 +63,13 @@ export const MATCHA_CONTROLS = [
   general("colors"),
   general("emotes"),
   general("ears"),
+  general("earSize"),
+  general("earX"),
+  general("earY"),
+  general("earTilt"),
   general("earColor"),
   general("earInner"),
-  general("earSize"),
-  general("earSpot"),
   general("earsFor"),
-  general("earWiggle"),
 ];
 
 // The mod icon has its own row of buttons on the page, so it is checked and linked here but not listed under "More options".

@@ -55,7 +55,7 @@ export const LOOK_KEYS = Object.keys(PRESETS.blueberry);
 export const MOD_ICONS = ["shield", "star", "leaf", "frog", "none"];
 
 // The little extras on the bubbles (cat ears and so on) start off, so a look is exactly what it was until someone turns them on.
-export const EAR_DEFAULTS = { ears: "none", earsFor: "all", earSpot: "left", earColor: "#ff9db8", earInner: "#ffd6e2", earSize: 100, earWiggle: true };
+export const EAR_DEFAULTS = { ears: "none", earSize: 100, earX: 10, earY: 0, earTilt: 0, earColor: "#ff9db8", earInner: "#ffd6e2", earsFor: "all" };
 
 export const DEFAULTS = { ...PRESETS.blueberry, letter: 0, modIcon: "shield", max: 6, life: 15, space: 8, colors: false, emotes: true, pictures: true, ...EAR_DEFAULTS };
 
@@ -71,7 +71,15 @@ export const CONTROLS = [
   { key: "font", where: "main", type: "select", label: "Font", options: Object.keys(FONTS).map((f) => ({ id: f, name: f })) },
   { key: "size", where: "main", type: "range", label: "Text size", min: 12, max: 34, step: 1, unit: " px" },
   { key: "letter", where: "main", type: "range", label: "Letter spacing", min: -2, max: 8, step: 0.5, unit: " px" },
-  { key: "ears", where: "main", type: "chips", label: "Ears on the bubbles", options: EARS, hint: "Cute little ears, a bow or a halo on the top edge of each message. Pick None to have nothing." },
+  { key: "ears", where: "main", type: "chips", label: "Ears on the bubbles", options: EARS, hint: "Cute little ears, a bow or a halo on the top edge of each message. Pick None to have nothing. Pick one and the settings below it appear." },
+  // these only matter once a design is picked, so the editors hide them while it is None (`needs`)
+  { key: "earSize", where: "main", needs: "ears", type: "range", label: "Ears size", min: 50, max: 200, step: 5, unit: " %" },
+  { key: "earX", where: "main", needs: "ears", type: "range", label: "Along the bubble", min: 0, max: 100, step: 1, unit: " %", hint: "0 is the left edge of the bubble, 50 the middle, 100 the right edge." },
+  { key: "earY", where: "main", needs: "ears", type: "range", label: "Up or down", min: -20, max: 30, step: 1, unit: " px", hint: "Up lifts the ears off the bubble, down tucks them behind its edge." },
+  { key: "earTilt", where: "main", needs: "ears", type: "range", label: "Tilt", min: -30, max: 30, step: 1, unit: "°" },
+  { key: "earColor", where: "main", needs: "ears", type: "color", label: "Ears color" },
+  { key: "earInner", where: "main", needs: "ears", type: "color", label: "Inside of the ears" },
+  { key: "earsFor", where: "main", needs: "ears", type: "chips", label: "Who gets ears", options: list(["all", "Everyone"], ["mods", "Mods only"], ["gifts", "Gift messages"]) },
   { key: "text", where: "more", type: "color", label: "Text color" },
   { key: "pop", where: "more", type: "color", label: "Gift color" },
   { key: "shape", where: "more", type: "chips", label: "Box", options: list(["filled", "Filled"], ["outline", "Outline"], ["none", "Text only"]) },
@@ -88,12 +96,6 @@ export const CONTROLS = [
   { key: "space", where: "more", type: "range", label: "Spacing", min: 0, max: 24, step: 1, unit: " px" },
   { key: "colors", where: "more", type: "toggle", label: "Viewers' own name colors" },
   { key: "emotes", where: "more", type: "toggle", label: "Show emotes" },
-  { key: "earColor", where: "more", type: "color", label: "Ears color" },
-  { key: "earInner", where: "more", type: "color", label: "Inside of the ears" },
-  { key: "earSize", where: "more", type: "range", label: "Ears size", min: 50, max: 200, step: 5, unit: " %" },
-  { key: "earSpot", where: "more", type: "chips", label: "Where the ears sit", options: list(["left", "Left corner"], ["middle", "Middle"], ["right", "Right corner"]) },
-  { key: "earsFor", where: "more", type: "chips", label: "Who gets ears", options: list(["all", "Everyone"], ["mods", "Mods only"], ["gifts", "Gift messages"]) },
-  { key: "earWiggle", where: "more", type: "toggle", label: "Ears twitch when a message arrives" },
 ];
 
 /** One value, checked against its control. Returns undefined if it isn't acceptable. */
@@ -159,9 +161,13 @@ export const earVars = (s) => ({
   "--ear": HEX.test(s.earColor ?? "") ? s.earColor : EAR_DEFAULTS.earColor,
   "--ear-in": HEX.test(s.earInner ?? "") ? s.earInner : EAR_DEFAULTS.earInner,
   "--ear-scale": String((Number.isFinite(s.earSize) ? s.earSize : EAR_DEFAULTS.earSize) / 100),
+  "--ear-x": String((Number.isFinite(s.earX) ? s.earX : EAR_DEFAULTS.earX) / 100), // how far along the bubble, 0 to 1
+  "--ear-y": (Number.isFinite(s.earY) ? s.earY : 0) + "px", // up (positive) or down
+  "--ear-room": Math.max(0, Number.isFinite(s.earY) ? s.earY : 0) + "px", // extra room above the bubble when they are lifted
+  "--ear-tilt": (Number.isFinite(s.earTilt) ? s.earTilt : 0) + "deg",
 });
-/** Where they sit and whether they twitch, as the stage's data attributes. */
-export const earAttrs = (s) => ({ ears: s.ears ?? "none", earSpot: s.earSpot ?? "left", earWiggle: s.earWiggle === false ? "off" : "on" });
+/** Which design, as the stage's data attribute (the stylesheet leaves room for how tall it stands). */
+export const earAttrs = (s) => ({ ears: s.ears ?? "none" });
 
 /**
  * Settings -> what the page needs to draw them: CSS variables for the chat's stage, data attributes, and the feed's options.

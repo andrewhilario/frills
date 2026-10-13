@@ -275,3 +275,54 @@ test("editor: connected but silent (an account that is not LIVE) says so after a
   assert.equal(await text("#source-status"), "Reading @not_live_yet's LIVE chat");
   assert.match(await text("#source ~ .checklist, .checklist"), /go LIVE first/, "the checklist is on the page");
 });
+
+// ── a restarted relay: the tunnel answers 502 while it is down, and the page has to come back by itself ──────────────────────────
+
+test("overlay: when the relay is restarted behind its tunnel, the page comes back by itself and chat flows again", { skip }, async () => {
+  // the stand-in for the tunnel: it forwards to whatever relay is running now, and answers 502 while there is none (as Cloudflare does)
+  let inner = 0;
+  const forward = http.createServer((req, res) => {
+    if (!inner) { res.writeHead(502, { "content-type": "text/plain" }); res.end("Bad gateway"); return; }
+    const up = http.request({ host: "127.0.0.1", port: inner, path: req.url, method: req.method, headers: req.headers }, (r) => {
+      res.writeHead(r.statusCode, r.headers);
+      r.pipe(res);
+      r.on("close", () => { if (!r.complete) res.destroy(); }); // the relay went away mid-stream: a tunnel drops the visitor too
+    });
+    up.on("error", () => { if (!res.headersSent) { res.writeHead(502); res.end(); } else res.destroy(); });
+    res.on("close", () => up.destroy());
+    req.pipe(up);
+  });
+  await new Promise((resolve) => forward.listen(0, "127.0.0.1", resolve));
+  const front = `http://127.0.0.1:${forward.address().port}`;
+  // a relay (not a helper on a PC) behind it, because a relay answers to whatever address the tunnel gives it
+  const relayBehind = async () => {
+    const made = [];
+    const helper = createHelper({ distDir: dist, factory: async (user) => { const conn = new FakeConnection(); made.push({ user, conn }); return conn; }, relay: { origins: [front], slots: 10, trustProxy: false }, idleStopMs: 200, beatMs: 200 });
+    const port = await helper.listen(0);
+    opened.push(helper);
+    return { port, made, helper };
+  };
+  try {
+    const first = await relayBehind();
+    inner = first.port;
+    await page.goto(`${front}/overlay/?platform=tiktok&channel=pond.pal`, { settle: 800 });
+    await until(() => first.made.length === 1).catch(() => { throw new Error("the page never reached the first relay"); });
+    await sleep(150);
+    first.made[0].conn.emit("chat", chat("a1", "before the restart"));
+    await page.waitFor(`document.querySelector("#chat .m")`);
+
+    // the relay goes away (the tunnel now says 502) and, several seconds later, a new one starts
+    inner = 0;
+    await first.helper.close();
+    await sleep(5000); // longer than the browser's own wait before trying again (3 seconds), so its first tries are answered 502
+    const second = await relayBehind();
+    inner = second.port;
+    await until(() => second.made.length === 1, 30000).catch(async () => { throw new Error("the page never came back to the new relay; the page says: " + (await page.evaluate(`document.getElementById("note")?.textContent + " | hidden=" + document.getElementById("note")?.hidden`)) + "; inner=" + inner); }); // the page found its way back without anyone reloading it
+    await sleep(200);
+    second.made[0].conn.emit("chat", chat("b1", "after the restart"));
+    await page.waitFor(`[...document.querySelectorAll("#chat .m .txt")].some((n) => n.textContent === "after the restart")`, 8000);
+  } finally {
+    forward.closeAllConnections?.();
+    forward.close();
+  }
+});

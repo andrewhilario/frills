@@ -273,20 +273,34 @@ test("changing the ears while the chat runs changes the messages already there, 
   assert.deepEqual({ ...r }, { none: 0, cat: "0 0 64 34", bunny: "0 0 64 52", one: 1, arrived: 2, gone: 0, marked: 0 });
 });
 
-test("the twitch of the ears is part of the page's own motion: off for people who ask for less", { skip }, async () => {
+test("the ears can be moved along the bubble, lifted or tucked, and tilted, and they never move by themselves", { skip }, async () => {
   const r = await run(async (Feed, wait, mk) => {
-    const host = mk();
-    host.className = "look look-general";
-    host.dataset.earWiggle = "on";
-    const feed = new Feed(host, { life: 0, max: 5, gapMs: 10, ears: "cat" });
-    feed.add({ id: "1", user: "a", name: "Ann", text: "hello" });
-    await wait(150);
-    const on = getComputedStyle(host.querySelector(".ears svg")).animationName;
-    host.dataset.earWiggle = "off";
-    const off = getComputedStyle(host.querySelector(".ears svg")).animationName;
-    return { on, off };
+    const make = async (vars) => {
+      const host = mk();
+      host.className = "look look-general";
+      host.dataset.ears = "cat";
+      host.style.cssText = "width: 400px; font-size: 20px; --ear-scale: 1; --g-bw: 0px; --g-space: 8px; " + vars;
+      const feed = new Feed(host, { life: 0, max: 5, gapMs: 10, glide: false, ears: "cat" });
+      feed.add({ id: "1", user: "a", name: "Ann", text: "hello" });
+      await wait(300);
+      const m = host.firstElementChild;
+      const body = m.querySelector(".body").getBoundingClientRect();
+      const ears = m.querySelector(".ears");
+      const box = ears.getBoundingClientRect();
+      return { left: Math.round(box.left - body.left), right: Math.round(body.right - box.right), lift: Math.round(body.top - box.bottom), margin: parseFloat(getComputedStyle(m).marginTop), rotate: getComputedStyle(ears.querySelector("svg")).transform, animation: getComputedStyle(ears.querySelector("svg")).animationName };
+    };
+    return { start: await make("--ear-x: 0;"), middle: await make("--ear-x: 0.5;"), end: await make("--ear-x: 1;"), lifted: await make("--ear-x: 0; --ear-y: 10px; --ear-room: 10px;"), tucked: await make("--ear-x: 0; --ear-y: -6px;"), tilted: await make("--ear-x: 0; --ear-tilt: 20deg;") };
   });
-  assert.deepEqual({ ...r }, { on: "earwig", off: "none" });
+  assert.equal(r.start.left, 0, "0 is the left edge of the bubble");
+  assert.ok(Math.abs(r.middle.left - r.middle.right) <= 1, "50 is the middle");
+  assert.equal(r.end.right, 0, "100 is the right edge");
+  assert.ok(r.lifted.lift > r.start.lift + 8, "lifted ears stand higher above the edge");
+  assert.ok(r.lifted.margin >= r.start.margin + 9, "and leave that much more room above the bubble");
+  assert.ok(r.tucked.lift < r.start.lift - 4, "tucked ears sit lower, behind the edge");
+  assert.equal(r.tucked.margin, r.start.margin, "tucking needs no extra room");
+  assert.notEqual(r.tilted.rotate, "matrix(1, 0, 0, 1, 0, 0)", "tilted");
+  assert.equal(r.start.rotate, "matrix(1, 0, 0, 1, 0, 0)", "no tilt by default");
+  for (const key of Object.keys(r)) assert.equal(r[key].animation, "none", key + ": the ears never animate");
 });
 
 test("TikTok emote pictures go into the words at their places, can be turned off, and a picture that fails leaves no hole", { skip }, async () => {

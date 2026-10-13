@@ -91,14 +91,23 @@ function change(key, value) {
   paletteChips.set(currentPalette(settings)); // no palette looks pressed once a color has been changed
   if (key === "font") fontsReady(matchaFaces(settings), 600).then(refresh);
   else refresh();
+  if (key === "ears") showNeeded();
 }
+const rows = {};
 for (const control of MATCHA_CONTROLS) {
   const { row, write } = buildControl(control, settings[control.key], (value) => change(control.key, value), { id: "m-" + control.key });
   writers[control.key] = write;
+  rows[control.key] = row;
   $("more-controls").append(row);
 }
+/** The settings that only matter once something is picked (the ears' size and place) are hidden until it is. */
+function showNeeded() {
+  for (const control of MATCHA_CONTROLS) if (control.needs) rows[control.key].style.display = settings[control.needs] === "none" ? "none" : "";
+}
+showNeeded();
 function syncControls() {
   for (const control of MATCHA_CONTROLS) writers[control.key](settings[control.key]);
+  showNeeded();
   paletteChips.set(currentPalette(settings));
 }
 $("more-reset").addEventListener("click", () => {

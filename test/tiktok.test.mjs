@@ -1,7 +1,7 @@
 // The TikTok parts that need no browser and no network: what counts as a TikTok name, how a message from the helper is checked, how
 // TikTok's own events become Frills messages, and how the links and status lines read.
 
-import test from "node:test";
+import test, { mock } from "node:test";
 import assert from "node:assert/strict";
 import { acceptMessage, cleanTikTokUser, connectTikTok, isAvatarUrl } from "../src/js/tiktok.js";
 import { cleanName, statusText } from "../src/js/connect.js";
@@ -209,12 +209,12 @@ test("the page side turns the helper's events into feed calls and status lines",
   assert.equal(seen.messages[0].mod, true);
   assert.deepEqual(seen.removed, [{ id: "1" }]);
   assert.deepEqual(seen.cleared, [{ user: "9" }]);
-  // the browser retrying by itself is "lost the helper"; the browser giving up is an error
+  // the browser retrying by itself is "lost the helper", and so is the browser giving up on a stream that had worked (see the next tests)
   source.readyState = 0;
   source.onerror();
   source.readyState = 2;
   source.onerror();
-  assert.deepEqual(seen.status.slice(3), ["helper-lost", "error!"]);
+  assert.deepEqual(seen.status.slice(3), ["helper-lost", "helper-lost"], "a stream that had worked is tried again, not given up on");
   conn.stop();
   assert.equal(source.closed, true);
   source.send("chat", { id: "3", name: "Late", text: "after stop" });
@@ -295,4 +295,113 @@ test("the page accepts pictures only from TikTok's servers, keeps their order, a
   assert.equal(acceptMessage({ name: "Mochi", text: "hi" }).pics, undefined);
   assert.equal(acceptMessage({ name: "Mochi", text: "hi", pics: "nope" }).pics, undefined);
   assert.equal(acceptMessage({ name: "Mochi", text: "hi", pics: Array.from({ length: 30 }, () => ({ at: 0, url: EMOTE })) }).pics.length, 8);
+});
+
+// ── coming back by itself when the relay was restarted ──────────────────────────────────────────────────────────────────────────
+
+/** Connects with pretend streams and a pretend clock. `sources` collects every stream opened, so a test can see a new one appear. */
+function reconnecting(options = {}) {
+  mock.timers.enable({ apis: ["setTimeout", "setInterval", "Date"] });
+  const sources = [];
+  const seen = { messages: [], status: [] };
+  const conn = connectTikTok({
+    user: "pond.pal",
+    base: "https://relay.example",
+    eventSourceFactory: () => { const s = fakeEventSource(); sources.push(s); return s; },
+    onMessage: (m) => seen.messages.push(m.text),
+    onStatus: (s) => seen.status.push(`${s.state}${s.fatal ? "!" : ""}`),
+    ...options,
+  });
+  return { sources, seen, conn };
+}
+const giveUp = (source) => { source.readyState = 2; source.onerror(); }; // what a browser does when the relay answers "502" while it restarts
+
+test("a stream that had worked is opened again after the relay restarts, with growing waits, and chat flows again", () => {
+  const { sources, seen, conn } = reconnecting();
+  try {
+    sources[0].send("status", { state: "connected" });
+    sources[0].send("chat", { id: "1", name: "Ann", text: "before" });
+    giveUp(sources[0]);
+    assert.equal(seen.status.at(-1), "helper-lost");
+    assert.equal(sources.length, 1, "not at once: the relay is still starting");
+    mock.timers.tick(2500);
+    assert.equal(sources.length, 2, "the first retry comes within a couple of seconds");
+    assert.equal(sources[0].closed, true, "the old stream is let go");
+    giveUp(sources[1]); // still down: the answer is 502 again
+    mock.timers.tick(2000);
+    assert.equal(sources.length, 2, "the next wait is longer");
+    mock.timers.tick(3500);
+    assert.equal(sources.length, 3);
+    giveUp(sources[2]);
+    mock.timers.tick(5000);
+    assert.equal(sources.length, 3, "and longer again");
+    mock.timers.tick(5000);
+    assert.equal(sources.length, 4, "it keeps trying, the wait growing each time");
+    sources[3].send("status", { state: "connected" });
+    sources[3].send("chat", { id: "2", name: "Ben", text: "after" });
+    assert.deepEqual(seen.messages, ["before", "after"]);
+    assert.equal(seen.status.at(-1), "connected");
+    sources[0].send("chat", { id: "3", name: "Old", text: "from the stream we let go" });
+    assert.deepEqual(seen.messages, ["before", "after"], "nothing from an old stream is drawn");
+    giveUp(sources[3]);
+    mock.timers.tick(2500);
+    assert.equal(sources.length, 5, "once it worked again, the next loss starts from a short wait again");
+  } finally {
+    conn.stop();
+    mock.timers.reset();
+  }
+});
+
+test("a stream that never worked says so once and does not keep trying; stopping ends any wait", () => {
+  const { sources, seen, conn } = reconnecting();
+  try {
+    giveUp(sources[0]);
+    assert.deepEqual(seen.status, ["connecting", "error!"]);
+    mock.timers.tick(60000);
+    assert.equal(sources.length, 1);
+  } finally {
+    conn.stop();
+    mock.timers.reset();
+  }
+  const again = reconnecting();
+  try {
+    again.sources[0].send("status", { state: "connected" });
+    giveUp(again.sources[0]);
+    again.conn.stop();
+    mock.timers.tick(60000);
+    assert.equal(again.sources.length, 1, "no new stream after stop");
+    assert.equal(again.seen.status.at(-1), "stopped");
+  } finally {
+    mock.timers.reset();
+  }
+});
+
+test("a relay that sends its beat and then goes silent is replaced; one that never beats is left alone", () => {
+  const live = reconnecting();
+  try {
+    live.sources[0].send("status", { state: "connected" });
+    live.sources[0].send("beat", {});
+    mock.timers.tick(15000);
+    live.sources[0].send("beat", {});
+    mock.timers.tick(30000);
+    assert.equal(live.sources.length, 1, "beating: fine, even when chat is quiet");
+    mock.timers.tick(30000);
+    assert.equal(live.sources.length, 2, "no beat for a minute: the connection is dead, so a new one is made at once");
+    assert.equal(live.sources[0].closed, true);
+    assert.equal(live.seen.status.at(-1), "helper-lost");
+    live.sources[1].send("status", { state: "connected" });
+    assert.equal(live.seen.status.at(-1), "connected");
+  } finally {
+    live.conn.stop();
+    mock.timers.reset();
+  }
+  const old = reconnecting();
+  try {
+    old.sources[0].send("status", { state: "connected" });
+    mock.timers.tick(10 * 60 * 1000);
+    assert.equal(old.sources.length, 1, "an older relay never sends a beat, so its silence means nothing");
+  } finally {
+    old.conn.stop();
+    mock.timers.reset();
+  }
 });

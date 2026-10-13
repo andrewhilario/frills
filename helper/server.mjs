@@ -169,7 +169,7 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
       return;
     }
     if (relay) perIp.set(who, (perIp.get(who) ?? 0) + 1);
-    const beat = setInterval(() => res.write(": ping\n\n"), 15000); // so a page can tell a quiet chat from a dead connection
+    const beat = setInterval(() => res.write("event: beat\ndata: {}\n\n"), tuning.beatMs ?? 15000); // so a page can tell a quiet chat from a dead connection (an event, because a page cannot see a comment)
     res.on("close", () => {
       clearInterval(beat);
       if (relay) perIp.set(who, Math.max(0, (perIp.get(who) ?? 1) - 1));
