@@ -35,7 +35,7 @@ export class Signing {
 }
 
 /** Everything the page and the alerts need. `device` (processor, memory) is added only for someone on the device itself. */
-export function snapshot({ stats, startedAt, now, version, features, signing, estimate, alertAt = ALERT_AT, device = null, roster = null }) {
+export function snapshot({ stats, startedAt, now, version, features, signing, estimate, alertAt = ALERT_AT, device = null, roster = null, ownerLogin = false }) {
   const free = Math.max(0, stats.max - stats.used);
   return {
     ok: true, name: "frills-relay", version, features, slots: stats,
@@ -43,7 +43,8 @@ export function snapshot({ stats, startedAt, now, version, features, signing, es
     signing: { busyRecently: signing.recent(), busy: signing.recent(2 * 60 * 1000) > 0 },
     capacity: estimate,
     ...(device ? { device } : {}),
-    ...(roster ? { roster } : {}), // the names: only for the owner's own screen, like `device`
+    ...(roster ? { roster } : {}), // the names: only for the owner (on the device, or with the owner's password), like `device`
+    ...(ownerLogin ? { ownerLogin: true } : {}), // says only that an owner password exists, so the page can offer the box for it
   };
 }
 
@@ -82,7 +83,7 @@ main{max-width:640px;margin:0 auto}h1{font-size:1.4rem;margin:0 0 4px}.sub{color
 .alarm{border:2px dashed var(--line);border-radius:14px;padding:14px;margin-top:16px}.alarm label{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 input[type=number]{width:5rem;padding:6px;border:2px solid var(--ink);border-radius:8px;font:inherit}button{font:inherit;font-weight:700;border:2px solid var(--ink);border-radius:99px;background:#ffd23f;padding:8px 16px;cursor:pointer;box-shadow:0 3px 0 var(--ink)}
 .note{color:var(--ink2);font-size:.9rem}.dev{display:none}.dev[data-on="true"]{display:block}
-.who{margin-top:16px}.who h2{font-size:1.1rem;margin:0 0 4px}.wrap{overflow-x:auto;margin-top:8px}table{border-collapse:collapse;width:100%;font-size:.92rem}
+.own{margin-top:16px}.ownrow{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.ownrow input{flex:1 1 12rem;min-width:0;padding:8px;border:2px solid var(--ink);border-radius:8px;font:inherit}#ownout{margin-top:8px}.who{margin-top:16px}.who h2{font-size:1.1rem;margin:0 0 4px}.wrap{overflow-x:auto;margin-top:8px}table{border-collapse:collapse;width:100%;font-size:.92rem}
 th{text-align:left;color:var(--ink2);font-weight:600;padding:6px 8px;border-bottom:2px solid var(--line);white-space:nowrap}td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
 td a{font-weight:700;color:var(--ink)}.pill{display:inline-block;padding:2px 10px;border-radius:99px;border:2px solid var(--ink);font-weight:700;font-size:.8rem;white-space:nowrap}.pill[data-s="live"]{background:#ffd23f}.pill[data-s="wait"]{background:var(--paper2)}
 </style></head>
@@ -101,13 +102,17 @@ td a{font-weight:700;color:var(--ink)}.pill{display:inline-block;padding:2px 10p
 <section class="alarm"><label>Warn me when <input type="number" id="at" min="0" max="500" value="${esc(s.alertAt)}"> or fewer spots are left <button id="allow" type="button">Turn on notifications</button></label>
 <p class="note" id="allownote">The warning also shows here as a red bar, and plays a short sound. Keep this page open to get it. Your phone can warn you by itself too (Termux notification), see the guide.</p></section>
 <section class="card dev" id="dev"><b>This device</b><span id="devtext"></span></section>
+<section class="card own" id="own" hidden><b>Owner?</b> <span class="note">Enter the relay password to see who is connected. It stays in this tab only.</span>
+<div class="ownrow"><input type="password" id="ownkey" autocomplete="current-password" spellcheck="false" aria-label="Relay password"> <button id="ownsave" type="button">Show who is connected</button></div><p class="note" id="ownmsg" role="status"></p></section>
 <section class="card who dev" id="who"><h2>Who is connected</h2><span class="note" id="whonote"></span>
 <div class="wrap"><table id="whotable"><thead><tr><th>Account</th><th>Status</th><th>Pages</th><th>Followers</th><th>Here for</th><th>Seen so far</th></tr></thead><tbody id="whobody"></tbody></table></div>
-<p class="note" id="waitnote"></p></section>
+<p class="note" id="waitnote"></p><button id="ownout" type="button" hidden>Hide the names again</button></section>
 </main>
 <script>
 const $=(id)=>document.getElementById(id);let last="ok",first=true;
 const asText=(s)=>{const h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h?h+" h "+m+" min":m+" min"};
+let OWNER="";try{OWNER=sessionStorage.getItem("frills:relay:owner")||""}catch{}
+const keep=(v)=>{OWNER=v;try{v?sessionStorage.setItem("frills:relay:owner",v):sessionStorage.removeItem("frills:relay:owner")}catch{}};
 const AT=localStorage.getItem("frills:relay:at");if(AT!==null)$("at").value=AT;
 $("at").addEventListener("input",()=>localStorage.setItem("frills:relay:at",$("at").value));
 $("allow").addEventListener("click",async()=>{try{const r=await Notification.requestPermission();$("allownote").textContent=r==="granted"?"Notifications are on. You will get one when spots run low.":"Notifications are blocked in this browser. The red bar and the sound still work."}catch{$("allownote").textContent="This browser cannot send notifications. The red bar and the sound still work."}});
@@ -140,12 +145,20 @@ function draw(s){
   $("signing").textContent=s.signing.busy?"Busy right now":s.signing.busyRecently?"OK (busy "+s.signing.busyRecently+"x lately)":"OK";
   const c=s.capacity;$("cap").textContent="About "+c.estimate+" accounts";$("capnote").textContent=(c.measured?"A guess from what this device uses now.":"A first guess; it improves once a few accounts are open.")+" Your internet and TikTok's free signing usually run out before the device does."+(c.estimate>s.slots.max*1.5?" You set "+s.slots.max+" spots, so there may be room to raise it.":"");
   const b=$("banner");b.dataset.on=String(low);b.textContent=s.slots.waiting>0?"People are waiting in line. Only "+free+" spots left.":free===0?"The relay is full.":"Only "+free+" spots left.";
-  if(s.roster){drawWho(s.roster)}
+  $("own").hidden=!s.ownerLogin;$("ownout").hidden=!(s.roster&&OWNER);
+  if(s.roster){drawWho(s.roster)}else{$("who").dataset.on="false"}
   if(s.device){$("dev").dataset.on="true";const d=s.device;$("devtext").textContent=d.cores+" processor cores. Memory: "+d.memoryFreeMB+" MB free of "+d.memoryTotalMB+" MB. The relay itself uses "+d.relayMemoryMB+" MB and about "+d.relayCpuPercent+"% of one core. Node "+d.node+"."}
   if(low&&last==="ok"&&!first){beep();try{if(Notification.permission==="granted")new Notification("Frills relay",{body:b.textContent})}catch{}}
   last=low?"low":"ok";first=false;document.title="Frills relay: "+free+" spots free";
 }
-async function tick(){try{const r=await fetch(location.pathname,{headers:{accept:"application/json"},cache:"no-store"});draw(await r.json())}catch{$("state").textContent="Cannot reach the relay right now."}}
-draw(${JSON.stringify(s).replace(/</g, "\\u003c")});setInterval(tick,5000);
+async function tick(){try{
+  const r=await fetch(location.pathname,{headers:{accept:"application/json",...(OWNER?{authorization:"Bearer "+OWNER}:{})},cache:"no-store"});
+  if(r.status===401){keep("");$("ownmsg").textContent="That is not the right password.";return tick()}
+  if(r.status===429){keep("");$("ownmsg").textContent="Too many wrong tries. Wait ten minutes and try again.";return}
+  draw(await r.json())}catch{$("state").textContent="Cannot reach the relay right now."}}
+$("ownsave").addEventListener("click",()=>{const v=$("ownkey").value.trim();if(!v)return;keep(v);$("ownkey").value="";$("ownmsg").textContent="";tick()});
+$("ownkey").addEventListener("keydown",(e)=>{if(e.key==="Enter")$("ownsave").click()});
+$("ownout").addEventListener("click",()=>{keep("");tick()});
+draw(${JSON.stringify(s).replace(/</g, "\\u003c")});setInterval(tick,5000);if(OWNER)tick();
 </script></body></html>`;
 }

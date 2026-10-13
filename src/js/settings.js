@@ -3,6 +3,7 @@
 // they become the CSS variables the chat is drawn with.
 
 import { HEX, inkFor, rgba } from "./color.js";
+import { EARS } from "./ears.js";
 
 // The faces a look can use, as the CSS stacks the page sets. Files are self-hosted; each one loads only when a look uses it.
 export const FONTS = {
@@ -53,7 +54,10 @@ export const LOOK_KEYS = Object.keys(PRESETS.blueberry);
 
 export const MOD_ICONS = ["shield", "star", "leaf", "frog", "none"];
 
-export const DEFAULTS = { ...PRESETS.blueberry, letter: 0, modIcon: "shield", max: 6, life: 15, space: 8, colors: false, emotes: true, pictures: true };
+// The little extras on the bubbles (cat ears and so on) start off, so a look is exactly what it was until someone turns them on.
+export const EAR_DEFAULTS = { ears: "none", earsFor: "all", earSpot: "left", earColor: "#ff9db8", earInner: "#ffd6e2", earSize: 100, earWiggle: true };
+
+export const DEFAULTS = { ...PRESETS.blueberry, letter: 0, modIcon: "shield", max: 6, life: 15, space: 8, colors: false, emotes: true, pictures: true, ...EAR_DEFAULTS };
 
 const list = (...pairs) => pairs.map(([id, name]) => ({ id, name }));
 
@@ -67,6 +71,7 @@ export const CONTROLS = [
   { key: "font", where: "main", type: "select", label: "Font", options: Object.keys(FONTS).map((f) => ({ id: f, name: f })) },
   { key: "size", where: "main", type: "range", label: "Text size", min: 12, max: 34, step: 1, unit: " px" },
   { key: "letter", where: "main", type: "range", label: "Letter spacing", min: -2, max: 8, step: 0.5, unit: " px" },
+  { key: "ears", where: "main", type: "chips", label: "Ears on the bubbles", options: EARS, hint: "Cute little ears, a bow or a halo on the top edge of each message. Pick None to have nothing." },
   { key: "text", where: "more", type: "color", label: "Text color" },
   { key: "pop", where: "more", type: "color", label: "Gift color" },
   { key: "shape", where: "more", type: "chips", label: "Box", options: list(["filled", "Filled"], ["outline", "Outline"], ["none", "Text only"]) },
@@ -83,6 +88,12 @@ export const CONTROLS = [
   { key: "space", where: "more", type: "range", label: "Spacing", min: 0, max: 24, step: 1, unit: " px" },
   { key: "colors", where: "more", type: "toggle", label: "Viewers' own name colors" },
   { key: "emotes", where: "more", type: "toggle", label: "Show emotes" },
+  { key: "earColor", where: "more", type: "color", label: "Ears color" },
+  { key: "earInner", where: "more", type: "color", label: "Inside of the ears" },
+  { key: "earSize", where: "more", type: "range", label: "Ears size", min: 50, max: 200, step: 5, unit: " %" },
+  { key: "earSpot", where: "more", type: "chips", label: "Where the ears sit", options: list(["left", "Left corner"], ["middle", "Middle"], ["right", "Right corner"]) },
+  { key: "earsFor", where: "more", type: "chips", label: "Who gets ears", options: list(["all", "Everyone"], ["mods", "Mods only"], ["gifts", "Gift messages"]) },
+  { key: "earWiggle", where: "more", type: "toggle", label: "Ears twitch when a message arrives" },
 ];
 
 /** One value, checked against its control. Returns undefined if it isn't acceptable. */
@@ -143,8 +154,17 @@ export function currentPreset(settings) {
   return Object.keys(PRESETS).find((id) => LOOK_KEYS.every((k) => settings[k] === PRESETS[id][k])) ?? null;
 }
 
+/** The ears' colors and size as CSS variables. Used by the general looks and the matcha looks alike. */
+export const earVars = (s) => ({
+  "--ear": HEX.test(s.earColor ?? "") ? s.earColor : EAR_DEFAULTS.earColor,
+  "--ear-in": HEX.test(s.earInner ?? "") ? s.earInner : EAR_DEFAULTS.earInner,
+  "--ear-scale": String((Number.isFinite(s.earSize) ? s.earSize : EAR_DEFAULTS.earSize) / 100),
+});
+/** Where they sit and whether they twitch, as the stage's data attributes. */
+export const earAttrs = (s) => ({ ears: s.ears ?? "none", earSpot: s.earSpot ?? "left", earWiggle: s.earWiggle === false ? "off" : "on" });
+
 /**
- * Settings -> what the page needs to draw them: CSS variables for the chat's stage, two data attributes, and the feed's options.
+ * Settings -> what the page needs to draw them: CSS variables for the chat's stage, data attributes, and the feed's options.
  * Colors are plain hex and rgba() so even old OBS browsers draw them.
  */
 export function lookVars(s) {
@@ -168,10 +188,11 @@ export function lookVars(s) {
     "--g-speed": s.speed + "ms",
     "--g-space": s.space + "px",
     "--g-outline": inkFor(s.text) === "#ffffff" ? "#f5f5f5" : "#0b0b0b", // a text outline that contrasts with the text
+    ...earVars(s),
   };
   return {
     vars,
-    attrs: { shape: s.shape, avatar: s.avatar ? "on" : "off" },
-    feed: { max: s.max, life: s.life * 1000, modIcon: s.modIcon, colors: s.colors, emotes: s.emotes, pictures: s.pictures },
+    attrs: { shape: s.shape, avatar: s.avatar ? "on" : "off", ...earAttrs(s) },
+    feed: { max: s.max, life: s.life * 1000, modIcon: s.modIcon, colors: s.colors, emotes: s.emotes, pictures: s.pictures, ears: s.ears, earsFor: s.earsFor },
   };
 }

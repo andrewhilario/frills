@@ -205,3 +205,108 @@ test("the moderator icon can be swapped and hidden while the chat is running", {
   });
   assert.deepEqual(r, { shield: true, frog: true, hidden: true });
 });
+
+test("ears sit on the top edge of the bubble, in the chosen colors, with room left above so the message before is not covered", { skip }, async () => {
+  const r = await run(async (Feed, wait, mk) => {
+    const host = mk();
+    host.className = "look look-general";
+    host.dataset.ears = "bunny";
+    host.style.cssText = "width: 400px; font-size: 20px; --ear: #112233; --ear-in: #445566; --ear-scale: 1; --g-bw: 0px; --g-space: 8px;";
+    const feed = new Feed(host, { life: 0, max: 5, gapMs: 10, glide: false, ears: "bunny" });
+    feed.add({ id: "1", user: "a", name: "Ann", text: "first" });
+    feed.add({ id: "2", user: "b", name: "Ben", text: "second" });
+    await wait(500);
+    const [first, second] = [...host.children];
+    const ears = second.querySelector(".body .ears");
+    const body = second.querySelector(".body").getBoundingClientRect();
+    const box = ears.getBoundingClientRect();
+    const fill = getComputedStyle(ears.querySelector(".o")).fill;
+    const inner = getComputedStyle(ears.querySelector(".i")).fill;
+    return {
+      both: first.classList.contains("has-ears") && second.classList.contains("has-ears"),
+      onEdge: Math.abs(box.bottom - body.top) <= 3,
+      width: Math.round(box.width),
+      fill, inner,
+      clear: first.getBoundingClientRect().bottom <= box.top + 1,
+      hidden: ears.getAttribute("aria-hidden"),
+      noClick: getComputedStyle(ears).pointerEvents,
+    };
+  });
+  assert.deepEqual({ ...r }, { both: true, onEdge: true, width: 72, fill: "rgb(17, 34, 51)", inner: "rgb(68, 85, 102)", clear: true, hidden: "true", noClick: "none" });
+});
+
+test("ears can go to everyone, to moderators only, or to gift messages only", { skip }, async () => {
+  const r = await run(async (Feed, wait, mk) => {
+    const out = {};
+    for (const earsFor of ["all", "mods", "gifts"]) {
+      const host = mk();
+      const feed = new Feed(host, { life: 0, max: 5, gapMs: 10, ears: "cat", earsFor });
+      feed.add({ id: "p", user: "p", name: "plain", text: "hi" });
+      feed.add({ id: "m", user: "m", name: "mod", text: "hi", mod: true });
+      feed.add({ id: "g", user: "g", name: "gift", text: "hi", gift: true });
+      await wait(300);
+      out[earsFor] = [...host.children].filter((c) => c.querySelector(".ears")).map((c) => c.dataset.id).join("");
+    }
+    return out;
+  });
+  assert.deepEqual({ ...r }, { all: "pmg", mods: "m", gifts: "g" });
+});
+
+test("changing the ears while the chat runs changes the messages already there, and none takes them away", { skip }, async () => {
+  const r = await run(async (Feed, wait, mk) => {
+    const host = mk();
+    const feed = new Feed(host, { life: 0, max: 5, gapMs: 10 });
+    feed.add({ id: "1", user: "a", name: "Ann", text: "hello" });
+    await wait(200);
+    const none = host.querySelectorAll(".ears").length;
+    feed.configure({ ears: "cat" });
+    const cat = host.querySelector(".ears svg").getAttribute("viewBox");
+    feed.configure({ ears: "bunny" });
+    const bunny = host.querySelector(".ears svg").getAttribute("viewBox");
+    const one = host.querySelectorAll(".ears").length; // changed, not piled up
+    feed.add({ id: "2", user: "b", name: "Ben", text: "new one" });
+    await wait(200);
+    const arrived = host.querySelectorAll(".ears").length;
+    feed.configure({ ears: "none" });
+    return { none, cat, bunny, one, arrived, gone: host.querySelectorAll(".ears").length, marked: host.querySelectorAll(".has-ears").length };
+  });
+  assert.deepEqual({ ...r }, { none: 0, cat: "0 0 64 34", bunny: "0 0 64 52", one: 1, arrived: 2, gone: 0, marked: 0 });
+});
+
+test("the twitch of the ears is part of the page's own motion: off for people who ask for less", { skip }, async () => {
+  const r = await run(async (Feed, wait, mk) => {
+    const host = mk();
+    host.className = "look look-general";
+    host.dataset.earWiggle = "on";
+    const feed = new Feed(host, { life: 0, max: 5, gapMs: 10, ears: "cat" });
+    feed.add({ id: "1", user: "a", name: "Ann", text: "hello" });
+    await wait(150);
+    const on = getComputedStyle(host.querySelector(".ears svg")).animationName;
+    host.dataset.earWiggle = "off";
+    const off = getComputedStyle(host.querySelector(".ears svg")).animationName;
+    return { on, off };
+  });
+  assert.deepEqual({ ...r }, { on: "earwig", off: "none" });
+});
+
+test("TikTok emote pictures go into the words at their places, can be turned off, and a picture that fails leaves no hole", { skip }, async () => {
+  const r = await run(async (Feed, wait, mk) => {
+    const host = mk();
+    const feed = new Feed(host, { life: 0, max: 10, gapMs: 10 });
+    const dot = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxIiBoZWlnaHQ9IjEiLz4=";
+    feed.add({ id: "a", user: "a", name: "Ann", text: "hello world", pics: [{ at: 5, url: dot }, { at: 11, url: dot }] });
+    feed.add({ id: "b", user: "b", name: "Ben", text: "", pics: [{ at: 0, url: dot }] });
+    feed.add({ id: "c", user: "c", name: "Cat", text: "x<b>y</b>", pics: [{ at: 1, url: "https://127.0.0.1:1/never.png" }] });
+    await wait(500);
+    const txt = (id) => host.querySelector(`[data-id=${id}] .txt`);
+    const parts = [...txt("a").childNodes].map((n) => (n.nodeType === 3 ? n.textContent : "[" + n.tagName.toLowerCase() + "]"));
+    const only = txt("b").querySelectorAll("img.emote").length;
+    const failed = txt("c").innerHTML; // the broken picture is gone; the words stay as text
+    feed.configure({ emotes: false });
+    feed.add({ id: "d", user: "d", name: "Dan", text: "off", pics: [{ at: 0, url: dot }] });
+    feed.add({ id: "e", user: "e", name: "Eve", text: "", pics: [{ at: 0, url: dot }] });
+    await wait(400);
+    return { parts, only, failed, off: host.querySelector("[data-id=d] .txt").querySelectorAll("img").length, offText: host.querySelector("[data-id=d] .txt").textContent, hidden: host.querySelector("[data-id=e]") === null };
+  });
+  assert.deepEqual({ ...r }, { parts: ["hello", "[img]", " world", "[img]"], only: 1, failed: "x&lt;b&gt;y&lt;/b&gt;", off: 0, offText: "off", hidden: true });
+});

@@ -69,7 +69,7 @@ test("the page shows the free spots big, says what to do, escapes everything, an
   assert.match(html, /free spots of 50/);
   assert.match(html, /Warn me when <input type="number" id="at" min="0" max="500" value="10">/);
   assert.match(html, /setInterval\(tick,5000\)/, "it asks again every 5 seconds");
-  assert.match(html, /headers:\{accept:"application\/json"\}/, "and asks for the numbers, not the page");
+  assert.match(html, /headers:\{accept:"application\/json",/, "and asks for the numbers, not the page");
   assert.ok(!html.includes("</script><script"), "the data inside the page cannot close the script");
   const hostile = statusPage({ ...snap(), version: "<img src=x onerror=alert(1)>" });
   assert.ok(!hostile.includes("<img src=x"), "a hostile value is escaped");
@@ -270,4 +270,79 @@ test("the status page draws the table: a link to each LIVE, a status for each, a
   assert.ok(page.includes("late.comer"));
   const without = statusPage(snapshot({ stats: { used: 1, max: 50, waiting: 0 }, startedAt: 0, now: 1000, version: "0.5.1", features: [], signing: new Signing(), estimate: { estimate: 20, measured: false } }));
   assert.ok(!without.includes("mochi_bun"));
+});
+
+// ── the owner's password: the names from anywhere, to nobody else ─────────────────────────────────────────────────────────────
+
+import { OWNER, ownerGate } from "../helper/owner.mjs";
+
+const KEY = "a-long-enough-relay-password";
+const PUBLIC = { Accept: "application/json", "CF-Connecting-IP": "203.0.113.9" };
+const asOwner = (key, over = {}) => ({ ...PUBLIC, Authorization: `Bearer ${key}`, ...over });
+
+test("the gate: no password set means nothing opens; a short one is the same; the right one opens; wrong tries lock that address only", () => {
+  let t = 1000;
+  assert.equal(ownerGate(undefined).check("Bearer anything", "a"), "none");
+  assert.equal(ownerGate("short").enabled, false, "a short password is not accepted as a password at all");
+  assert.equal(ownerGate("short").check("Bearer short", "a"), "none");
+  const gate = ownerGate(KEY, { now: () => t });
+  assert.equal(gate.enabled, true);
+  assert.equal(gate.check(undefined, "a"), "none", "nothing sent");
+  assert.equal(gate.check("Basic abc", "a"), "none", "not a bearer password");
+  assert.equal(gate.check(`Bearer ${KEY}`, "a"), "ok");
+  assert.equal(gate.check(`Bearer ${KEY}x`, "a"), "wrong");
+  assert.equal(gate.check(`Bearer ${KEY.slice(1)}`, "a"), "wrong");
+  for (let i = 0; i < OWNER.maxWrong - 2; i++) assert.equal(gate.check("Bearer nope" + i, "a"), "wrong");
+  assert.equal(gate.check(`Bearer ${KEY}`, "a"), "locked", "ten wrong tries: even the right password waits");
+  assert.equal(gate.check(`Bearer ${KEY}`, "b"), "ok", "another address is not affected");
+  t += OWNER.windowMs + 1;
+  assert.equal(gate.check(`Bearer ${KEY}`, "a"), "ok", "after ten minutes it works again");
+});
+
+test("with the owner's password the names come through the public address; without it, never", async () => {
+  await start({ ownerKey: KEY });
+  const first = await listen("mochi_bun");
+  try {
+    const open = JSON.parse((await ask("/health", PUBLIC)).body);
+    assert.equal("roster" in open, false, "the public address: numbers only");
+    assert.equal(open.ownerLogin, true, "and it says a password exists, so the page can offer the box");
+    const page = await ask("/health", { Accept: "text/html", "CF-Connecting-IP": "203.0.113.9" });
+    assert.ok(!page.body.includes("mochi_bun"));
+    assert.match(page.body, /id="own"/);
+
+    const asked = await ask("/health", asOwner(KEY));
+    assert.equal(asked.status, 200);
+    const owner = JSON.parse(asked.body);
+    assert.deepEqual(owner.roster.accounts.map((a) => a.user), ["mochi_bun"]);
+    assert.ok(owner.device.cores >= 1);
+    assert.equal("ownerLogin" in owner, false, "the owner is not asked again");
+    assert.equal(asked.headers["cache-control"], "no-store");
+
+    const wrong = await ask("/health", asOwner("not-the-password-at-all"));
+    assert.equal(wrong.status, 401);
+    assert.ok(!wrong.body.includes("mochi_bun"));
+    assert.equal(JSON.parse(wrong.body).error, "wrong_key");
+    assert.ok(!(await ask("/tiktok/ping", asOwner(KEY))).body.includes("mochi_bun"), "the password opens the status page only");
+  } finally {
+    first.destroy();
+  }
+});
+
+test("too many wrong passwords lock that visitor out, even for the right one, and the device itself is never locked", async () => {
+  await start({ ownerKey: KEY, trustProxy: true });
+  for (let i = 0; i < OWNER.maxWrong; i++) assert.equal((await ask("/health", asOwner("guess-number-" + i))).status, 401);
+  const locked = await ask("/health", asOwner(KEY));
+  assert.equal(locked.status, 429);
+  assert.equal(locked.headers["retry-after"], "600");
+  assert.equal((await ask("/health", asOwner(KEY, { "CF-Connecting-IP": "198.51.100.7" }))).status, 200, "somebody else, from another address, is fine");
+  assert.ok(JSON.parse((await ask("/health", { Accept: "application/json" })).body).device, "on the device: always");
+});
+
+test("without a password set, a password sent changes nothing, and the page offers no box", async () => {
+  await start();
+  const sent = await ask("/health", asOwner("whatever-it-is-123"));
+  assert.equal(sent.status, 200);
+  const json = JSON.parse(sent.body);
+  assert.equal("roster" in json, false);
+  assert.equal("ownerLogin" in json, false);
 });

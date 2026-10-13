@@ -3,7 +3,7 @@
 // Their colors are worked out here (not with color-mix() in the stylesheet) so old OBS browsers draw them too.
 
 import { HEX, mix, rgba } from "./color.js";
-import { CONTROLS, FONTS, coerce } from "./settings.js";
+import { CONTROLS, EAR_DEFAULTS, FONTS, coerce } from "./settings.js";
 
 export const MATCHA_STYLES = [
   { id: "latte", name: "Matcha Latte", note: "Soft cream bubbles that hop in, with a ripple. Cute and gentle. Light on the PC." },
@@ -62,6 +62,13 @@ export const MATCHA_CONTROLS = [
   general("space"),
   general("colors"),
   general("emotes"),
+  general("ears"),
+  general("earColor"),
+  general("earInner"),
+  general("earSize"),
+  general("earSpot"),
+  general("earsFor"),
+  general("earWiggle"),
 ];
 
 // The mod icon has its own row of buttons on the page, so it is checked and linked here but not listed under "More options".
@@ -85,6 +92,7 @@ export const MATCHA_DEFAULTS = {
   space: 8,
   colors: false,
   emotes: true,
+  ...EAR_DEFAULTS,
 };
 
 export const isMatchaStyle = (id) => MATCHA_STYLES.some((s) => s.id === id);

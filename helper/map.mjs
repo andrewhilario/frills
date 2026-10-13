@@ -19,11 +19,30 @@ export function avatarUrl(user) {
   return "";
 }
 
+/**
+ * The pictures of TikTok emotes in a chat message: [{ at, url }], where `at` is the place in the text the picture goes (TikTok sends the
+ * words without the emotes and says where each one belongs). Only addresses a page may load are kept, at most 8, in order.
+ */
+export function emotePics(list, textLength = 0) {
+  const out = [];
+  for (const item of Array.isArray(list) ? list : []) {
+    if (out.length >= 8) break;
+    const emote = item?.emote ?? item; // a chat line wraps each emote with its place; an emote-only message lists them bare
+    const image = emote?.image;
+    const url = [image?.imageUrl, emote?.emoteImageUrl, ...(Array.isArray(image?.url) ? image.url : []), ...(Array.isArray(image?.urlList) ? image.urlList : []), ...(Array.isArray(image?.mUrls) ? image.mUrls : [])].find((u) => isAvatarUrl(u));
+    if (!url) continue;
+    const at = Math.max(0, Math.min(textLength, Math.round(Number(item?.placeInComment) || 0)));
+    out.push({ at, url });
+  }
+  return out.sort((a, b) => a.at - b.at);
+}
+
 /** A chat event -> a message, or null when there is nothing to draw. */
 export function mapChat(d) {
   const text = clean(d?.content ?? d?.comment, 300);
   const u = d?.user;
-  if (!text || !u) return null;
+  const pics = emotePics(d?.emotes ?? d?.emotesList, Array.from(text).length);
+  if ((!text && !pics.length) || !u) return null;
   const handle = clean(u.displayId ?? u.uniqueId, 40);
   const who = d.userIdentity ?? {};
   return {
@@ -38,6 +57,29 @@ export function mapChat(d) {
     // Who it is: their @name, and whether TikTok says they are the streamer. Song requests use these so "!next" can be the streamer's.
     login: handle,
     host: who.isAnchor === true,
+    ...(pics.length ? { pics } : {}),
+  };
+}
+
+/** A message that is only emotes (a subscriber's sticker) -> a message with no words, or null when none of the pictures can be shown. */
+export function mapEmoteChat(d) {
+  const u = d?.user;
+  const pics = emotePics(d?.emoteList ?? d?.emotes ?? [], 0);
+  if (!u || !pics.length) return null;
+  const handle = clean(u.displayId ?? u.uniqueId, 40);
+  const who = d.userIdentity ?? {};
+  return {
+    id: clean(d.common?.msgId ?? d.msgId, 60),
+    user: clean(u.idStr || u.id || u.userId || handle, 40),
+    name: clean(u.nickname, 40) || handle || "viewer",
+    text: "",
+    mod: who.isModeratorOfAnchor === true,
+    gifter: who.isGiftGiverOfAnchor === true,
+    gift: false,
+    avatar: avatarUrl(u),
+    login: handle,
+    host: who.isAnchor === true,
+    pics,
   };
 }
 

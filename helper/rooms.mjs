@@ -2,7 +2,7 @@
 // listening, and keeps trying again by itself (the account may not be live yet, TikTok may drop us, the free connection may be busy).
 // The Hub keeps the rooms, so two pages watching the same account (the editor's preview and OBS) share one connection.
 
-import { mapChat, mapDelete, mapFollow, mapGift, mapGiftAlert, mapLike, mapShare } from "./map.mjs";
+import { mapChat, mapDelete, mapEmoteChat, mapFollow, mapGift, mapGiftAlert, mapLike, mapShare } from "./map.mjs";
 
 /** What went wrong when connecting, in the three ways that need different handling. */
 export function classify(err) {
@@ -102,9 +102,28 @@ export class Room {
     return true;
   }
 
+  /** Once per account: says in the relay's own log when emotes came in a message but none could be shown, and from which picture server. */
+  noteEmotes(d, m) {
+    if (this.emoteNoted || !Array.isArray(d?.emotes) || !d.emotes.length || m?.pics?.length) return;
+    this.emoteNoted = true;
+    let host = "unknown";
+    try {
+      const image = d.emotes[0]?.emote?.image;
+      host = new URL(image?.imageUrl ?? image?.url?.[0] ?? image?.urlList?.[0] ?? image?.mUrls?.[0]).hostname;
+    } catch { /* no address to name */ }
+    this.hub.log(`@${this.user}: emotes arrived but none could be shown (picture server ${host})`);
+  }
+
   wire(conn, finish) {
     conn.on("chat", (d) => {
       const m = mapChat(d);
+      this.noteEmotes(d, m);
+      if (!m || !this.fresh(m.id)) return;
+      this.counts.chat += 1;
+      this.broadcast("chat", m);
+    });
+    conn.on("emote", (d) => {
+      const m = mapEmoteChat(d);
       if (!m || !this.fresh(m.id)) return;
       this.counts.chat += 1;
       this.broadcast("chat", m);

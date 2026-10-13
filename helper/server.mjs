@@ -23,6 +23,7 @@ import { ALERT_KINDS } from "./map.mjs";
 import { DEMO_USER, DemoConnection } from "./demo.mjs";
 import { ALERT_AT, Signing, capacity, deviceFacts, snapshot, statusPage } from "./status.mjs";
 import { SlotAlerts, termuxNotifier } from "./alerts.mjs";
+import { ownerGate } from "./owner.mjs";
 
 const VERSION = "0.5.1";
 /** What this program can do, so a page can tell an old one ("chat" only) from one that sends alerts. */
@@ -72,10 +73,11 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
   };
   const sampler = setInterval(sample, 10000);
   sampler.unref?.();
+  const gate = ownerGate(relay?.ownerKey); // the owner's password, to see the names from anywhere
   const numbers = (local) => {
     const stats = hub.stats();
     const estimate = capacity({ freeMem: os.freemem(), rss: process.memoryUsage().rss, baseRss, rooms: stats.used, cpuFraction });
-    return snapshot({ stats, startedAt, now: Date.now(), version: VERSION, features: FEATURES, signing, estimate, alertAt: relay?.alertAt ?? ALERT_AT, device: local ? deviceFacts(cpuFraction) : null, roster: local ? hub.roster() : null });
+    return snapshot({ stats, startedAt, now: Date.now(), version: VERSION, features: FEATURES, signing, estimate, alertAt: relay?.alertAt ?? ALERT_AT, device: local ? deviceFacts(cpuFraction) : null, roster: local ? hub.roster() : null, ownerLogin: gate.enabled && !local });
   };
   const nothing = (req, res) => {
     res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
@@ -119,14 +121,24 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
     // The relay's own address in a browser is a readable page; a program (or the page itself, asking again) gets the numbers as JSON.
     const accept = String(req.headers.accept ?? "");
     const wantsPage = Boolean(relay) && (url.pathname === "/" || url.pathname === "/health") && accept.includes("text/html") && !accept.includes("application/json");
-    // Device details (cores, memory) only for someone on the device itself, never through the tunnel.
+    // The device's details and the names of who is connected: for someone on the device itself, or anyone who sends the owner's password.
+    // Everyone else gets only the numbers.
     const onDevice = !req.headers["cf-connecting-ip"] && !req.headers["x-forwarded-for"];
+    let owner = onDevice;
+    if (relay && url.pathname === "/health" && !wantsPage) {
+      const asked = gate.check(req.headers.authorization, visitor(req));
+      if (asked === "wrong" || asked === "locked") {
+        res.writeHead(asked === "wrong" ? 401 : 429, { "Content-Type": "application/json", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", ...(asked === "locked" ? { "Retry-After": "600" } : {}), ...cors });
+        return res.end(JSON.stringify({ ok: false, error: asked === "wrong" ? "wrong_key" : "locked" }));
+      }
+      owner = owner || asked === "ok";
+    }
     if (wantsPage) {
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'" });
-      res.end(statusPage(numbers(onDevice)));
+      res.end(statusPage(numbers(onDevice))); // a page load can't carry the password: the page asks again with it
     } else if (url.pathname === "/tiktok/ping" || (relay && url.pathname === "/health")) {
       res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", ...cors });
-      res.end(JSON.stringify(relay && url.pathname === "/health" ? numbers(onDevice) : relay ? { ok: true, name: "frills-relay", version: VERSION, features: FEATURES, slots: hub.stats() } : { ok: true, name: "frills-helper", version: VERSION, features: FEATURES }));
+      res.end(JSON.stringify(relay && url.pathname === "/health" ? numbers(owner) : relay ? { ok: true, name: "frills-relay", version: VERSION, features: FEATURES, slots: hub.stats() } : { ok: true, name: "frills-helper", version: VERSION, features: FEATURES }));
     } else if (url.pathname === "/tiktok/stream") {
       stream(req, res, url, cors);
     } else {
@@ -206,7 +218,8 @@ async function mainRelay() {
   const origins = (process.env.RELAY_ORIGINS ?? "https://frills.valwidgets.live").split(",").map((o) => o.trim()).filter(Boolean);
   const slots = numberOr(process.env.RELAY_SLOTS, 30);
   const alertAt = Number.isFinite(Number(process.env.RELAY_ALERT_SPOTS)) && process.env.RELAY_ALERT_SPOTS !== undefined && process.env.RELAY_ALERT_SPOTS !== "" ? Math.max(0, Number(process.env.RELAY_ALERT_SPOTS)) : 10;
-  const relay = { origins, slots, alertAt, maxPerIp: numberOr(process.env.RELAY_PER_IP, 8), trustProxy: process.env.RELAY_TRUST_PROXY !== "0" };
+  const ownerKey = process.env.RELAY_OWNER_KEY;
+  const relay = { origins, slots, alertAt, ownerKey, maxPerIp: numberOr(process.env.RELAY_PER_IP, 8), trustProxy: process.env.RELAY_TRUST_PROXY !== "0" };
   const port = numberOr(process.argv.find((a) => a.startsWith("--port="))?.slice(7) ?? process.env.PORT, 8765);
   const bind = process.env.RELAY_BIND ?? "127.0.0.1"; // behind a tunnel nothing else may reach it
   const helper = createHelper({ relay, apiKey: (process.env.EULER_API_KEY ?? "").trim(), log: say });

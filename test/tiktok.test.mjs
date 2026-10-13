@@ -247,3 +247,52 @@ test("the page side takes the account's follower count, and ignores a damaged on
   assert.deepEqual(infos.at(-1), { live: true, followers: 0 }, "the room being LIVE is passed on on its own");
   assert.equal(infos.length, 2);
 });
+
+// ── TikTok's own emotes: pictures put in the words at the places TikTok names ───────────────────────────────────────────────────
+
+import { emotePics, mapEmoteChat } from "../helper/map.mjs";
+
+const EMOTE = "https://p16-webcast.tiktokcdn.com/webcast-va/emote_rose.webp";
+const withEmote = (place, url = EMOTE) => ({ placeInComment: place, emote: { emoteId: "1", image: { imageUrl: url } } });
+const person = { idStr: "6800000000000000001", displayId: "pond.pal", nickname: "Pond Pal" };
+
+test("emotes in a chat message become pictures with their place in the words, in order, and only from TikTok's picture servers", () => {
+  const m = mapChat({ common: { msgId: "m1" }, user: person, content: "hello world", emotes: [withEmote(11), withEmote(6, "https://p19-webcast.tiktokcdn-us.com/b.webp")] });
+  assert.deepEqual(m.pics, [{ at: 6, url: "https://p19-webcast.tiktokcdn-us.com/b.webp" }, { at: 11, url: EMOTE }], "sorted by place");
+  assert.equal(mapChat({ user: person, content: "plain" }).pics, undefined, "no emotes, no pics at all");
+  assert.equal(mapChat({ user: person, content: "x", emotes: [withEmote(0, "https://evil.example/a.png")] }).pics, undefined, "another server is never used");
+  assert.equal(mapChat({ user: person, content: "x", emotes: [withEmote(0, "http://p16-webcast.tiktokcdn.com/a.webp")] }).pics, undefined, "and not over http");
+  assert.deepEqual(mapChat({ user: person, content: "abc", emotes: [withEmote(99)] }).pics, [{ at: 3, url: EMOTE }], "a place past the end goes to the end");
+  assert.deepEqual(mapChat({ user: person, content: "abc", emotes: [withEmote(-4)] }).pics, [{ at: 0, url: EMOTE }]);
+  assert.equal(mapChat({ user: person, content: "x", emotes: Array.from({ length: 20 }, () => withEmote(0)) }).pics.length, 8, "at most eight");
+});
+
+test("a chat message that is only emotes is a message with no words, and nothing at all is still nothing", () => {
+  const only = mapChat({ common: { msgId: "m2" }, user: person, content: "", emotes: [withEmote(0)] });
+  assert.equal(only.text, "");
+  assert.deepEqual(only.pics, [{ at: 0, url: EMOTE }]);
+  assert.equal(mapChat({ user: person, content: "", emotes: [] }), null);
+  assert.equal(mapChat({ user: person, content: "", emotes: [withEmote(0, "https://evil.example/a.png")] }), null, "an emote that cannot be shown is not a message");
+});
+
+test("an emote-only event (a sticker) is read from its list, whichever way the picture's addresses are named", () => {
+  const sticker = (image) => mapEmoteChat({ common: { msgId: "e1" }, user: person, emoteList: [{ emoteId: "5", image }] });
+  assert.deepEqual(sticker({ url: [EMOTE] }).pics, [{ at: 0, url: EMOTE }]);
+  assert.deepEqual(sticker({ urlList: ["https://evil.example/x.png", EMOTE] }).pics, [{ at: 0, url: EMOTE }], "the first address a page may use");
+  assert.deepEqual(sticker({ imageUrl: EMOTE }).pics, [{ at: 0, url: EMOTE }]);
+  assert.equal(sticker({}), null);
+  assert.equal(mapEmoteChat({ user: person, emoteList: [] }), null);
+  assert.deepEqual(emotePics("not a list"), []);
+  const m = sticker({ url: [EMOTE] });
+  assert.deepEqual([m.id, m.user, m.name, m.text, m.login], ["e1", "6800000000000000001", "Pond Pal", "", "pond.pal"]);
+});
+
+test("the page accepts pictures only from TikTok's servers, keeps their order, and accepts a message of only pictures", () => {
+  const ok = acceptMessage({ name: "Mochi", text: "hi there", pics: [{ at: 8, url: EMOTE }, { at: 3, url: EMOTE }, { at: 1, url: "https://evil.example/a.png" }, { at: 2, url: 5 }, null] });
+  assert.deepEqual(ok.pics, [{ at: 3, url: EMOTE }, { at: 8, url: EMOTE }]);
+  assert.deepEqual(acceptMessage({ name: "Mochi", text: "", pics: [{ at: 0, url: EMOTE }] }).pics, [{ at: 0, url: EMOTE }]);
+  assert.equal(acceptMessage({ name: "Mochi", text: "", pics: [{ at: 0, url: "https://evil.example/a.png" }] }), null);
+  assert.equal(acceptMessage({ name: "Mochi", text: "hi" }).pics, undefined);
+  assert.equal(acceptMessage({ name: "Mochi", text: "hi", pics: "nope" }).pics, undefined);
+  assert.equal(acceptMessage({ name: "Mochi", text: "hi", pics: Array.from({ length: 30 }, () => ({ at: 0, url: EMOTE })) }).pics.length, 8);
+});

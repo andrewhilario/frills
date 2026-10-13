@@ -34,12 +34,23 @@ export function cleanTikTokUser(input) {
   return /^[a-z0-9._]{2,24}$/.test(text) && !text.endsWith(".") ? text : "";
 }
 
+/** The emote pictures of a message, checked: at most 8, each a place in the words and an address a page may load. */
+function acceptPics(list, textLength) {
+  const out = [];
+  for (const item of Array.isArray(list) ? list : []) {
+    if (out.length >= 8) break;
+    if (item && isAvatarUrl(item.url)) out.push({ at: Math.max(0, Math.min(textLength, Math.round(Number(item.at) || 0))), url: item.url });
+  }
+  return out.sort((a, b) => a.at - b.at);
+}
+
 /** One message from the helper -> the plain object a feed draws, with every field checked. Null if there is nothing to draw. */
 export function acceptMessage(raw) {
   if (!raw || typeof raw !== "object") return null;
   const text = String(raw.text ?? "").slice(0, MAX_TEXT);
   const name = String(raw.name ?? "").slice(0, 60);
-  if (!text.trim() || !name.trim()) return null;
+  const pics = acceptPics(raw.pics, Array.from(text).length);
+  if ((!text.trim() && !pics.length) || !name.trim()) return null;
   return {
     id: String(raw.id ?? "").slice(0, 80),
     user: String(raw.user ?? "").slice(0, 80),
@@ -53,6 +64,7 @@ export function acceptMessage(raw) {
     login: String(raw.login ?? "").slice(0, 40),
     host: raw.host === true,
     emotes: [],
+    ...(pics.length ? { pics } : {}),
     source: "tiktok",
   };
 }

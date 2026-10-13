@@ -1,7 +1,7 @@
 // Puts a look on a stage element: the general look (settings -> CSS variables) or one of the matcha styles. Returns the options the
 // feed should be configured with.
 
-import { ANIMS, FONTS, lookVars } from "./settings.js";
+import { ANIMS, FONTS, earAttrs, earVars, lookVars } from "./settings.js";
 import { matchaVars } from "./matcha.js";
 
 const MATCHA_CLASSES = ["look-latte", "look-glass", "look-sticker", "look-pixel", "look-minimal", "look-night"];
@@ -11,8 +11,7 @@ export function paintGeneral(stage, settings) {
   stage.classList.remove(...MATCHA_CLASSES);
   stage.classList.add("look", "look-general");
   for (const [name, value] of Object.entries(vars)) stage.style.setProperty(name, value);
-  stage.dataset.shape = attrs.shape;
-  stage.dataset.avatar = attrs.avatar;
+  Object.assign(stage.dataset, attrs);
   return feed;
 }
 
@@ -55,5 +54,7 @@ export function paintMatcha(stage, settings) {
   }
   stage.dataset.avatar = settings.avatar ? "on" : "off";
   stage.dataset.font = settings.font ? "custom" : "own";
-  return { max: settings.max, life: settings.life * 1000, modIcon: settings.modIcon, colors: settings.colors, emotes: settings.emotes, pictures: settings.pictures };
+  for (const [name, value] of Object.entries(earVars(settings))) stage.style.setProperty(name, value);
+  Object.assign(stage.dataset, earAttrs(settings));
+  return { max: settings.max, life: settings.life * 1000, modIcon: settings.modIcon, colors: settings.colors, emotes: settings.emotes, pictures: settings.pictures, ears: settings.ears, earsFor: settings.earsFor };
 }

@@ -254,3 +254,15 @@ Open the status page **on the phone itself** (the same `http://localhost:PORT/he
 - It is a live view only. Nothing is saved, so there is no history: if you want to know who was on an hour ago, you have to have been looking.
 - "LIVE now" comes from what TikTok said when the relay connected. An account that went LIVE a moment later can read "Connected, not LIVE yet" until its next connect.
 - The privacy page says that the person running the relay can see who is connected.
+
+### Seeing who is connected from your PC (the owner password)
+
+On the phone itself the table needs nothing. To see it from anywhere, through `https://relay.valwidgets.live/health`, give the relay a password of your own: 12 or more characters, never shared and never pasted in a chat. Put it inside the quotes of the start command, as `RELAY_OWNER_KEY=your-password`:
+
+```bash
+tmux kill-session -t relay; tmux new-session -d -s relay "cd ~/frills/helper && RELAY_SLOTS=100 RELAY_ALERT_SPOTS=10 RELAY_OWNER_KEY=your-password npm run relay"
+```
+
+Then open the public status page, type the password in the "Owner?" box and press the button. The page remembers it only until you close that tab, and sends it in a header (never in the address). Ten wrong tries in ten minutes lock that visitor out for ten minutes. Without `RELAY_OWNER_KEY` nothing changes: the public page shows only numbers.
+
+TikTok emotes (relay 0.5.1): chat messages that contain TikTok emotes, and messages that are only an emote, now reach the overlay as small pictures. Only pictures from TikTok's own picture servers are used. This is new and was tried only with made-up messages. If emotes still do not show, `tmux attach -t relay` prints a line "emotes arrived but none could be shown (picture server ...)" once per account: tell me the server name.

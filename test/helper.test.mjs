@@ -294,3 +294,26 @@ test("an account that never goes live is looked for only so long, and a new conn
   await again.close();
   await helper.close();
 });
+
+test("a chat message with emotes, and an emote-only message, reach a page as pictures with their places", async () => {
+  const { factory, made } = scripted();
+  await start(factory);
+  const page = listen("pond.pal");
+  await page.until(() => page.states().includes("connected"));
+  const conn = made[0].conn;
+  const url = "https://p16-webcast.tiktokcdn.com/webcast-va/rose.webp";
+  const user = { id: "7", displayId: "ann", nickname: "Ann" };
+  conn.emit("chat", { common: { msgId: "e1" }, user, content: "love this", emotes: [{ placeInComment: 4, emote: { emoteId: "1", image: { imageUrl: url } } }] });
+  conn.emit("chat", { common: { msgId: "e2" }, user, content: "", emotes: [{ placeInComment: 0, emote: { emoteId: "1", image: { imageUrl: url } } }] });
+  conn.emit("emote", { common: { msgId: "e3" }, user, emoteList: [{ emoteId: "2", image: { url: [url] } }] });
+  conn.emit("chat", { common: { msgId: "e4" }, user, content: "from nowhere", emotes: [{ placeInComment: 0, emote: { emoteId: "1", image: { imageUrl: "https://evil.example/x.png" } } }] });
+  await page.until(() => page.chats().length === 4);
+  assert.deepEqual(page.chats().map((m) => [m.text, m.pics ?? null]), [
+    ["love this", [{ at: 4, url }]],
+    ["", [{ at: 0, url }]],
+    ["", [{ at: 0, url }]],
+    ["from nowhere", null],
+  ]);
+  await page.close();
+  await helper.close();
+});

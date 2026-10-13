@@ -2,6 +2,8 @@
 // Chat text is somebody else's words, so it only ever goes in with textContent and text nodes, never as HTML.
 // A message is a plain object: { id, user, name, text, mod, color, emotes, gift, gifter }.
 
+import { earsMarkup } from "./ears.js";
+
 /** Makes an element: el("div", { className: "x" }, child, "text"). */
 export const el = (tag, props = {}, ...kids) => {
   const node = Object.assign(document.createElement(tag), props);
@@ -51,6 +53,26 @@ export function renderText(node, text, emotes) {
   if (pos < chars.length) node.append(chars.slice(pos).join(""));
 }
 
+/**
+ * Writes a TikTok message's words into `node` with its emote pictures put in at their places (pics: [{ at, url }], `at` counting code
+ * points). A picture that never loads is taken away, so a broken address leaves no hole.
+ */
+export function renderPics(node, text, pics) {
+  const chars = Array.from(text);
+  let pos = 0;
+  for (const pic of pics) {
+    const at = Math.min(chars.length, Math.max(pos, pic.at));
+    if (at > pos) node.append(chars.slice(pos, at).join(""));
+    const img = el("img", { className: "emote", alt: "", decoding: "async" });
+    img.referrerPolicy = "no-referrer";
+    img.addEventListener("error", () => img.remove(), { once: true });
+    img.src = pic.url;
+    node.append(img);
+    pos = at;
+  }
+  if (pos < chars.length) node.append(chars.slice(pos).join(""));
+}
+
 const prefersReducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /** A profile picture for the round badge. It covers the letter once it has loaded; if it never loads, the letter stays. */
@@ -72,6 +94,8 @@ export class Feed {
     this.colors = false; // use each viewer's own name color when the source gives one
     this.emotes = true;
     this.pictures = true; // a chatter's own profile picture in the round badge, when the source has one (TikTok does, Twitch doesn't)
+    this.ears = "none"; // a little extra on the top edge of each bubble: none, cat, bunny, bear, fox, horns, bow or halo (see ears.js)
+    this.earsFor = "all"; // who gets them: all, mods, or gifts (messages that came with a gift)
     this.glide = true; // older messages slide up when a new one arrives
     this.gapMs = 160; // the fastest a feed shows messages, so a busy chat can't make the page do more work
     this.queueMax = 12; // when chat is faster than that, the oldest waiting messages are dropped
@@ -83,11 +107,31 @@ export class Feed {
 
   configure(options) {
     Object.assign(this, options);
+    const dressed = this.ears + "|" + this.earsFor;
+    if (dressed !== this.dressed) {
+      this.dressed = dressed;
+      for (const m of this.host.children) this.dress(m); // ears turned on, off or changed: the messages already here follow
+    }
     this.host.dataset.modIcon = this.modIcon;
     if (this.modIcon !== "none") {
       for (const node of this.host.querySelectorAll(".ico")) node.innerHTML = ICONS[this.modIcon] ?? ICONS.shield;
     }
     this.prune();
+  }
+
+  /** Puts the chosen ears on a message's bubble, or takes them off, according to the settings and who wrote it. The drawing is one of ours. */
+  dress(m) {
+    const body = m.querySelector(".body");
+    if (!body) return;
+    body.querySelector(".ears")?.remove();
+    const markup = earsMarkup(this.ears);
+    const wears = markup !== "" && (this.earsFor === "all" || (this.earsFor === "mods" && m.dataset.mod === "1") || (this.earsFor === "gifts" && m.classList.contains("gift")));
+    m.classList.toggle("has-ears", wears);
+    if (!wears) return;
+    const ears = el("span", { className: "ears" });
+    ears.setAttribute("aria-hidden", "true");
+    ears.innerHTML = markup; // our own fixed drawing, never anything a viewer wrote
+    body.append(ears);
   }
 
   /** Messages still on their way out don't count: they are gone from the page 320 ms after they start leaving. */
@@ -120,10 +164,13 @@ export class Feed {
   }
 
   /** Draws a message now. */
-  show({ id = "", user = "", name, text, mod = false, color = null, emotes = null, gift = false, gifter = false, avatar = "" }) {
+  show({ id = "", user = "", name, text, mod = false, color = null, emotes = null, pics = null, gift = false, gifter = false, avatar = "" }) {
+    const showPics = this.emotes && Array.isArray(pics) && pics.length > 0;
+    if (!text && !showPics) return; // a message of only pictures, with pictures turned off, has nothing to draw
     const m = el("div", { className: "m" + (gift ? " gift" : "") });
     m.dataset.id = id;
     m.dataset.user = user;
+    m.dataset.mod = mod ? "1" : "0";
     const av = el("div", { className: "av", textContent: (Array.from(name)[0] ?? "?").toUpperCase() });
     if (this.pictures && avatar) av.append(picture(av, avatar));
     const who = el("div", { className: "who" });
@@ -137,8 +184,10 @@ export class Feed {
       who.append(badge);
     }
     const tx = el("div", { className: "txt" });
-    renderText(tx, text, this.emotes ? emotes : null);
+    if (showPics) renderPics(tx, text, pics);
+    else renderText(tx, text, this.emotes ? emotes : null);
     m.append(av, el("div", { className: "body" }, who, tx));
+    this.dress(m);
     // Older messages glide up to make room, rather than jumping: note where each is, add the new one, then slide each from where it was.
     const glide = this.glide && !this.host.classList.contains("is-static") && !prefersReducedMotion();
     const before = glide ? this.showing().map((c) => [c, c.getBoundingClientRect().top]) : [];
