@@ -24,7 +24,7 @@
     </div>
     <div class="chatstage" id="stage" aria-hidden="true"><div id="alerts"></div></div>
     <div class="preview__tests" role="group" aria-label="Try an alert">
-      <button class="btn btn--soft btn--sm" type="button" data-test="follow" data-platform="tiktok">Test follow</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="follow" data-platform="tiktok twitch">Test follow</button>
       <button class="btn btn--soft btn--sm" type="button" data-test="gift-1" data-platform="tiktok">Test gift</button>
       <button class="btn btn--soft btn--sm" type="button" data-test="gift-3" data-platform="tiktok">Test big gift</button>
       <button class="btn btn--soft btn--sm" type="button" data-test="share" data-platform="tiktok">Test share</button>
@@ -63,7 +63,7 @@
         <summary>Gifts</summary>
         <div class="stack" id="gift-controls"></div>
       </details>
-      <details class="more" data-platform="tiktok">
+      <details class="more" data-platform="tiktok twitch">
         <summary>Follows</summary>
         <div class="stack" id="follow-controls"></div>
       </details>
@@ -107,10 +107,17 @@
         <h2 class="step-card__title" id="s4">Connect your account</h2>
       </div>
       <div id="source"></div>
+      <div class="followbox" data-platform="twitch" hidden>
+        <h3 class="seen__title">Follows on Twitch</h3>
+        <p class="ctl__hint">Twitch only tells a logged-in streamer who follows them. Log in once on the Twitch follows page and keep it open while you stream: it passes each new follower to your alerts. Nothing else on your Twitch is read.</p>
+        <label class="form__choice"><input type="checkbox" id="follows-on"> Show Twitch follows in my alerts link</label>
+        <p class="ctl__hint"><a href="/twitch/" target="_blank" rel="noopener">Open the Twitch follows page</a> (it opens in a new tab).</p>
+        <p class="ctl__hint" id="follows-state" role="status"></p>
+      </div>
       <div class="seen" aria-labelledby="seen-title">
         <h3 class="seen__title" id="seen-title">What Frills sees</h3>
         <p class="ctl__hint" data-platform="tiktok">Counted since you pressed Connect. Follow your own account from another account, or send a 1 coin gift, and watch the numbers move.</p>
-        <p class="ctl__hint" data-platform="twitch" hidden>Counted since you pressed Connect. Ask a friend to cheer 1 bit or gift a sub and watch the numbers move. Follows are not listed: Twitch only gives those to a logged-in streamer, so Frills does not show them yet.</p>
+        <p class="ctl__hint" data-platform="twitch" hidden>Counted since you pressed Connect. Ask a friend to cheer 1 bit or gift a sub and watch the numbers move. Follows are not counted here: they arrive through the Twitch follows page instead (see below).</p>
         <dl class="seen__list">
           <div data-platform="tiktok"><dt>Follows</dt><dd id="seen-follow">0</dd></div>
           <div data-platform="tiktok"><dt>Gifts</dt><dd id="seen-gift">0</dd></div>

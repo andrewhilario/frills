@@ -30,7 +30,7 @@ test("every page carries the relay's address (tidied) for the scripts, and the o
 
 test("the security policy lets the pages reach the relay and still nothing else new", () => {
   const headers = read("_headers");
-  assert.ok(headers.includes(`connect-src 'self' wss://irc-ws.chat.twitch.tv ${RELAY} https://accounts.spotify.com https://api.spotify.com;`), "the relay is allowed to be connected to, and Spotify (for the private test page)");
+  assert.ok(headers.includes(`connect-src 'self' wss://irc-ws.chat.twitch.tv ${RELAY} wss://eventsub.wss.twitch.tv https://api.twitch.tv https://id.twitch.tv https://accounts.spotify.com https://api.spotify.com;`), "the relay is allowed to be connected to, and Twitch's follow notifications and Spotify (for the private pages)");
   assert.ok(headers.includes("default-src 'self'") && headers.includes("script-src 'self'"));
   assert.ok(!/connect-src[^;]*\*/.test(headers), "no wildcard in connect-src");
 });
@@ -63,7 +63,7 @@ test("without a relay the same pages say none of that", () => {
     const plain = readFileSync(join(plainOut, "index.html"), "utf8");
     assert.ok(!plain.includes("free relay"));
     assert.ok(plain.includes('data-relay=""'));
-    assert.ok(readFileSync(join(plainOut, "_headers"), "utf8").includes("connect-src 'self' wss://irc-ws.chat.twitch.tv https://accounts.spotify.com https://api.spotify.com;"), "and the policy has no relay in it");
+    assert.ok(readFileSync(join(plainOut, "_headers"), "utf8").includes("connect-src 'self' wss://irc-ws.chat.twitch.tv wss://eventsub.wss.twitch.tv https://api.twitch.tv https://id.twitch.tv https://accounts.spotify.com https://api.spotify.com;"), "and the policy has no relay in it");
   } finally {
     rmSync(plainOut, { recursive: true, force: true });
   }

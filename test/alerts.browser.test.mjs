@@ -220,8 +220,8 @@ const shown = (selector) => page.evaluate(`[...document.querySelectorAll(${JSON.
 test("editor: choosing Twitch shows its own test buttons and sections, and the link names Twitch", { skip }, async () => {
   const { base } = await withHelper();
   await page.goto(base + "/alerts/?platform=twitch&maxShown=3&subTime=2&subgiftTime=2&bitsTime=2&raidTime=2&speed=250", { settle: 700 });
-  assert.deepEqual(await shown(".preview__tests [data-test]"), ["sub", "resub", "subgift", "bits", "bits-big", "raid"]);
-  assert.deepEqual(await shown("details[data-platform]"), ["Subs and resubs", "Gifted subs", "Bits", "Raids"]);
+  assert.deepEqual(await shown(".preview__tests [data-test]"), ["follow", "sub", "resub", "subgift", "bits", "bits-big", "raid"]);
+  assert.deepEqual(await shown("details[data-platform]"), ["Follows", "Subs and resubs", "Gifted subs", "Bits", "Raids"]);
   assert.equal((await shown(".seen__list [data-platform]")).length, 4, "four counters: subs, gifted subs, bits and raids");
   await type("#source-channel", "pond_cafe");
   const link = new URL(await page.evaluate(`document.getElementById("link").value`));

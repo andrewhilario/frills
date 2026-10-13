@@ -23,7 +23,7 @@ import { ALERT_KINDS } from "./map.mjs";
 import { DEMO_USER, DemoConnection } from "./demo.mjs";
 import { ALERT_AT, Signing, capacity, deviceFacts, snapshot, statusPage } from "./status.mjs";
 import { SlotAlerts, termuxNotifier } from "./alerts.mjs";
-import { ownerGate } from "./owner.mjs";
+import { OWNER, ownerGate } from "./owner.mjs";
 
 const VERSION = "0.5.1";
 /** What this program can do, so a page can tell an old one ("chat" only) from one that sends alerts. */
@@ -201,6 +201,13 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
   };
 }
 
+/** One plain line for the start-up message: is the owner password on, and if not, why. Never prints the password itself. */
+function ownerState(key) {
+  if (key === undefined || key === "") return "not set (RELAY_OWNER_KEY); the names show only on this phone";
+  if (key.length < OWNER.minKey) return `NOT USED: it has ${key.length} characters and needs at least ${OWNER.minKey}`;
+  return "on";
+}
+
 // ── Running it ────────────────────────────────────────────────────────────────────────────────────────────────────────────
 function openInBrowser(url) {
   const [command, args] = process.platform === "win32" ? ["cmd", ["/c", "start", "", url]] : process.platform === "darwin" ? ["open", [url]] : ["xdg-open", [url]];
@@ -229,7 +236,7 @@ async function mainRelay() {
     console.error(error.code === "EADDRINUSE" ? `Port ${port} is already in use. Is the relay already running?` : `Couldn't start: ${error.message}`);
     process.exit(1);
   }
-  console.log(`\nFrills relay ${VERSION} is running on ${bind}:${port}.\n  Spots: ${slots}. Allowed website addresses: ${origins.join(", ")}.\n  Status page: http://${bind}:${port}/health (open it in a browser)\n  Warns you when ${alertAt} spots or fewer are left${process.env.RELAY_ALERTS === "0" ? " (alerts are off)" : ""}.\n`);
+  console.log(`\nFrills relay ${VERSION} is running on ${bind}:${port}.\n  Spots: ${slots}. Allowed website addresses: ${origins.join(", ")}.\n  Status page: http://${bind}:${port}/health (open it in a browser)\n  Warns you when ${alertAt} spots or fewer are left${process.env.RELAY_ALERTS === "0" ? " (alerts are off)" : ""}.\n  Owner password (to see who is connected from your PC): ${ownerState(ownerKey)}.\n`);
   if (process.env.RELAY_ALERTS !== "0") {
     const alerts = new SlotAlerts({ stats: () => helper.hub.stats(), signing: helper.signing, alertAt, notify: termuxNotifier({ log: say }), log: say });
     alerts.start();

@@ -11,7 +11,9 @@ export const mediaUrl = (id) => `/api/media/${id}`;
 export const KINDS = ["follow", "gift", "share", "sub", "subgift", "bits", "raid"];
 export const KIND_NAMES = { follow: "Follow", gift: "Gift", share: "Share", sub: "Sub", subgift: "Gifted subs", bits: "Bits", raid: "Raid" };
 /** Which kinds each place you stream can send. TikTok's come from the relay; Twitch's arrive in Twitch's public chat connection, with no login. */
-export const PLATFORM_KINDS = { tiktok: ["follow", "gift", "share"], twitch: ["sub", "subgift", "bits", "raid"] };
+export const PLATFORM_KINDS = { tiktok: ["follow", "gift", "share"], twitch: ["follow", "sub", "subgift", "bits", "raid"] };
+/** The Twitch kinds that arrive in Twitch's public chat connection. Follows are not among them: Twitch gives those only to the logged-in streamer (see worker/follows.mjs). */
+export const TWITCH_CHAT_KINDS = ["sub", "subgift", "bits", "raid"];
 
 /** The sounds, by id. The sounds themselves are made in sounds.js. */
 export const SOUNDS = [
@@ -238,12 +240,14 @@ export function toParams(settings, params = new URLSearchParams()) {
   return params;
 }
 
-/** The address a streamer pastes into their streaming app. `base` is the alerts overlay page's address; `platform` is "tiktok" or "twitch". */
-export function alertsUrl(base, { channel = "", settings = DEFAULTS, platform = "tiktok" } = {}) {
+/** The address a streamer pastes into their streaming app. `base` is the alerts overlay page's address; `platform` is "tiktok" or "twitch"; `follows` is the post box code for Twitch follows. */
+export function alertsUrl(base, { channel = "", settings = DEFAULTS, platform = "tiktok", follows = "" } = {}) {
   const params = new URLSearchParams();
   if (channel) {
     params.set("channel", channel);
     params.set("platform", platform === "twitch" ? "twitch" : "tiktok");
+    // The code of the post box that the streamer's Twitch follows page fills (only a Twitch link has one).
+    if (platform === "twitch" && /^[A-Za-z0-9_-]{16}$/.test(follows)) params.set("follows", follows);
   }
   return base + "?" + toParams(settings, params);
 }

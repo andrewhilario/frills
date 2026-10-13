@@ -1,0 +1,57 @@
+<!--
+{
+  "title": "Twitch follows | Frills",
+  "description": "A private page that listens for your new Twitch followers and passes them to your alerts. Keep it open while you stream.",
+  "path": "/twitch/",
+  "css": "page",
+  "js": "twitch",
+  "bodyClass": "page-guide",
+  "chrome": "nav",
+  "footer": true,
+  "noindex": true,
+  "listed": false
+}
+-->
+<main id="main">
+  <article class="article shell spotify" id="twitch" data-client="{{twitchClientId}}" data-ticker="{{tickerJs}}">
+    <header class="article__head">
+      <h1 class="display">Twitch follows</h1>
+      <p class="lede">Twitch only tells a logged-in streamer who follows them. Log in once here and keep this page open while you stream: it passes each new follower to your alerts, so the alert pops up. Nothing else on your Twitch is read.</p>
+    </header>
+
+    <div class="article__body">
+      <p class="note note--warm" role="note"><strong>Good to know.</strong> Follow alerts only work while this page is open (a tab in the background is fine). Twitch asks you to log in again every few hours, and this page tells you when. The other Twitch alerts (subs, gifted subs, bits and raids) need none of this.</p>
+
+      <section class="spotify__card" aria-labelledby="tw-login">
+        <h2 class="subtitle" id="tw-login">1. Log in</h2>
+        <p class="spotify__status" id="tw-status" role="status">Checking…</p>
+        <div class="spotify__row">
+          <button class="btn" type="button" id="tw-login-btn">Log in with Twitch</button>
+          <button class="btn btn--soft" type="button" id="tw-logout-btn" hidden>Log out</button>
+        </div>
+        <p class="ctl__hint">Twitch will ask if Frills may <strong>see who follows your channel</strong>. That is the only thing it asks for. The login stays in this browser and is never sent to Frills.</p>
+      </section>
+
+      <section class="spotify__card" aria-labelledby="tw-listen" id="tw-listen-card" hidden>
+        <h2 class="subtitle" id="tw-listen">2. Listening for new followers</h2>
+        <p class="spotify__status" id="tw-listen-status" role="status"></p>
+        <ul class="spotify__results" id="tw-recent" role="list"></ul>
+        <div class="spotify__row">
+          <button class="btn btn--soft" type="button" id="tw-test">Send a test follower</button>
+        </div>
+        <p class="ctl__hint" id="tw-test-note" role="status">A test follower goes through the same way a real one does, so you can see the alert in your overlay.</p>
+      </section>
+
+      <section class="spotify__card" aria-labelledby="tw-link">
+        <h2 class="subtitle" id="tw-link">3. Show them in your alerts</h2>
+        <p class="ctl__hint">In the alerts editor, pick Twitch, turn on <strong>Show Twitch follows in my alerts link</strong>, and copy the link into your streaming app.</p>
+        <div class="spotify__row"><a class="btn btn--soft" href="/alerts/?platform=twitch">Open the alerts editor</a></div>
+      </section>
+
+      <section class="spotify__card" aria-labelledby="tw-details">
+        <h2 class="subtitle" id="tw-details">Details</h2>
+        <dl class="spotify__facts" id="tw-facts"></dl>
+      </section>
+    </div>
+  </article>
+</main>

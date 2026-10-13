@@ -2,7 +2,7 @@
 
 import { AlertQueue, makeAlert } from "./alerts.js";
 import { createAlertView } from "./alerts-view.js";
-import { CONTROLS, DEFAULTS, KINDS, LOOKS, LOOK_NAMES, PLATFORM_KINDS, alertsUrl, currentLook, fromParams, mediaUrl, sanitize } from "./alerts-settings.js";
+import { CONTROLS, DEFAULTS, KINDS, LOOKS, LOOK_NAMES, PLATFORM_KINDS, TWITCH_CHAT_KINDS, alertsUrl, currentLook, fromParams, mediaUrl, sanitize } from "./alerts-settings.js";
 import { mountMediaPicker } from "./alerts-media.js";
 import { createSounds } from "./sounds.js";
 import { fakeAlert, fakeCrowd } from "./fake-alerts.js";
@@ -10,6 +10,7 @@ import { buildControl, chips, copyButton } from "./ui.js";
 import { mountSource } from "./source.js";
 import { fontsReady, generalFaces } from "./look.js";
 import { luminance } from "./color.js";
+import { followIdentity, followsOn, setFollowsOn } from "./follow-bridge.js";
 
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
@@ -145,7 +146,7 @@ const source = mountSource($("source"), {
   waitlistUrl: document.body.dataset.waitlist || "",
   tools: false,
   idleHint: "Type your name. On TikTok, frills_demo gives you made-up follows, gifts and shares. The test buttons above work without connecting.",
-  events: () => PLATFORM_KINDS[platform],
+  events: () => (platform === "twitch" ? TWITCH_CHAT_KINDS : PLATFORM_KINDS.tiktok), // Twitch follows do not come through the chat connection
   onAlert: (event) => {
     seen[event.kind] += 1;
     showSeen(event.kind);
@@ -177,7 +178,7 @@ function refreshLink() {
     linkHint.textContent = "Your link appears here once you have typed your name in step 4.";
     return;
   }
-  linkInput.value = alertsUrl(`${location.origin}/overlay/alerts/`, { channel, settings, platform });
+  linkInput.value = alertsUrl(`${location.origin}/overlay/alerts/`, { channel, settings, platform, follows: platform === "twitch" && followsOn() ? followIdentity().code : "" });
   copyBtn.disabled = false;
   linkHint.replaceChildren("Paste it into a Browser source in your streaming app, next to your chat. For a vertical LIVE use 1080 wide by 1920 high. ");
   const guide = document.createElement("a");
@@ -188,8 +189,29 @@ function refreshLink() {
 linkInput.addEventListener("focus", () => linkInput.select());
 /** Shows what belongs to the chosen place you stream (its test buttons, its sections, its counters) and hides the rest. */
 function showPlatform() {
-  for (const node of document.querySelectorAll("[data-platform]")) node.hidden = node.dataset.platform !== platform;
+  for (const node of document.querySelectorAll("[data-platform]")) node.hidden = !node.dataset.platform.split(" ").includes(platform);
+  checkFollows();
 }
+
+// ── Twitch follows: whether to put them in the link, and whether the Twitch follows page is running right now ────────────────────────
+const followsBox = $("follows-on");
+followsBox.checked = followsOn();
+let followsTimer = 0;
+async function checkFollows() {
+  clearTimeout(followsTimer);
+  const note = $("follows-state");
+  if (platform !== "twitch" || !followsBox.checked) { note.textContent = ""; return; }
+  try {
+    const res = await fetch("/api/follows/" + followIdentity().code, { cache: "no-store" });
+    const data = await res.json();
+    const alive = data.updatedAt > 0 && data.now - data.updatedAt < 180000;
+    note.textContent = alive ? "The Twitch follows page is running, so new followers will show up in your alerts." : "The Twitch follows page is not running. Open it, log in, and keep it open while you stream.";
+  } catch {
+    note.textContent = "";
+  }
+  followsTimer = setTimeout(checkFollows, 10000);
+}
+followsBox.addEventListener("change", () => { setFollowsOn(followsBox.checked); refreshLink(); checkFollows(); });
 source.onChange(() => {
   if (source.platform !== platform) { platform = source.platform; showPlatform(); }
   refreshLink();

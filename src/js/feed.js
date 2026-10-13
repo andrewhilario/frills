@@ -2,7 +2,7 @@
 // Chat text is somebody else's words, so it only ever goes in with textContent and text nodes, never as HTML.
 // A message is a plain object: { id, user, name, text, mod, color, emotes, gift, gifter }.
 
-import { earsMarkup } from "./ears.js";
+import { earsMarkup, earsPair } from "./ears.js";
 
 /** Makes an element: el("div", { className: "x" }, child, "text"). */
 export const el = (tag, props = {}, ...kids) => {
@@ -128,7 +128,7 @@ export class Feed {
     const wears = markup !== "" && (this.earsFor === "all" || (this.earsFor === "mods" && m.dataset.mod === "1") || (this.earsFor === "gifts" && m.classList.contains("gift")));
     m.classList.toggle("has-ears", wears);
     if (!wears) return;
-    const ears = el("span", { className: "ears" });
+    const ears = el("span", { className: "ears" + (earsPair(this.ears) ? " ears--pair" : "") });
     ears.setAttribute("aria-hidden", "true");
     ears.innerHTML = markup; // our own fixed drawing, never anything a viewer wrote
     body.append(ears);

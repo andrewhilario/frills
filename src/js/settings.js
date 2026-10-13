@@ -55,7 +55,7 @@ export const LOOK_KEYS = Object.keys(PRESETS.blueberry);
 export const MOD_ICONS = ["shield", "star", "leaf", "frog", "none"];
 
 // The little extras on the bubbles (cat ears and so on) start off, so a look is exactly what it was until someone turns them on.
-export const EAR_DEFAULTS = { ears: "none", earSize: 100, earX: 10, earY: 0, earTilt: 0, earColor: "#ff9db8", earInner: "#ffd6e2", earsFor: "all" };
+export const EAR_DEFAULTS = { ears: "none", earSize: 100, earX: 10, earGap: 0, earY: 0, earTilt: 0, earColor: "#ff9db8", earInner: "#ffd6e2", earsFor: "all" };
 
 export const DEFAULTS = { ...PRESETS.blueberry, letter: 0, modIcon: "shield", max: 6, life: 15, space: 8, colors: false, emotes: true, pictures: true, ...EAR_DEFAULTS };
 
@@ -75,6 +75,7 @@ export const CONTROLS = [
   // these only matter once a design is picked, so the editors hide them while it is None (`needs`)
   { key: "earSize", where: "main", needs: "ears", type: "range", label: "Ears size", min: 50, max: 200, step: 5, unit: " %" },
   { key: "earX", where: "main", needs: "ears", type: "range", label: "Along the bubble", min: 0, max: 100, step: 1, unit: " %", hint: "0 is the left edge of the bubble, 50 the middle, 100 the right edge." },
+  { key: "earGap", where: "main", needs: "ears", type: "range", label: "Space between the ears", min: -10, max: 100, step: 1, unit: " px", hint: "Moves the two ears apart, or closer together. A bow and a halo are one piece, so this does not change them." },
   { key: "earY", where: "main", needs: "ears", type: "range", label: "Up or down", min: -20, max: 30, step: 1, unit: " px", hint: "Up lifts the ears off the bubble, down tucks them behind its edge." },
   { key: "earTilt", where: "main", needs: "ears", type: "range", label: "Tilt", min: -30, max: 30, step: 1, unit: "°" },
   { key: "earColor", where: "main", needs: "ears", type: "color", label: "Ears color" },
@@ -162,6 +163,7 @@ export const earVars = (s) => ({
   "--ear-in": HEX.test(s.earInner ?? "") ? s.earInner : EAR_DEFAULTS.earInner,
   "--ear-scale": String((Number.isFinite(s.earSize) ? s.earSize : EAR_DEFAULTS.earSize) / 100),
   "--ear-x": String((Number.isFinite(s.earX) ? s.earX : EAR_DEFAULTS.earX) / 100), // how far along the bubble, 0 to 1
+  "--ear-gap": (Number.isFinite(s.earGap) ? s.earGap : 0) + "px", // the space between the two ears of a pair
   "--ear-y": (Number.isFinite(s.earY) ? s.earY : 0) + "px", // up (positive) or down
   "--ear-room": Math.max(0, Number.isFinite(s.earY) ? s.earY : 0) + "px", // extra room above the bubble when they are lifted
   "--ear-tilt": (Number.isFinite(s.earTilt) ? s.earTilt : 0) + "deg",

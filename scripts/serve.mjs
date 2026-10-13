@@ -13,6 +13,7 @@ import { handleMedia } from "../worker/media.mjs";
 import { handleSongs } from "../worker/songs.mjs";
 import { handleNowPlaying } from "../worker/nowplaying.mjs";
 import { handleAdmin } from "../worker/admin.mjs";
+import { handleFollows } from "../worker/follows.mjs";
 
 const root = join(import.meta.dirname, "..");
 const port = Number(process.argv[2] ?? process.env.PORT ?? 3020);
@@ -24,6 +25,14 @@ createServer(async (req, res) => {
   const path = req.url?.split("?")[0] ?? "";
   if (path === "/api/songs") {
     const response = await handleSongs(new Request(`http://${req.headers.host}${req.url}`, { method: req.method }), { cache: null });
+    res.writeHead(response.status, Object.fromEntries(response.headers));
+    res.end(Buffer.from(await response.arrayBuffer()));
+    return;
+  }
+  if (path.startsWith("/api/follows/")) {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const response = await handleFollows(new Request(`http://${req.headers.host}${req.url}`, { method: req.method, headers: req.headers, body: ["GET", "HEAD"].includes(req.method) ? undefined : Buffer.concat(chunks) }), env);
     res.writeHead(response.status, Object.fromEntries(response.headers));
     res.end(Buffer.from(await response.arrayBuffer()));
     return;

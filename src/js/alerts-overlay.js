@@ -12,6 +12,7 @@ import { cleanName, connectTo, statusText } from "./connect.js";
 import { relayForPage } from "./tiktok.js";
 import { fakeAlertSource } from "./fake-alerts.js";
 import { fontsReady, generalFaces } from "./look.js";
+import { FollowReader, validCode } from "./follow-bridge.js";
 
 const params = new URLSearchParams(location.search);
 const settings = sanitize(fromParams(params));
@@ -45,6 +46,9 @@ const push = (event) => {
 };
 
 const channel = cleanName(platform, params.get("channel"));
+// Twitch follows reach this page another way: the streamer's Twitch follows page puts each one in a small post box, and this reads the box.
+const followsCode = platform === "twitch" ? validCode(params.get("follows")) : "";
+if (followsCode && params.get("demo") !== "1") new FollowReader({ code: followsCode, onFollow: (f) => push({ kind: "follow", id: f.id, user: f.user, name: f.name, avatar: "" }) }).start();
 if (params.get("demo") === "1") {
   fontsReady(generalFaces(settings), 1000).then(() => fakeAlertSource(push, demoPace ? () => [demoPace * 0.6, demoPace * 1.4] : undefined, demoOnly));
 } else if (!channel) {

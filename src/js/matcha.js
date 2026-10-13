@@ -65,6 +65,7 @@ export const MATCHA_CONTROLS = [
   general("ears"),
   general("earSize"),
   general("earX"),
+  general("earGap"),
   general("earY"),
   general("earTilt"),
   general("earColor"),

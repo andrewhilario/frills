@@ -49,7 +49,7 @@ export function faq({ kb, waitlistUrl, helperUrl, relayUrl }) {
     },
     {
       q: "Does Frills have alerts, a last gifts list, goals and top likers?",
-      a: "Yes, for TikTok LIVE, in beta. Alerts pop up for follows, gifts and shares with your own words, animation, effect, sound, image or GIF, and bigger gifts get a bigger alert. Alerts also work for a Twitch channel: new subs and resubs, gifted subs, bits and raids (not follows yet, because Twitch only gives those to a logged-in streamer). The last gifts list, the goals (followers, gifts or likes) and the top likers ranking work the same way: pick a look, try it with the test buttons, and copy the link into your streaming app. See <a href=\"/overlays/\">all the overlays</a> and the <a href=\"/guides/alerts/\">alerts guide</a>.",
+      a: "Yes, for TikTok LIVE, in beta. Alerts pop up for follows, gifts and shares with your own words, animation, effect, sound, image or GIF, and bigger gifts get a bigger alert. Alerts also work for a Twitch channel: new subs and resubs, gifted subs, bits and raids, and follows too, after a one-time Twitch login on a private page that you keep open while you stream (Twitch only gives follows to a logged-in streamer). The last gifts list, the goals (followers, gifts or likes) and the top likers ranking work the same way: pick a look, try it with the test buttons, and copy the link into your streaming app. See <a href=\"/overlays/\">all the overlays</a> and the <a href=\"/guides/alerts/\">alerts guide</a>.",
     },
     {
       q: "How do I add it to my stream?",

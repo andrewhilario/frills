@@ -43,3 +43,20 @@ CREATE TABLE IF NOT EXISTS nowplaying (
 CREATE TABLE IF NOT EXISTS admin_tries (
   at INTEGER NOT NULL      -- milliseconds since 1970
 );
+
+-- Twitch follows, handed from the streamer's browser tab to their alerts overlay (see worker/follows.mjs). Run this part once.
+CREATE TABLE IF NOT EXISTS twitch_boxes (
+  code TEXT PRIMARY KEY,     -- 16 random characters, in the overlay link
+  key_hash TEXT NOT NULL,    -- sha-256 of the key that may add to it (the key itself is never stored)
+  seq INTEGER NOT NULL,      -- the number of the latest follow
+  updated_at INTEGER NOT NULL -- milliseconds since 1970; also moved by the tab's "still here" posts
+);
+CREATE TABLE IF NOT EXISTS twitch_follows (
+  code TEXT NOT NULL,
+  seq INTEGER NOT NULL,      -- 1, 2, 3 ... for each box
+  ev TEXT NOT NULL,          -- Twitch's own id for this follow, so one is never added twice
+  login TEXT NOT NULL,       -- the follower's short Twitch name
+  name TEXT NOT NULL,        -- the name shown
+  at INTEGER NOT NULL,
+  PRIMARY KEY (code, seq)
+);

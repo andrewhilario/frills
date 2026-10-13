@@ -35,9 +35,13 @@
 
 /* The little extras on a bubble's top edge (feed.js puts one in; ears.js has the drawings). They sit on the edge and leave room above, so the
    message before is never covered. --ear and --ear-in are the two colors, --ear-scale the size. */
-.m .ears { position: absolute; z-index: 1; bottom: calc(100% - 1px + var(--ear-y, 0px)); left: calc((100% - 3.6em * var(--ear-scale, 1)) * var(--ear-x, 0.1)); width: calc(3.6em * var(--ear-scale, 1)); pointer-events: none; }
+.m .ears { position: absolute; z-index: 1; display: flex; align-items: flex-end; bottom: calc(100% - 1px + var(--ear-y, 0px)); left: calc((100% - 3.6em * var(--ear-scale, 1)) * var(--ear-x, 0.1)); width: calc(3.6em * var(--ear-scale, 1)); pointer-events: none; transform-origin: 50% 100%; transform: rotate(var(--ear-tilt, 0deg)); }
 .look-general .m .ears { bottom: calc(100% + var(--g-bw, 0px) - 2px + var(--ear-y, 0px)); }
-.m .ears svg { display: block; width: 100%; height: auto; transform-origin: 50% 100%; transform: rotate(var(--ear-tilt, 0deg)); }
+.m .ears svg { display: block; flex: none; width: 100%; height: auto; }
+/* two ears: each is half of the drawing, so the space between them is the gap, and the pair's width grows with it */
+.m .ears--pair { width: auto; left: calc((100% - 3.6em * var(--ear-scale, 1) - var(--ear-gap, 0px)) * var(--ear-x, 0.1)); }
+.m .ears--pair svg { width: calc(1.8em * var(--ear-scale, 1)); }
+.m .ears--pair svg + svg { margin-left: var(--ear-gap, 0px); } /* a margin, because a gap cannot be negative */
 .m .ears .o { fill: var(--ear, #ff9db8); stroke: var(--ear, #ff9db8); stroke-width: 3; stroke-linejoin: round; }
 .m .ears .i { fill: var(--ear-in, #ffd6e2); }
 .m .ears .r { fill: none; stroke: var(--ear, #ff9db8); stroke-width: 4; }

@@ -270,7 +270,7 @@ test("changing the ears while the chat runs changes the messages already there, 
     feed.configure({ ears: "none" });
     return { none, cat, bunny, one, arrived, gone: host.querySelectorAll(".ears").length, marked: host.querySelectorAll(".has-ears").length };
   });
-  assert.deepEqual({ ...r }, { none: 0, cat: "0 0 64 34", bunny: "0 0 64 52", one: 1, arrived: 2, gone: 0, marked: 0 });
+  assert.deepEqual({ ...r }, { none: 0, cat: "0 0 32 34", bunny: "0 0 32 52", one: 1, arrived: 2, gone: 0, marked: 0 });
 });
 
 test("the ears can be moved along the bubble, lifted or tucked, and tilted, and they never move by themselves", { skip }, async () => {
@@ -287,7 +287,7 @@ test("the ears can be moved along the bubble, lifted or tucked, and tilted, and 
       const body = m.querySelector(".body").getBoundingClientRect();
       const ears = m.querySelector(".ears");
       const box = ears.getBoundingClientRect();
-      return { left: Math.round(box.left - body.left), right: Math.round(body.right - box.right), lift: Math.round(body.top - box.bottom), margin: parseFloat(getComputedStyle(m).marginTop), rotate: getComputedStyle(ears.querySelector("svg")).transform, animation: getComputedStyle(ears.querySelector("svg")).animationName };
+      return { left: Math.round(box.left - body.left), right: Math.round(body.right - box.right), lift: Math.round(body.top - box.bottom), margin: parseFloat(getComputedStyle(m).marginTop), rotate: getComputedStyle(ears).transform, animation: getComputedStyle(ears.querySelector("svg")).animationName };
     };
     return { start: await make("--ear-x: 0;"), middle: await make("--ear-x: 0.5;"), end: await make("--ear-x: 1;"), lifted: await make("--ear-x: 0; --ear-y: 10px; --ear-room: 10px;"), tucked: await make("--ear-x: 0; --ear-y: -6px;"), tilted: await make("--ear-x: 0; --ear-tilt: 20deg;") };
   });
@@ -323,4 +323,36 @@ test("TikTok emote pictures go into the words at their places, can be turned off
     return { parts, only, failed, off: host.querySelector("[data-id=d] .txt").querySelectorAll("img").length, offText: host.querySelector("[data-id=d] .txt").textContent, hidden: host.querySelector("[data-id=e]") === null };
   });
   assert.deepEqual({ ...r }, { parts: ["hello", "[img]", " world", "[img]"], only: 1, failed: "x&lt;b&gt;y&lt;/b&gt;", off: 0, offText: "off", hidden: true });
+});
+
+test("a pair of ears is two separate pieces with space between them that can be set, and a one-piece design ignores it", { skip }, async () => {
+  const r = await run(async (Feed, wait, mk) => {
+    const make = async (ears, vars) => {
+      const host = mk();
+      host.className = "look look-general";
+      host.dataset.ears = ears;
+      host.style.cssText = "width: 400px; font-size: 20px; --ear-scale: 1; --g-bw: 0px; --g-space: 8px; " + vars;
+      const feed = new Feed(host, { life: 0, max: 5, gapMs: 10, glide: false, ears });
+      feed.add({ id: "1", user: "a", name: "Ann", text: "hello" });
+      await wait(300);
+      const m = host.firstElementChild;
+      const body = m.querySelector(".body").getBoundingClientRect();
+      const wrap = m.querySelector(".ears").getBoundingClientRect();
+      const pieces = [...m.querySelectorAll(".ears svg")].map((s) => s.getBoundingClientRect());
+      return { count: pieces.length, between: pieces.length === 2 ? Math.round(pieces[1].left - pieces[0].right) : null, width: Math.round(wrap.width), left: Math.round(wrap.left - body.left), right: Math.round(body.right - wrap.right) };
+    };
+    return {
+      none: await make("cat", "--ear-x: 0; --ear-gap: 0px;"),
+      apart: await make("cat", "--ear-x: 0; --ear-gap: 40px;"),
+      apartEnd: await make("cat", "--ear-x: 1; --ear-gap: 40px;"),
+      closer: await make("cat", "--ear-x: 0; --ear-gap: -8px;"),
+      bow: await make("bow", "--ear-x: 0; --ear-gap: 40px;"),
+    };
+  });
+  assert.deepEqual({ count: r.none.count, between: r.none.between, width: r.none.width, left: r.none.left }, { count: 2, between: 0, width: 72, left: 0 }, "no gap: the two halves of the drawing touch, as the design was drawn");
+  assert.equal(r.apart.between, 40, "40 px between the ears");
+  assert.equal(r.apart.width, 112, "and the pair is that much wider");
+  assert.equal(r.apartEnd.right, 0, "100 along the bubble still puts the outer edge at the bubble's edge, gap and all");
+  assert.equal(r.closer.between, -8, "a negative gap brings them closer");
+  assert.deepEqual([r.bow.count, r.bow.width], [1, 72], "a bow is one piece and ignores the gap");
 });

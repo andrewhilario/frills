@@ -6,6 +6,7 @@ import { handleMedia } from "./media.mjs";
 import { handleSongs } from "./songs.mjs";
 import { handleNowPlaying } from "./nowplaying.mjs";
 import { handleAdmin } from "./admin.mjs";
+import { handleFollows } from "./follows.mjs";
 
 /** How long the edge keeps a file it has already read from the database. Short, so a deleted or reported file is gone within the hour. */
 const EDGE_SECONDS = 3600;
@@ -16,6 +17,7 @@ export default {
     if (pathname === "/api/feedback") return handleFeedback(request, env);
     if (pathname === "/api/songs") return handleSongs(request, { ctx });
     if (pathname.startsWith("/api/nowplaying/")) return handleNowPlaying(request, env);
+    if (pathname.startsWith("/api/follows/")) return handleFollows(request, env);
     if (pathname.startsWith("/api/admin/")) {
       const response = await handleAdmin(request, env);
       // a file the owner removed also goes from the copy this edge holds right now (other edges clear within the hour)
