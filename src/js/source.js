@@ -32,7 +32,7 @@ export function mountSource(host, { feeds, pace, channel = "", platform = "tikto
   const changed = () => listeners.forEach((fn) => fn());
   // What the page waits for besides chat, in words ("follows", "gifts and likes"), so the status says that and not "chat".
   const eventsNow = () => (typeof eventsOf === "function" ? eventsOf() : eventsOf); // a page can change what it wants (the goal's type)
-  const WORDS = { follow: "follows", gift: "gifts", share: "shares", like: "likes" };
+  const WORDS = { follow: "follows", gift: "gifts", share: "shares", like: "likes", sub: "subs", subgift: "gifted subs", bits: "bits", raid: "raids" };
   const wantsNow = () => {
     const names = eventsNow().map((kind) => WORDS[kind]).filter(Boolean);
     return names.length ? (names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0]) : "";

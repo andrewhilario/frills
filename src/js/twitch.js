@@ -94,6 +94,58 @@ export function toChatMessage(p) {
   };
 }
 
+const whole = (value, fallback = 0) => {
+  const n = Math.round(Number(value));
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+};
+const nameOf = (login, shown) => {
+  if (login === "ananonymousgifter") return "Someone"; // a gift from a person who chose to stay hidden
+  return String(shown ?? "").trim().slice(0, 60) || login || "Someone";
+};
+
+/**
+ * A line of Twitch notices (USERNOTICE) -> an alert event, or null for the ones we don't turn into alerts. These arrive in the public chat
+ * connection, so they need no login:
+ *   { kind: "sub", name, count (months; 1 is a new sub), resub, tier }      a new or renewed subscription
+ *   { kind: "subgift", name, count (how many), tier, community }            someone gifted subs (one line for the whole batch)
+ *   { kind: "raid", name, count (viewers) }                                  another channel sent its viewers here
+ * Twitch also sends one line for each person who received a gift from a batch; those carry the batch's id in `community` and are ignored
+ * by connect() once the batch itself has been announced.
+ */
+export function toNotice(p) {
+  if (!p || p.command !== "USERNOTICE") return null;
+  const t = p.tags;
+  const id = t.id || "";
+  const login = String(t["msg-param-login"] || t.login || "").toLowerCase();
+  const tier = t["msg-param-sub-plan"] || "1000";
+  const batch = t["msg-param-community-gift-id"] || t["msg-param-origin-id"] || ""; // names Twitch has used for "which gift batch is this"
+  switch (t["msg-id"]) {
+    case "sub":
+    case "resub":
+      return { kind: "sub", id, user: login, name: nameOf(login, t["display-name"]), avatar: "", count: whole(t["msg-param-cumulative-months"] || t["msg-param-months"], 1), resub: t["msg-id"] === "resub", tier };
+    case "subgift":
+    case "anonsubgift":
+      return { kind: "subgift", id, user: login, name: nameOf(login, t["display-name"]), avatar: "", count: 1, tier, community: batch, single: true };
+    case "submysterygift":
+    case "anonsubmysterygift":
+      return { kind: "subgift", id, user: login, name: nameOf(login, t["display-name"]), avatar: "", count: whole(t["msg-param-mass-gift-count"], 1), tier, community: batch, single: false };
+    case "raid":
+      return { kind: "raid", id, user: login, name: nameOf(login, t["msg-param-displayName"] || t["display-name"]), avatar: "", count: whole(t["msg-param-viewerCount"], 1) };
+    default:
+      return null;
+  }
+}
+
+/** A chat message that came with bits (Twitch's cheers) -> { kind: "bits", name, count }, or null. */
+export function toBits(p) {
+  if (!p || p.command !== "PRIVMSG") return null;
+  const count = whole(p.tags.bits);
+  if (!count) return null;
+  const bang = p.prefix.indexOf("!");
+  const user = (bang === -1 ? p.prefix : p.prefix.slice(0, bang)).toLowerCase();
+  return { kind: "bits", id: p.tags.id || "", user, name: nameOf(user, p.tags["display-name"]), avatar: "", count };
+}
+
 /** What a person typed -> a channel login, or "" if it can't be one. Also keeps anything odd out of the commands we send. */
 export function cleanChannel(input) {
   const name = String(input ?? "").trim().replace(/^#/, "").toLowerCase();
@@ -106,9 +158,10 @@ export function cleanChannel(input) {
  *   onMessage(msg)   a chat message
  *   onRemove({ id }) a moderator deleted one message
  *   onClear({ user }) a moderator timed out or banned someone (user), or cleared the whole chat (no user)
+ *   onEvent(event)   an alert: a sub, gifted subs, bits or a raid (see toNotice and toBits)
  *   onStatus({ state, channel, detail, fatal }) state: connecting, connected, reconnecting, error, stopped
  */
-export function connect({ channel, onMessage, onRemove, onClear, onStatus, socketFactory, reconnectBase = 1000, reconnectMax = 30000, pingEvery = 45000, silentAfter = 100000 } = {}) {
+export function connect({ channel, onMessage, onRemove, onClear, onEvent, onStatus, socketFactory, reconnectBase = 1000, reconnectMax = 30000, pingEvery = 45000, silentAfter = 100000 } = {}) {
   const login = cleanChannel(channel);
   const say = (state, detail, fatal = false) => onStatus && onStatus({ state, channel: login, detail, fatal });
   if (!login) {
@@ -123,6 +176,21 @@ export function connect({ channel, onMessage, onRemove, onClear, onStatus, socke
   let retryTimer = 0;
   let pingTimer = 0;
   let lastHeard = 0;
+  const batches = new Set(); // ids of gifted-sub batches already announced, so their one-by-one lines don't each become an alert
+  const told = new Set(); // ids of notices already passed on, because Twitch repeats a line when it reconnects us
+  const tell = (event) => {
+    if (!event || !onEvent) return;
+    if (event.id) {
+      if (told.has(event.id)) return;
+      told.add(event.id);
+      if (told.size > 500) told.delete(told.values().next().value);
+    }
+    if (event.kind === "subgift" && event.community) {
+      if (!event.single) batches.add(event.community);
+      else if (batches.has(event.community)) return;
+    }
+    onEvent(event);
+  };
 
   const send = (line) => {
     if (socket && socket.readyState === OPEN) socket.send(line);
@@ -164,8 +232,12 @@ export function connect({ channel, onMessage, onRemove, onClear, onStatus, socke
       case "PRIVMSG": {
         const m = toChatMessage(p);
         if (m && onMessage) onMessage(m);
+        tell(toBits(p));
         break;
       }
+      case "USERNOTICE":
+        tell(toNotice(p));
+        break;
       case "CLEARMSG":
         if (p.tags["target-msg-id"] && onRemove) onRemove({ id: p.tags["target-msg-id"] });
         break;

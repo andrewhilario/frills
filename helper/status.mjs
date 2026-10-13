@@ -35,7 +35,7 @@ export class Signing {
 }
 
 /** Everything the page and the alerts need. `device` (processor, memory) is added only for someone on the device itself. */
-export function snapshot({ stats, startedAt, now, version, features, signing, estimate, alertAt = ALERT_AT, device = null }) {
+export function snapshot({ stats, startedAt, now, version, features, signing, estimate, alertAt = ALERT_AT, device = null, roster = null }) {
   const free = Math.max(0, stats.max - stats.used);
   return {
     ok: true, name: "frills-relay", version, features, slots: stats,
@@ -43,6 +43,7 @@ export function snapshot({ stats, startedAt, now, version, features, signing, es
     signing: { busyRecently: signing.recent(), busy: signing.recent(2 * 60 * 1000) > 0 },
     capacity: estimate,
     ...(device ? { device } : {}),
+    ...(roster ? { roster } : {}), // the names: only for the owner's own screen, like `device`
   };
 }
 
@@ -81,6 +82,9 @@ main{max-width:640px;margin:0 auto}h1{font-size:1.4rem;margin:0 0 4px}.sub{color
 .alarm{border:2px dashed var(--line);border-radius:14px;padding:14px;margin-top:16px}.alarm label{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 input[type=number]{width:5rem;padding:6px;border:2px solid var(--ink);border-radius:8px;font:inherit}button{font:inherit;font-weight:700;border:2px solid var(--ink);border-radius:99px;background:#ffd23f;padding:8px 16px;cursor:pointer;box-shadow:0 3px 0 var(--ink)}
 .note{color:var(--ink2);font-size:.9rem}.dev{display:none}.dev[data-on="true"]{display:block}
+.who{margin-top:16px}.who h2{font-size:1.1rem;margin:0 0 4px}.wrap{overflow-x:auto;margin-top:8px}table{border-collapse:collapse;width:100%;font-size:.92rem}
+th{text-align:left;color:var(--ink2);font-weight:600;padding:6px 8px;border-bottom:2px solid var(--line);white-space:nowrap}td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
+td a{font-weight:700;color:var(--ink)}.pill{display:inline-block;padding:2px 10px;border-radius:99px;border:2px solid var(--ink);font-weight:700;font-size:.8rem;white-space:nowrap}.pill[data-s="live"]{background:#ffd23f}.pill[data-s="wait"]{background:var(--paper2)}
 </style></head>
 <body><main data-level="${esc(s.level)}" id="app">
 <div class="banner" id="banner" role="alert"></div>
@@ -97,6 +101,9 @@ input[type=number]{width:5rem;padding:6px;border:2px solid var(--ink);border-rad
 <section class="alarm"><label>Warn me when <input type="number" id="at" min="0" max="500" value="${esc(s.alertAt)}"> or fewer spots are left <button id="allow" type="button">Turn on notifications</button></label>
 <p class="note" id="allownote">The warning also shows here as a red bar, and plays a short sound. Keep this page open to get it. Your phone can warn you by itself too (Termux notification), see the guide.</p></section>
 <section class="card dev" id="dev"><b>This device</b><span id="devtext"></span></section>
+<section class="card who dev" id="who"><h2>Who is connected</h2><span class="note" id="whonote"></span>
+<div class="wrap"><table id="whotable"><thead><tr><th>Account</th><th>Status</th><th>Pages</th><th>Followers</th><th>Here for</th><th>Seen so far</th></tr></thead><tbody id="whobody"></tbody></table></div>
+<p class="note" id="waitnote"></p></section>
 </main>
 <script>
 const $=(id)=>document.getElementById(id);let last="ok",first=true;
@@ -105,6 +112,25 @@ const AT=localStorage.getItem("frills:relay:at");if(AT!==null)$("at").value=AT;
 $("at").addEventListener("input",()=>localStorage.setItem("frills:relay:at",$("at").value));
 $("allow").addEventListener("click",async()=>{try{const r=await Notification.requestPermission();$("allownote").textContent=r==="granted"?"Notifications are on. You will get one when spots run low.":"Notifications are blocked in this browser. The red bar and the sound still work."}catch{$("allownote").textContent="This browser cannot send notifications. The red bar and the sound still work."}});
 let ctx;const beep=()=>{try{ctx=ctx||new AudioContext();const o=ctx.createOscillator(),g=ctx.createGain();o.connect(g);g.connect(ctx.destination);o.frequency.value=880;g.gain.setValueAtTime(.2,ctx.currentTime);g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+.5);o.start();o.stop(ctx.currentTime+.5)}catch{}};
+const cell=(tr,text)=>{const td=document.createElement("td");td.textContent=text;tr.append(td);return td};
+const forText=(n)=>n<90?n+" s":n<5400?Math.round(n/60)+" min":Math.floor(n/3600)+" h "+Math.round(n%3600/60)+" min";
+function drawWho(r){
+  $("who").dataset.on="true";
+  const body=$("whobody");body.replaceChildren();
+  for(const a of r.accounts){
+    const tr=document.createElement("tr"),td=document.createElement("td"),link=document.createElement("a");
+    link.textContent="@"+a.user;link.href="https://www.tiktok.com/@"+encodeURIComponent(a.user)+"/live";link.target="_blank";link.rel="noopener noreferrer";td.append(link);tr.append(td);
+    const st=a.state==="connected"?(a.live?["LIVE now","live"]:["Connected, not LIVE yet","wait"]):a.state==="offline"?["Waiting for their LIVE","wait"]:a.state==="limited"?["Waiting (TikTok is busy)","wait"]:[a.state,"wait"];
+    const sc=document.createElement("td"),pill=document.createElement("span");pill.className="pill";pill.dataset.s=st[1];pill.textContent=st[0];sc.append(pill);tr.append(sc);
+    cell(tr,String(a.pages));cell(tr,a.followers?a.followers.toLocaleString():"-");cell(tr,forText(a.forS));
+    cell(tr,a.counts.chat+" chat, "+a.counts.gift+" gifts, "+a.counts.follow+" follows, "+a.counts.share+" shares");
+    body.append(tr);
+  }
+  const live=r.accounts.filter((a)=>a.live).length;
+  $("whotable").hidden=r.accounts.length===0;
+  $("whonote").textContent=r.accounts.length?r.accounts.length+" connected, "+live+" LIVE right now. Press a name to open their LIVE on TikTok.":"Nobody is connected right now.";
+  $("waitnote").textContent=r.waiting.length?"In line: "+r.waiting.map((u)=>"@"+u).join(", "):"";
+}
 function draw(s){
   const at=Math.max(0,Number($("at").value)||0),free=s.free,low=free<=at||s.slots.waiting>0;
   $("app").dataset.level=free===0?"full":low?"low":"ok";
@@ -114,6 +140,7 @@ function draw(s){
   $("signing").textContent=s.signing.busy?"Busy right now":s.signing.busyRecently?"OK (busy "+s.signing.busyRecently+"x lately)":"OK";
   const c=s.capacity;$("cap").textContent="About "+c.estimate+" accounts";$("capnote").textContent=(c.measured?"A guess from what this device uses now.":"A first guess; it improves once a few accounts are open.")+" Your internet and TikTok's free signing usually run out before the device does."+(c.estimate>s.slots.max*1.5?" You set "+s.slots.max+" spots, so there may be room to raise it.":"");
   const b=$("banner");b.dataset.on=String(low);b.textContent=s.slots.waiting>0?"People are waiting in line. Only "+free+" spots left.":free===0?"The relay is full.":"Only "+free+" spots left.";
+  if(s.roster){drawWho(s.roster)}
   if(s.device){$("dev").dataset.on="true";const d=s.device;$("devtext").textContent=d.cores+" processor cores. Memory: "+d.memoryFreeMB+" MB free of "+d.memoryTotalMB+" MB. The relay itself uses "+d.relayMemoryMB+" MB and about "+d.relayCpuPercent+"% of one core. Node "+d.node+"."}
   if(low&&last==="ok"&&!first){beep();try{if(Notification.permission==="granted")new Notification("Frills relay",{body:b.textContent})}catch{}}
   last=low?"low":"ok";first=false;document.title="Frills relay: "+free+" spots free";

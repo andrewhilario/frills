@@ -12,11 +12,13 @@ import { handleFeedback } from "../worker/feedback.mjs";
 import { handleMedia } from "../worker/media.mjs";
 import { handleSongs } from "../worker/songs.mjs";
 import { handleNowPlaying } from "../worker/nowplaying.mjs";
+import { handleAdmin } from "../worker/admin.mjs";
 
 const root = join(import.meta.dirname, "..");
 const port = Number(process.argv[2] ?? process.env.PORT ?? 3020);
 const serveFiles = createStatic(join(root, "dist"));
-const env = { DB: localDatabase(process.env.FEEDBACK_DB ?? join(root, ".dev-feedback.sqlite")) };
+// ADMIN_KEY is the admin password for this local server only (at least 12 characters); without it the admin side answers "off", as live does.
+const env = { DB: localDatabase(process.env.FEEDBACK_DB ?? join(root, ".dev-feedback.sqlite")), ADMIN_KEY: process.env.ADMIN_KEY };
 
 createServer(async (req, res) => {
   const path = req.url?.split("?")[0] ?? "";
@@ -34,12 +36,12 @@ createServer(async (req, res) => {
     res.end(Buffer.from(await response.arrayBuffer()));
     return;
   }
-  if (path === "/api/feedback" || path.startsWith("/api/media")) {
+  if (path === "/api/feedback" || path.startsWith("/api/media") || path.startsWith("/api/admin/")) {
     const chunks = [];
     for await (const chunk of req) chunks.push(chunk);
     const origin = `http://${req.headers.host}`;
     const request = new Request(origin + req.url, { method: req.method, headers: req.headers, body: ["GET", "HEAD"].includes(req.method) ? undefined : Buffer.concat(chunks) });
-    const response = path === "/api/feedback" ? await handleFeedback(request, env) : await handleMedia(request, env);
+    const response = path === "/api/feedback" ? await handleFeedback(request, env) : path.startsWith("/api/admin/") ? await handleAdmin(request, env) : await handleMedia(request, env);
     res.writeHead(response.status, Object.fromEntries(response.headers));
     res.end(Buffer.from(await response.arrayBuffer()));
     return;

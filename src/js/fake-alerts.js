@@ -10,13 +10,20 @@ let counter = 0;
 const giftPicture = (color) =>
   "data:image/svg+xml;base64," + btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><circle cx="32" cy="32" r="26" fill="${color}"/><path d="M32 18l4.6 9.4 10.4 1.5-7.5 7.3 1.8 10.3L32 41.6l-9.3 4.9 1.8-10.3-7.5-7.3 10.4-1.5z" fill="#fff"/></svg>`);
 
+/** Made-up sizes for the Twitch kinds: [small ones, medium ones, big ones]. */
+const AMOUNTS = { bits: [[10, 25, 50], [100, 250, 500], [1000, 5000]], subgift: [[1, 2, 3], [5, 10], [20, 50]], raid: [[8, 15], [25, 60], [150, 400]] };
+const pickAmount = (kind, size) => pick(AMOUNTS[kind][(size ?? 1 + Math.floor(Math.random() * 3)) - 1]);
+
 /**
- * One made-up alert of a kind: "follow", "share", or "gift" (`size` 1 small, 2 medium, 3 big, or leave it out for any). Names that are
- * given are used as they are; otherwise one is picked.
+ * One made-up alert of a kind: "follow", "share", "gift", or a Twitch one ("sub", "subgift", "bits", "raid"). `size` is 1 small, 2 medium,
+ * 3 big, or leave it out for any (a gift, a batch of subs, bits, a raid). `resub` makes a sub a renewal, with a number of months.
+ * Names that are given are used as they are; otherwise one is picked.
  */
-export function fakeAlert(kind, { size, name } = {}) {
+export function fakeAlert(kind, { size, name, resub = false } = {}) {
   const who = name ?? pick(NAMES);
   const base = { kind, id: `practice-${++counter}`, user: who, name: who, avatar: "" };
+  if (kind === "sub") return { ...base, resub, count: resub ? 2 + Math.floor(Math.random() * 30) : 1, tier: "1000" };
+  if (kind === "subgift" || kind === "bits" || kind === "raid") return { ...base, count: pickAmount(kind, size) };
   if (kind !== "gift") return base;
   const [gift, diamonds, color] = pick(GIFTS.filter((_, i) => !size || (size === 1 ? i < 3 : size === 2 ? i === 3 : i >= 4)));
   const count = diamonds >= 100 ? 1 : 1 + Math.floor(Math.random() * 5);
@@ -27,8 +34,8 @@ export function fakeAlert(kind, { size, name } = {}) {
 export const fakeCrowd = (kind = "follow", size = 6) => Array.from({ length: size }, () => fakeAlert(kind));
 
 /**
- * Sends practice alerts to `push` now and then, at a pace you can change. `only` (a list of "follow", "share", "gift") keeps the practice
- * to those kinds, with no crowds. Returns { stop() }.
+ * Sends practice alerts to `push` now and then, at a pace you can change. `only` (a list of kinds) keeps the practice to those kinds,
+ * with no crowds. Returns { stop() }.
  */
 export function fakeAlertSource(push, getPace = () => [1800, 4200], only = []) {
   let stopped = false;
@@ -36,7 +43,10 @@ export function fakeAlertSource(push, getPace = () => [1800, 4200], only = []) {
   const loop = () => {
     if (stopped) return;
     const roll = Math.random();
-    if (only.length) push(fakeAlert(only[Math.floor(Math.random() * only.length)]));
+    if (only.length) {
+      const kind = only[Math.floor(Math.random() * only.length)];
+      push(fakeAlert(kind, { resub: kind === "sub" && Math.random() < 0.4 }));
+    }
     else if (roll < 0.08) fakeCrowd().forEach((a, i) => setTimeout(() => !stopped && push(a), i * 200));
     else push(fakeAlert(roll < 0.45 ? "follow" : roll < 0.6 ? "share" : "gift"));
     const [lo, hi] = getPace();

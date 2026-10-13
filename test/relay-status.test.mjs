@@ -192,7 +192,7 @@ test("the relay's address gives a readable page to a browser and the numbers as 
   assert.match(page.headers["content-security-policy"], /default-src 'none'/);
   assert.equal((await ask("/", { Accept: "text/html" })).status, 200, "the bare address works too");
   const json = JSON.parse((await ask("/health", { Accept: "application/json" })).body);
-  assert.deepEqual([json.name, json.version, json.free, json.level, json.slots], ["frills-relay", "0.5.0", 50, "ok", { used: 0, max: 50, waiting: 0 }]);
+  assert.deepEqual([json.name, json.version, json.free, json.level, json.slots], ["frills-relay", "0.5.1", 50, "ok", { used: 0, max: 50, waiting: 0 }]);
   assert.ok(json.features.includes("status"));
   assert.ok(json.capacity.estimate >= 1 && json.capacity.estimate <= 500);
   assert.equal(JSON.parse((await ask("/health")).body).free, 50, "no Accept header at all: JSON, as before");
@@ -217,4 +217,57 @@ test("the alarm number is the owner's to set, and the server counts the signing 
   helper.signing.note();
   const json = JSON.parse((await ask("/health", { Accept: "application/json" })).body);
   assert.deepEqual(json.signing, { busyRecently: 1, busy: true });
+});
+
+// ── who is connected: names, for the owner's own screen only ───────────────────────────────────────────────────────────────────
+
+/** Opens a page's event stream for an account, as an overlay would, and resolves once the relay has let it in. Returns the request, to end it. */
+const listen = (user) => new Promise((resolve, reject) => {
+  const req = http.request({ host: "127.0.0.1", port, path: `/tiktok/stream?user=${user}`, headers: { Host: "relay.example.test", Origin: "https://site.example", Accept: "text/event-stream" } }, (res) => {
+    res.once("data", () => resolve(req)); // the first thing sent is the status
+  });
+  req.on("error", reject);
+  req.end();
+});
+
+test("the list of who is connected shows names, LIVE or not, and how long, only on the device itself", async () => {
+  await start();
+  const first = await listen("mochi_bun");
+  const second = await listen("pond.cafe");
+  try {
+    const local = JSON.parse((await ask("/health", { Accept: "application/json" })).body);
+    assert.deepEqual(local.roster.accounts.map((a) => a.user).sort(), ["mochi_bun", "pond.cafe"]);
+    const one = local.roster.accounts.find((a) => a.user === "mochi_bun");
+    assert.deepEqual(Object.keys(one).sort(), ["counts", "followers", "forS", "live", "pages", "state", "user"]);
+    assert.equal(one.pages, 1);
+    assert.ok(one.forS >= 0);
+    assert.deepEqual(local.roster.waiting, []);
+    assert.deepEqual(local.slots.used, 2);
+
+    const viaTunnel = await ask("/health", { Accept: "application/json", "CF-Connecting-IP": "203.0.113.9" });
+    assert.equal("roster" in JSON.parse(viaTunnel.body), false, "through the tunnel: numbers only");
+    assert.ok(!viaTunnel.body.includes("mochi_bun") && !viaTunnel.body.includes("pond.cafe"), "no name anywhere");
+    const viaProxy = await ask("/health", { Accept: "application/json", "X-Forwarded-For": "203.0.113.9" });
+    assert.ok(!viaProxy.body.includes("mochi_bun"));
+    const publicPage = await ask("/health", { Accept: "text/html", "CF-Connecting-IP": "203.0.113.9" });
+    assert.ok(!publicPage.body.includes("mochi_bun"), "and not in the page for everyone else");
+    const ownPage = await ask("/health", { Accept: "text/html" });
+    assert.ok(ownPage.body.includes("mochi_bun"), "the page on the device has them in it");
+    assert.match(ownPage.body, /Who is connected/);
+    assert.equal((await ask("/tiktok/ping")).body.includes("mochi_bun"), false, "the ping never lists anyone");
+  } finally {
+    first.destroy();
+    second.destroy();
+  }
+});
+
+test("the status page draws the table: a link to each LIVE, a status for each, and who is in line", () => {
+  const roster = { accounts: [{ user: "mochi_bun", state: "connected", live: true, pages: 2, followers: 1234, forS: 400, counts: { chat: 5, gift: 1, follow: 2, share: 0 } }], waiting: ["late.comer"] };
+  const page = statusPage(snapshot({ stats: { used: 1, max: 50, waiting: 1 }, startedAt: 0, now: 1000, version: "0.5.1", features: [], signing: new Signing(), estimate: { estimate: 20, measured: false }, roster }));
+  assert.match(page, /id="who"/);
+  assert.match(page, /tiktok\.com\/@"\+encodeURIComponent\(a\.user\)\+"\/live/, "each name links to their LIVE");
+  assert.ok(page.includes('"user":"mochi_bun"'), "the first drawing already has the data");
+  assert.ok(page.includes("late.comer"));
+  const without = statusPage(snapshot({ stats: { used: 1, max: 50, waiting: 0 }, startedAt: 0, now: 1000, version: "0.5.1", features: [], signing: new Signing(), estimate: { estimate: 20, measured: false } }));
+  assert.ok(!without.includes("mochi_bun"));
 });

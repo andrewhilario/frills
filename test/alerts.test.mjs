@@ -294,3 +294,59 @@ test("a click unlocks sound, and a browser that never answers the unlock does no
   assert.equal(await createSounds(never.Context).unlock(), false);
   assert.ok(Date.now() - started < 1500, "it gave up waiting after a moment");
 });
+
+// ── Twitch: subs, gifted subs, bits and raids go through the same engine ─────────────────────────────────────────────────────────
+
+test("the Twitch kinds have words, a size and a time of their own", () => {
+  const joined = (item) => wording(item, DEFAULTS).map((p) => p.text).join("");
+  assert.equal(joined({ kind: "sub", name: "Newbie", count: 1, resub: false, tier: 1 }), "Newbie subscribed!");
+  assert.equal(joined({ kind: "sub", name: "Oldie", count: 14, resub: true, tier: 2 }), "Oldie resubscribed for 14 months!");
+  assert.equal(joined({ kind: "sub", name: "Oldie", count: 1, resub: true, tier: 1 }), "Oldie subscribed!", "a resub of one month reads as a new sub");
+  assert.equal(joined({ kind: "subgift", name: "Kind", count: 10, tier: 2 }), "Kind gifted 10 subs!");
+  assert.equal(joined({ kind: "subgift", name: "Kind", count: 1, tier: 1 }), "Kind gifted a sub!", "one sub is not \"1 subs\"");
+  assert.equal(joined({ kind: "bits", name: "Cheerer", count: 50, tier: 1 }), "Cheerer cheered 50 bits!");
+  assert.equal(joined({ kind: "bits", name: "Cheerer", count: 5000, tier: 3 }), "Cheerer cheered 5000 bits!!");
+  assert.equal(joined({ kind: "raid", name: "Big", count: 250, tier: 3 }), "Big is raiding with 250 viewers!");
+  const bits = (count) => makeAlert({ kind: "bits", id: "b", name: "A", count }, DEFAULTS);
+  assert.deepEqual([bits(1), bits(99), bits(100), bits(999), bits(1000)].map((a) => a.tier), [1, 1, 2, 2, 3]);
+  const gifts = (count) => makeAlert({ kind: "subgift", id: "s", name: "A", count }, DEFAULTS).tier;
+  assert.deepEqual([gifts(1), gifts(5), gifts(20)], [1, 2, 3]);
+  const raid = (count) => makeAlert({ kind: "raid", id: "r", name: "A", count }, DEFAULTS).tier;
+  assert.deepEqual([raid(10), raid(25), raid(100)], [1, 2, 3]);
+  const sub = (count) => makeAlert({ kind: "sub", id: "u", name: "A", count, resub: true }, DEFAULTS).tier;
+  assert.deepEqual([sub(1), sub(12), sub(36)], [1, 2, 3]);
+  assert.equal(makeAlert({ kind: "raid", id: "r", name: "A", count: 10 }, DEFAULTS).time, 8000);
+  assert.equal(makeAlert({ kind: "sub", id: "u", name: "A", count: 1 }, DEFAULTS).sound, "levelup");
+});
+
+test("a Twitch kind that is switched off, and a cheer below the smallest wanted, make no alert", () => {
+  assert.equal(makeAlert({ kind: "raid", name: "A", count: 5 }, { ...DEFAULTS, raidOn: false }), null);
+  assert.equal(makeAlert({ kind: "sub", name: "A", count: 1 }, { ...DEFAULTS, subOn: false }), null);
+  assert.equal(makeAlert({ kind: "bits", name: "A", count: 9 }, { ...DEFAULTS, bitsMin: 10 }), null);
+  assert.ok(makeAlert({ kind: "bits", name: "A", count: 10 }, { ...DEFAULTS, bitsMin: 10 }));
+});
+
+test("a medium cheer can never be bigger than a big one, and a link names Twitch only when it is Twitch", () => {
+  assert.equal(sanitize({ bitsMid: 800, bitsBig: 300 }).bitsMid, 300);
+  const url = (platform) => alertsUrl("https://x.test/overlay/alerts/", { channel: "me", settings: DEFAULTS, platform });
+  assert.equal(url("twitch"), "https://x.test/overlay/alerts/?channel=me&platform=twitch");
+  assert.equal(url("tiktok"), "https://x.test/overlay/alerts/?channel=me&platform=tiktok");
+  assert.equal(url(undefined), "https://x.test/overlay/alerts/?channel=me&platform=tiktok");
+  const custom = sanitize({ raidText: "{name} brought {count}!", subSound: "bell" });
+  assert.deepEqual(fromParams(new URLSearchParams(toParams(custom))), { raidText: "{name} brought {count}!", subSound: "bell" });
+});
+
+test("Twitch alerts outrank follows when the line is too long, and are never joined into a crowd", () => {
+  const { send, log, timers } = rig({ maxWaiting: 3 });
+  send("follow", "F1");
+  send("follow", "F2");
+  send("raid", "R1", { count: 40 });
+  send("sub", "S1", { count: 1 });
+  send("bits", "B1", { count: 5 });
+  send("sub", "S2", { count: 1 });
+  timers.tick(60000);
+  const shown = log.filter((l) => l.startsWith("+"));
+  assert.ok(shown.some((l) => l.includes("R1")), "the raid was kept");
+  assert.ok(!shown.some((l) => l.includes("(+")), "no crowd was made out of subs or bits");
+  assert.ok(!shown.some((l) => l.includes("F2")), "a follow was dropped before the Twitch alerts");
+});

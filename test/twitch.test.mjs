@@ -271,3 +271,76 @@ test("a connection that goes quiet is replaced, and pings are sent while it wait
   assert.ok(sockets.length >= 2, "and a new connection is made");
   conn.stop();
 });
+
+// ── alerts: subs, gifted subs, bits and raids arrive in the same public connection, with no login ────────────────────────────────
+
+const notice = (tags) => Twitch.parseIrc("@" + Object.entries(tags).map(([k, v]) => `${k}=${String(v).replace(/ /g, "\\s")}`).join(";") + " :tmi.twitch.tv USERNOTICE #shroud :Hello");
+
+test("a new sub, a resub and a prime sub become sub events with the months", () => {
+  assert.deepEqual(Twitch.toNotice(notice({ id: "n1", "msg-id": "sub", login: "newbie", "display-name": "Newbie", "msg-param-cumulative-months": "1", "msg-param-sub-plan": "1000" })),
+    { kind: "sub", id: "n1", user: "newbie", name: "Newbie", avatar: "", count: 1, resub: false, tier: "1000" });
+  const resub = Twitch.toNotice(notice({ id: "n2", "msg-id": "resub", login: "oldie", "display-name": "Old Ie", "msg-param-cumulative-months": "14", "msg-param-sub-plan": "Prime" }));
+  assert.equal(resub.resub, true);
+  assert.equal(resub.count, 14);
+  assert.equal(resub.name, "Old Ie");
+  assert.equal(resub.tier, "Prime");
+});
+
+test("a gifted batch is one event with its size, a single gift is one, and a hidden gifter is called Someone", () => {
+  const batch = Twitch.toNotice(notice({ id: "g1", "msg-id": "submysterygift", login: "kind", "display-name": "Kind", "msg-param-mass-gift-count": "10", "msg-param-origin-id": "batch-1" }));
+  assert.equal(batch.kind, "subgift");
+  assert.equal(batch.count, 10);
+  assert.equal(batch.single, false);
+  assert.equal(batch.community, "batch-1");
+  const one = Twitch.toNotice(notice({ id: "g2", "msg-id": "subgift", login: "kind", "display-name": "Kind", "msg-param-recipient-display-name": "Lucky" }));
+  assert.equal(one.count, 1);
+  assert.equal(one.single, true);
+  const hidden = Twitch.toNotice(notice({ id: "g3", "msg-id": "anonsubmysterygift", login: "ananonymousgifter", "display-name": "AnAnonymousGifter", "msg-param-mass-gift-count": "5" }));
+  assert.equal(hidden.name, "Someone");
+});
+
+test("a raid names the raider and the viewers they bring", () => {
+  const raid = Twitch.toNotice(notice({ id: "r1", "msg-id": "raid", login: "bigstreamer", "display-name": "BigStreamer", "msg-param-displayName": "BigStreamer", "msg-param-login": "bigstreamer", "msg-param-viewerCount": "250" }));
+  assert.deepEqual(raid, { kind: "raid", id: "r1", user: "bigstreamer", name: "BigStreamer", avatar: "", count: 250 });
+});
+
+test("other notices (a ritual, a gift upgrade, a gift's recipient) and other commands make no event", () => {
+  assert.equal(Twitch.toNotice(notice({ "msg-id": "ritual", login: "x" })), null);
+  assert.equal(Twitch.toNotice(notice({ "msg-id": "giftpaidupgrade", login: "x" })), null);
+  assert.equal(Twitch.toNotice(Twitch.parseIrc("@id=1 :a!a@a PRIVMSG #shroud :hi")), null);
+  assert.equal(Twitch.toNotice(null), null);
+});
+
+test("a chat message with bits becomes a bits event, and one without does not", () => {
+  const cheer = Twitch.parseIrc("@id=c1;bits=100;display-name=Cheerer :cheerer!cheerer@cheerer PRIVMSG #shroud :cheer100 go");
+  assert.deepEqual(Twitch.toBits(cheer), { kind: "bits", id: "c1", user: "cheerer", name: "Cheerer", avatar: "", count: 100 });
+  assert.equal(Twitch.toBits(Twitch.parseIrc("@id=c2;bits=0 :a!a@a PRIVMSG #shroud :plain")), null);
+  assert.equal(Twitch.toBits(Twitch.parseIrc("@id=c3 :a!a@a PRIVMSG #shroud :plain")), null);
+});
+
+test("connect passes alerts on: one per notice, the batch once instead of once per recipient, and a repeated line only once", () => {
+  const events = [];
+  const { sockets, log, conn } = setup({ onEvent: (e) => events.push(e) });
+  sockets[0].open();
+  sockets[0].receive(JOIN);
+  sockets[0].receive(
+    "@id=n1;msg-id=sub;login=newbie;display-name=Newbie;msg-param-cumulative-months=1 :tmi.twitch.tv USERNOTICE #shroud",
+    "@id=n1;msg-id=sub;login=newbie;display-name=Newbie;msg-param-cumulative-months=1 :tmi.twitch.tv USERNOTICE #shroud", // sent again after a reconnect
+    "@id=g1;msg-id=submysterygift;login=kind;display-name=Kind;msg-param-mass-gift-count=3;msg-param-origin-id=b1 :tmi.twitch.tv USERNOTICE #shroud",
+    "@id=g2;msg-id=subgift;login=kind;display-name=Kind;msg-param-origin-id=b1 :tmi.twitch.tv USERNOTICE #shroud",
+    "@id=g3;msg-id=subgift;login=kind;display-name=Kind;msg-param-origin-id=b1 :tmi.twitch.tv USERNOTICE #shroud",
+    "@id=g4;msg-id=subgift;login=solo;display-name=Solo;msg-param-origin-id=lone :tmi.twitch.tv USERNOTICE #shroud", // a gift that was not part of a batch
+    "@id=c1;bits=50;display-name=Cheerer :cheerer!cheerer@cheerer PRIVMSG #shroud :cheer50",
+    "@id=r1;msg-id=raid;login=big;display-name=Big;msg-param-viewerCount=40 :tmi.twitch.tv USERNOTICE #shroud",
+  );
+  assert.deepEqual(events.map((e) => [e.kind, e.name, e.count]), [["sub", "Newbie", 1], ["subgift", "Kind", 3], ["subgift", "Solo", 1], ["bits", "Cheerer", 50], ["raid", "Big", 40]]);
+  assert.equal(log.messages.length, 1, "the cheer is still a chat message too");
+  conn.stop();
+});
+
+test("connect without an alert listener still works, and never throws on a notice", () => {
+  const { sockets, conn } = setup();
+  sockets[0].open();
+  sockets[0].receive(JOIN, "@id=n1;msg-id=sub;login=a :tmi.twitch.tv USERNOTICE #shroud");
+  conn.stop();
+});

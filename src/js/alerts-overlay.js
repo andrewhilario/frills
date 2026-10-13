@@ -1,11 +1,12 @@
-// The alerts overlay: what a streaming app opens. It reads its look and account from the address, listens for follows, gifts and shares,
-// and shows them with the chosen animation and sound. A see-through page, nothing else.
+// The alerts overlay: what a streaming app opens. It reads its look and account from the address, listens for follows, gifts and shares
+// (TikTok) or subs, gifted subs, bits and raids (Twitch), and shows them with the chosen animation and sound. A see-through page.
 //   /overlay/alerts/?channel=yourname&platform=tiktok&look=night&volume=50     your account
+//   /overlay/alerts/?channel=yourname&platform=twitch                          the same, for a Twitch channel
 //   add &demo=1 to see practice alerts instead of a real account
 
 import { AlertQueue, makeAlert } from "./alerts.js";
 import { createAlertView } from "./alerts-view.js";
-import { fromParams, mediaUrl, sanitize } from "./alerts-settings.js";
+import { KINDS, PLATFORM_KINDS, fromParams, mediaUrl, sanitize } from "./alerts-settings.js";
 import { createSounds } from "./sounds.js";
 import { cleanName, connectTo, statusText } from "./connect.js";
 import { relayForPage } from "./tiktok.js";
@@ -16,8 +17,10 @@ const params = new URLSearchParams(location.search);
 const settings = sanitize(fromParams(params));
 // ?pace=1500 makes the practice (demo) events come about that many milliseconds apart: handy for trying a look, or for filming it
 const demoPace = Math.min(10000, Math.max(300, Number(params.get("pace")) || 0)) || 0;
-// ?only=follow,gift keeps the practice to those kinds
-const demoOnly = (params.get("only") ?? "").split(",").filter((kind) => ["follow", "share", "gift"].includes(kind));
+const platform = params.get("platform") === "twitch" ? "twitch" : "tiktok";
+// ?only=follow,gift keeps the practice to those kinds; a Twitch overlay practises with the Twitch kinds
+const demoOnly = (params.get("only") ?? "").split(",").filter((kind) => KINDS.includes(kind));
+if (platform === "twitch" && !demoOnly.length) demoOnly.push(...PLATFORM_KINDS.twitch);
 
 const note = document.getElementById("note");
 const say = (text) => { note.hidden = !text; note.textContent = text; };
@@ -41,7 +44,7 @@ const push = (event) => {
   if (alert) queue.push(alert);
 };
 
-const channel = cleanName("tiktok", params.get("channel"));
+const channel = cleanName(platform, params.get("channel"));
 if (params.get("demo") === "1") {
   fontsReady(generalFaces(settings), 1000).then(() => fakeAlertSource(push, demoPace ? () => [demoPace * 0.6, demoPace * 1.4] : undefined, demoOnly));
 } else if (!channel) {
@@ -51,12 +54,12 @@ if (params.get("demo") === "1") {
   fontsReady(generalFaces(settings), 1000).then(() => {
     const noFeed = { add() {}, removeById() {}, removeUser() {}, clear() {} }; // chat is not shown here; only alerts
     let old = false; // the relay we found can only send chat: say so, and keep saying it
-    connectTo([noFeed], "tiktok", channel, (status) => {
+    connectTo([noFeed], platform, channel, (status) => {
       if (old) return;
       say(status.state === "connected" || status.state === "stopped" ? "" : statusText(status));
     }, {
       relay: relayForPage(),
-      events: ["follow", "gift", "share"],
+      events: PLATFORM_KINDS.tiktok,
       onAlert: push,
       onFound: (found) => {
         if (found && !found.features.includes("alerts")) {

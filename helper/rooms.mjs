@@ -23,6 +23,7 @@ export class Room {
     this.user = user;
     this.hub = hub;
     this.clients = new Set();
+    this.since = Date.now(); // when this account was let in, for the owner's list of who is connected
     this.status = { state: "connecting", detail: "", fatal: false };
     this.conn = null;
     this.running = false;
@@ -315,6 +316,25 @@ export class Hub {
   /** How full it is. Numbers only: no account names. */
   stats() {
     return { used: this.rooms.size, max: this.opts.maxRooms, waiting: this.waiting.size };
+  }
+
+  /**
+   * Who is connected right now, for the owner's own screen only (the status page opened on the device itself): each account with whether
+   * it is LIVE, how many pages are listening, what has passed, and for how long it has been here; and the names in line. Held in memory
+   * only: nothing here is written down, and the server never sends it to a page that comes from the internet.
+   */
+  roster(now = Date.now()) {
+    const accounts = [...this.rooms.values()].map((room) => ({
+      user: room.user,
+      state: room.status.state,
+      live: room.live,
+      pages: room.clients.size,
+      followers: room.info().followers,
+      forS: Math.max(0, Math.round((now - room.since) / 1000)),
+      counts: { ...room.counts },
+    }));
+    accounts.sort((a, b) => Number(b.live) - Number(a.live) || b.forS - a.forS);
+    return { accounts, waiting: [...this.waiting.values()].map((entry) => entry.user) };
   }
 
   /**

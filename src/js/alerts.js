@@ -2,13 +2,27 @@
 // goes: how many at once, who waits, who is dropped when the line is too long, and how a crowd of follows is joined into one.
 // No page and no clock of its own, so it is tested with a pretend clock; the view (alerts-view.js) only draws what this tells it.
 
-import { PLACEHOLDERS } from "./alerts-settings.js";
+import { KINDS, PLACEHOLDERS } from "./alerts-settings.js";
 
 /** 1 for a small gift, 2 for a medium one, 3 for a big one. Follows and shares are always 1. */
 export const tierOf = (diamonds, config) => (diamonds >= config.giftBig ? 3 : diamonds >= config.giftMid ? 2 : 1);
 
+/** The same for every kind: gifts and bits by the person's own limits, the rest by a fixed size (a long sub streak, a big batch, a big raid). */
+export function tierFor(event, config) {
+  const n = event.count ?? 0;
+  switch (event.kind) {
+    case "gift": return tierOf(event.diamonds ?? 0, config);
+    case "bits": return n >= config.bitsBig ? 3 : n >= config.bitsMid ? 2 : 1;
+    case "sub": return n >= 36 ? 3 : n >= 12 ? 2 : 1;
+    case "subgift": return n >= 20 ? 3 : n >= 5 ? 2 : 1;
+    case "raid": return n >= 100 ? 3 : n >= 25 ? 2 : 1;
+    default: return 1;
+  }
+}
+
 const TIME_FACTOR = [1, 1.3, 1.7];
-const PRIORITY = (item) => (item.kind === "gift" ? item.tier : 0); // gifts outrank follows and shares, bigger gifts outrank smaller
+const CROWDS = ["follow", "share"]; // the kinds that are joined into one alert when many arrive together
+const PRIORITY = (item) => (CROWDS.includes(item.kind) ? 0 : item.tier); // everything else outranks follows and shares, bigger outranks smaller
 
 /**
  * A text with {name}, {gift}, {count}, {diamonds}, {total} and {others} in it -> pieces to draw: [{ text, mark }]. `mark` is true for the
@@ -36,6 +50,10 @@ export function wording(item, config) {
   let template;
   if (item.kind === "follow") template = item.others ? config.followCrowd : config.followText;
   else if (item.kind === "share") template = item.others ? config.shareCrowd : config.shareText;
+  else if (item.kind === "sub") template = item.resub && item.count > 1 ? config.resubText : config.subText;
+  else if (item.kind === "subgift") template = item.count === 1 ? config.subgiftOneText : config.subgiftText;
+  else if (item.kind === "bits") template = item.tier === 3 ? config.bitsBigText : config.bitsText;
+  else if (item.kind === "raid") template = config.raidText;
   else template = item.tier === 3 ? config.giftBigText : config.giftText;
   return fillTemplate(template, vars);
 }
@@ -43,15 +61,16 @@ export function wording(item, config) {
 let serial = 0;
 
 /**
- * An event from the relay ({ kind, id, name, avatar, ... }) -> an alert ready to queue, or null when that kind is switched off or the
- * gift is smaller than the smallest the person wants.
+ * An event from the relay or from Twitch's chat ({ kind, id, name, avatar, ... }) -> an alert ready to queue, or null when that kind is
+ * switched off or the gift (or cheer) is smaller than the smallest the person wants.
  */
 export function makeAlert(event, config) {
   const kind = event?.kind;
-  if (!["follow", "gift", "share"].includes(kind) || !config[`${kind}On`]) return null;
+  if (!KINDS.includes(kind) || !config[`${kind}On`]) return null;
   const diamonds = kind === "gift" ? event.diamonds ?? 0 : 0;
   if (kind === "gift" && diamonds < config.giftMin) return null;
-  const tier = kind === "gift" ? tierOf(diamonds, config) : 1;
+  if (kind === "bits" && (event.count ?? 0) < config.bitsMin) return null;
+  const tier = tierFor(event, config);
   return {
     key: `a${++serial}`,
     kind,
@@ -60,6 +79,7 @@ export function makeAlert(event, config) {
     avatar: event.avatar ?? "",
     picture: kind === "gift" ? event.picture ?? "" : "",
     gift: event.gift,
+    resub: Boolean(event.resub),
     count: event.count,
     diamonds,
     total: event.total,
@@ -105,7 +125,7 @@ export class AlertQueue {
 
   /** Three or more follows (or shares) waiting become one alert: the first person's name and the number of others. */
   joinCrowd(kind) {
-    if (kind === "gift") return;
+    if (!CROWDS.includes(kind)) return;
     const same = this.waiting.filter((w) => w.kind === kind);
     // Three waiting make a crowd; once there is a crowd, the next one to arrive simply joins it.
     if (same.length < 3 && !same.some((w) => w.others)) return;

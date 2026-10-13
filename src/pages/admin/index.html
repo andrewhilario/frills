@@ -1,0 +1,74 @@
+<!--
+{
+  "title": "Admin | Frills",
+  "description": "The private admin page for Frills: read the feedback and manage the uploaded files.",
+  "path": "/admin/",
+  "css": "admin",
+  "js": "admin",
+  "bodyClass": "page-admin",
+  "chrome": "none",
+  "footer": false,
+  "noindex": true,
+  "listed": false
+}
+-->
+<main class="admin" id="main">
+  <header class="admin__bar">
+    <h1 class="admin__title">Frills admin</h1>
+    <div class="admin__bar-actions" id="bar-actions" hidden>
+      <button class="btn btn--soft btn--sm" type="button" id="refresh">Refresh</button>
+      <button class="btn btn--outline btn--sm" type="button" id="logout">Log out</button>
+    </div>
+  </header>
+
+  <noscript><p class="admin__note">The admin page needs JavaScript. Turn it on for this page and reload.</p></noscript>
+
+  <section class="admin__login" id="login" aria-labelledby="login-title">
+    <h2 class="admin__h" id="login-title">Log in</h2>
+    <form id="login-form" class="admin__form">
+      <label class="admin__label" for="key">Admin password</label>
+      <input type="password" id="key" name="key" autocomplete="current-password" spellcheck="false" required>
+      <button class="btn" type="submit" id="login-go">Open the admin page</button>
+      <p class="admin__status" id="login-status" role="status"></p>
+    </form>
+    <p class="admin__note">The password is the <code>ADMIN_KEY</code> secret you set in Cloudflare (Workers &amp; Pages, frills, Settings, Variables and Secrets). It stays in this tab only and is forgotten when you close it.</p>
+  </section>
+
+  <div id="dash" hidden>
+    <section class="admin__cards" id="cards" aria-label="Totals"></section>
+    <p class="admin__note admin__note--warn" id="no-status" hidden>Feedback cannot be marked as done yet, because the database is from before this page. Run this one line in the D1 console, then press Refresh: <code>ALTER TABLE feedback ADD COLUMN status TEXT NOT NULL DEFAULT 'new';</code></p>
+
+    <div class="chips admin__tabs" role="group" aria-label="What to look at">
+      <button class="chip" type="button" id="tab-feedback" aria-pressed="true">Feedback</button>
+      <button class="chip" type="button" id="tab-files" aria-pressed="false">Files</button>
+    </div>
+
+    <section id="panel-feedback" aria-label="Feedback">
+      <div class="admin__filters">
+        <div class="chips" id="f-state" role="group" aria-label="Show"></div>
+        <label class="visually-hidden" for="f-kind">Kind</label>
+        <select id="f-kind">
+          <option value="">Every kind</option>
+          <option value="broken">Something broke</option>
+          <option value="idea">An idea</option>
+          <option value="look">A look</option>
+          <option value="other">Other</option>
+        </select>
+        <label class="visually-hidden" for="f-search">Search</label>
+        <input type="search" id="f-search" placeholder="Search the words or the contact" autocomplete="off" spellcheck="false">
+      </div>
+      <p class="admin__status" id="f-status" role="status"></p>
+      <div class="admin__list" id="f-list"></div>
+      <button class="btn btn--soft" type="button" id="f-more" hidden>Show more</button>
+    </section>
+
+    <section id="panel-files" aria-label="Uploaded files" hidden>
+      <div class="admin__filters">
+        <div class="chips" id="m-kind" role="group" aria-label="Show"></div>
+      </div>
+      <p class="admin__status" id="m-status" role="status"></p>
+      <div class="admin__files" id="m-list"></div>
+      <button class="btn btn--soft" type="button" id="m-more" hidden>Show more</button>
+    </section>
+  </div>
+</main>

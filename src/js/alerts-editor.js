@@ -1,8 +1,8 @@
-// The alerts editor: pick a look, write the words, choose sounds and effects, try every kind of alert, connect a TikTok account, copy one link.
+// The alerts editor: pick a look, write the words, choose sounds and effects, try every kind of alert, connect a TikTok or Twitch account, copy one link.
 
 import { AlertQueue, makeAlert } from "./alerts.js";
 import { createAlertView } from "./alerts-view.js";
-import { CONTROLS, DEFAULTS, LOOKS, LOOK_NAMES, alertsUrl, currentLook, fromParams, mediaUrl, sanitize } from "./alerts-settings.js";
+import { CONTROLS, DEFAULTS, KINDS, LOOKS, LOOK_NAMES, PLATFORM_KINDS, alertsUrl, currentLook, fromParams, mediaUrl, sanitize } from "./alerts-settings.js";
 import { mountMediaPicker } from "./alerts-media.js";
 import { createSounds } from "./sounds.js";
 import { fakeAlert, fakeCrowd } from "./fake-alerts.js";
@@ -83,7 +83,7 @@ lookChips = chips(
   { dot: true },
 );
 
-const HOLDERS = { look: "look-controls", move: "move-controls", queue: "queue-controls", follow: "follow-controls", gift: "gift-controls", share: "share-controls" };
+const HOLDERS = { look: "look-controls", move: "move-controls", queue: "queue-controls", ...Object.fromEntries(KINDS.map((kind) => [kind, `${kind}-controls`])) };
 for (const control of CONTROLS) {
   const { row, write } = control.type === "media"
     ? mountMediaPicker({ consentBox: $("media-ok"), kind: control.media, label: control.label, hint: control.hint, value: settings[control.key], onSet: (value) => change(control.key, value) })
@@ -107,6 +107,12 @@ const TESTS = {
   "gift-3": () => send(fakeAlert("gift", { size: 3 })),
   share: () => send(fakeAlert("share")),
   crowd: () => fakeCrowd("follow", 6).forEach(send),
+  sub: () => send(fakeAlert("sub")),
+  resub: () => send(fakeAlert("sub", { resub: true })),
+  subgift: () => send(fakeAlert("subgift")),
+  bits: () => send(fakeAlert("bits", { size: 1 })),
+  "bits-big": () => send(fakeAlert("bits", { size: 3 })),
+  raid: () => send(fakeAlert("raid")),
 };
 for (const button of document.querySelectorAll("[data-test]")) {
   button.addEventListener("click", async () => {
@@ -117,7 +123,7 @@ for (const button of document.querySelectorAll("[data-test]")) {
 }
 
 // ── Step 4: the account, and what arrives ────────────────────────────────────────────────────────────────────────
-const seen = { follow: 0, gift: 0, share: 0 };
+const seen = Object.fromEntries(KINDS.map((kind) => [kind, 0]));
 const showSeen = (kind) => {
   const dd = $(`seen-${kind}`);
   dd.textContent = String(seen[kind]);
@@ -127,17 +133,19 @@ const showSeen = (kind) => {
 };
 
 const channelFromLink = params.get("channel") ?? "";
+// TikTok or Twitch: the address says, else what was used last, else TikTok. What each one can send is in PLATFORM_KINDS.
+let platform = ["tiktok", "twitch"].includes(params.get("platform")) ? params.get("platform") : ["tiktok", "twitch"].includes(saved?.platform) ? saved.platform : "tiktok";
 const source = mountSource($("source"), {
   feeds: [],
   pace: () => [2000, 4000],
-  channel: channelFromLink || saved?.channel || "",
-  platform: "tiktok",
-  platforms: ["tiktok"],
+  channel: channelFromLink || ((saved?.platform ?? "tiktok") === platform ? saved?.channel : "") || "",
+  platform,
+  platforms: ["tiktok", "twitch"],
   autoconnect: Boolean(channelFromLink),
   waitlistUrl: document.body.dataset.waitlist || "",
   tools: false,
-  idleHint: "Type your TikTok name, or frills_demo to get made-up follows, gifts and shares. The test buttons above work without connecting.",
-  events: ["follow", "gift", "share"],
+  idleHint: "Type your name. On TikTok, frills_demo gives you made-up follows, gifts and shares. The test buttons above work without connecting.",
+  events: () => PLATFORM_KINDS[platform],
   onAlert: (event) => {
     seen[event.kind] += 1;
     showSeen(event.kind);
@@ -166,10 +174,10 @@ function refreshLink() {
   if (!channel) {
     linkInput.value = "";
     copyBtn.disabled = true;
-    linkHint.textContent = "Your link appears here once you have typed your TikTok name in step 4.";
+    linkHint.textContent = "Your link appears here once you have typed your name in step 4.";
     return;
   }
-  linkInput.value = alertsUrl(`${location.origin}/overlay/alerts/`, { channel, settings });
+  linkInput.value = alertsUrl(`${location.origin}/overlay/alerts/`, { channel, settings, platform });
   copyBtn.disabled = false;
   linkHint.replaceChildren("Paste it into a Browser source in your streaming app, next to your chat. For a vertical LIVE use 1080 wide by 1920 high. ");
   const guide = document.createElement("a");
@@ -178,10 +186,19 @@ function refreshLink() {
   linkHint.append(guide, ".");
 }
 linkInput.addEventListener("focus", () => linkInput.select());
-source.onChange(() => { refreshLink(); save(); });
+/** Shows what belongs to the chosen place you stream (its test buttons, its sections, its counters) and hides the rest. */
+function showPlatform() {
+  for (const node of document.querySelectorAll("[data-platform]")) node.hidden = node.dataset.platform !== platform;
+}
+source.onChange(() => {
+  if (source.platform !== platform) { platform = source.platform; showPlatform(); }
+  refreshLink();
+  save();
+});
+showPlatform();
 
 function save() {
-  try { localStorage.setItem(STORE, JSON.stringify({ settings, channel: source.channel, canvas })); } catch { /* storage can be blocked; the editor still works */ }
+  try { localStorage.setItem(STORE, JSON.stringify({ settings, channel: source.channel, platform, canvas })); } catch { /* storage can be blocked; the editor still works */ }
 }
 
 // ── The preview itself ───────────────────────────────────────────────────────────────────────────────────────────

@@ -8,8 +8,10 @@ import { FONTS } from "./settings.js";
 export const MEDIA_ID = /^[A-Za-z0-9_-]{16}$/;
 export const mediaUrl = (id) => `/api/media/${id}`;
 
-export const KINDS = ["follow", "gift", "share"];
-export const KIND_NAMES = { follow: "Follow", gift: "Gift", share: "Share" };
+export const KINDS = ["follow", "gift", "share", "sub", "subgift", "bits", "raid"];
+export const KIND_NAMES = { follow: "Follow", gift: "Gift", share: "Share", sub: "Sub", subgift: "Gifted subs", bits: "Bits", raid: "Raid" };
+/** Which kinds each place you stream can send. TikTok's come from the relay; Twitch's arrive in Twitch's public chat connection, with no login. */
+export const PLATFORM_KINDS = { tiktok: ["follow", "gift", "share"], twitch: ["sub", "subgift", "bits", "raid"] };
 
 /** The sounds, by id. The sounds themselves are made in sounds.js. */
 export const SOUNDS = [
@@ -65,6 +67,11 @@ export const DEFAULTS = {
   followOn: true, followText: "{name} just followed!", followCrowd: "{name} and {others} others followed!", followSound: "chime", followTime: 4, followFx: "hearts", followImage: "", followMySound: "",
   giftOn: true, giftText: "{name} sent {gift} ×{count}", giftBigText: "{name} sent {gift} ×{count}!!", giftSound: "coin", giftTime: 5, giftFx: "confetti", giftMid: 100, giftBig: 1000, giftMin: 0, giftImage: "", giftMySound: "", giftBigImage: "", giftBigMySound: "",
   shareOn: true, shareText: "{name} shared the LIVE!", shareCrowd: "{name} and {others} others shared!", shareSound: "pop", shareTime: 4, shareFx: "sparkles", shareImage: "", shareMySound: "",
+  // Twitch
+  subOn: true, subText: "{name} subscribed!", resubText: "{name} resubscribed for {count} months!", subSound: "levelup", subTime: 5, subFx: "hearts", subImage: "", subMySound: "",
+  subgiftOn: true, subgiftText: "{name} gifted {count} subs!", subgiftOneText: "{name} gifted a sub!", subgiftSound: "fanfare", subgiftTime: 6, subgiftFx: "confetti", subgiftImage: "", subgiftMySound: "",
+  bitsOn: true, bitsText: "{name} cheered {count} bits!", bitsBigText: "{name} cheered {count} bits!!", bitsSound: "coin", bitsTime: 5, bitsFx: "sparkles", bitsMin: 0, bitsMid: 100, bitsBig: 1000, bitsImage: "", bitsMySound: "",
+  raidOn: true, raidText: "{name} is raiding with {count} viewers!", raidSound: "fanfare", raidTime: 8, raidFx: "confetti", raidImage: "", raidMySound: "",
 };
 
 const text = (key, label, hint) => ({ key, type: "text", label, max: 80, hint });
@@ -137,6 +144,44 @@ export const CONTROLS = [
   { section: "share", ...range("shareTime", "Seconds on screen", 2, 15, 1, " s") },
   { section: "share", ...media("shareImage", "Your own image or GIF", "image") },
   { section: "share", ...media("shareMySound", "Your own sound", "sound", "Plays instead of the sound above.") },
+  // sub
+  { section: "sub", ...toggle("subOn", "Show new subs and resubs") },
+  { section: "sub", ...text("subText", "Text for a new sub") },
+  { section: "sub", ...text("resubText", "Text for a resub", "{count} is how many months in a row.") },
+  { section: "sub", ...select("subSound", "Sound", SOUNDS.map(({ id, name }) => [id, name])) },
+  { section: "sub", ...select("subFx", "Effect", FX.map(({ id, name }) => [id, name])) },
+  { section: "sub", ...range("subTime", "Seconds on screen", 2, 15, 1, " s") },
+  { section: "sub", ...media("subImage", "Your own image or GIF", "image") },
+  { section: "sub", ...media("subMySound", "Your own sound", "sound", "Plays instead of the sound above.") },
+  // gifted subs
+  { section: "subgift", ...toggle("subgiftOn", "Show gifted subs") },
+  { section: "subgift", ...text("subgiftText", "Text", "{count} is how many subs they gave. A whole batch is one alert.") },
+  { section: "subgift", ...text("subgiftOneText", "Text for a single sub") },
+  { section: "subgift", ...select("subgiftSound", "Sound", SOUNDS.map(({ id, name }) => [id, name])) },
+  { section: "subgift", ...select("subgiftFx", "Effect", FX.map(({ id, name }) => [id, name])) },
+  { section: "subgift", ...range("subgiftTime", "Seconds on screen", 2, 15, 1, " s") },
+  { section: "subgift", ...media("subgiftImage", "Your own image or GIF", "image") },
+  { section: "subgift", ...media("subgiftMySound", "Your own sound", "sound", "Plays instead of the sound above.") },
+  // bits
+  { section: "bits", ...toggle("bitsOn", "Show bits") },
+  { section: "bits", ...text("bitsText", "Text") },
+  { section: "bits", ...text("bitsBigText", "Text for a big cheer") },
+  { section: "bits", ...select("bitsSound", "Sound", SOUNDS.map(({ id, name }) => [id, name])) },
+  { section: "bits", ...select("bitsFx", "Effect", FX.map(({ id, name }) => [id, name])) },
+  { section: "bits", ...range("bitsTime", "Seconds on screen", 2, 15, 1, " s") },
+  { section: "bits", ...media("bitsImage", "Your own image or GIF", "image") },
+  { section: "bits", ...media("bitsMySound", "Your own sound", "sound", "Plays instead of the sound above.") },
+  { section: "bits", ...range("bitsMin", "Smallest cheer to show", 0, 1000, 1, " bits", { zero: "every cheer" }) },
+  { section: "bits", ...range("bitsMid", "A medium cheer is at least", 1, 5000, 1, " bits", { hint: "Medium cheers stay longer and get a bigger effect." }) },
+  { section: "bits", ...range("bitsBig", "A big cheer is at least", 1, 50000, 1, " bits", { hint: "Big cheers get the biggest effect, the longest time and the big-cheer text." }) },
+  // raid
+  { section: "raid", ...toggle("raidOn", "Show raids") },
+  { section: "raid", ...text("raidText", "Text", "{count} is how many viewers came with them.") },
+  { section: "raid", ...select("raidSound", "Sound", SOUNDS.map(({ id, name }) => [id, name])) },
+  { section: "raid", ...select("raidFx", "Effect", FX.map(({ id, name }) => [id, name])) },
+  { section: "raid", ...range("raidTime", "Seconds on screen", 2, 15, 1, " s") },
+  { section: "raid", ...media("raidImage", "Your own image or GIF", "image") },
+  { section: "raid", ...media("raidMySound", "Your own sound", "sound", "Plays instead of the sound above.") },
 ].map((c) => (Array.isArray(c.options) && Array.isArray(c.options[0]) ? { ...c, options: list(...c.options) } : c));
 
 const byKey = Object.fromEntries(CONTROLS.map((c) => [c.key, c]));
@@ -165,8 +210,9 @@ export function sanitize(raw) {
     const value = coerce(control, raw[control.key]);
     if (value !== undefined) out[control.key] = value;
   }
-  // A medium gift can't be bigger than a big one.
+  // A medium gift can't be bigger than a big one, nor a medium cheer than a big one.
   if (out.giftMid > out.giftBig) out.giftMid = out.giftBig;
+  if (out.bitsMid > out.bitsBig) out.bitsMid = out.bitsBig;
   return out;
 }
 
@@ -192,12 +238,12 @@ export function toParams(settings, params = new URLSearchParams()) {
   return params;
 }
 
-/** The address a streamer pastes into their streaming app. `base` is the alerts overlay page's address. */
-export function alertsUrl(base, { channel = "", settings = DEFAULTS } = {}) {
+/** The address a streamer pastes into their streaming app. `base` is the alerts overlay page's address; `platform` is "tiktok" or "twitch". */
+export function alertsUrl(base, { channel = "", settings = DEFAULTS, platform = "tiktok" } = {}) {
   const params = new URLSearchParams();
   if (channel) {
     params.set("channel", channel);
-    params.set("platform", "tiktok");
+    params.set("platform", platform === "twitch" ? "twitch" : "tiktok");
   }
   return base + "?" + toParams(settings, params);
 }

@@ -212,3 +212,67 @@ test("overlay: an old relay that cannot send alerts is called out on the page, a
   await page.goto(`${base}/overlay/alerts/?demo=1`, { settle: 600 });
   await until(async () => (await cards()).length > 0, 6000);
 });
+
+// ── Twitch ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+const shown = (selector) => page.evaluate(`[...document.querySelectorAll(${JSON.stringify(selector)})].filter((n) => !n.hidden).map((n) => n.dataset.test ?? n.querySelector("summary")?.textContent)`);
+
+test("editor: choosing Twitch shows its own test buttons and sections, and the link names Twitch", { skip }, async () => {
+  const { base } = await withHelper();
+  await page.goto(base + "/alerts/?platform=twitch&maxShown=3&subTime=2&subgiftTime=2&bitsTime=2&raidTime=2&speed=250", { settle: 700 });
+  assert.deepEqual(await shown(".preview__tests [data-test]"), ["sub", "resub", "subgift", "bits", "bits-big", "raid"]);
+  assert.deepEqual(await shown("details[data-platform]"), ["Subs and resubs", "Gifted subs", "Bits", "Raids"]);
+  assert.equal((await shown(".seen__list [data-platform]")).length, 4, "four counters: subs, gifted subs, bits and raids");
+  await type("#source-channel", "pond_cafe");
+  const link = new URL(await page.evaluate(`document.getElementById("link").value`));
+  assert.equal(link.searchParams.get("platform"), "twitch");
+  assert.equal(link.searchParams.get("channel"), "pond_cafe");
+
+  for (const [test, pattern] of [["sub", /subscribed!$/], ["resub", /resubscribed for \d+ months!$/], ["subgift", /gifted \d+ subs!$/], ["bits", /cheered \d+ bits!/], ["bits-big", /cheered \d+ bits!/], ["raid", /is raiding with \d+ viewers!$/]]) {
+    await click(`[data-test="${test}"]`);
+    await until(async () => (await liveCards()).some((c) => pattern.test(c.text)), 6000);
+  }
+
+  // back to TikTok: its buttons return, and the link follows
+  await page.evaluate(`[...document.querySelectorAll("#source .chip")].find((b) => b.textContent.trim() === "TikTok").click()`);
+  assert.deepEqual(await shown(".preview__tests [data-test]"), ["follow", "gift-1", "gift-3", "share", "crowd"]);
+  await type("#source-channel", "pond_cafe");
+  assert.equal(new URL(await page.evaluate(`document.getElementById("link").value`)).searchParams.get("platform"), "tiktok");
+});
+
+test("overlay: Twitch subs, gifted subs, bits and raids come from Twitch's chat connection and are shown, each once", { skip }, async () => {
+  // a pretend Twitch chat server: after the page joins a channel it sends a sub, a repeat of that sub, a batch of 3 gifted subs with its
+  // 3 one-by-one lines, a lone gifted sub, a cheer and a raid
+  const lines = [
+    ":x JOIN #pond",
+    "@id=n1;msg-id=sub;login=newbie;display-name=Newbie;msg-param-cumulative-months=1 :tmi.twitch.tv USERNOTICE #pond",
+    "@id=n1;msg-id=sub;login=newbie;display-name=Newbie;msg-param-cumulative-months=1 :tmi.twitch.tv USERNOTICE #pond",
+    "@id=g1;msg-id=submysterygift;login=kind;display-name=Kind;msg-param-mass-gift-count=3;msg-param-origin-id=b1 :tmi.twitch.tv USERNOTICE #pond",
+    "@id=g2;msg-id=subgift;login=kind;display-name=Kind;msg-param-origin-id=b1 :tmi.twitch.tv USERNOTICE #pond",
+    "@id=g3;msg-id=subgift;login=kind;display-name=Kind;msg-param-origin-id=b1 :tmi.twitch.tv USERNOTICE #pond",
+    "@id=g4;msg-id=subgift;login=kind;display-name=Kind;msg-param-origin-id=b1 :tmi.twitch.tv USERNOTICE #pond",
+    "@id=g5;msg-id=subgift;login=solo;display-name=Solo;msg-param-origin-id=lone :tmi.twitch.tv USERNOTICE #pond",
+    "@id=c1;bits=50;display-name=Cheerer :cheerer!cheerer@cheerer PRIVMSG #pond :cheer50 go",
+    "@id=r1;msg-id=raid;login=big;display-name=Big;msg-param-viewerCount=40 :tmi.twitch.tv USERNOTICE #pond",
+  ];
+  const added = await page.send("Page.addScriptToEvaluateOnNewDocument", { source: `
+    window.WebSocket = class {
+      constructor(url) { this.url = url; this.readyState = 0; setTimeout(() => { this.readyState = 1; this.onopen && this.onopen(); }, 5); }
+      send(line) {
+        if (!String(line).startsWith("JOIN")) return;
+        setTimeout(() => this.onmessage && this.onmessage({ data: ${JSON.stringify(lines.join("\r\n") + "\r\n")} }), 20);
+      }
+      close() { this.readyState = 3; }
+    };` });
+  try {
+    const { base } = await withHelper();
+    await page.goto(`${base}/overlay/alerts/?channel=pond&platform=twitch&maxShown=3&subTime=2&subgiftTime=2&bitsTime=2&raidTime=2&speed=250`, { settle: 600 });
+    const seen = new Set();
+    await until(async () => { for (const c of await cards()) seen.add(c.text); return seen.size >= 5; }, 15000);
+    await sleep(2500); // long enough for a wrongly repeated alert to turn up
+    for (const c of await cards()) seen.add(c.text);
+    assert.deepEqual([...seen].sort(), ["Big is raiding with 40 viewers!", "Cheerer cheered 50 bits!", "Kind gifted 3 subs!", "Newbie subscribed!", "Solo gifted a sub!"]);
+  } finally {
+    await page.send("Page.removeScriptToEvaluateOnNewDocument", { identifier: added.identifier });
+  }
+});

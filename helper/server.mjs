@@ -24,7 +24,7 @@ import { DEMO_USER, DemoConnection } from "./demo.mjs";
 import { ALERT_AT, Signing, capacity, deviceFacts, snapshot, statusPage } from "./status.mjs";
 import { SlotAlerts, termuxNotifier } from "./alerts.mjs";
 
-const VERSION = "0.5.0";
+const VERSION = "0.5.1";
 /** What this program can do, so a page can tell an old one ("chat" only) from one that sends alerts. */
 const FEATURES = ["chat", "alerts", "info", "roles", "status"];
 
@@ -75,7 +75,7 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
   const numbers = (local) => {
     const stats = hub.stats();
     const estimate = capacity({ freeMem: os.freemem(), rss: process.memoryUsage().rss, baseRss, rooms: stats.used, cpuFraction });
-    return snapshot({ stats, startedAt, now: Date.now(), version: VERSION, features: FEATURES, signing, estimate, alertAt: relay?.alertAt ?? ALERT_AT, device: local ? deviceFacts(cpuFraction) : null });
+    return snapshot({ stats, startedAt, now: Date.now(), version: VERSION, features: FEATURES, signing, estimate, alertAt: relay?.alertAt ?? ALERT_AT, device: local ? deviceFacts(cpuFraction) : null, roster: local ? hub.roster() : null });
   };
   const nothing = (req, res) => {
     res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });

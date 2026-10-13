@@ -26,7 +26,8 @@ export function connectTo(feeds, platform, name, onStatus, { relay = "", events 
     onRemove: ({ id }) => list.forEach((f) => f.removeById(id)),
     onClear: ({ user }) => list.forEach((f) => (user ? f.removeUser(user) : f.clear())),
   };
-  if (platform !== "tiktok") return connectTwitch({ channel: name, ...handlers });
+  // Twitch sends its alerts (subs, gifted subs, bits, raids) in the same public chat connection, so onAlert simply hears them from there.
+  if (platform !== "tiktok") return connectTwitch({ channel: name, ...handlers, onStatus: onStatus && ((s) => onStatus({ ...s, platform: "twitch" })), onEvent: onAlert });
 
   const login = cleanTikTokUser(name);
   if (!login) return connectTikTok({ user: name, ...handlers }); // says the name is wrong, at once
@@ -57,7 +58,7 @@ const STATUS = {
   // Connected is not the same as reading: TikTok accepts a connection to an account that is not LIVE, and then nothing arrives. So for
   // TikTok it says what is true until the first message comes, and the page changes it to "Reading ..." when one does.
   // `wants` is set by the overlays that wait for events other than chat ("follows", "likes"): they say that, not "chat".
-  connected: (s) => s.detail || (s.wants ? `Connected to TikTok. Waiting for ${s.wants}. They only come while the account is LIVE.` : s.platform === "tiktok" ? "Connected to TikTok. Waiting for the first chat message. Real chat only shows while you are LIVE." : `Reading chat from ${who(s)}`),
+  connected: (s) => s.detail || (s.wants && s.platform === "twitch" ? `Reading chat from ${who(s)}. ${s.wants[0].toUpperCase()}${s.wants.slice(1)} show up here when someone does them. They only come while you are live.` : s.wants ? `Connected to TikTok. Waiting for ${s.wants}. They only come while the account is LIVE.` : s.platform === "tiktok" ? "Connected to TikTok. Waiting for the first chat message. Real chat only shows while you are LIVE." : `Reading chat from ${who(s)}`),
   reading: (s) => (s.wants ? `Reading ${who(s)}'s LIVE. ${s.wants[0].toUpperCase()}${s.wants.slice(1)} will show up here.` : `Reading ${who(s)}'s LIVE chat`),
   silent: (s) => (s.wants ? `Nothing has arrived yet. Is the account LIVE right now? Real ${s.wants} only come while it is LIVE and someone does it. If you just went LIVE, press Disconnect and then Connect again.` : "Nothing has arrived yet. Are you LIVE? Real chat only shows while you are LIVE. If you just went LIVE, press Disconnect and then Connect again."),
   queued: (s) => (s.position ? `The free relay is full. Waiting for a spot: ${s.position} of ${s.total}…` : "The free relay is full. Waiting for a spot…"),

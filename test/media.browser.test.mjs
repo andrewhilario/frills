@@ -70,7 +70,7 @@ test("the file box stays off until the rights box is ticked", { skip }, async ()
 
 test("a picture is uploaded, shown, put in the link and drawn in the alert", { skip }, async () => {
   await page.goto(`${base}/alerts/`, { settle: 700 });
-  assert.equal((await labels()).length, 8, "an image and a sound each for follow, gift, share and a big gift");
+  assert.equal((await labels()).length, 16, "an image and a sound each for follow, gift, share and a big gift (TikTok) and for sub, gifted subs, bits and raid (Twitch)");
   const at = (await labels()).findIndex((k) => k === "Your own image or GIF"); // the follow one comes first
   await pick(at, PNG, "me.png", "image/png");
   await page.waitFor(`document.querySelectorAll(".media")[${at}].querySelector(".media__preview img")`);

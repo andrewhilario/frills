@@ -27,7 +27,7 @@ test("a good message is saved with its date, kind, app and contact, and nothing 
   const res = await send(good, env, {}, { now });
   assert.deepEqual([res.status, res.body], [201, { ok: true }]);
   const [row] = rows(env);
-  assert.deepEqual({ ...row }, { id: 1, created: "2026-10-09T12:00:00.000Z", kind: "idea", app: "obs", message: "Please add a pink look with hearts.", contact: "@mochi" });
+  assert.deepEqual({ ...row }, { id: 1, created: "2026-10-09T12:00:00.000Z", kind: "idea", app: "obs", message: "Please add a pink look with hearts.", contact: "@mochi", status: "new" }); // status is set by the admin page, and starts as new
 });
 
 test("the app and the contact are optional", async () => {

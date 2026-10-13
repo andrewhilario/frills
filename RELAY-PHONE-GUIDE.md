@@ -245,3 +245,12 @@ Open the relay's address in a browser (`https://relay.valwidgets.live/health`, o
 - To change the number or turn it off, start the relay with `RELAY_ALERT_SPOTS=15` (or `RELAY_ALERTS=0`). `update-relay.sh` accepts the same variables: `RELAY_ALERT_SPOTS=15 bash ~/frills/update-relay.sh`.
 
 **How many can it handle?** The "About N accounts" number is a guess from the free memory and how much of one core each open account uses. It gets better once a few accounts are open. The real limit is usually your home internet and TikTok's free signing service (about 2,500 requests a day), so raise `RELAY_SLOTS` a little at a time and watch the page.
+
+## Who is connected (relay 0.5.1)
+
+Open the status page **on the phone itself** (the same `http://localhost:PORT/health` address, in the phone's own browser) and under "This device" there is a table, **Who is connected**: each TikTok account the relay is watching right now, whether it is LIVE, how many overlay pages are listening, its follower count, how long it has been here and how much has passed (chat lines, gifts, follows, shares). Press a name to open their LIVE on TikTok so you can say thank you. Accounts waiting in line are listed under the table.
+
+- It is only shown on the phone. Through the tunnel (the public address) the page and the numbers carry no names at all.
+- It is a live view only. Nothing is saved, so there is no history: if you want to know who was on an hour ago, you have to have been looking.
+- "LIVE now" comes from what TikTok said when the relay connected. An account that went LIVE a moment later can read "Connected, not LIVE yet" until its next connect.
+- The privacy page says that the person running the relay can see who is connected.

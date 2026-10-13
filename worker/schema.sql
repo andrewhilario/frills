@@ -5,8 +5,12 @@ CREATE TABLE IF NOT EXISTS feedback (
   kind TEXT NOT NULL,      -- broken, idea, look or other
   app TEXT,                -- the streaming app they picked, if any
   message TEXT NOT NULL,
-  contact TEXT             -- an email or @name, only if they typed one
+  contact TEXT,            -- an email or @name, only if they typed one
+  status TEXT NOT NULL DEFAULT 'new' -- new or done, set from the admin page
 );
+-- A database made before the admin page has no status column. Run this one line once to add it (the admin page works without it, but
+-- then cannot mark feedback as done):
+--   ALTER TABLE feedback ADD COLUMN status TEXT NOT NULL DEFAULT 'new';
 CREATE INDEX IF NOT EXISTS feedback_created ON feedback (created);
 
 -- To read the newest 50:  SELECT id, created, kind, app, message, contact FROM feedback ORDER BY id DESC LIMIT 50;
@@ -33,4 +37,9 @@ CREATE TABLE IF NOT EXISTS nowplaying (
   key_hash TEXT NOT NULL,   -- sha-256 of the key that may change it (the key itself is never stored)
   data TEXT NOT NULL,       -- the song: title, artist, cover, position (JSON)
   updated_at INTEGER NOT NULL -- milliseconds since 1970
+);
+
+-- Wrong admin passwords, kept for 10 minutes so that guessing is stopped (see worker/admin.mjs). Run this part once.
+CREATE TABLE IF NOT EXISTS admin_tries (
+  at INTEGER NOT NULL      -- milliseconds since 1970
 );
