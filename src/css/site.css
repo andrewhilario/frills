@@ -221,6 +221,7 @@
 .spotify__card { display: grid; gap: var(--space-sm); padding: var(--space-md); margin-block: var(--space-md); border: 2px solid var(--color-ink); border-radius: var(--radius-card); background: var(--color-paper-2); }
 .spotify__row { display: flex; flex-wrap: wrap; gap: var(--space-sm); align-items: center; }
 .spotify__row input { flex: 1 1 14rem; min-width: 0; }
+.spotify__row [hidden], .spotify__card[hidden] { display: none; } /* a button with its own display still goes when it is hidden */
 .spotify__status[data-state="error"], .ctl__hint[data-state="error"] { color: var(--color-error); font-weight: 600; }
 .spotify__now { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-md); align-items: center; }
 .spotify__cover { width: 6rem; height: 6rem; border-radius: var(--radius-sm); object-fit: cover; background: var(--color-paper-3); }

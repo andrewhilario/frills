@@ -106,3 +106,52 @@ test("the Twitch pages: logged out they say so and offer the login; a login that
   assert.equal(await page.evaluate(`location.hash`), "", "the login is taken out of the address");
   assert.equal(await page.evaluate(`localStorage.getItem("frills:twitch:login")`), null, "and nothing was kept");
 });
+
+test("the follows page, logged in (with a pretend Twitch): the login button goes, the listener starts, a follower shows up and reaches the box, and a test follower is sent", { skip }, async () => {
+  const added = await page.send("Page.addScriptToEvaluateOnNewDocument", { source: `
+    localStorage.setItem("frills:twitch:login", JSON.stringify({ token: "abcdefghij1234567890", login: "ainzzuu", userId: "42", savedAt: Date.now() }));
+    const realFetch = window.fetch.bind(window);
+    window.fetch = (url, options) => {
+      const u = String(url);
+      if (u === "https://id.twitch.tv/oauth2/validate") return Promise.resolve(new Response(JSON.stringify({ client_id: "tcve57go7uzw3k8bfptf3kgxdjdizz", login: "ainzzuu", user_id: "42", scopes: ["moderator:read:followers"], expires_in: 5000 }), { status: 200 }));
+      if (u.startsWith("https://api.twitch.tv/helix/eventsub/subscriptions")) return Promise.resolve(new Response("{}", { status: 202 }));
+      return realFetch(url, options);
+    };
+    window.WebSocket = class {
+      constructor(url) {
+        this.url = url;
+        setTimeout(() => {
+          this.onmessage && this.onmessage({ data: JSON.stringify({ metadata: { message_id: "w1", message_type: "session_welcome" }, payload: { session: { id: "s1", keepalive_timeout_seconds: 10 } } }) });
+          setTimeout(() => this.onmessage && this.onmessage({ data: JSON.stringify({ metadata: { message_id: "n1", message_type: "notification" }, payload: { subscription: { type: "channel.follow" }, event: { user_id: "7", user_login: "mochi_bun", user_name: "Mochi Bun", followed_at: "2026-10-13T10:00:00Z" } } }) }), 300);
+        }, 50);
+      }
+      close() {}
+      send() {}
+    };` });
+  try {
+    await page.goto(`${base}/twitch/`, { settle: 1500 });
+    const shows = (id) => page.evaluate(`(() => { const n = document.getElementById(${JSON.stringify(id)}); return Boolean(n) && !n.hidden && getComputedStyle(n).display !== "none"; })()`);
+    assert.equal(await page.evaluate(`document.getElementById("tw-status").textContent`), "Logged in as ainzzuu.");
+    assert.equal(await shows("tw-login-btn"), false, "already logged in: no login button");
+    assert.equal(await shows("tw-logout-btn"), true);
+    assert.equal(await shows("tw-listen-card"), true);
+    await page.waitFor(`/Listening/.test(document.getElementById("tw-listen-status").textContent)`);
+    await page.waitFor(`/Mochi Bun followed at/.test(document.getElementById("tw-recent").textContent)`);
+    const identity = await page.evaluate(`JSON.parse(localStorage.getItem("frills:twitch:bridge"))`);
+    await until(async () => {
+      const res = await fetch(`${base}/api/follows/${identity.code}?after=0`);
+      return (await res.json()).items?.some((i) => i.name === "Mochi Bun" && i.user === "mochi_bun");
+    }, 8000);
+    await page.evaluate(`document.getElementById("tw-test").click()`);
+    await page.waitFor(`/^Sent\./.test(document.getElementById("tw-test-note").textContent)`);
+    const names = (await (await fetch(`${base}/api/follows/${identity.code}?after=0`)).json()).items.map((i) => i.name);
+    assert.deepEqual(names, ["Mochi Bun", "Frills Test"]);
+    await page.evaluate(`document.getElementById("tw-logout-btn").click()`);
+    assert.equal(await shows("tw-login-btn"), true, "logged out: the login button is back");
+    assert.equal(await shows("tw-listen-card"), false);
+    assert.equal(await page.evaluate(`localStorage.getItem("frills:twitch:login")`), null);
+  } finally {
+    await page.send("Page.removeScriptToEvaluateOnNewDocument", { identifier: added.identifier });
+    await page.evaluate(`localStorage.removeItem("frills:twitch:login")`);
+  }
+});

@@ -30,7 +30,8 @@ function main() {
   const logoutBtn = $("tw-logout-btn");
   const listenCard = $("tw-listen-card");
   const identity = followIdentity();
-  const publisher = new FollowPublisher({ code: identity.code, key: identity.key });
+  let lastError = 0; // the answer that stopped the last send: 0 means no connection
+  const publisher = new FollowPublisher({ code: identity.code, key: identity.key, onError: (status) => { lastError = status; } });
   let watcher = null;
   let clock = null;
   let login = loadLogin();
@@ -49,6 +50,16 @@ function main() {
       const id = setInterval(fn, every);
       return { stop: () => clearInterval(id) };
     }
+  }
+
+  /** What went wrong with a send, in words: the post box's own answers, not just "try again". */
+  function problem(status) {
+    if (status === 0) return "Could not reach Frills. Check your connection and try again.";
+    if (status === 503) return "Frills' server is not ready for follows yet: its database is missing the follows tables. (The owner has to add them once; see worker/schema.sql.)";
+    if (status === 507) return "Frills has too many follow boxes right now. Try again later.";
+    if (status === 429) return "Too many follows at once. It will be sent in a moment.";
+    if (status === 403) return "Frills did not accept this browser's key for your box. Reload this page and try again.";
+    return `Could not send it (answer ${status}). Try again in a moment.`;
   }
 
   function facts() {
@@ -105,13 +116,22 @@ function main() {
     clock = null;
   }
 
+  /** Says "still here" to the post box, and tells the person if the box cannot be reached (so a broken box is not found out only when a follower is lost). */
+  async function checkBox() {
+    lastError = 0;
+    const ok = await publisher.ping();
+    const note = $("tw-test-note");
+    if (!ok) say(note, problem(lastError), true);
+    else if (note.dataset.state === "error") say(note, "The link to your alerts is working.");
+  }
+
   async function startListening() {
     stopListening();
     watcher = new FollowWatcher({ token: login.token, clientId, userId: login.userId, onFollow, onStatus });
     watcher.start();
-    publisher.ping();
+    checkBox();
     clock = startClock(async () => {
-      publisher.ping(); // "still here", so the alerts editor can tell something is listening
+      checkBox(); // "still here", so the alerts editor can tell something is listening
       if (Date.now() - (login.checkedAt ?? 0) > 3600 * 1000) { // Twitch asks apps to check the login once an hour
         login.checkedAt = Date.now();
         const who = await validate(login.token);
@@ -148,8 +168,9 @@ function main() {
   logoutBtn.addEventListener("click", () => { stopListening(); clearLogin(); login = null; show(); });
   $("tw-test").addEventListener("click", async () => {
     const note = $("tw-test-note");
+    lastError = -1;
     const sent = await publisher.send({ id: `test-${Date.now()}`, user: "frills_test", name: "Frills Test" });
-    say(note, sent ? "Sent. Look at your alerts overlay (or the preview in the alerts editor)." : "Could not send it. Try again in a moment.", !sent);
+    say(note, sent ? "Sent. Look at your alerts overlay (or the preview in the alerts editor)." : problem(lastError), !sent);
   });
   show();
 }
