@@ -305,3 +305,46 @@ test("letter spacing is a look option every overlay shares: alerts, gifts, goals
     assert.equal(widget.sanitize(widget.fromParams(new URL(link).searchParams)).letterSpacing, 4);
   }
 });
+
+test("alignment is an adjustment every overlay shares: chat, alerts, gifts, goals, likers and song requests", async () => {
+  const { alertVars, DEFAULTS: ALERT_DEFAULTS, CONTROLS: ALERT_CONTROLS, sanitize: sanitizeAlerts } = await import("../src/js/alerts-settings.js");
+  assert.equal(ALERT_DEFAULTS.align, "left");
+  assert.equal(alertVars(ALERT_DEFAULTS)["--a-align"], "left");
+  assert.equal(alertVars(sanitizeAlerts({ align: "center" }))["--a-align"], "center");
+  assert.equal(sanitizeAlerts({ align: "right" }).align, "right");
+  assert.equal(sanitizeAlerts({ align: "invalid" }).align, "left");
+  assert.ok(ALERT_CONTROLS.some((c) => c.key === "align" && c.section === "look"), "align is in alerts look controls");
+
+  const { SONGS } = await import("../src/js/songs.js");
+  for (const widget of [GIFTS, GOAL, SONGS]) {
+    assert.equal(widget.defaults.align, "left");
+    assert.equal(widget.sanitize({ align: "center" }).align, "center");
+    assert.equal(widget.sanitize({ align: "right" }).align, "right");
+    assert.equal(widget.sanitize({ align: "bogus" }).align, "left");
+    assert.ok(widget.controls.some((c) => c.key === "align" && c.section === "look"), "align is in widget look section");
+    const link = widget.url("https://x.example/o/", { settings: widget.sanitize({ align: "center" }) });
+    assert.equal(new URL(link).searchParams.get("align"), "center");
+    assert.equal(widget.sanitize(widget.fromParams(new URL(link).searchParams)).align, "center");
+  }
+
+  const { DEFAULTS: CHAT_DEFAULTS, CONTROLS: CHAT_CONTROLS, sanitize: sanitizeChat, lookVars: chatLookVars, toParams: chatToParams, fromParams: chatFromParams } = await import("../src/js/settings.js");
+  assert.equal(CHAT_DEFAULTS.align, "left");
+  assert.equal(chatLookVars(CHAT_DEFAULTS).vars["--g-align"], "left");
+  assert.equal(chatLookVars(sanitizeChat({ align: "right" })).vars["--g-align"], "right");
+  assert.equal(sanitizeChat({ align: "center" }).align, "center");
+  assert.equal(sanitizeChat({ align: "bad" }).align, "left");
+  assert.ok(CHAT_CONTROLS.some((c) => c.key === "align"), "align is in chat controls");
+  const chatParams = chatToParams(sanitizeChat({ align: "right" }));
+  assert.equal(chatParams.get("align"), "right");
+  assert.equal(sanitizeChat(chatFromParams(chatParams)).align, "right");
+
+  const { MATCHA_DEFAULTS, MATCHA_CONTROLS, sanitizeMatcha, matchaOverlayUrl, matchaFromParams } = await import("../src/js/matcha.js");
+  assert.equal(MATCHA_DEFAULTS.align, "left");
+  assert.equal(sanitizeMatcha({ align: "right" }).align, "right");
+  assert.equal(sanitizeMatcha({ align: "foo" }).align, "left");
+  assert.ok(MATCHA_CONTROLS.some((c) => c.key === "align"), "align is in matcha controls");
+  const matchaUrl = matchaOverlayUrl("https://x.example/o/", { settings: sanitizeMatcha({ align: "center" }) });
+  const matchaParams = new URL(matchaUrl).searchParams;
+  assert.equal(matchaParams.get("align"), "center");
+  assert.equal(sanitizeMatcha(matchaFromParams(matchaParams)).align, "center");
+});

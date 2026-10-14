@@ -26,7 +26,12 @@
 /* A ring around a big one: a drawn border rather than a second shadow, because a shadow list that starts with "none" is not valid. */
 .alert[data-tier="3"] .alert__card::after { content: ""; position: absolute; inset: -0.3em; border: 0.12em solid var(--a-accent, #fc0); border-radius: calc(var(--a-radius, 20px) + 0.3em); opacity: 0.55; }
 .alert__mark { color: var(--a-pop, #f48); font-weight: 800; }
-.alert__words { min-width: 0; }
+.alert__words { min-width: 0; text-align: var(--a-align, left); }
+
+.alerts[data-align="center"] .alert__card { justify-content: center; text-align: center; }
+.alerts[data-align="center"] .alert__words { text-align: center; }
+.alerts[data-align="right"] .alert__card { justify-content: flex-end; flex-direction: row-reverse; text-align: right; }
+.alerts[data-align="right"] .alert__words { text-align: right; }
 
 .alert__av {
   position: relative; flex: none; display: grid; place-items: center; width: 2.3em; height: 2.3em; border-radius: 50%; overflow: hidden;

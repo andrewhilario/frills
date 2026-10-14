@@ -3,7 +3,7 @@
 //   2. renders each page from src/pages with the shared nav, footer and layout
 //   3. measures the overlay page, so the numbers on the site are the real ones
 //   4. writes sitemap.xml, robots.txt and the security headers
-// The site is plain static files: there is no server and no database behind it.
+// The site is plain static files. A small Worker and a Cloudflare D1 database sit behind a few of its features (feedback, uploaded files, Twitch follows, Spotify); see worker/.
 
 import { build as esbuild } from "esbuild";
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -12,6 +12,7 @@ import { gzipSync } from "node:zlib";
 import { site, checkSite } from "./src/site.mjs";
 import { CONTROLS, PRESETS, PRESET_NAMES } from "./src/js/settings.js";
 import { faq } from "./src/faq.mjs";
+import { overlaysFaq } from "./src/overlays-faq.mjs";
 import { tokenHex } from "./scripts/tokens.mjs";
 
 const root = import.meta.dirname;
@@ -144,9 +145,18 @@ const shared = {
   spotifyClientId: site.spotifyClientId ?? "",
   twitchClientId: site.twitchClientId ?? "",
   tickerJs: assets.js.ticker,
-  privacyAlerts: relayOn ? `\n      <h2 class="subtitle">Alerts, last gifts and goals</h2>\n      <p>These work like chat: follows, gifts and shares pass through the free Frills relay to your overlay and nobody keeps them. The list of gifts, the follower count and the like ranking live only in your overlay page\u2019s memory. If you turn on \u201cremember\u201d, the count is kept in your own browser or streaming app and nowhere else.</p>\n      <p>Images, GIFs and sounds you upload for alerts are stored by Frills, in the same database as feedback, until you delete them with the delete code you were given or we remove them. Your link carries only a short code for each file, and the files are not listed anywhere. We do not store who uploaded them.</p>` : "",
-  privacyTwitchFollows: site.twitchClientId ? `\n      <h2 class="subtitle">Twitch follows</h2>\n      <p>Twitch only tells a logged-in streamer who follows them. If you use Twitch follow alerts, you log in to Twitch on a private Frills page and say yes to one thing: seeing who follows your channel. That login stays in your own browser and is never sent to Frills. The page listens to Twitch for new followers and passes each new follower\u2019s name, with a random code, to Frills so that your alerts overlay can show it. Frills keeps those names for one day, in the same database as feedback, and does not list them. Log out on that page to forget the login, or remove Frills in your Twitch connections settings.</p>` : "",
-  privacyFeedback: site.feedbackForm ? `\n      <h2 class="subtitle">If you send feedback</h2>\n      <p>The feedback form saves your message, the kind you pick, the streaming app you pick, your contact if you type one, and the date, in a database on Cloudflare. It does not save your address with the message. Only we read it, and we use it to improve Frills. Ask us to delete a message by sending another one that says which.</p>` : "",
+  privacyAlerts: relayOn ? `\n      <h2 class="subtitle">Alerts, last gifts and goals</h2>\n      <p>These work like chat: follows, gifts and shares pass through the free Frills relay to your overlay and nobody keeps them. The list of gifts, the follower count and the like ranking live only in your overlay page\u2019s memory. If you turn on \u201cremember\u201d, the count is kept in your own browser or streaming app and nowhere else.</p>` : "",
+  // Everything the site's database keeps, in one list. Each item says what is kept, for how long, and who can see it.
+  privacyStored: `\n      <h2 class="subtitle">What Frills keeps on its server</h2>
+      <p>Frills has no accounts, but it does use a small database on Cloudflare for the few things below. Nothing else is kept, and none of it is sold or used for advertising.</p>
+      <ul>${site.feedbackForm ? `
+        <li><strong>Feedback you send.</strong> The message, the kind you pick, the streaming app you pick, your contact if you type one, and the date. It does not save your address with the message. Only we read it, and we use it to improve Frills. Ask us to delete a message by sending another one that says which.</li>` : ""}
+        <li><strong>Images, GIFs and sounds you upload for alerts.</strong> The file itself, its type, its size and the time, plus a scrambled copy (a hash) of the delete code you are shown once. We do not store your name or your address with it. A file stays until you delete it with that code or we remove it. Anyone who has your overlay link, or the file\u2019s own address, can open it, so do not upload anything private; the files are not listed anywhere. After a deletion a copy can stay at Cloudflare for up to an hour. Files are limited to 300 KB and to common picture and sound types, and you must have the right to use what you upload.</li>${site.twitchClientId ? `
+        <li><strong>New Twitch followers, if you use Twitch follow alerts.</strong> Your Twitch login stays in your browser and is never sent to Frills. Each new follower\u2019s name and Twitch name are kept for one day, under a random code in your overlay link, so that your overlay can show them. The page that listens also tells Frills now and then that it is still running.</li>` : ""}${site.spotifyClientId ? `
+        <li><strong>The song playing, if you share Spotify with Song requests</strong> (still being built). Its title, artist, cover and position go to a small box under a random code, so that your overlay can show it. It is replaced as the song changes and removed after 14 days of no use. Your Spotify login stays in your browser.</li>` : ""}
+        <li><strong>Song names in Song requests</strong> (still being built). The words a viewer types to ask for a song are looked up on Deezer\u2019s public catalog through Frills\u2019 server, so that the overlay can show a cover. Frills does not keep them, but Cloudflare can keep the answer for a short while.</li>
+      </ul>
+      <p>The person who runs Frills can read all of the above on a private page, to read feedback and to remove files that should not be there. Wrong-password tries on that page are counted for ten minutes so that guessing is stopped.</p>`,
   gscTag: site.googleSiteVerification ? `\n<meta name="google-site-verification" content="${esc(site.googleSiteVerification)}">` : "",
   tallyUrl: site.tally.url,
   tallyBlurb: site.tally.blurb,
@@ -159,12 +169,13 @@ const shared = {
   looksGrid,
 };
 
-function jsonLd(meta, canonical, faqItems) {
+function jsonLd(meta, canonical, faqItems, overlayItems = []) {
   const nodes = [];
   for (const kind of meta.jsonld ?? []) {
     if (kind === "website") nodes.push({ "@type": "WebSite", name: site.name, url: `${site.url}/`, description: site.description });
     if (kind === "software") nodes.push({ "@type": "SoftwareApplication", name: site.name, url: `${site.url}/`, description: site.description, applicationCategory: "MultimediaApplication", operatingSystem: "Any (runs in a web browser)", offers: { "@type": "Offer", price: "0", priceCurrency: "USD" } });
     if (kind === "faq") nodes.push({ "@type": "FAQPage", mainEntity: faqItems.map((i) => ({ "@type": "Question", name: i.q, acceptedAnswer: { "@type": "Answer", text: i.text } })) });
+    if (kind === "faq-overlays") nodes.push({ "@type": "FAQPage", mainEntity: overlayItems.map((i) => ({ "@type": "Question", name: i.q, acceptedAnswer: { "@type": "Answer", text: i.text } })) });
     if (kind.startsWith("breadcrumb:")) nodes.push({ "@type": "BreadcrumbList", itemListElement: [{ "@type": "ListItem", position: 1, name: site.name, item: `${site.url}/` }, { "@type": "ListItem", position: 2, name: kind.slice(11), item: canonical }] });
   }
   return nodes.map((n) => `<script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org", ...n }).replace(/</g, "\\u003c")}</script>`).join("\n");
@@ -174,6 +185,7 @@ function renderPage(page, stats) {
   const { meta } = page;
   const canonical = site.url + meta.path;
   const faqItems = faq({ kb: stats.kb, waitlistUrl: site.waitlistUrl, helperUrl: site.helperUrl, relayUrl: site.relayUrl });
+  const overlayItems = overlaysFaq({ kb: stats.kb, relayUrl: site.relayUrl });
   const vars = {
     ...shared,
     stats,
@@ -185,12 +197,13 @@ function renderPage(page, stats) {
     css: assets.css[meta.css],
     js: assets.js[meta.js],
     bodyClass: meta.bodyClass ?? "",
-    jsonld: jsonLd(meta, canonical, faqItems),
+    jsonld: jsonLd(meta, canonical, faqItems, overlayItems),
     navGuide: meta.navGuide ? ' aria-current="page"' : "",
     navTikTok: meta.navTikTok ? ' aria-current="page"' : "",
     navTest: meta.navTest ? ' aria-current="page"' : "",
     navFeedback: meta.navFeedback ? ' aria-current="page"' : "",
     navOverlays: meta.navOverlays ? ' aria-current="page"' : "",
+    overlaysFaqItems: overlayItems.map((i) => `        <details><summary>${esc(i.q)}</summary><div class="faq__answer"><p>${i.a}</p></div></details>`).join("\n"),
     faqItems: faqItems.map((i) => `        <details><summary>${esc(i.q)}</summary><div class="faq__answer"><p>${i.a}</p></div></details>`).join("\n"),
   };
   const where = relative(root, page.file);

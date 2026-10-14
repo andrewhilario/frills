@@ -27,6 +27,7 @@ export function createAlertView(host) {
     host.dataset.enter = next.enter;
     host.dataset.leave = next.leave;
     host.dataset.idle = next.idle;
+    host.dataset.align = next.align || "left";
     host.style.setProperty("--a-dir", next.hpos === "right" ? "1" : "-1");
   }
 

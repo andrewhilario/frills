@@ -20,6 +20,21 @@
 /* "Show picture" turned off: no round badge, and the text takes its room. (The general look says the same for itself in looks.css.) */
 .look[data-avatar="off"] .m { grid-template-columns: minmax(0, 1fr); }
 .look[data-avatar="off"] .av { display: none; }
+
+/* Text and message alignment */
+.look[data-align="center"] .chatbox { align-items: center; }
+.look[data-align="center"] .m { text-align: center; }
+.look[data-align="center"] .m .who { justify-content: center; }
+.look[data-align="center"] .m .txt { text-align: center; }
+
+.look[data-align="right"] .chatbox { align-items: flex-end; }
+.look[data-align="right"] .m { grid-template-columns: minmax(0, 1fr) auto; text-align: right; }
+.look[data-align="right"] .m .av { order: 2; }
+.look[data-align="right"] .m .body { order: 1; text-align: right; }
+.look[data-align="right"] .m .who { justify-content: flex-end; }
+.look[data-align="right"] .m .txt { text-align: right; }
+.look[data-align="right"][data-avatar="off"] .m { grid-template-columns: minmax(0, 1fr); }
+
 .m .body { position: relative; }
 .m .who { display: flex; align-items: center; gap: 6px; line-height: 1.15; }
 .m .name { font-weight: 800; font-size: 0.9em; overflow-wrap: anywhere; }

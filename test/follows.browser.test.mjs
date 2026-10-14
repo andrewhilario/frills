@@ -89,6 +89,10 @@ test("editor: Twitch has the follow test button and section and a box for the fo
   await postToBox({ ping: true }, { code, key }); // the follows page says "still here"
   await page.evaluate(`document.getElementById("follows-on").click(); document.getElementById("follows-on").click();`);
   await page.waitFor(`/is running/.test(document.getElementById("follows-state").textContent)`);
+  // with the box ticked, the preview in the editor also shows a follower the follows page passes on (only ones that arrive after it opened)
+  await sleep(5600); // the first look at the box only learns where the line is
+  await postToBox({ id: "preview-1", user: "pond_pal", name: "Pond Pal" }, { code, key });
+  await page.waitFor(`[...document.querySelectorAll(".alert__words")].some((n) => n.textContent === "Pond Pal just followed!")`, 15000);
   // TikTok has no such box, and the code stays out of a TikTok link
   await page.evaluate(`[...document.querySelectorAll("#source .chip")].find((b) => b.textContent.trim() === "TikTok").click()`);
   assert.equal(await visible(".followbox"), false);
@@ -145,10 +149,61 @@ test("the follows page, logged in (with a pretend Twitch): the login button goes
     await page.evaluate(`document.getElementById("tw-test").click()`);
     await page.waitFor(`/^Sent\./.test(document.getElementById("tw-test-note").textContent)`);
     const names = (await (await fetch(`${base}/api/follows/${identity.code}?after=0`)).json()).items.map((i) => i.name);
-    assert.deepEqual(names, ["Mochi Bun", "Frills Test"]);
+    assert.deepEqual(names.slice(-2), ["Mochi Bun", "Frills Test"]);
     await page.evaluate(`document.getElementById("tw-logout-btn").click()`);
     assert.equal(await shows("tw-login-btn"), true, "logged out: the login button is back");
     assert.equal(await shows("tw-listen-card"), false);
+    assert.equal(await page.evaluate(`localStorage.getItem("frills:twitch:login")`), null);
+  } finally {
+    await page.send("Page.removeScriptToEvaluateOnNewDocument", { identifier: added.identifier });
+    await page.evaluate(`localStorage.removeItem("frills:twitch:login")`);
+  }
+});
+
+test("the alerts editor, logged in to Twitch (with a pretend Twitch): no second page needed, a follower shows in the preview and reaches the box, and the test follower works", { skip }, async () => {
+  const added = await page.send("Page.addScriptToEvaluateOnNewDocument", { source: `
+    localStorage.setItem("frills:twitch:login", JSON.stringify({ token: "abcdefghij1234567890", login: "ainzzuu", userId: "42", savedAt: Date.now() }));
+    const realFetch = window.fetch.bind(window);
+    window.fetch = (url, options) => {
+      const u = String(url);
+      if (u === "https://id.twitch.tv/oauth2/validate") return Promise.resolve(new Response(JSON.stringify({ client_id: "tcve57go7uzw3k8bfptf3kgxdjdizz", login: "ainzzuu", user_id: "42", scopes: ["moderator:read:followers"], expires_in: 5000 }), { status: 200 }));
+      if (u.startsWith("https://api.twitch.tv/helix/eventsub/subscriptions")) return Promise.resolve(new Response("{}", { status: 202 }));
+      return realFetch(url, options);
+    };
+    window.WebSocket = class {
+      constructor(url) {
+        this.url = url;
+        setTimeout(() => {
+          this.onmessage && this.onmessage({ data: JSON.stringify({ metadata: { message_id: "w1", message_type: "session_welcome" }, payload: { session: { id: "s1", keepalive_timeout_seconds: 10 } } }) });
+          setTimeout(() => this.onmessage && this.onmessage({ data: JSON.stringify({ metadata: { message_id: "n1", message_type: "notification" }, payload: { subscription: { type: "channel.follow" }, event: { user_id: "7", user_login: "editor_fan", user_name: "Editor Fan", followed_at: "2026-10-14T10:00:00Z" } } }) }), 400);
+        }, 50);
+      }
+      close() {}
+      send() {}
+    };` });
+  try {
+    await page.goto(`${base}/alerts/?platform=twitch`, { settle: 1500 });
+    const shows = (selector) => page.evaluate(`(() => { const n = document.querySelector(${JSON.stringify(selector)}); return Boolean(n) && !n.hidden && getComputedStyle(n).display !== "none"; })()`);
+    await page.waitFor(`document.getElementById("tw-status").textContent === "Logged in as @ainzzuu."`);
+    assert.equal(await shows("#tw-login-btn"), false, "already logged in: no login button");
+    assert.equal(await shows("#tw-logout-btn"), true);
+    assert.equal(await shows("#tw-test-follower"), true);
+    assert.equal(await page.evaluate(`document.getElementById("follows-on").checked`), true, "logging in turns the follows on for the link");
+    await page.evaluate(`(() => { const i = document.getElementById("source-channel"); i.value = "pond_cafe"; i.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+    const identity = await page.evaluate(`JSON.parse(localStorage.getItem("frills:twitch:bridge"))`);
+    assert.equal(new URL(await page.evaluate(`document.getElementById("link").value`)).searchParams.get("follows"), identity.code);
+    // a follower arrives from Twitch: shown in the preview, and put in the box so the real overlay shows it too
+    await page.waitFor(`[...document.querySelectorAll(".alert__words")].some((n) => n.textContent === "Editor Fan just followed!")`, 10000);
+    await until(async () => (await (await fetch(`${base}/api/follows/${identity.code}?after=0`)).json()).items?.some((i) => i.name === "Editor Fan"), 8000);
+    await page.waitFor(`/is running/.test(document.getElementById("follows-state").textContent)`);
+    // the test follower
+    await page.evaluate(`document.getElementById("tw-test-follower").click()`);
+    await page.waitFor(`/Test follower sent/.test(document.getElementById("follows-state").textContent)`);
+    await page.waitFor(`[...document.querySelectorAll(".alert__words")].some((n) => n.textContent === "Frills Test just followed!")`, 8000);
+    // logging out
+    await page.evaluate(`document.getElementById("tw-logout-btn").click()`);
+    await page.waitFor(`!document.getElementById("tw-login-btn").hidden`);
+    assert.equal(await shows("#tw-test-follower"), false);
     assert.equal(await page.evaluate(`localStorage.getItem("frills:twitch:login")`), null);
   } finally {
     await page.send("Page.removeScriptToEvaluateOnNewDocument", { identifier: added.identifier });

@@ -255,10 +255,10 @@ test("a song asked for before is answered from the edge's memory, and nothing fo
 
 test("layouts: the song playing can be a card, a strip, a stack or a disc, and an overlay can show only the song or only the queue", async () => {
   const { SONG_LAYOUTS, SONG_SHOWS } = await import("../src/js/songs.js");
-  assert.deepEqual(SONG_LAYOUTS.map((l) => l[0]), ["card", "strip", "stack", "disc", "glass", "equalizer", "capsule", "poster", "boxy", "minimal"]);
+  assert.deepEqual(SONG_LAYOUTS.map((l) => l[0]), ["card", "compact", "strip", "stack", "disc", "glass", "equalizer", "capsule", "poster", "boxy", "minimal", "macos", "shell", "discord"]);
   assert.deepEqual(SONG_SHOWS.map((l) => l[0]), ["both", "now", "queue"]);
   assert.deepEqual([SONGS.defaults.layout, SONGS.defaults.show], ["card", "both"], "what it was before: a card, and both");
-  for (const layout of ["card", "strip", "stack", "disc", "glass", "equalizer", "capsule", "poster", "boxy", "minimal"]) assert.equal(SONGS.sanitize({ layout }).layout, layout);
+  for (const layout of ["card", "compact", "strip", "stack", "disc", "glass", "equalizer", "capsule", "poster", "boxy", "minimal", "macos", "shell", "discord"]) assert.equal(SONGS.sanitize({ layout }).layout, layout);
   assert.deepEqual([SONGS.defaults.progress, SONGS.defaults.scrollTitle], [true, true]);
   assert.equal(SONGS.sanitize({ layout: "<script>" }).layout, "card", "anything else falls back");
   assert.equal(SONGS.sanitize({ show: "now" }).show, "now");
@@ -299,10 +299,10 @@ test("the queue's view says when the first song came up, so the progress bar can
 
 test("the cover is its own choice, apart from the layout, with a glow and a blur, and a card for when nothing is playing", async () => {
   const { SONG_COVERS } = await import("../src/js/songs.js");
-  assert.deepEqual(SONG_COVERS.map((c) => c[0]), ["auto", "square", "round", "vinyl"]);
+  assert.deepEqual(SONG_COVERS.map((c) => c[0]), ["auto", "square", "round", "vinyl", "none"]);
   const d = SONGS.defaults;
   assert.deepEqual([d.coverShape, d.coverGlow, d.coverBlur, d.idleCard], ["auto", false, false, true], "what it was before: the layout decides, no glow, no blur");
-  for (const shape of ["auto", "square", "round", "vinyl"]) assert.equal(SONGS.sanitize({ coverShape: shape }).coverShape, shape);
+  for (const shape of ["auto", "square", "round", "vinyl", "none"]) assert.equal(SONGS.sanitize({ coverShape: shape }).coverShape, shape);
   assert.equal(SONGS.sanitize({ coverShape: "triangle" }).coverShape, "auto");
   assert.match(d.idleText, /{command}/, "the words use the command word, so they follow it when it changes");
   const link = SONGS.url("https://x.example/o/", { settings: SONGS.sanitize({ coverShape: "vinyl", coverGlow: true, coverBlur: true, idleCard: false }) });

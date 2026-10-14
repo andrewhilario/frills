@@ -1,0 +1,112 @@
+<!--
+{
+  "title": "Changelog | Frills",
+  "description": "What changed in Frills, newest first, in plain words: new overlays, Twitch alerts and follows, chat looks, fixes and what is still in beta.",
+  "path": "/changelog/",
+  "css": "page",
+  "js": "page",
+  "bodyClass": "page-guide",
+  "chrome": "nav",
+  "footer": true,
+  "jsonld": ["breadcrumb:Changelog"]
+}
+-->
+<main id="main">
+  <article class="article shell">
+    <ol class="crumbs" aria-label="Breadcrumb">
+      <li><a href="/">Frills</a></li>
+      <li aria-current="page">Changelog</li>
+    </ol>
+    <header class="article__head">
+      <h1 class="display">Changelog</h1>
+      <p class="lede">What changed, newest first, in plain words. Frills is free and in beta: it works in our tests, but a real LIVE can still surprise us. If something breaks, <a href="/feedback/">tell us</a>.</p>
+    </header>
+
+    <div class="article__body">
+      <h2 class="subtitle">14 October 2026</h2>
+
+      <h3>Text alignment</h3>
+      <ul>
+        <li><strong>Left, center or right</strong> for the chat, the Matcha looks, alerts, last gifts, goals, top likers and song requests. It is among the look options in every editor. Right swaps the sides too: the picture and the number move to the other end.</li>
+      </ul>
+
+      <h3>Twitch</h3>
+      <ul>
+        <li><strong>Log in with Twitch inside the alerts editor</strong> to get follow alerts, with no second page needed while the editor is open. There is still a separate page, <a href="/twitch/">Twitch follows</a>, to keep open when you stream without the editor.</li>
+        <li>With Twitch picked and follows ticked, the preview in the editor shows new followers as they arrive, and there is a test follower button.</li>
+      </ul>
+
+      <h3>Song requests (not open to everyone yet)</h3>
+      <ul>
+        <li>New layouts: compact, a macOS window, a retro terminal and a Discord card, and a redesigned glass card.</li>
+        <li>A cover choice of "none", to hide the cover.</li>
+      </ul>
+
+      <h3>Help and privacy</h3>
+      <ul>
+        <li><strong>An overlays FAQ</strong> at <a href="/overlays/faq/">/overlays/faq/</a>: which overlays work with Twitch, how follow alerts and the Twitch login work, your own images and sounds, no sound in your streaming app, missing alerts, and what is kept.</li>
+        <li><strong>The privacy page is accurate about the database.</strong> It no longer says there is no database. It lists what Frills keeps on its server: feedback, the images, GIFs and sounds you upload for alerts (what is stored, how long, who can see it, the delete code), new Twitch followers’ names for one day, and the song playing if you share Spotify.</li>
+      </ul>
+
+      <hr class="rule">
+
+      <h2 class="subtitle">13 October 2026</h2>
+
+      <h3>Twitch</h3>
+      <ul>
+        <li><strong>Twitch alerts.</strong> The alerts editor has a TikTok / Twitch switch. On Twitch it shows new subs and resubs, gifted subs (a whole batch is one alert), bits and raids, each with its own words, sound, effect, time and your own image or GIF.</li>
+        <li><strong>Twitch follows.</strong> Twitch only tells a logged-in streamer who follows them, so you log in with Twitch once (it asks for one thing: seeing who follows your channel). The login stays in your browser. Only the follower’s name goes to Frills, and it is kept for a day.</li>
+      </ul>
+
+      <h3>Chat looks</h3>
+      <ul>
+        <li><strong>Ears on the chat bubbles.</strong> Cat, bunny, bear and fox ears, little horns, a bow or a halo on the top edge of each message. You can change the size, how far along the bubble they sit, the space between the two ears, up or down, the tilt, both colors, and who gets them (everyone, moderators only, or gift messages). Off until you turn them on, and they never move by themselves. They work on the general looks and on the Matcha looks.</li>
+        <li><strong>TikTok emotes in chat.</strong> Emotes in a TikTok chat message (and messages that are only an emote) now show as small pictures. New: tried only with made-up messages so far.</li>
+      </ul>
+
+      <h3>The relay (the free TikTok connection)</h3>
+      <ul>
+        <li><strong>It comes back by itself.</strong> If the relay is restarted, pages that were connected reconnect without a reload (one reload is needed to pick up this fix).</li>
+        <li><strong>Who is connected.</strong> The owner can see which accounts are connected right now, whether each is LIVE, and open their LIVE to say thank you. Nothing is saved: there is no history.</li>
+      </ul>
+
+      <h3>Behind the scenes</h3>
+      <ul>
+        <li>An admin page for the owner, to read and mark feedback and to see and delete uploaded files. It needs a password and is kept out of search.</li>
+        <li>Wrong passwords are counted, and ten wrong tries in ten minutes lock that visitor out for ten minutes.</li>
+      </ul>
+
+      <hr class="rule">
+
+      <h2 class="subtitle">12 October 2026</h2>
+      <ul>
+        <li><strong>Relay status page.</strong> A readable page instead of plain text: the free spots, a bar, how many are waiting, whether TikTok’s free signing service is busy, a guess of how many accounts the device could hold, and an alarm when 10 or fewer spots are left.</li>
+        <li><strong>Spotify sharing</strong> keeps working when the Spotify tab is in the background, and the Spotify code is hidden from the Song requests editor and filled in by itself.</li>
+      </ul>
+
+      <hr class="rule">
+
+      <h2 class="subtitle">11 October 2026</h2>
+      <ul>
+        <li><strong>Alerts</strong> are public: pop-ups for follows, gifts and shares, with your own words, animations, effects and sounds, and images, GIFs and sounds you upload (up to 300 KB each). Many follows in a row join into one alert.</li>
+        <li><strong>Last gifts</strong>, <strong>Goals</strong> (followers, gifts or likes, starting from the account’s real follower count) and <strong>Top likers</strong>, and an Overlays page that lists them.</li>
+        <li><strong>Letter spacing</strong> for chat, alerts, last gifts, goals, top likers and song requests.</li>
+        <li><strong>Song requests</strong> (the page is unlisted for now): viewers type <code>!sr song name</code> in the LIVE chat and the streamer or a moderator types <code>!next</code>. Ten layouts for the song playing, covers and a progress bar, plus a private Spotify page that shows what is playing and adds requested songs to your queue.</li>
+        <li>A LIVE room reads at once: the relay passes TikTok’s own LIVE status, so a quiet chat is not called silence.</li>
+        <li>The relay holds accounts for 10 minutes, looks for an offline account every 3 minutes and gives up after 30.</li>
+      </ul>
+
+      <hr class="rule">
+
+      <h2 class="subtitle">8 to 10 October 2026</h2>
+      <ul>
+        <li><strong>Frills launches:</strong> free chat overlays for TikTok LIVE and Twitch. Pick a look, change anything, copy one link into your streaming app.</li>
+        <li>The free TikTok relay is switched on, so TikTok works with nothing to install.</li>
+        <li>A feedback form on the site, saved in the site’s own database. Nothing that identifies the sender is kept.</li>
+        <li>A "Test it" guide for trying your overlay without going LIVE, a before-you-start checklist, and honest TikTok status messages.</li>
+      </ul>
+
+      <p class="label">Not affiliated with TikTok or Twitch.</p>
+    </div>
+  </article>
+</main>

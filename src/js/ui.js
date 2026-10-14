@@ -2,6 +2,9 @@
 // worked, and the controls the editor is built from.
 
 import { el } from "./feed.js";
+import { initAnnouncement } from "./nav.js";
+
+initAnnouncement();
 
 const prefersReducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 

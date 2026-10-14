@@ -7,7 +7,7 @@ import { CONTROLS as ALERT_CONTROLS, DEFAULTS as ALERT_DEFAULTS, LOOKS, LOOK_KEY
 
 export { LOOKS, LOOK_NAMES, alertVars as lookVars, currentLook } from "./alerts-settings.js";
 
-const LOOK_PICKS = ["accent", "bg", "text", "pop", "font", "size", "letterSpacing", "radius", "border", "shadow"];
+const LOOK_PICKS = ["accent", "bg", "text", "pop", "font", "size", "letterSpacing", "align", "radius", "border", "shadow"];
 /** The look options every overlay shares (colours, font, size, corners, edge, shadow), taken from the alerts so they can never differ. */
 export const LOOK_CONTROLS = ALERT_CONTROLS.filter((c) => c.section === "look" && LOOK_PICKS.includes(c.key));
 export const LOOK_DEFAULTS = Object.fromEntries(LOOK_PICKS.map((k) => [k, ALERT_DEFAULTS[k]]));

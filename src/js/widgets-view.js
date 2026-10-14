@@ -12,6 +12,7 @@ const reducedMotion = () => globalThis.matchMedia?.("(prefers-reduced-motion: re
 
 function applyLook(host, settings) {
   for (const [name, value] of Object.entries(lookVars(settings))) host.style.setProperty(name, value);
+  host.dataset.align = settings.align || "left";
 }
 
 /** The Last Gifts list. Returns { apply(settings), render(items), gone(item), clear() }. */

@@ -10,7 +10,8 @@ import { buildControl, chips, copyButton } from "./ui.js";
 import { mountSource } from "./source.js";
 import { fontsReady, generalFaces } from "./look.js";
 import { luminance } from "./color.js";
-import { followIdentity, followsOn, setFollowsOn } from "./follow-bridge.js";
+import { FollowPublisher, FollowReader, followIdentity, followsOn, setFollowsOn } from "./follow-bridge.js";
+import { FollowWatcher, REDIRECT_PATH, beginLogin, clearLogin, loadLogin, validate } from "./twitch-follows.js";
 
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
@@ -187,31 +188,228 @@ function refreshLink() {
   linkHint.append(guide, ".");
 }
 linkInput.addEventListener("focus", () => linkInput.select());
-/** Shows what belongs to the chosen place you stream (its test buttons, its sections, its counters) and hides the rest. */
-function showPlatform() {
-  for (const node of document.querySelectorAll("[data-platform]")) node.hidden = !node.dataset.platform.split(" ").includes(platform);
-  checkFollows();
+// ── Twitch follows: in-editor login, watcher & bridge ───────────────────────────────────────────
+const mainEl = $("main");
+const clientId = mainEl?.dataset?.client || "";
+const redirectUri = location.origin + REDIRECT_PATH;
+const tickerJs = mainEl?.dataset?.ticker || "";
+
+const twStatus = $("tw-status");
+const twLoginBtn = $("tw-login-btn");
+const twLogoutBtn = $("tw-logout-btn");
+const twTestFollowerBtn = $("tw-test-follower");
+
+const identity = followIdentity();
+let lastError = 0;
+const publisher = new FollowPublisher({
+  code: identity.code,
+  key: identity.key,
+  onError: (status) => { lastError = status; },
+});
+
+let watcher = null;
+let watcherClock = null;
+
+function startClock(fn, every) {
+  try {
+    if (tickerJs) {
+      const worker = new Worker(tickerJs);
+      worker.onmessage = fn;
+      worker.postMessage({ every });
+      return { stop: () => worker.terminate() };
+    }
+  } catch {}
+  const id = setInterval(fn, every);
+  return { stop: () => clearInterval(id) };
 }
 
-// ── Twitch follows: whether to put them in the link, and whether the Twitch follows page is running right now ────────────────────────
+function stopWatcher() {
+  watcher?.stop();
+  watcher = null;
+  watcherClock?.stop();
+  watcherClock = null;
+}
+
+const seenFollowIds = new Set();
+
+async function onTwitchFollow(follow) {
+  if (follow.id && seenFollowIds.has(follow.id)) return;
+  if (follow.id) seenFollowIds.add(follow.id);
+  await publisher.send(follow);
+  send({ kind: "follow", id: follow.id, user: follow.user, name: follow.name, avatar: "" });
+  seen.follow += 1;
+  showSeen("follow");
+}
+
+function onWatcherStatus(s) {
+  const note = $("follows-state");
+  if (!note) return;
+  if (s.state === "listening") {
+    note.textContent = "The Twitch follows page is running, so new followers will show up in your alerts.";
+    note.dataset.state = "";
+  } else if (s.state === "expired") {
+    note.textContent = "Your Twitch login has ended. Log in again.";
+    note.dataset.state = "error";
+    stopWatcher();
+    clearLogin();
+    syncTwitchAuth();
+  } else if (s.state === "error") {
+    note.textContent = s.detail || "Could not connect to Twitch.";
+    note.dataset.state = "error";
+  }
+}
+
+async function startWatcher(login) {
+  if (watcher || !clientId) return;
+  watcher = new FollowWatcher({
+    token: login.token,
+    clientId,
+    userId: login.userId,
+    onFollow: onTwitchFollow,
+    onStatus: onWatcherStatus,
+  });
+  watcher.start();
+  publisher.ping();
+  watcherClock = startClock(async () => {
+    publisher.ping();
+    if (Date.now() - (login.checkedAt ?? 0) > 3600 * 1000) {
+      login.checkedAt = Date.now();
+      const who = await validate(login.token);
+      if (who.expired) onWatcherStatus({ state: "expired", detail: who.error });
+    }
+  }, 30000);
+}
+
+async function syncTwitchAuth() {
+  if (!twStatus) return;
+  const login = loadLogin();
+  if (!login) {
+    twStatus.textContent = clientId ? "Not logged in with Twitch." : "This site has no Twitch app set up yet.";
+    twStatus.dataset.state = "";
+    if (twLoginBtn) { twLoginBtn.hidden = false; twLoginBtn.disabled = !clientId; }
+    if (twLogoutBtn) twLogoutBtn.hidden = true;
+    if (twTestFollowerBtn) twTestFollowerBtn.hidden = true;
+    stopWatcher();
+    return;
+  }
+  twStatus.textContent = `Logged in as @${login.login}.`;
+  twStatus.dataset.state = "";
+  if (twLoginBtn) twLoginBtn.hidden = true;
+  if (twLogoutBtn) twLogoutBtn.hidden = false;
+  if (twTestFollowerBtn) twTestFollowerBtn.hidden = false;
+
+  if (!followsBox.checked) {
+    followsBox.checked = true;
+    setFollowsOn(true);
+    refreshLink();
+  }
+
+  const who = await validate(login.token);
+  if (who.expired) {
+    clearLogin();
+    syncTwitchAuth();
+    twStatus.textContent = who.error || "The Twitch login has ended. Log in again.";
+    twStatus.dataset.state = "error";
+    return;
+  }
+
+  if (platform === "twitch") {
+    startWatcher(login);
+  }
+}
+
+if (twLoginBtn) {
+  twLoginBtn.addEventListener("click", () => {
+    if (!clientId) return;
+    twLoginBtn.disabled = true;
+    try { sessionStorage.setItem("frills:twitch:return", location.pathname + location.search); } catch {}
+    location.assign(beginLogin({ clientId, redirectUri }));
+  });
+}
+
+if (twLogoutBtn) {
+  twLogoutBtn.addEventListener("click", () => {
+    stopWatcher();
+    clearLogin();
+    syncTwitchAuth();
+    checkFollows();
+  });
+}
+
+if (twTestFollowerBtn) {
+  twTestFollowerBtn.addEventListener("click", async () => {
+    const note = $("follows-state");
+    const testFollow = { id: `test-${Date.now()}`, user: "frills_test", name: "Frills Test" };
+    const sent = await publisher.send(testFollow);
+    send({ kind: "follow", id: testFollow.id, user: testFollow.user, name: testFollow.name, avatar: "" });
+    seen.follow += 1;
+    showSeen("follow");
+    if (note) {
+      note.textContent = sent
+        ? "Test follower sent! It pops up here in the preview and in your live overlay."
+        : "Sent to preview. (Could not reach bridge server: " + lastError + ")";
+      note.dataset.state = "";
+    }
+  });
+}
+
 const followsBox = $("follows-on");
 followsBox.checked = followsOn();
 let followsTimer = 0;
 async function checkFollows() {
   clearTimeout(followsTimer);
   const note = $("follows-state");
-  if (platform !== "twitch" || !followsBox.checked) { note.textContent = ""; return; }
+  if (platform !== "twitch" || !followsBox.checked) { if (note) note.textContent = ""; return; }
+  const login = loadLogin();
+  if (login && watcher) {
+    if (note) {
+      note.textContent = "The Twitch follows page is running, so new followers will show up in your alerts.";
+      note.dataset.state = "";
+    }
+    followsTimer = setTimeout(checkFollows, 10000);
+    return;
+  }
   try {
-    const res = await fetch("/api/follows/" + followIdentity().code, { cache: "no-store" });
+    const res = await fetch("/api/follows/" + identity.code, { cache: "no-store" });
     const data = await res.json();
     const alive = data.updatedAt > 0 && data.now - data.updatedAt < 180000;
-    note.textContent = alive ? "The Twitch follows page is running, so new followers will show up in your alerts." : "The Twitch follows page is not running. Open it, log in, and keep it open while you stream.";
+    if (note) {
+      note.textContent = alive
+        ? "The Twitch follows page is running, so new followers will show up in your alerts."
+        : "The Twitch follows page is not running. Open it, log in, and keep it open while you stream.";
+      note.dataset.state = "";
+    }
   } catch {
-    note.textContent = "";
+    if (note) note.textContent = "";
   }
   followsTimer = setTimeout(checkFollows, 10000);
 }
-followsBox.addEventListener("change", () => { setFollowsOn(followsBox.checked); refreshLink(); checkFollows(); });
+
+let followReader = null;
+function syncFollowReader() {
+  followReader?.stop();
+  followReader = null;
+  if (platform !== "twitch" || !followsBox.checked) return;
+  followReader = new FollowReader({
+    code: identity.code,
+    onFollow: (f) => {
+      if (f.id && seenFollowIds.has(f.id)) return;
+      if (f.id) seenFollowIds.add(f.id);
+      send({ kind: "follow", id: f.id, user: f.user, name: f.name, avatar: "" });
+    },
+  }).start();
+}
+
+/** Shows what belongs to the chosen place you stream (its test buttons, its sections, its counters) and hides the rest. */
+function showPlatform() {
+  for (const node of document.querySelectorAll("[data-platform]")) node.hidden = !node.dataset.platform.split(" ").includes(platform);
+  if (platform === "twitch") syncTwitchAuth();
+  else stopWatcher();
+  checkFollows();
+  syncFollowReader();
+}
+
+followsBox.addEventListener("change", () => { setFollowsOn(followsBox.checked); refreshLink(); checkFollows(); syncFollowReader(); });
 source.onChange(() => {
   if (source.platform !== platform) { platform = source.platform; showPlatform(); }
   refreshLink();

@@ -5,8 +5,23 @@
 
 import { defineWidget, imageOf, number, range, selectOf, text, toggle } from "./widget-settings.js";
 
-export const SONG_LAYOUTS = [["card", "Card"], ["strip", "Strip: one slim line"], ["stack", "Stack: big cover on top"], ["disc", "Disc: a spinning record"], ["glass", "Glass: a blurred cover behind the card"], ["equalizer", "Equalizer: bouncing bars"], ["capsule", "Capsule: a pill with a spinning disc"], ["poster", "Poster: a tall card with a big cover"], ["boxy", "Boxy: the cover and the words in two boxes"], ["minimal", "Minimal: just the words, no card"]];
-export const SONG_COVERS = [["auto", "The layout\u2019s own"], ["square", "Square"], ["round", "Round"], ["vinyl", "Vinyl: round and spinning"]];
+export const SONG_LAYOUTS = [
+  ["card", "Card"],
+  ["compact", "Compact: a tight slim card"],
+  ["strip", "Strip: one slim line"],
+  ["stack", "Stack: big cover on top"],
+  ["disc", "Disc: a spinning record"],
+  ["glass", "Glass: a blurred cover behind the card"],
+  ["equalizer", "Equalizer: bouncing bars"],
+  ["capsule", "Capsule: a pill with a spinning disc"],
+  ["poster", "Poster: a tall card with a big cover"],
+  ["boxy", "Boxy: the cover and the words in two boxes"],
+  ["minimal", "Minimal: just the words, no card"],
+  ["macos", "macOS: a desktop window with buttons"],
+  ["shell", "Shell: a retro terminal window"],
+  ["discord", "Discord: rich presence card"],
+];
+export const SONG_COVERS = [["auto", "The layout\u2019s own"], ["square", "Square"], ["round", "Round"], ["vinyl", "Vinyl: round and spinning"], ["none", "None: hide the cover"]];
 export const SONG_SHOWS = [["both", "The song playing and the queue"], ["now", "Only the song playing"], ["queue", "Only the queue"]];
 
 export const SONGS = defineWidget({

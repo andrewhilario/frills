@@ -57,7 +57,7 @@ export const MOD_ICONS = ["shield", "star", "leaf", "frog", "none"];
 // The little extras on the bubbles (cat ears and so on) start off, so a look is exactly what it was until someone turns them on.
 export const EAR_DEFAULTS = { ears: "none", earSize: 100, earX: 10, earGap: 0, earY: 0, earTilt: 0, earColor: "#ff9db8", earInner: "#ffd6e2", earsFor: "all" };
 
-export const DEFAULTS = { ...PRESETS.blueberry, letter: 0, modIcon: "shield", max: 6, life: 15, space: 8, colors: false, emotes: true, pictures: true, ...EAR_DEFAULTS };
+export const DEFAULTS = { ...PRESETS.blueberry, letter: 0, align: "left", modIcon: "shield", max: 6, life: 15, space: 8, colors: false, emotes: true, pictures: true, ...EAR_DEFAULTS };
 
 const list = (...pairs) => pairs.map(([id, name]) => ({ id, name }));
 
@@ -71,6 +71,7 @@ export const CONTROLS = [
   { key: "font", where: "main", type: "select", label: "Font", options: Object.keys(FONTS).map((f) => ({ id: f, name: f })) },
   { key: "size", where: "main", type: "range", label: "Text size", min: 12, max: 34, step: 1, unit: " px" },
   { key: "letter", where: "main", type: "range", label: "Letter spacing", min: -2, max: 8, step: 0.5, unit: " px" },
+  { key: "align", where: "main", type: "chips", label: "Text alignment", options: list(["left", "Left"], ["center", "Center"], ["right", "Right"]) },
   { key: "ears", where: "main", type: "chips", label: "Ears on the bubbles", options: EARS, hint: "Cute little ears, a bow or a halo on the top edge of each message. Pick None to have nothing. Pick one and the settings below it appear." },
   // these only matter once a design is picked, so the editors hide them while it is None (`needs`)
   { key: "earSize", where: "main", needs: "ears", type: "range", label: "Ears size", min: 50, max: 200, step: 5, unit: " %" },
@@ -195,6 +196,7 @@ export function lookVars(s) {
     "--g-ease": ANIMS[s.anim].ease,
     "--g-speed": s.speed + "ms",
     "--g-space": s.space + "px",
+    "--g-align": s.align || "left",
     "--g-outline": inkFor(s.text) === "#ffffff" ? "#f5f5f5" : "#0b0b0b", // a text outline that contrasts with the text
     ...earVars(s),
   };

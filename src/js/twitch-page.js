@@ -22,7 +22,12 @@ async function callback() {
   if (who.clientId !== clientId) return say(status, "That login belongs to a different app, so it was ignored.", true);
   saveLogin({ token: result.token, login: who.login, userId: who.userId, savedAt: Date.now() });
   say(status, "Connected. Taking you back…");
-  setTimeout(() => location.replace("/twitch/"), 600);
+  let returnTo = "/alerts/?platform=twitch";
+  try {
+    returnTo = sessionStorage.getItem("frills:twitch:return") || returnTo;
+    sessionStorage.removeItem("frills:twitch:return");
+  } catch {}
+  setTimeout(() => location.replace(returnTo), 600);
 }
 
 function main() {
@@ -170,7 +175,7 @@ function main() {
     const note = $("tw-test-note");
     lastError = -1;
     const sent = await publisher.send({ id: `test-${Date.now()}`, user: "frills_test", name: "Frills Test" });
-    say(note, sent ? "Sent. Look at your alerts overlay (or the preview in the alerts editor)." : problem(lastError), !sent);
+    say(note, sent ? "Sent. It shows up within a few seconds in an alerts overlay, or in the alerts editor (Twitch picked, follows ticked), that was already open. One opened after this is not shown the old follower." : problem(lastError), !sent);
   });
   show();
 }

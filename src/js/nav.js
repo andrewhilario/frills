@@ -1,6 +1,24 @@
 // The nav: it gains a hairline and a soft shadow once the page has moved, and below the wide breakpoint its links live in a sheet.
 
+export function initAnnouncement() {
+  const banner = document.getElementById("site-announcement");
+  if (!banner) return;
+  const key = "frills:update:2026-10-14";
+  try {
+    if (localStorage.getItem(key) === "dismissed") {
+      banner.hidden = true;
+      return;
+    }
+  } catch {}
+  banner.hidden = false;
+  banner.querySelector(".announcement__close")?.addEventListener("click", () => {
+    banner.hidden = true;
+    try { localStorage.setItem(key, "dismissed"); } catch {}
+  });
+}
+
 export function initNav() {
+  initAnnouncement();
   const nav = document.querySelector("[data-nav]");
   if (!nav) return;
 

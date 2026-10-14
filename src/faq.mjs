@@ -25,7 +25,7 @@ export function faq({ kb, waitlistUrl, helperUrl, relayUrl }) {
     },
     {
       q: "Do I need an account?",
-      a: "No. Your settings live in your browser and in the link you copy. There is no database to put them in.",
+      a: "No. Your settings live in your browser and in the link you copy. Frills keeps a few things in a small database, but only ones you choose to send it: feedback, and any image, GIF or sound you upload for alerts. The <a href=\"/privacy/\">privacy page</a> lists all of it.",
     },
     {
       q: "How does it read my chat?",
@@ -45,11 +45,11 @@ export function faq({ kb, waitlistUrl, helperUrl, relayUrl }) {
     },
     {
       q: "Is it safe, and is it allowed?",
-      a: `Frills only reads public chat, never asks for a password, and stores nothing. ${relayUrl ? "On TikTok it doesn’t log in to your account either." : "The TikTok helper doesn’t log in to your TikTok account either."} TikTok offers no official way for overlays to read chat, so every overlay tool uses an unofficial one, and TikTok could change or block it. Frills isn’t affiliated with Twitch or TikTok.`,
+      a: `Frills only reads public chat and never asks for your password. It keeps no chat and has no accounts; what it does store is short and listed on the <a href=\"/privacy/\">privacy page</a> (feedback you send, files you upload for alerts, and new Twitch followers’ names for one day if you use that feature). The one optional Twitch login, for follow alerts, happens on Twitch’s own page. ${relayUrl ? "On TikTok it doesn’t log in to your account either." : "The TikTok helper doesn’t log in to your TikTok account either."} TikTok offers no official way for overlays to read chat, so every overlay tool uses an unofficial one, and TikTok could change or block it. Frills isn’t affiliated with Twitch or TikTok.`,
     },
     {
       q: "Does Frills have alerts, a last gifts list, goals and top likers?",
-      a: "Yes, for TikTok LIVE, in beta. Alerts pop up for follows, gifts and shares with your own words, animation, effect, sound, image or GIF, and bigger gifts get a bigger alert. Alerts also work for a Twitch channel: new subs and resubs, gifted subs, bits and raids, and follows too, after a one-time Twitch login on a private page that you keep open while you stream (Twitch only gives follows to a logged-in streamer). The last gifts list, the goals (followers, gifts or likes) and the top likers ranking work the same way: pick a look, try it with the test buttons, and copy the link into your streaming app. See <a href=\"/overlays/\">all the overlays</a> and the <a href=\"/guides/alerts/\">alerts guide</a>.",
+      a: "Yes, for TikTok LIVE, in beta. Alerts pop up for follows, gifts and shares with your own words, animation, effect, sound, image or GIF, and bigger gifts get a bigger alert. Alerts also work for a Twitch channel: new subs and resubs, gifted subs, bits and raids, and follows too, after a one-time Twitch login on a private page that you keep open while you stream (Twitch only gives follows to a logged-in streamer). The last gifts list, the goals (followers, gifts or likes) and the top likers ranking work the same way: pick a look, try it with the test buttons, and copy the link into your streaming app. See <a href=\"/overlays/\">all the overlays</a>, the <a href=\"/guides/alerts/\">alerts guide</a> and the <a href=\"/overlays/faq/\">overlays FAQ</a>.",
     },
     {
       q: "How do I add it to my stream?",

@@ -10,7 +10,7 @@
   "footer": false
 }
 -->
-<main class="workspace" id="main">
+<main class="workspace" id="main" data-client="{{twitchClientId}}" data-ticker="{{tickerJs}}">
   <section class="preview" id="preview" data-back="dark" aria-label="Live preview of your alerts">
     <div class="preview__bar">
       <span class="preview__tag">Preview</span>
@@ -109,10 +109,18 @@
       <div id="source"></div>
       <div class="followbox" data-platform="twitch" hidden>
         <h3 class="seen__title">Follows on Twitch</h3>
-        <p class="ctl__hint">Twitch only tells a logged-in streamer who follows them. Log in once on the Twitch follows page and keep it open while you stream: it passes each new follower to your alerts. Nothing else on your Twitch is read.</p>
+        <p class="ctl__hint">Twitch only tells a logged-in streamer who follows them. Log in with Twitch below to listen for new followers while this editor is open. Nothing else on your Twitch is read.</p>
+        <div class="followbox__auth" id="tw-auth-card">
+          <p class="followbox__status" id="tw-status" role="status">Checking Twitch login…</p>
+          <div class="followbox__actions">
+            <button class="btn btn--sm" type="button" id="tw-login-btn">Log in with Twitch</button>
+            <button class="btn btn--soft btn--sm" type="button" id="tw-logout-btn" hidden>Log out</button>
+            <button class="btn btn--soft btn--sm" type="button" id="tw-test-follower" hidden>Send test follower</button>
+          </div>
+        </div>
         <label class="form__choice"><input type="checkbox" id="follows-on"> Show Twitch follows in my alerts link</label>
-        <p class="ctl__hint"><a href="/twitch/" target="_blank" rel="noopener">Open the Twitch follows page</a> (it opens in a new tab).</p>
         <p class="ctl__hint" id="follows-state" role="status"></p>
+        <p class="ctl__hint followbox__aside"><small>Streaming without this editor open? Keep the <a href="/twitch/" target="_blank" rel="noopener">Twitch follows background page</a> open instead.</small></p>
       </div>
       <div class="seen" aria-labelledby="seen-title">
         <h3 class="seen__title" id="seen-title">What Frills sees</h3>

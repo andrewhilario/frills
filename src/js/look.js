@@ -12,6 +12,7 @@ export function paintGeneral(stage, settings) {
   stage.classList.add("look", "look-general");
   for (const [name, value] of Object.entries(vars)) stage.style.setProperty(name, value);
   Object.assign(stage.dataset, attrs);
+  stage.dataset.align = settings.align || "left";
   return feed;
 }
 
@@ -54,6 +55,7 @@ export function paintMatcha(stage, settings) {
   }
   stage.dataset.avatar = settings.avatar ? "on" : "off";
   stage.dataset.font = settings.font ? "custom" : "own";
+  stage.dataset.align = settings.align || "left";
   for (const [name, value] of Object.entries(earVars(settings))) stage.style.setProperty(name, value);
   Object.assign(stage.dataset, earAttrs(settings));
   return { max: settings.max, life: settings.life * 1000, modIcon: settings.modIcon, colors: settings.colors, emotes: settings.emotes, pictures: settings.pictures, ears: settings.ears, earsFor: settings.earsFor };

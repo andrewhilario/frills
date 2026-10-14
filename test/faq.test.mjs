@@ -52,3 +52,43 @@ test("the numbers in the answers come from the build, and the words use real apo
   assert.match(faq({ ...none, kb: 17 }).find((i) => i.q === "Will it slow down my stream?").a, /about 17 KB/);
   for (const item of faq(none)) assert.doesNotMatch(item.a, /[A-Za-z]'[a-z]/, `${item.q}: a straight apostrophe`);
 });
+
+// ── the overlays' own FAQ ───────────────────────────────────────────────────────────────────────────────────────────────────────
+
+import { overlaysFaq } from "../src/overlays-faq.mjs";
+
+test("the overlays FAQ answers what people ask about alerts, Twitch, uploads, sound, follows and what is kept, in plain text for search engines too", () => {
+  const items = overlaysFaq({ kb: 19, relayUrl: "https://relay.example" });
+  const questions = items.map((i) => i.q);
+  for (const wanted of ["Which overlays are there?", "Do the overlays work with Twitch?", "How do I add an overlay to my stream?", "Can I use my own images, GIFs and sounds in alerts?", "How do follow alerts work on Twitch, and why do they need a login?", "Is my Twitch login safe?", "What does Frills keep about me and my viewers?"]) assert.ok(questions.includes(wanted), wanted);
+  assert.equal(new Set(questions).size, questions.length, "no question twice");
+  for (const item of items) {
+    assert.doesNotMatch(item.text, /<|>/, item.q);
+    assert.ok(item.text.length > 60, item.q);
+    assert.ok(item.a.length > 0);
+  }
+});
+
+test("the overlays FAQ keeps its promises: Twitch support as it is, uploads described honestly, and the privacy page linked", () => {
+  const items = overlaysFaq({});
+  const answer = (q) => items.find((i) => i.q === q).a;
+  assert.match(answer("Do the overlays work with Twitch?"), /chat overlay and the alerts do/);
+  assert.match(answer("Do the overlays work with Twitch?"), /Last gifts, goals and top likers are for TikTok LIVE only/);
+  assert.match(answer("Can I use my own images, GIFs and sounds in alerts?"), /300 KB/);
+  assert.match(answer("Can I use my own images, GIFs and sounds in alerts?"), /delete code/);
+  assert.ok(answer("Can I use my own images, GIFs and sounds in alerts?").includes('href="/privacy/"'));
+  assert.ok(answer("What does Frills keep about me and my viewers?").includes('href="/privacy/"'));
+  assert.ok(answer("How do follow alerts work on Twitch, and why do they need a login?").includes('href="/twitch/"'));
+  assert.doesNotMatch(items.map((i) => i.text).join(" "), /no database|stores nothing|nothing is stored/i, "it never claims there is no database");
+  assert.match(answer("Which overlays are there?"), /Song requests are coming soon/);
+});
+
+test("the main FAQ no longer claims there is no database or that nothing is stored", () => {
+  const text = faq(none).map((i) => i.text).join(" ");
+  assert.doesNotMatch(text, /no database|stores nothing|nothing stored/i);
+  const account = faq(none).find((i) => i.q === "Do I need an account?");
+  assert.match(account.text, /feedback/);
+  assert.match(account.text, /upload/);
+  assert.ok(account.a.includes('href="/privacy/"'));
+  assert.ok(faq(none).find((i) => i.q.startsWith("Does Frills have alerts")).a.includes('href="/overlays/faq/"'), "and it points at the overlays FAQ");
+});

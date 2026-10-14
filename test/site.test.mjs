@@ -1,6 +1,7 @@
 // Checks the built site in dist/ without a browser: addresses, search settings, links, headers, weight, copy.
 // `npm test` builds first. If you run this file alone, run `npm run build` before it.
 
+import { overlaysFaq } from "../src/overlays-faq.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
@@ -25,7 +26,7 @@ const assetOf = (html, kind) => (new RegExp(`${kind === "css" ? 'href="(/assets/
 
 test("the pages we expect are all there", () => {
   const urls = pages.map((p) => p.url).sort();
-  assert.deepEqual(urls, ["/", "/404.html", "/admin/", "/alerts/", "/editor/", "/feedback/", "/gifts/", "/goal/", "/guides/alerts/", "/guides/obs/", "/guides/test/", "/guides/tiktok/", "/likers/", "/matcha/", "/overlay/", "/overlay/alerts/", "/overlay/gifts/", "/overlay/goal/", "/overlay/likers/", "/overlay/songs/", "/overlays/", "/privacy/", "/songs/", "/spotify/", "/spotify/callback/", "/twitch/", "/twitch/callback/"]);
+  assert.deepEqual(urls, ["/", "/404.html", "/admin/", "/alerts/", "/changelog/", "/editor/", "/feedback/", "/gifts/", "/goal/", "/guides/alerts/", "/guides/obs/", "/guides/test/", "/guides/tiktok/", "/likers/", "/matcha/", "/overlay/", "/overlay/alerts/", "/overlay/gifts/", "/overlay/goal/", "/overlay/likers/", "/overlay/songs/", "/overlays/", "/overlays/faq/", "/privacy/", "/songs/", "/spotify/", "/spotify/callback/", "/twitch/", "/twitch/callback/"]);
 });
 
 test("every indexable page has its own title and description, a canonical address, share tags and one h1", () => {
@@ -167,7 +168,7 @@ test("no page still says TikTok is missing or only coming, and the TikTok pages 
   const feedbackPage = pages.find((p) => p.url === "/feedback/").html;
   assert.ok(site.feedbackForm && feedbackPage.includes('id="feedback-form"'), "the feedback form page exists when the form is on");
   assert.ok(home.includes('<a href="/feedback/" rel="noopener">Feedback</a>') || home.includes('href="/feedback/"'), "the footer links to the feedback form");
-  assert.ok(pages.find((p) => p.url === "/privacy/").html.includes("If you send feedback"), "the privacy page says what the form saves");
+  assert.ok(pages.find((p) => p.url === "/privacy/").html.includes("Feedback you send."), "the privacy page says what the form saves");
   const testGuide = pages.find((p) => p.url === "/guides/test/").html;
   assert.ok(home.includes('<a class="nav__link" href="/guides/test/">Test it</a>'), "the top menu offers the test guide on every page");
   assert.ok(testGuide.includes('<a class="nav__link" href="/guides/test/" aria-current="page">Test it</a>'), "and marks it as the current page there");
@@ -204,4 +205,57 @@ test("structured data is valid JSON and describes the page", () => {
   assert.deepEqual(types, ["FAQPage", "SoftwareApplication", "WebSite"]);
   assert.match(home, /"price":"0"/);
   assert.doesNotMatch(home, /aggregateRating|ratingValue/, "no invented ratings");
+});
+
+test("the privacy page says what the database keeps (feedback, uploaded files and their delete code, Twitch followers, Spotify) and no longer says there is no database", () => {
+  const html = read("privacy/index.html").replace(/\s+/g, " ");
+  assert.doesNotMatch(html, /no database/i);
+  assert.doesNotMatch(html, /no accounts and no database/i);
+  for (const phrase of ["What Frills keeps on its server", "Feedback you send.", "Images, GIFs and sounds you upload for alerts.", "delete code", "300 KB", "do not store your name or your address", "New Twitch followers", "kept for one day", "The song playing", "Song names in Song requests", "Cloudflare", "private page"]) {
+    assert.ok(html.includes(phrase), `the privacy page says "${phrase}"`);
+  }
+});
+
+test("the overlays FAQ is its own indexable page with structured data, listed in the sitemap, and linked from the overlays page and the main FAQ", () => {
+  const html = read("overlays/faq/index.html");
+  assert.equal((html.match(/<details>/g) ?? []).length, overlaysFaq({ kb: 19, relayUrl: site.relayUrl }).length);
+  const data = [...html.matchAll(/<script type="application\/ld\+json">(.*?)<\/script>/g)].map((m) => JSON.parse(m[1]));
+  const page = data.find((d) => d["@type"] === "FAQPage");
+  assert.equal(page.mainEntity.length, (html.match(/<details>/g) ?? []).length);
+  assert.ok(data.some((d) => d["@type"] === "BreadcrumbList"));
+  assert.match(read("sitemap.xml"), new RegExp(`${site.url}/overlays/faq/`));
+  assert.ok(read("overlays/index.html").includes('href="/overlays/faq/"'));
+  assert.ok(read("index.html").includes('href="/overlays/faq/"'), "the main FAQ points at it");
+  assert.doesNotMatch(read("index.html"), /nothing stored|no database/i);
+});
+
+test("the changelog page says what the 14 October update did, the banner points to it, and the alerts editor has the Twitch login it describes", () => {
+  const changelog = read("changelog/index.html");
+  assert.ok(changelog.includes("14 October 2026"));
+  assert.ok(changelog.includes("Log in with Twitch inside the alerts editor"));
+  assert.ok(changelog.includes("Text alignment"));
+  assert.ok(read("sitemap.xml").includes(`${site.url}/changelog/`));
+  assert.ok(read("index.html").includes('href="/changelog/"'));
+  assert.ok(read("index.html").includes("See what"), "the banner on the home page points at it");
+  assert.ok(read("alerts/index.html").includes('id="tw-login-btn"'));
+  assert.ok(read("alerts/index.html").includes('id="tw-test-follower"'));
+});
+
+test("the changelog page is listed, linked from the menu and footer, and its claims match the site (the overlays FAQ, the privacy page, alignment)", () => {
+  const html = read("changelog/index.html");
+  assert.match(read("sitemap.xml"), new RegExp(`${site.url}/changelog/`));
+  assert.ok(read("index.html").includes('href="/changelog/"'), "the home page's menu and footer link to it");
+  assert.ok(html.includes('href="/overlays/faq/"') && html.includes('href="/privacy/"') && html.includes('href="/twitch/"'));
+  assert.match(html, /Text alignment/);
+  assert.ok(html.indexOf("14 October 2026") < html.indexOf("13 October 2026") && html.indexOf("13 October 2026") < html.indexOf("8 to 10 October 2026"), "newest first");
+});
+
+test("the update banner sits above the menu where it scrolls away, appears once, and is not on the editor pages whose preview sticks under the top bar", () => {
+  const home = read("index.html");
+  assert.equal((home.match(/id="site-announcement"/g) ?? []).length, 1);
+  assert.ok(home.indexOf('id="site-announcement"') < home.indexOf('<header class="nav"'), "above the sticky menu, not inside it");
+  assert.match(home, /<aside class="announcement" id="site-announcement"[^>]* hidden>/, "hidden until the script has checked that it was not dismissed");
+  for (const editor of ["alerts/index.html", "editor/index.html", "gifts/index.html", "likers/index.html", "goal/index.html", "songs/index.html", "matcha/index.html"]) {
+    assert.ok(!read(editor).includes("site-announcement"), `${editor} has no banner (its preview is pinned under the top bar)`);
+  }
 });
