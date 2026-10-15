@@ -207,3 +207,17 @@ test("the name tag pill never wraps a letter per line in a short message, and th
     }
   }
 });
+
+test("the name inside the tag stays readable on a gift message, in every look that fills its bubbles", { skip }, async () => {
+  for (const query of ["look=butter&tag=pill", "look=bubblegum&tag=pill", "style=latte&palette=latte&tag=pill"]) {
+    await open(query);
+    const r = await page.evaluate(`(() => {
+      const m = document.querySelector("#chat .m");
+      m.classList.add("gift"); // the practice chat rarely sends a gift, so one of its messages is marked as one
+      const who = getComputedStyle(m.querySelector(".who"));
+      return { ink: getComputedStyle(m.querySelector(".name")).color, tag: who.backgroundColor, tagInk: who.color };
+    })()`);
+    assert.notEqual(r.ink, r.tag, `${query}: the name is not the color of its tag`);
+    assert.equal(r.ink, r.tagInk, `${query}: the name takes the tag's ink`);
+  }
+});

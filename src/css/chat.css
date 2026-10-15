@@ -72,7 +72,7 @@
 .look[data-tag="pill"] .m { --m-top-tag: 0.9em; }
 .look[data-tag="pill"] .m .body { padding-top: 1.05em; }
 .look[data-tag="pill"] .m .who { position: absolute; z-index: 3; left: 0.9em; top: 0; transform: translateY(-58%); width: max-content; max-width: max(80%, 9em); padding: 0.12em 0.8em 0.16em; border-radius: 999px; background: var(--tag-bg); color: var(--tag-ink); font-size: 0.82em; line-height: 1.2; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25); }
-.look[data-tag="pill"] .m .who .name { color: inherit; font-size: 1em; text-shadow: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.look[data-tag="pill"] .m .who .name, .look[data-tag="pill"] .m.gift .who .name { color: var(--tag-ink); font-size: 1em; text-shadow: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .look[data-tag="pill"] .m .who .ico { color: var(--tag-ink); --icon-ink: var(--tag-bg); }
 .look[data-tag="pill"][data-align="center"] .m .who { left: 50%; transform: translate(-50%, -58%); }
 .look[data-tag="pill"][data-align="right"] .m .who { left: auto; right: 0.9em; }
