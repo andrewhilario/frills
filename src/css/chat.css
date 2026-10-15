@@ -48,14 +48,11 @@
 .ico svg { width: 100%; height: 100%; display: block; }
 [data-mod-icon="none"] .ico { display: none; }
 
-/* Decorations: pictures and shapes laid over a bubble's edges (feed.js puts them in; decor.js has the packs). They never take a click. */
+/* Decorations: pictures laid over a bubble's edges (feed.js puts them in; decor.js has the packs). They never take a click. */
 .m .deco { position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: 2; pointer-events: none; }
 .m .deco > * { position: absolute; display: block; height: auto; }
-.m .deco svg { display: block; width: 100%; height: auto; }
-.m .deco .o { fill: var(--deco, #ff9db8); }
-.m .deco .i { fill: var(--deco-in, #ffd6e2); }
-.look-general { --deco: var(--g-accent, #ff9db8); --deco-in: var(--g-pop, #ffd6e2); --tag-bg: var(--g-accent, #9db4ff); --tag-ink: var(--g-accent-ink, #10131a); }
-.look:not(.look-general) { --deco: var(--matcha, #8dae5f); --deco-in: var(--pop, #f4b8a2); --tag-bg: var(--deep, #4e6b3a); --tag-ink: var(--bg, #f5f0e1); }
+.look-general { --tag-bg: var(--g-accent, #9db4ff); --tag-ink: var(--g-accent-ink, #10131a); }
+.look:not(.look-general) { --tag-bg: var(--deep, #4e6b3a); --tag-ink: var(--bg, #f5f0e1); }
 .m .deco__peek { bottom: calc(100% - 3px); right: 0.9em; width: calc(4.4em * var(--deco-scale, 1)); }
 .m .deco__corner { left: -1.5em; bottom: -1.45em; width: calc(2.9em * var(--deco-scale, 1)); }
 .m .deco__spark--1 { top: -0.55em; left: 30%; width: calc(0.95em * var(--deco-scale, 1)); }
@@ -68,7 +65,7 @@
 .look[data-deco-side="right"] .m .deco__spark--3 { left: auto; right: 55%; }
 /* room for what sticks out of the bubble, so a neighbor is never covered */
 .m { margin-top: calc(var(--m-top-peek, 0px) + var(--m-top-tag, 0px)); }
-.m.has-peek { --m-top-peek: calc(2.2em * var(--deco-scale, 1)); }
+.m.has-peek { --m-top-peek: calc(4.4em * var(--peek-ratio, 0.5) * var(--deco-scale, 1)); } /* as tall as the picture on top (4.4em wide) */
 .m.has-corner { margin-bottom: calc(1.25em * var(--deco-scale, 1)); }
 
 /* The name tag as a pill: the name leaves the bubble and sits in a small rounded label on the top-left edge. */

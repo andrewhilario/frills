@@ -45,31 +45,25 @@ test("no decoration and no name tag changes nothing: no pieces, and no picture i
   assert.equal(await page.evaluate(`performance.getEntriesByType("resource").filter((r) => r.name.includes("/decor/")).length`), 0, "nothing is downloaded for a pack nobody picked");
 });
 
-test("plain shapes: every message gets a bow on top, a flower on a bottom corner and sparkles, in the look's colors, and none of it takes a click", { skip }, async () => {
-  await open("look=bubblegum&deco=shapes");
+test("every message gets a cat on top, a kitten on a bottom corner and little pieces around, and none of it takes a click", { skip }, async () => {
+  await open("look=bubblegum&deco=neko");
+  await page.waitFor(`[...document.querySelectorAll("#chat .deco img")].every((i) => i.complete)`);
   const r = await page.evaluate(`(() => {
     const ms = [...document.querySelectorAll("#chat .m")];
     const m = ms[2];
     const body = m.querySelector(".body").getBoundingClientRect();
-    const peek = m.querySelector(".deco__peek").getBoundingClientRect();
     const corner = m.querySelector(".deco__corner").getBoundingClientRect();
-    const prev = ms[1].getBoundingClientRect();
     return {
       all: ms.every((x) => x.querySelector(".deco")),
       sparks: m.querySelectorAll(".deco__spark").length,
-      onTop: peek.bottom > body.top && peek.bottom - body.top <= 10,
       cornerLeftOfBubble: corner.left < body.left && corner.bottom > body.bottom,
-      clearOfNeighbor: peek.top >= prev.bottom - 1,
-      fill: getComputedStyle(m.querySelector(".deco__peek .o")).fill,
-      accent: getComputedStyle(document.getElementById("stage")).getPropertyValue("--g-accent").trim(),
       clicks: getComputedStyle(m.querySelector(".deco")).pointerEvents,
       hasClasses: m.classList.contains("has-peek") && m.classList.contains("has-corner"),
       hidden: m.querySelector(".deco").getAttribute("aria-hidden"),
+      alt: [...m.querySelectorAll(".deco img")].every((i) => i.alt === ""),
     };
   })()`);
-  assert.deepEqual({ ...r, fill: undefined, accent: undefined }, { all: true, sparks: 3, onTop: true, cornerLeftOfBubble: true, clearOfNeighbor: true, fill: undefined, accent: undefined, clicks: "none", hasClasses: true, hidden: "true" });
-  const hex = (h) => `rgb(${parseInt(h.slice(1, 3), 16)}, ${parseInt(h.slice(3, 5), 16)}, ${parseInt(h.slice(5, 7), 16)})`;
-  assert.equal(r.fill, hex(r.accent), "the bow takes the look's accent color");
+  assert.deepEqual({ ...r }, { all: true, sparks: 3, cornerLeftOfBubble: true, clicks: "none", hasClasses: true, hidden: "true", alt: true });
 });
 
 test("frog pond: the lily-pad scene and the sparkles are real pictures that load, and the empty peeker slot leaves no gap above the bubble", { skip }, async () => {
@@ -89,7 +83,7 @@ test("frog pond: the lily-pad scene and the sparkles are real pictures that load
 });
 
 test("the corner side, the size and the switches change what is drawn; who gets them can be mods only", { skip }, async () => {
-  await open("look=bubblegum&deco=shapes&decoSide=right&decoSize=200&decoPeek=0&decoSpark=0");
+  await open("look=bubblegum&deco=neko&decoSide=right&decoSize=200&decoPeek=0&decoSpark=0");
   const r = await page.evaluate(`(() => {
     const m = document.querySelectorAll("#chat .m")[2];
     const body = m.querySelector(".body").getBoundingClientRect();
@@ -98,7 +92,7 @@ test("the corner side, the size and the switches change what is drawn; who gets 
   })()`);
   assert.deepEqual({ peek: r.peek, sparks: r.sparks, rightSide: r.rightSide }, { peek: false, sparks: 0, rightSide: true });
   assert.ok(r.width >= 80, `twice the size (${r.width} px)`);
-  await open("look=bubblegum&deco=shapes&decoFor=mods");
+  await open("look=bubblegum&deco=neko&decoFor=mods");
   await page.waitFor(`document.querySelector("#chat .m .ico")`, 30000); // the practice chat is random: wait until a moderator has written
   const mods = await page.evaluate(`[...document.querySelectorAll("#chat .m")].map((m) => [Boolean(m.querySelector(".ico")), Boolean(m.querySelector(".deco"))])`);
   assert.ok(mods.length >= 4);
@@ -138,7 +132,7 @@ test("the chat editor: the decoration settings appear when a pack is picked and 
   const hidden = await shown();
   assert.ok(hidden.includes("Decorations on the bubbles") && hidden.includes("Name tag"));
   assert.ok(!hidden.includes("Decoration size") && !hidden.includes("Sparkles"), "nothing about decorations until a pack is picked");
-  await chip("Plain shapes");
+  await chip("Neko cafe");
   const open = await shown();
   for (const label of ["Decoration size", "Corner scene sits on the", "A friend peeking over the top", "A scene on a corner", "Sparkles", "Who gets decorations"]) assert.ok(open.includes(label), label);
   await chip("A pill on the edge");
@@ -146,7 +140,7 @@ test("the chat editor: the decoration settings appear when a pack is picked and 
   await page.waitFor(`document.querySelectorAll("#chat .m .deco").length >= 2`, 8000);
   assert.equal(await page.evaluate(`document.getElementById("stage").dataset.tag`), "pill");
   const link = new URL(await page.evaluate(`document.getElementById("link").value`));
-  assert.equal(link.searchParams.get("deco"), "shapes");
+  assert.equal(link.searchParams.get("deco"), "neko");
   assert.equal(link.searchParams.get("tag"), "pill");
   await chip("None", "Decorations on the bubbles");
   assert.ok(!(await shown()).includes("Sparkles"), "and they go again");
@@ -168,4 +162,27 @@ test("the matcha page has a Pictures choice up front: Frog pond puts the frog on
   await page.evaluate(`[...document.querySelectorAll("#more-controls .chip")].find((b) => b.textContent.trim() === "None" && b.closest("#more-controls > *")?.querySelector(".ctl__label")?.textContent.trim() === "Decorations on the bubbles").click()`);
   assert.deepEqual(await pressed(), ["None"], "choosing None under More options moves the quick choice too");
   await page.waitFor(`document.querySelectorAll(".chatbox .deco").length === 0`);
+});
+
+test("neko cafe: a cat peeks over the top edge with room left for it, a kitten sits on the corner, and little cat things are scattered", { skip }, async () => {
+  await open("style=latte&palette=latte&deco=neko");
+  await page.waitFor(`[...document.querySelectorAll("#chat .deco img")].every((i) => i.complete)`);
+  const r = await page.evaluate(`(() => {
+    const ms = [...document.querySelectorAll("#chat .m")];
+    const m = ms[2];
+    const body = m.querySelector(".body").getBoundingClientRect();
+    const peek = m.querySelector("img.deco__peek");
+    const box = peek.getBoundingClientRect();
+    const prev = ms[1].getBoundingClientRect();
+    return {
+      loaded: [...document.querySelectorAll("#chat .deco img")].every((i) => i.naturalWidth > 0 && i.src.includes("/decor/neko/")),
+      onTop: box.bottom > body.top && box.bottom - body.top <= 10,
+      clearOfNeighbor: box.top >= prev.bottom - 1,
+      corner: Boolean(m.querySelector("img.deco__corner")),
+      sparks: m.querySelectorAll(".deco__spark").length,
+      both: new Set(ms.map((x) => x.querySelector("img.deco__peek")?.src.split("/").pop())).size,
+    };
+  })()`);
+  assert.deepEqual({ ...r, both: undefined }, { loaded: true, onTop: true, clearOfNeighbor: true, corner: true, sparks: 3, both: undefined });
+  assert.ok(r.both >= 1);
 });

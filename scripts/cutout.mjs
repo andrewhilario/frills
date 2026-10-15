@@ -4,6 +4,7 @@
 //     --pad   empty pixels kept around the piece. Default 6.
 //     --glow  the piece is light and soft-edged (sparkles, glows, stars): how see-through a pixel is comes from its green instead, which is
 //             0 in the magenta and high in a light piece, so a soft glow fades out cleanly instead of leaving a pink halo.
+//     --join  with --split: how many pixels apart two parts can be and still count as one piece (default 24; use less for a tight sheet).
 //     --split the picture holds several separate pieces (a sheet of sparkles or badges): each one is cut out on its own and saved as
 //             <out>-1.png, <out>-2.png, ... from top-left to bottom-right.
 // Needs ffmpeg and ffprobe on the PATH (the promo videos need them too). Nothing else is installed.
@@ -128,13 +129,13 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, "
   const flag = (name, fallback) => { const i = args.indexOf(name); return i >= 0 ? Number(args[i + 1]) : fallback; };
   const [input, output] = args.filter((a, i) => !a.startsWith("--") && !(i > 0 && args[i - 1].startsWith("--") && args[i - 1] !== "--split"));
   if (!input || !output) {
-    console.error("Usage: node scripts/cutout.mjs <in> <out.png> [--max 512] [--pad 6] [--glow] [--split]");
+    console.error("Usage: node scripts/cutout.mjs <in> <out.png> [--max 512] [--pad 6] [--glow] [--split [--join 24]]");
     process.exit(1);
   }
   const options = { max: flag("--max", 512), pad: flag("--pad", 6) };
   const image = keyOut(decode(input), { glow: args.includes("--glow") });
   if (args.includes("--split")) {
-    const all = pieces(image);
+    const all = pieces(image, flag("--join", 24));
     all.forEach((box, i) => {
       const file = output.replace(/\.png$/i, `-${i + 1}.png`);
       console.log(file, JSON.stringify(save(image, box, file, options)));

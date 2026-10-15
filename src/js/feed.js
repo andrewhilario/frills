@@ -2,7 +2,7 @@
 // Chat text is somebody else's words, so it only ever goes in with textContent and text nodes, never as HTML.
 // A message is a plain object: { id, user, name, text, mod, color, emotes, gift, gifter }.
 
-import { SHAPES, decoPieces, hasDeco, seedOf } from "./decor.js";
+import { decoPieces, hasDeco, seedOf } from "./decor.js";
 
 /** Makes an element: el("div", { className: "x" }, child, "text"). */
 export const el = (tag, props = {}, ...kids) => {
@@ -94,7 +94,7 @@ export class Feed {
     this.colors = false; // use each viewer's own name color when the source gives one
     this.emotes = true;
     this.pictures = true; // a chatter's own profile picture in the round badge, when the source has one (TikTok does, Twitch doesn't)
-    this.deco = "none"; // decorations on the bubbles: a pack (frog, shapes) or none (see decor.js)
+    this.deco = "none"; // decorations on the bubbles: a pack (frog, neko) or none (see decor.js)
     this.decoFor = "all"; // who gets them: all, mods, or gifts
     this.decoPeek = true; // the friend peeking over the top
     this.decoCorner = true; // the scene on a bottom corner
@@ -124,14 +124,15 @@ export class Feed {
 
   /**
    * Lays the chosen decorations over a message's bubble (a friend peeking over the top, a scene on a corner, sparkles), or takes them off. Which
-   * pieces a message gets depends on its id, so the same message always looks the same and a chat is not copy-pasted. They are our own pictures
-   * and shapes, never anything a viewer wrote.
+   * pieces a message gets depends on its id, so the same message always looks the same and a chat is not copy-pasted. They are our own pictures,
+   * never anything a viewer wrote.
    */
   adorn(m) {
     const body = m.querySelector(".body");
     if (!body) return;
     body.querySelector(".deco")?.remove();
     m.classList.remove("has-peek", "has-corner");
+    m.style.removeProperty("--peek-ratio");
     const wears = this.deco !== "none" && (this.decoFor === "all" || (this.decoFor === "mods" && m.dataset.mod === "1") || (this.decoFor === "gifts" && m.classList.contains("gift")));
     if (!wears) return;
     const pieces = decoPieces(this.deco, seedOf(m.dataset.id || m.dataset.user), { peek: this.decoPeek, corner: this.decoCorner, spark: this.decoSpark });
@@ -139,22 +140,17 @@ export class Feed {
     const wrap = el("span", { className: "deco" });
     wrap.setAttribute("aria-hidden", "true");
     const piece = (what, className) => {
-      let node;
-      if (what.src) {
-        node = el("img", { className, alt: "", decoding: "async" });
-        node.referrerPolicy = "no-referrer";
-        node.addEventListener("error", () => node.remove(), { once: true }); // a picture that does not load leaves no hole
-        node.src = what.src;
-      } else {
-        node = el("span", { className });
-        node.innerHTML = SHAPES[what.shape]?.markup ?? ""; // drawn by us, in decor.js
-      }
+      const node = el("img", { className, alt: "", decoding: "async" });
+      node.referrerPolicy = "no-referrer";
+      node.addEventListener("error", () => node.remove(), { once: true }); // a picture that does not load leaves no hole
+      node.src = what.src;
       wrap.append(node);
     };
     if (pieces.peek) piece(pieces.peek, "deco__peek");
     if (pieces.corner) piece(pieces.corner, "deco__corner");
     pieces.spark.forEach((what, i) => piece(what, `deco__spark deco__spark--${i + 1}`));
     body.append(wrap);
+    if (pieces.peek?.ratio) m.style.setProperty("--peek-ratio", String(pieces.peek.ratio)); // how much room the friend on top needs
     m.classList.toggle("has-peek", Boolean(pieces.peek));
     m.classList.toggle("has-corner", Boolean(pieces.corner));
   }
