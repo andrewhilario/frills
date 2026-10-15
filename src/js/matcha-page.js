@@ -3,6 +3,7 @@
 import { Feed, ICONS, el } from "./feed.js";
 import { MATCHA_CONTROLS, MATCHA_DEFAULTS, MATCHA_PALETTES, MATCHA_STYLES, currentPalette, matchaFromParams, matchaOverlayUrl, paletteColors, sanitizeMatcha } from "./matcha.js";
 import { MOD_ICONS } from "./settings.js";
+import { DECOS } from "./decor.js";
 import { fontsReady, matchaFaces, paintMatcha } from "./look.js";
 import { buildControl, chips, copyButton } from "./ui.js";
 import { mountSource } from "./source.js";
@@ -77,6 +78,17 @@ chips(
   settings.modIcon,
   (item) => { settings.modIcon = item.id; refresh(); },
 );
+const decoChips = chips(
+  $("decos"),
+  DECOS.map((d) => ({ id: d.id, name: d.id === "none" ? "None" : d.name })),
+  settings.deco,
+  (item) => {
+    settings.deco = item.id;
+    writers.deco?.(item.id); // the same setting is also under More options: keep the two in step
+    showNeeded();
+    refresh();
+  },
+);
 chips(
   $("backs"),
   [{ id: "dark", name: "Dark game" }, { id: "bright", name: "Bright game" }, { id: "busy", name: "Busy scene" }],
@@ -89,9 +101,10 @@ const writers = {};
 function change(key, value) {
   settings[key] = value;
   paletteChips.set(currentPalette(settings)); // no palette looks pressed once a color has been changed
+  if (key === "deco") decoChips.set(value);
   if (key === "font") fontsReady(matchaFaces(settings), 600).then(refresh);
   else refresh();
-  if (key === "ears") showNeeded();
+  showNeeded(); // the settings that depend on another one (the decorations) appear and go with it
 }
 const rows = {};
 for (const control of MATCHA_CONTROLS) {
@@ -100,7 +113,7 @@ for (const control of MATCHA_CONTROLS) {
   rows[control.key] = row;
   $("more-controls").append(row);
 }
-/** The settings that only matter once something is picked (the ears' size and place) are hidden until it is. */
+/** The settings that only matter once something is picked (the decoration's size and place) are hidden until it is. */
 function showNeeded() {
   for (const control of MATCHA_CONTROLS) if (control.needs) rows[control.key].style.display = settings[control.needs] === "none" ? "none" : "";
 }
@@ -108,6 +121,7 @@ showNeeded();
 function syncControls() {
   for (const control of MATCHA_CONTROLS) writers[control.key](settings[control.key]);
   showNeeded();
+  decoChips.set(settings.deco);
   paletteChips.set(currentPalette(settings));
 }
 $("more-reset").addEventListener("click", () => {

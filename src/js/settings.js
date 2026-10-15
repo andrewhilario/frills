@@ -3,7 +3,7 @@
 // they become the CSS variables the chat is drawn with.
 
 import { HEX, inkFor, rgba } from "./color.js";
-import { EARS } from "./ears.js";
+import { DECOS } from "./decor.js";
 
 // The faces a look can use, as the CSS stacks the page sets. Files are self-hosted; each one loads only when a look uses it.
 export const FONTS = {
@@ -54,10 +54,10 @@ export const LOOK_KEYS = Object.keys(PRESETS.blueberry);
 
 export const MOD_ICONS = ["shield", "star", "leaf", "frog", "none"];
 
-// The little extras on the bubbles (cat ears and so on) start off, so a look is exactly what it was until someone turns them on.
-export const EAR_DEFAULTS = { ears: "none", earSize: 100, earX: 10, earGap: 0, earY: 0, earTilt: 0, earColor: "#ff9db8", earInner: "#ffd6e2", earsFor: "all" };
+// Decorations (a friend peeking over the bubble, a small scene on a corner, sparkles) and the name tag: off to begin with, so a look is exactly what it was until someone turns them on.
+export const DECO_DEFAULTS = { deco: "none", decoSize: 100, decoSide: "left", decoPeek: true, decoCorner: true, decoSpark: true, decoFor: "all", tag: "inside" };
 
-export const DEFAULTS = { ...PRESETS.blueberry, letter: 0, align: "left", modIcon: "shield", max: 6, life: 15, space: 8, colors: false, emotes: true, pictures: true, ...EAR_DEFAULTS };
+export const DEFAULTS = { ...PRESETS.blueberry, letter: 0, align: "left", modIcon: "shield", max: 6, life: 15, space: 8, colors: false, emotes: true, pictures: true, ...DECO_DEFAULTS };
 
 const list = (...pairs) => pairs.map(([id, name]) => ({ id, name }));
 
@@ -72,16 +72,14 @@ export const CONTROLS = [
   { key: "size", where: "main", type: "range", label: "Text size", min: 12, max: 34, step: 1, unit: " px" },
   { key: "letter", where: "main", type: "range", label: "Letter spacing", min: -2, max: 8, step: 0.5, unit: " px" },
   { key: "align", where: "main", type: "chips", label: "Text alignment", options: list(["left", "Left"], ["center", "Center"], ["right", "Right"]) },
-  { key: "ears", where: "main", type: "chips", label: "Ears on the bubbles", options: EARS, hint: "Cute little ears, a bow or a halo on the top edge of each message. Pick None to have nothing. Pick one and the settings below it appear." },
-  // these only matter once a design is picked, so the editors hide them while it is None (`needs`)
-  { key: "earSize", where: "main", needs: "ears", type: "range", label: "Ears size", min: 50, max: 200, step: 5, unit: " %" },
-  { key: "earX", where: "main", needs: "ears", type: "range", label: "Along the bubble", min: 0, max: 100, step: 1, unit: " %", hint: "0 is the left edge of the bubble, 50 the middle, 100 the right edge." },
-  { key: "earGap", where: "main", needs: "ears", type: "range", label: "Space between the ears", min: -10, max: 100, step: 1, unit: " px", hint: "Moves the two ears apart, or closer together. A bow and a halo are one piece, so this does not change them." },
-  { key: "earY", where: "main", needs: "ears", type: "range", label: "Up or down", min: -20, max: 30, step: 1, unit: " px", hint: "Up lifts the ears off the bubble, down tucks them behind its edge." },
-  { key: "earTilt", where: "main", needs: "ears", type: "range", label: "Tilt", min: -30, max: 30, step: 1, unit: "°" },
-  { key: "earColor", where: "main", needs: "ears", type: "color", label: "Ears color" },
-  { key: "earInner", where: "main", needs: "ears", type: "color", label: "Inside of the ears" },
-  { key: "earsFor", where: "main", needs: "ears", type: "chips", label: "Who gets ears", options: list(["all", "Everyone"], ["mods", "Mods only"], ["gifts", "Gift messages"]) },
+  { key: "deco", where: "main", type: "chips", label: "Decorations on the bubbles", options: DECOS, hint: "Little pictures laid over the bubbles: a scene on a corner, sparkles, a friend peeking over the top. Frog pond is pictures in green. Plain shapes are drawn in your look's own colors, so they go with anything." },
+  { key: "decoSize", where: "main", needs: "deco", type: "range", label: "Decoration size", min: 50, max: 200, step: 5, unit: " %" },
+  { key: "decoSide", where: "main", needs: "deco", type: "chips", label: "Corner scene sits on the", options: list(["left", "Left"], ["right", "Right"]), hint: "The friend peeking over the top goes on the other side." },
+  { key: "decoPeek", where: "main", needs: "deco", type: "toggle", label: "A friend peeking over the top" },
+  { key: "decoCorner", where: "main", needs: "deco", type: "toggle", label: "A scene on a corner" },
+  { key: "decoSpark", where: "main", needs: "deco", type: "toggle", label: "Sparkles" },
+  { key: "decoFor", where: "main", needs: "deco", type: "chips", label: "Who gets decorations", options: list(["all", "Everyone"], ["mods", "Mods only"], ["gifts", "Gift messages"]) },
+  { key: "tag", where: "main", type: "chips", label: "Name tag", options: list(["inside", "Inside the bubble"], ["pill", "A pill on the edge"]), hint: "A pill puts the name in a small rounded label that overlaps the top-left edge of the bubble, in your look's accent color." },
   { key: "text", where: "more", type: "color", label: "Text color" },
   { key: "pop", where: "more", type: "color", label: "Gift color" },
   { key: "shape", where: "more", type: "chips", label: "Box", options: list(["filled", "Filled"], ["outline", "Outline"], ["none", "Text only"]) },
@@ -158,19 +156,12 @@ export function currentPreset(settings) {
   return Object.keys(PRESETS).find((id) => LOOK_KEYS.every((k) => settings[k] === PRESETS[id][k])) ?? null;
 }
 
-/** The ears' colors and size as CSS variables. Used by the general looks and the matcha looks alike. */
-export const earVars = (s) => ({
-  "--ear": HEX.test(s.earColor ?? "") ? s.earColor : EAR_DEFAULTS.earColor,
-  "--ear-in": HEX.test(s.earInner ?? "") ? s.earInner : EAR_DEFAULTS.earInner,
-  "--ear-scale": String((Number.isFinite(s.earSize) ? s.earSize : EAR_DEFAULTS.earSize) / 100),
-  "--ear-x": String((Number.isFinite(s.earX) ? s.earX : EAR_DEFAULTS.earX) / 100), // how far along the bubble, 0 to 1
-  "--ear-gap": (Number.isFinite(s.earGap) ? s.earGap : 0) + "px", // the space between the two ears of a pair
-  "--ear-y": (Number.isFinite(s.earY) ? s.earY : 0) + "px", // up (positive) or down
-  "--ear-room": Math.max(0, Number.isFinite(s.earY) ? s.earY : 0) + "px", // extra room above the bubble when they are lifted
-  "--ear-tilt": (Number.isFinite(s.earTilt) ? s.earTilt : 0) + "deg",
-});
-/** Which design, as the stage's data attribute (the stylesheet leaves room for how tall it stands). */
-export const earAttrs = (s) => ({ ears: s.ears ?? "none" });
+/** The decoration's size, as the stylesheet's CSS variable. */
+export const decoVars = (s) => ({ "--deco-scale": String((Number.isFinite(s.decoSize) ? s.decoSize : DECO_DEFAULTS.decoSize) / 100) });
+/** Which pack, which side the corner scene sits on, and the name tag style, as the stage's data attributes. */
+export const decoAttrs = (s) => ({ deco: s.deco ?? "none", decoSide: s.decoSide === "right" ? "right" : "left", tag: s.tag === "pill" ? "pill" : "inside" });
+/** What the feed needs to draw the decorations on each message. */
+export const decoFeed = (s) => ({ deco: s.deco ?? "none", decoFor: s.decoFor ?? "all", decoPeek: s.decoPeek !== false, decoCorner: s.decoCorner !== false, decoSpark: s.decoSpark !== false });
 
 /**
  * Settings -> what the page needs to draw them: CSS variables for the chat's stage, data attributes, and the feed's options.
@@ -198,11 +189,11 @@ export function lookVars(s) {
     "--g-space": s.space + "px",
     "--g-align": s.align || "left",
     "--g-outline": inkFor(s.text) === "#ffffff" ? "#f5f5f5" : "#0b0b0b", // a text outline that contrasts with the text
-    ...earVars(s),
+    ...decoVars(s),
   };
   return {
     vars,
-    attrs: { shape: s.shape, avatar: s.avatar ? "on" : "off", ...earAttrs(s) },
-    feed: { max: s.max, life: s.life * 1000, modIcon: s.modIcon, colors: s.colors, emotes: s.emotes, pictures: s.pictures, ears: s.ears, earsFor: s.earsFor },
+    attrs: { shape: s.shape, avatar: s.avatar ? "on" : "off", ...decoAttrs(s) },
+    feed: { max: s.max, life: s.life * 1000, modIcon: s.modIcon, colors: s.colors, emotes: s.emotes, pictures: s.pictures, ...decoFeed(s) },
   };
 }
