@@ -186,3 +186,24 @@ test("neko cafe: a cat peeks over the top edge with room left for it, a kitten s
   assert.deepEqual({ ...r, both: undefined }, { loaded: true, onTop: true, clearOfNeighbor: true, corner: true, sparks: 3, both: undefined });
   assert.ok(r.both >= 1);
 });
+
+test("the name tag pill never wraps a letter per line in a short message, and the cat on top keeps off the tag, whichever way the text is aligned", { skip }, async () => {
+  for (const align of ["left", "center", "right"]) {
+    for (const side of ["left", "right"]) {
+      await open(`look=bubblegum&deco=neko&tag=pill&align=${align}&decoSide=${side}`);
+      await page.waitFor(`[...document.querySelectorAll("#chat .deco img")].every((i) => i.complete)`);
+      const r = await page.evaluate(`(() => {
+        const ms = [...document.querySelectorAll("#chat .m")].filter((m) => m.querySelector("img.deco__peek"));
+        const size = parseFloat(getComputedStyle(document.querySelector("#chat .m .name")).fontSize);
+        return ms.map((m) => {
+          const who = m.querySelector(".who").getBoundingClientRect();
+          const cat = m.querySelector("img.deco__peek").getBoundingClientRect();
+          return { oneLine: who.height < size * 2, apart: cat.right <= who.left + 1 || cat.left >= who.right - 1 };
+        });
+      })()`);
+      assert.ok(r.length >= 3);
+      assert.ok(r.every((x) => x.oneLine), `${align}/${side}: the name stays on one line`);
+      assert.ok(r.every((x) => x.apart), `${align}/${side}: the cat and the tag do not overlap`);
+    }
+  }
+});

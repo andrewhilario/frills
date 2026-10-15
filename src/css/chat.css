@@ -71,11 +71,18 @@
 /* The name tag as a pill: the name leaves the bubble and sits in a small rounded label on the top-left edge. */
 .look[data-tag="pill"] .m { --m-top-tag: 0.9em; }
 .look[data-tag="pill"] .m .body { padding-top: 1.05em; }
-.look[data-tag="pill"] .m .who { position: absolute; z-index: 3; left: 0.9em; top: 0; transform: translateY(-58%); max-width: 80%; padding: 0.12em 0.8em 0.16em; border-radius: 999px; background: var(--tag-bg); color: var(--tag-ink); font-size: 0.82em; line-height: 1.2; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25); }
-.look[data-tag="pill"] .m .who .name { color: inherit; font-size: 1em; text-shadow: none; }
+.look[data-tag="pill"] .m .who { position: absolute; z-index: 3; left: 0.9em; top: 0; transform: translateY(-58%); width: max-content; max-width: max(80%, 9em); padding: 0.12em 0.8em 0.16em; border-radius: 999px; background: var(--tag-bg); color: var(--tag-ink); font-size: 0.82em; line-height: 1.2; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25); }
+.look[data-tag="pill"] .m .who .name { color: inherit; font-size: 1em; text-shadow: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .look[data-tag="pill"] .m .who .ico { color: var(--tag-ink); --icon-ink: var(--tag-bg); }
 .look[data-tag="pill"][data-align="center"] .m .who { left: 50%; transform: translate(-50%, -58%); }
 .look[data-tag="pill"][data-align="right"] .m .who { left: auto; right: 0.9em; }
+/* the friend on top goes to the side the tag is not on, so the two never sit on each other */
+.look[data-tag="pill"][data-align="left"] .m .deco__peek { left: auto; right: 0.9em; }
+.look[data-tag="pill"][data-align="right"] .m .deco__peek { right: auto; left: 0.9em; }
+/* a short message is kept wide enough for the tag and the friend on top to sit side by side (the tag is 9em at most, the friend 4.4em); centered, the tag stays in the middle and the friend hangs on its corner */
+.look[data-tag="pill"] .m.has-peek .body { min-width: 15em; }
+.look[data-tag="pill"][data-align="center"] .m .deco__peek { right: -0.4em; left: auto; }
+.look[data-tag="pill"][data-align="center"][data-deco-side="right"] .m .deco__peek { left: -0.4em; right: auto; }
 
 /* A message leaves by fading up, then it is removed from the page. */
 .m.leaving { animation: out 300ms var(--ease-in) forwards !important; }
