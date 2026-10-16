@@ -326,3 +326,49 @@ test("overlay: when the relay is restarted behind its tunnel, the page comes bac
     forward.close();
   }
 });
+
+test("editor: after the relay restarts, the status line goes back from \"Lost…\" to the real state (it used to stay on \"Connecting…\" while chat flowed)", { skip }, async () => {
+  let inner = 0;
+  const forward = http.createServer((req, res) => {
+    if (!inner) { res.writeHead(502, { "content-type": "text/plain" }); res.end("Bad gateway"); return; }
+    const up = http.request({ host: "127.0.0.1", port: inner, path: req.url, method: req.method, headers: req.headers }, (r) => {
+      res.writeHead(r.statusCode, r.headers);
+      r.pipe(res);
+      r.on("close", () => { if (!r.complete) res.destroy(); });
+    });
+    up.on("error", () => { if (!res.headersSent) { res.writeHead(502); res.end(); } else res.destroy(); });
+    res.on("close", () => up.destroy());
+    req.pipe(up);
+  });
+  await new Promise((resolve) => forward.listen(0, "127.0.0.1", resolve));
+  const front = `http://127.0.0.1:${forward.address().port}`;
+  const relayBehind = async () => {
+    const helper = createHelper({ distDir: dist, demoPace: [300, 500], relay: { origins: [front], slots: 10, trustProxy: false } });
+    const port = await helper.listen(0);
+    opened.push(helper);
+    return { port, helper };
+  };
+  const status = () => page.evaluate(`document.getElementById("source-status").textContent`);
+  const messages = () => page.evaluate(`document.querySelectorAll("#chat .m").length > 0 ? [...document.querySelectorAll("#chat .m .txt")].map((n) => n.textContent).join("|") : ""`);
+  try {
+    let relay = await relayBehind();
+    inner = relay.port;
+    await page.viewport(1280, 900);
+    await page.goto(`${front}/editor/`, { settle: 1200 });
+    await page.evaluate(`(() => { const i = document.getElementById("source-channel"); i.value = "frills_demo"; i.dispatchEvent(new Event("input", { bubbles: true })); [...document.querySelectorAll(".source__row button")].find((b) => /connect/i.test(b.textContent)).click(); })()`);
+    await page.waitFor(`document.querySelector("#chat .m")`, 10000);
+    const practice = await status();
+    assert.match(practice, /Practice chat/);
+    inner = 0;
+    await relay.helper.close();
+    await page.waitFor(`/Lost/.test(document.getElementById("source-status").textContent)`, 10000);
+    await sleep(3000);
+    relay = await relayBehind();
+    inner = relay.port;
+    const stuck = await page.waitFor(`document.getElementById("source-status").textContent.includes("Practice chat")`, 40000).then(() => "", () => "the status line stayed on: " + "");
+    assert.equal(stuck, "", "the status line never went back from the lost/connecting text; it says: " + (await status()));
+  } finally {
+    forward.closeAllConnections?.();
+    forward.close();
+  }
+});

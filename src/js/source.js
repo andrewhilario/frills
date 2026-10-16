@@ -129,10 +129,13 @@ export function mountSource(host, { feeds, pace, channel = "", platform = "tikto
       if (current === "tiktok" && !pretend && status.dataset.state !== "error") setStatus("connected", statusText({ state: "reading", platform: current, channel: name, wants }));
     };
     let pretend = false; // the practice account says so itself, and keeps saying it
+    let lost = false; // the connection dropped: when it comes back, its "connected" must be shown even though chat had been seen before
     conn = connectTo(list, current, name, (s) => {
       onState?.(s.state);
       if (s.state === "connected" && s.detail) pretend = true;
-      if (s.state === "connected" && chatSeen) return; // already reading: a status repeat does not take that back
+      if (s.state === "helper-lost" || s.state === "reconnecting") lost = true;
+      if (s.state === "connected" && chatSeen && !lost) return; // already reading: a status repeat does not take that back
+      if (s.state === "connected") lost = false;
       setStatus(s.state, statusText({ ...s, wants }));
       // TikTok can accept a connection to an account that is not LIVE, and then nothing ever arrives. After a while of nothing, say so.
       clearTimeout(silence);
