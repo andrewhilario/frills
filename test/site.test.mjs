@@ -26,7 +26,7 @@ const assetOf = (html, kind) => (new RegExp(`${kind === "css" ? 'href="(/assets/
 
 test("the pages we expect are all there", () => {
   const urls = pages.map((p) => p.url).sort();
-  assert.deepEqual(urls, ["/", "/404.html", "/admin/", "/alerts/", "/changelog/", "/editor/", "/feedback/", "/gifts/", "/goal/", "/guides/alerts/", "/guides/obs/", "/guides/test/", "/guides/tiktok/", "/likers/", "/matcha/", "/overlay/", "/overlay/alerts/", "/overlay/gifts/", "/overlay/goal/", "/overlay/likers/", "/overlay/songs/", "/overlays/", "/overlays/faq/", "/privacy/", "/songs/", "/spotify/", "/spotify/callback/", "/twitch/", "/twitch/callback/"]);
+  assert.deepEqual(urls, ["/", "/404.html", "/admin/", "/alerts/", "/changelog/", "/editor/", "/feedback/", "/gifts/", "/goal/", "/guides/alerts/", "/guides/obs/", "/guides/setup/", "/guides/test/", "/guides/tiktok/", "/likers/", "/matcha/", "/overlay/", "/overlay/alerts/", "/overlay/gifts/", "/overlay/goal/", "/overlay/likers/", "/overlay/songs/", "/overlays/", "/overlays/faq/", "/privacy/", "/songs/", "/spotify/", "/spotify/callback/", "/twitch/", "/twitch/callback/"]);
 });
 
 test("every indexable page has its own title and description, a canonical address, share tags and one h1", () => {
@@ -258,4 +258,28 @@ test("the update banner sits above the menu where it scrolls away, appears once,
   for (const editor of ["alerts/index.html", "editor/index.html", "gifts/index.html", "likers/index.html", "goal/index.html", "songs/index.html", "matcha/index.html"]) {
     assert.ok(!read(editor).includes("site-announcement"), `${editor} has no banner (its preview is pinned under the top bar)`);
   }
+});
+
+test("the setup clips page has a clip and written steps for each of the five overlays, every file it names is in the site, and the clips never start by themselves", () => {
+  const page = pages.find((p) => p.url === "/guides/setup/").html;
+  const names = ["chat", "alerts", "gifts", "goal", "likers"];
+  for (const name of names) {
+    const section = new RegExp(String.raw`<section class="setup" id="${name}"[\s\S]*?</section>`).exec(page)?.[0];
+    assert.ok(section, name + ": a section");
+    assert.equal((section.match(/<video /g) ?? []).length, 1, name + ": one clip");
+    assert.ok((section.match(/<li><div><h3 class="subtitle">/g) ?? []).length >= 4, name + ": the steps are written out too");
+    for (const file of [`${name}.mp4`, `${name}.jpg`]) assert.ok(files.includes("guides/clips/" + file), file + " is in the site");
+    assert.match(section, new RegExp(String.raw`poster="/guides/clips/${name}\.jpg"`));
+    assert.ok(/<video [^>]*\bwidth="\d+" height="\d+"/.test(section), name + ": the size is set, so the page does not jump");
+    assert.ok(/<video [^>]*preload="none"/.test(section) && !/<video [^>]*\bautoplay\b/.test(section), name + ": nothing downloads or plays until it is on screen");
+    assert.ok(/<video [^>]*\bcontrols\b/.test(section) && /aria-label="A silent clip/.test(section), name + ": it has controls and a description");
+    assert.ok(section.includes(`href="/${name === "chat" ? "editor" : name}/"`), name + ": a link to its editor");
+  }
+  for (const file of files.filter((x) => x.startsWith("guides/clips/") && /\.mp4$/.test(x))) assert.ok(readFileSync(join(dist, file)).length < 1_200_000, file + " stays small");
+  // the editors and the overlays page point to it
+  for (const [url, anchor] of [["/editor/", "chat"], ["/alerts/", "alerts"], ["/gifts/", "gifts"], ["/goal/", "goal"], ["/likers/", "likers"]]) {
+    assert.ok(pages.find((p) => p.url === url).html.includes(`href="/guides/setup/#${anchor}"`), url + " links to its clip");
+    assert.ok(pages.find((p) => p.url === "/overlays/").html.includes(`href="/guides/setup/#${anchor}"`), "the overlays page links to the " + anchor + " clip");
+  }
+  assert.ok(pages.find((p) => p.url === "/").html.includes('href="/guides/setup/"'), "the home page links to the clips");
 });

@@ -196,6 +196,17 @@
 .steps-list > li { counter-increment: guide; display: grid; grid-template-columns: 2.75rem minmax(0, 1fr); gap: var(--space-md); align-items: start; }
 .steps-list > li::before { content: counter(guide); display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border: 2px solid var(--color-ink); border-radius: 50%; background: var(--color-accent); font-weight: 800; font-variant-numeric: tabular-nums; }
 .steps-list > li > div { display: grid; gap: var(--space-xs); padding-top: var(--space-2xs); min-width: 0; }
+/* The setup clips (/guides/setup/): one short, silent, looping clip per overlay with its steps under it. */
+.article__body--wide { max-width: 60rem; }
+.jump { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin-bottom: var(--space-xl); }
+.setup { display: grid; gap: var(--space-md); padding-top: var(--space-xl); border-top: 2px dashed var(--color-rule-2); scroll-margin-top: var(--space-lg); }
+.setup > p, .setup > .steps-list { max-width: 44rem; }
+.clip { margin: 0; display: grid; gap: var(--space-xs); }
+.clip video { display: block; width: 100%; height: auto; aspect-ratio: 960 / 596; background: var(--color-ink); border: 3px solid var(--color-ink); border-radius: var(--radius-card); box-shadow: 0 6px 0 var(--color-ink); }
+.clip figcaption { font-size: var(--text-sm); color: var(--color-ink-2); }
+/* Small links to the clips: on the overlays page, on the home page and at the top of each editor. */
+.tool__watch, .hero__watch { margin: 0; font-size: var(--text-sm); }
+.hero__watch { margin-top: var(--space-md); }
 .note { padding: var(--space-md) var(--space-lg); border-radius: var(--radius-card); background: var(--color-accent-2-tint); color: var(--color-ink); }
 .note--warm { background: var(--color-accent-tint); }
 /* A web address to copy, shown whole: long ones wrap instead of pushing the page sideways. */

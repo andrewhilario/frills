@@ -77,3 +77,7 @@
   .preview__bar { padding-inline: var(--space-lg); }
   .preview .chatstage { padding: 0 var(--space-lg) var(--space-lg); }
 }
+
+/* A small link at the top of each editor to the setup clip, for people who have not used it before. */
+.watch { margin: 0 0 var(--space-md); font-size: var(--text-sm); }
+.watch a { display: inline-flex; align-items: center; gap: var(--space-xs); font-weight: 600; }
