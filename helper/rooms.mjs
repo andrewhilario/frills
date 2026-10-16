@@ -130,10 +130,7 @@ export class Room {
     });
     conn.on("gift", (d) => {
       const m = mapGift(d);
-      if (m && this.fresh(m.id)) {
-        this.counts.gift += 1;
-        this.broadcast("chat", m);
-      }
+      if (m && this.fresh(m.id)) this.broadcast("chat", m); // (the gift is counted once, with its alert below)
       this.alert(mapGiftAlert(d));
     });
     conn.on("like", (d) => this.like(mapLike(d)));
