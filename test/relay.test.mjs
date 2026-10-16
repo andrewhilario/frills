@@ -40,9 +40,9 @@ const raw = (path, { method = "GET", headers = {} } = {}) => new Promise((resolv
 });
 
 /** Listens to a stream like a page on the website would. */
-function listen(user, headers = {}) {
+function listen(user, headers = {}, kinds = "") {
   const events = [];
-  const req = http.get({ host: "127.0.0.1", port, path: `/tiktok/stream?user=${encodeURIComponent(user)}`, headers: { Host: "relay.example.test", Origin: SITE, ...headers } });
+  const req = http.get({ host: "127.0.0.1", port, path: `/tiktok/stream?user=${encodeURIComponent(user)}${kinds ? `&events=${kinds}` : ""}`, headers: { Host: "relay.example.test", Origin: SITE, ...headers } });
   let status = 0;
   const done = new Promise((resolve) => {
     req.on("response", (res) => {
@@ -189,5 +189,25 @@ test("the pretend account works through a relay too, and still never touches Tik
   await page.until(() => page.events.filter((e) => e.name === "chat").length >= 3, 3000);
   assert.equal(made.length, 0);
   await page.close();
+  await helper.close();
+});
+
+test("the relay says when a page connects, leaves or is turned away, by kind and with counts only, never an address", async () => {
+  const lines = [];
+  await start({ relay: { slots: 10, maxPerIp: 2, trustProxy: false }, log: (line) => lines.push(line) });
+  const chat = listen("acct.a");
+  await chat.until(() => chat.states().includes("connected"));
+  const alerts = listen("acct.a", {}, "follow,gift");
+  await alerts.until(() => alerts.states().includes("connected"));
+  const refused = await raw("/tiktok/stream?user=acct.a", { headers: { Origin: SITE } });
+  assert.equal(refused.status, 429);
+  await alerts.close();
+  await sleep(80);
+  assert.ok(lines.some((l) => l === "@acct.a: a page connected (chat), 1 open"), lines.join(" | "));
+  assert.ok(lines.some((l) => l === "@acct.a: a page connected (follow+gift), 2 open"), lines.join(" | "));
+  assert.ok(lines.some((l) => /^@acct\.a: a page was turned away \(2 pages are already open from its address\)$/.test(l)), lines.join(" | "));
+  assert.ok(lines.some((l) => l === "@acct.a: a page left (follow+gift), 1 open"), lines.join(" | "));
+  assert.ok(!lines.some((l) => /127\.0\.0\.1|::1|\d+\.\d+\.\d+\.\d+/.test(l)), "no address in any line");
+  await chat.close();
   await helper.close();
 });

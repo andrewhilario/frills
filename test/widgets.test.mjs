@@ -154,11 +154,22 @@ test("reaching the goal celebrates once, and raising sets the next goal by the s
   assert.equal(stops.state.goal, 100);
 });
 
-test("a count restored past its goal does not celebrate again, and editing the goal moves it", () => {
+test("a count restored past its goal does not celebrate again and is not left stuck on it, and editing the goal moves it", () => {
   const { state, events } = goalRig({}, { gained: 30, target: 100 });
-  assert.equal(state.reached, true);
+  assert.deepEqual([state.goal, state.reached], [125, false], "120 is past 100, so the goal moves up by the step, quietly");
   state.follow();
   assert.ok(!events.includes("reached"));
+  assert.equal(state.goal, 125);
+  const full = goalRig({ step: 0 }, { gained: 30, target: 100 });
+  assert.deepEqual([full.state.goal, full.state.reached], [100, true], "with no step the goal stays and the bar is full");
+  const exact = goalRig({ start: 0 }, { gained: 100, target: 100 });
+  exact.state.follow(5);
+  assert.deepEqual([exact.state.value, exact.state.goal], [105, 125], "a page reloaded at the goal (the count saved before the next goal was set) carries on to the next one");
+  const huge = goalRig({ start: 0, step: 1 }, { gained: 2_000_000_000, target: 100 });
+  assert.equal(huge.state.goal, 2_000_000_001, "no waiting however far past the goal the count is");
+  state.setSettings({ ...state.settings, target: 20 });
+  assert.equal(state.goal, 145, "a smaller goal typed in (20) is already passed by the 121 counted, so it moves up by the step (20, 45, ... 145) quietly too");
+  state.setSettings({ ...state.settings, target: 500 });
   state.setSettings({ ...state.settings, target: 500 });
   assert.equal(state.goal, 500, "the person changed the goal");
   assert.equal(state.reached, false);

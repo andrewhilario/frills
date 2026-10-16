@@ -4,6 +4,7 @@
 import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
+import net from "node:net";
 import { EventEmitter } from "node:events";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
@@ -356,17 +357,73 @@ test("editor: after the relay restarts, the status line goes back from \"Lost…
     await page.viewport(1280, 900);
     await page.goto(`${front}/editor/`, { settle: 1200 });
     await page.evaluate(`(() => { const i = document.getElementById("source-channel"); i.value = "frills_demo"; i.dispatchEvent(new Event("input", { bubbles: true })); [...document.querySelectorAll(".source__row button")].find((b) => /connect/i.test(b.textContent)).click(); })()`);
-    await page.waitFor(`document.querySelector("#chat .m")`, 10000);
+    await page.waitFor(`document.querySelector("#chat .m")`, { timeout: 10000 });
     const practice = await status();
     assert.match(practice, /Practice chat/);
     inner = 0;
     await relay.helper.close();
-    await page.waitFor(`/Lost/.test(document.getElementById("source-status").textContent)`, 10000);
+    await page.waitFor(`/Lost/.test(document.getElementById("source-status").textContent)`, { timeout: 10000 });
     await sleep(3000);
     relay = await relayBehind();
     inner = relay.port;
-    const stuck = await page.waitFor(`document.getElementById("source-status").textContent.includes("Practice chat")`, 40000).then(() => "", () => "the status line stayed on: " + "");
+    const stuck = await page.waitFor(`document.getElementById("source-status").textContent.includes("Practice chat")`, { timeout: 40000 }).then(() => "", () => "the status line stayed on: " + "");
     assert.equal(stuck, "", "the status line never went back from the lost/connecting text; it says: " + (await status()));
+  } finally {
+    forward.closeAllConnections?.();
+    forward.close();
+  }
+});
+
+test("overlay: a page the relay turns away (too many pages open from one address) says so, and gets in by itself once there is room", { skip }, async () => {
+  const port = await new Promise((resolve) => { const s = net.createServer(); s.listen(0, "127.0.0.1", () => { const p = s.address().port; s.close(() => resolve(p)); }); });
+  const base = `http://127.0.0.1:${port}`;
+  const relay = createHelper({ distDir: dist, demoPace: [200, 400], relay: { origins: [base], slots: 10, maxPerIp: 1, trustProxy: false } });
+  await relay.listen(port);
+  opened.push(relay);
+  // the one page that fits: a stream held open by hand
+  const first = http.get(`${base}/tiktok/stream?user=frills_demo`, { headers: { Origin: base } });
+  await new Promise((resolve) => first.on("response", (res) => { res.on("data", () => {}); resolve(); }));
+  try {
+    await page.viewport(520, 400);
+    await page.goto(`${base}/overlay/alerts/?channel=frills_demo&platform=tiktok`, { settle: 1500 });
+    await page.waitFor(`/turned the connection down/.test(document.getElementById("note").textContent)`, { timeout: 10000 });
+    first.destroy(); // there is room now
+    await page.waitFor(`document.getElementById("note").hidden`, { timeout: 40000 }).catch(async () => { throw new Error("the page never got in; it says: " + (await page.evaluate(`document.getElementById("note").textContent`))); });
+  } finally {
+    first.destroy();
+  }
+});
+
+test("overlay: when every new connection attempt hangs with no answer at all (a half-dead link), the page gives up on it and gets back in by itself", { skip }, async () => {
+  let mode = "ok";
+  let inner = 0;
+  const forward = http.createServer((req, res) => {
+    if (mode === "hang") return; // the request is taken and never answered, as on a link that has half died
+    const up = http.request({ host: "127.0.0.1", port: inner, path: req.url, method: req.method, headers: req.headers }, (r) => {
+      res.writeHead(r.statusCode, r.headers);
+      r.pipe(res);
+      r.on("close", () => { if (!r.complete) res.destroy(); });
+    });
+    up.on("error", () => { if (!res.headersSent) { res.writeHead(502); res.end(); } else res.destroy(); });
+    res.on("close", () => up.destroy());
+    req.pipe(up);
+  });
+  await new Promise((resolve) => forward.listen(0, "127.0.0.1", resolve));
+  const front = `http://127.0.0.1:${forward.address().port}`;
+  const helper = createHelper({ distDir: dist, demoPace: [300, 500], relay: { origins: [front], slots: 10, trustProxy: false } });
+  inner = await helper.listen(0);
+  opened.push(helper);
+  const note = () => page.evaluate(`document.getElementById("note").hidden ? "" : document.getElementById("note").textContent`);
+  try {
+    await page.viewport(520, 400);
+    await page.goto(`${front}/overlay/?platform=tiktok&channel=frills_demo`, { settle: 1500 });
+    await page.waitFor(`document.querySelector("#chat .m")`, { timeout: 10000 });
+    mode = "hang";
+    forward.closeAllConnections(); // the link breaks, and from now on every attempt to open a stream sits there unanswered
+    await page.waitFor(`!document.getElementById("note").hidden`, { timeout: 15000 });
+    await sleep(8000);
+    mode = "ok"; // the link is fine again, but the attempt the browser is waiting on will never be answered
+    await page.waitFor(`document.getElementById("note").hidden`, { timeout: 90000 }).catch(async () => { throw new Error("it never came back; the note says: " + (await note())); });
   } finally {
     forward.closeAllConnections?.();
     forward.close();

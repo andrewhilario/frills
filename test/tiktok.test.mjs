@@ -405,3 +405,85 @@ test("a relay that sends its beat and then goes silent is replaced; one that nev
     mock.timers.reset();
   }
 });
+
+test("a stream the relay turned away on its first try is tried again by itself (when told it is a relay we found), with growing waits, and stopping ends it", () => {
+  const { sources, seen, conn } = reconnecting({ retryRefused: true });
+  try {
+    giveUp(sources[0]);
+    assert.deepEqual(seen.status, ["connecting", "refused"], "it says so, and it is not a fatal error");
+    assert.equal(sources.length, 1);
+    mock.timers.tick(2500);
+    assert.equal(sources.length, 2, "a new stream after the first wait");
+    giveUp(sources[1]);
+    mock.timers.tick(2500);
+    assert.equal(sources.length, 2, "the wait grows");
+    mock.timers.tick(2500);
+    assert.equal(sources.length, 3);
+    sources[2].send("status", { state: "connected" });
+    assert.equal(seen.status.at(-1), "connected", "and when a spot is free it is in");
+    conn.stop();
+    mock.timers.tick(60000);
+    assert.equal(sources.length, 3, "no new stream after stop");
+  } finally {
+    conn.stop();
+    mock.timers.reset();
+  }
+});
+
+// ── a stream that dies without a word: the page notices and opens a fresh one ──────────────────────────────────────────────────
+
+test("a stream that has said nothing at all for 30 seconds is replaced (a connection attempt can hang with no error), and again if the next hangs too", () => {
+  const { sources, seen, conn } = reconnecting();
+  try {
+    mock.timers.tick(25000);
+    assert.equal(sources.length, 1, "not yet: a slow start is not a dead stream");
+    mock.timers.tick(10000);
+    mock.timers.tick(3000); // the short wait before the new try
+    assert.equal(sources.length, 2, "a fresh stream after 30 seconds of nothing");
+    assert.equal(sources[0].closed, true, "the hung one is let go");
+    assert.ok(seen.status.includes("helper-lost"));
+    mock.timers.tick(35000);
+    mock.timers.tick(5000);
+    assert.equal(sources.length, 3, "and a third when that one hangs too");
+    sources[2].send("status", { state: "connected" });
+    mock.timers.tick(120000);
+    assert.equal(sources.length, 3, "a stream that has said something, with a quiet chat, is left alone (an older relay sends no beat)");
+  } finally {
+    conn.stop();
+    mock.timers.reset();
+  }
+});
+
+test("a stream the browser lost and cannot reopen for 45 seconds is replaced at once, and the network coming back does not wait out a back-off", () => {
+  const { sources, conn } = reconnecting();
+  const handlers = {};
+  const before = { add: globalThis.addEventListener, remove: globalThis.removeEventListener };
+  globalThis.addEventListener = (name, fn) => { (handlers[name] ??= []).push(fn); };
+  globalThis.removeEventListener = (name, fn) => { handlers[name] = (handlers[name] ?? []).filter((x) => x !== fn); };
+  try {
+    sources[0].send("status", { state: "connected" });
+    sources[0].readyState = 0; // the browser lost it and is trying again by itself
+    sources[0].onerror();
+    mock.timers.tick(40000);
+    assert.equal(sources.length, 1, "the browser has had 40 seconds");
+    mock.timers.tick(10000);
+    assert.equal(sources.length, 2, "after 45 seconds of nothing a fresh stream, with no wait");
+    // a stream that came back, then died: it is given up, and the network coming back does not wait out the back-off
+    const otherSources = [];
+    const otherConn = connectTikTok({ user: "pond.pal", base: "https://relay.example", eventSourceFactory: () => { const s = fakeEventSource(); otherSources.push(s); return s; } });
+    const other = { sources: otherSources, conn: otherConn };
+    other.sources[0].send("status", { state: "connected" });
+    other.sources[0].readyState = 2;
+    other.sources[0].onerror();
+    assert.equal(other.sources.length, 1, "waiting for its back-off");
+    (handlers.online ?? []).forEach((fn) => fn());
+    mock.timers.tick(1); // (no back-off left to wait for)
+    assert.ok(other.sources.length >= 2, "the network came back: a fresh stream at once");
+    other.conn.stop();
+  } finally {
+    conn.stop();
+    globalThis.addEventListener = before.add;
+    globalThis.removeEventListener = before.remove;
+    mock.timers.reset();
+  }
+});

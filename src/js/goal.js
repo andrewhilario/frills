@@ -47,13 +47,23 @@ export class GoalState {
     this.goal = target ?? settings.target;
     this.onChange = onChange ?? (() => {});
     this.onReach = onReach ?? (() => {});
-    this.reached = this.value >= this.goal; // a count restored past its goal does not celebrate again
     this.seenTarget = settings.target; // (the editor changes one settings object in place, so the goal it had is remembered here)
+    this.catchUp(); // a count restored past its goal does not celebrate again, and is not left stuck on it
   }
 
   get value() { return (this.liveStart ?? this.settings.start) + this.gained; }
   get percent() { return Math.min(100, Math.floor((this.value / this.goal) * 100)); }
   get snapshot() { return { value: this.value, goal: this.goal, percent: this.percent, gained: this.gained, reached: this.reached }; }
+
+  /**
+   * The count is already past the goal (it was restored, the real follower count arrived, or a smaller goal was typed): nobody just reached it, so
+   * with a step the goal moves up to the next one quietly, with no celebration. With no step it stays and the bar is full.
+   */
+  catchUp() {
+    const { step } = this.settings;
+    if (step > 0 && this.goal <= this.value) this.goal += Math.ceil((this.value - this.goal + 1) / step) * step;
+    this.reached = this.value >= this.goal;
+  }
 
   /** The settings changed (the person is editing): keep the people counted, take the new start and goal. */
   setSettings(settings) {
@@ -64,7 +74,7 @@ export class GoalState {
     this.seenType = settings.type;
     if (typeMoved) { this.gained = 0; this.liveStart = null; } // a different thing is counted now: start again
     if (goalMoved || typeMoved) this.goal = settings.target;
-    this.reached = this.value >= this.goal;
+    this.catchUp();
     this.onChange(this.snapshot);
   }
 
@@ -84,9 +94,7 @@ export class GoalState {
   setLive(followers) {
     this.liveStart = followers;
     this.gained = 0;
-    const { step } = this.settings;
-    if (step > 0) while (this.goal <= this.value) this.goal += step;
-    this.reached = this.value >= this.goal;
+    this.catchUp();
     this.onChange(this.snapshot);
   }
 
@@ -100,7 +108,7 @@ export class GoalState {
   raise() {
     const { step } = this.settings;
     if (step <= 0) return false;
-    while (this.goal <= this.value) this.goal += step;
+    if (this.goal <= this.value) this.goal += Math.ceil((this.value - this.goal + 1) / step) * step;
     this.reached = false;
     this.onChange(this.snapshot);
     return true;
@@ -110,7 +118,7 @@ export class GoalState {
     this.gained = 0;
     this.liveStart = null;
     this.goal = this.settings.target;
-    this.reached = this.value >= this.goal;
+    this.catchUp();
     this.onChange(this.snapshot);
   }
 }

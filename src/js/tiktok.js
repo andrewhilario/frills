@@ -131,7 +131,7 @@ export async function findTikTokSource(relayBase = "") {
  * `events` (a list of "follow", "gift", "share") also asks for those alerts, which arrive at onAlert(alert).
  * States: connecting, connected, offline (not live yet), reconnecting, limited, helper-lost, error, stopped. Returns { stop() }.
  */
-export function connectTikTok({ user, base = "", onMessage, onRemove, onClear, onStatus, onAlert, onInfo, events = [], eventSourceFactory } = {}) {
+export function connectTikTok({ user, base = "", onMessage, onRemove, onClear, onStatus, onAlert, onInfo, events = [], eventSourceFactory, retryRefused = false } = {}) {
   const name = cleanTikTokUser(user);
   const say = (state, detail, fatal = false, extra = {}) => onStatus && onStatus({ state, channel: name, detail, fatal, platform: "tiktok", ...extra });
   if (!name) {
@@ -142,6 +142,9 @@ export function connectTikTok({ user, base = "", onMessage, onRemove, onClear, o
   let source = null;
   let heard = false; // something has come from this stream at least once, so it is known to be the relay or helper and worth coming back to
   let beatAt = 0; // when the last "beat" came (a relay sends one every 15 seconds; an older one never does, and is then not watched)
+  let openedAt = 0; // when the stream we have now was opened
+  let lastEventAt = 0; // when anything last came from it (0: nothing yet)
+  let lostSince = 0; // when the browser told us it lost the stream and began trying again by itself (0: not lost)
   let tries = 0; // failed attempts in a row, which sets how long to wait before the next
   let again = 0;
   let watcher = 0;
@@ -153,10 +156,15 @@ export function connectTikTok({ user, base = "", onMessage, onRemove, onClear, o
   function open() {
     const mine = (eventSourceFactory ?? ((url) => new EventSource(url)))(address);
     source = mine;
+    openedAt = Date.now();
+    lastEventAt = 0;
+    lostSince = 0;
     const listen = (event, fn) => mine.addEventListener(event, (e) => {
       if (stopped || mine !== source) return;
       heard = true;
       tries = 0;
+      lastEventAt = Date.now();
+      lostSince = 0;
       let data;
       try { data = JSON.parse(e.data); } catch { return; } // a damaged event is skipped, never fatal
       fn(data);
@@ -182,6 +190,13 @@ export function connectTikTok({ user, base = "", onMessage, onRemove, onClear, o
       // such page), or the relay turned us down, and that is said once.
       if (mine.readyState === 2) {
         if (!heard) {
+          if (retryRefused) {
+            // The relay or helper was found a moment ago, so a stream it turns away is busy or full for this address (too many pages open from one
+            // address, say), which passes. Waiting and trying again is better than giving up for good.
+            say("refused", base ? "The free Frills relay turned the connection down. It may be busy, or too many pages are open from your address. Trying again…" : "The Frills helper turned the connection down. Trying again…");
+            comeBack();
+            return;
+          }
           say("error", base ? "The free Frills relay turned the connection down. It may be busy, or too many pages are open from your address." : "The Frills helper isn't answering here. TikTok chat needs it running on this PC.", true);
           return;
         }
@@ -189,6 +204,7 @@ export function connectTikTok({ user, base = "", onMessage, onRemove, onClear, o
         comeBack();
       } else {
         // the browser is trying again by itself
+        lostSince ||= Date.now();
         say("helper-lost", base ? "Lost the free Frills relay. This reconnects by itself." : "");
       }
     };
@@ -200,19 +216,37 @@ export function connectTikTok({ user, base = "", onMessage, onRemove, onClear, o
     try { source?.close(); } catch { /* already closed */ }
     source = null;
     beatAt = 0;
+    lastEventAt = 0;
+    lostSince = 0;
     const wait = now ? 0 : Math.min(30000, 2000 * 2 ** Math.min(tries, 4)) * (0.8 + Math.random() * 0.4);
     tries += 1;
     again = setTimeout(() => { if (!stopped) open(); }, wait);
   }
 
-  // A relay says "beat" every 15 seconds. Once one has been heard, a long silence means the connection is dead even though the browser
-  // does not know it (a tunnel that restarted can leave it hanging), so it is replaced.
+  // A stream can die without a word: a tunnel or a phone's connection that blinked can leave one hanging, and a new attempt can hang too, with no
+  // error for the browser to report. So three things are watched, every few seconds, and each one replaces the stream with a fresh one:
+  //   1. a relay says "beat" every 15 seconds; once one has been heard, 50 seconds without one means the stream is dead
+  //   2. a stream that has said nothing at all, not even its first status (a relay answers at once), 30 seconds after it was opened
+  //   3. a stream the browser lost and is trying to reopen by itself for 45 seconds without success
   watcher = setInterval(() => {
-    if (!stopped && beatAt && Date.now() - beatAt > 50000) {
+    if (stopped || !source) return;
+    const now = Date.now();
+    if (beatAt && now - beatAt > 50000) {
+      say("helper-lost", base ? "Lost the free Frills relay. This reconnects by itself." : "");
+      comeBack(true);
+    } else if (!lastEventAt && now - openedAt > 30000) {
+      say("helper-lost", base ? "Lost the free Frills relay. This reconnects by itself." : "");
+      comeBack();
+    } else if (lostSince && now - lostSince > 45000) {
       say("helper-lost", base ? "Lost the free Frills relay. This reconnects by itself." : "");
       comeBack(true);
     }
-  }, 10000);
+  }, 5000);
+
+  // The network came back (Wi-Fi reconnected, the phone woke up): do not wait out the rest of a back-off, and do not trust a stream that was
+  // open before it went away.
+  const online = () => { if (!stopped && (!source || lostSince || !lastEventAt || (beatAt && Date.now() - beatAt > 20000))) comeBack(true); };
+  globalThis.addEventListener?.("online", online);
 
   watcher?.unref?.(); // in a program (the tests) a waiting timer must not keep it from ending
   open();
@@ -221,6 +255,7 @@ export function connectTikTok({ user, base = "", onMessage, onRemove, onClear, o
       stopped = true;
       clearTimeout(again);
       clearInterval(watcher);
+      globalThis.removeEventListener?.("online", online);
       try { source?.close(); } catch { /* already closed */ }
       say("stopped");
     },

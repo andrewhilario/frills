@@ -150,7 +150,10 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
     const user = cleanTikTokUser(url.searchParams.get("user"));
     if (!user) return text(res, 400, "That is not a TikTok name.", cors);
     const who = relay ? visitor(req) : "";
-    if (relay && (perIp.get(who) ?? 0) >= maxPerIp) return text(res, 429, "Too many open streams from your address.", cors);
+    if (relay && (perIp.get(who) ?? 0) >= maxPerIp) {
+      log(`@${user}: a page was turned away (${maxPerIp} pages are already open from its address)`);
+      return text(res, 429, "Too many open streams from your address.", cors);
+    }
     res.writeHead(200, {
       "Content-Type": "text/event-stream; charset=utf-8",
       "Cache-Control": "no-cache, no-transform",
@@ -169,11 +172,14 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
       return;
     }
     if (relay) perIp.set(who, (perIp.get(who) ?? 0) + 1);
+    const kinds = events.size ? [...events].join("+") : "chat"; // which kind of page it is: chat, or the alerts it asked for
+    if (relay) log(`@${user}: a page connected (${kinds}), ${room.clients.size} open`);
     const beat = setInterval(() => res.write("event: beat\ndata: {}\n\n"), tuning.beatMs ?? 15000); // so a page can tell a quiet chat from a dead connection (an event, because a page cannot see a comment)
     res.on("close", () => {
       clearInterval(beat);
       if (relay) perIp.set(who, Math.max(0, (perIp.get(who) ?? 1) - 1));
       room.remove(client);
+      if (relay) log(`@${user}: a page left (${kinds}), ${room.clients.size} open`);
     });
   }
 

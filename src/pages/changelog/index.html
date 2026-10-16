@@ -25,9 +25,15 @@
     <div class="article__body">
       <h2 class="subtitle">15 October 2026</h2>
 
+      <h3>Goals</h3>
+      <ul>
+        <li><strong>A goal no longer gets stuck at its target.</strong> If the page reloaded while the count was already at or past the goal (with “Remember the count” on, for example when a streaming app refreshes the source), the bar stayed on “105 / 100” for good. It now moves on to the next goal by the “raise it by” amount. With “raise it by” set to 0 it still stops at the goal on purpose.</li>
+      </ul>
+
       <h3>The relay (the free TikTok connection)</h3>
       <ul>
         <li><strong>The status line no longer gets stuck after a restart.</strong> When the relay was restarted, the editor and the Matcha page found it again and chat carried on, but the line under your name could stay on “Connecting…”. It now goes back to saying what is really happening.</li>
+        <li><strong>Overlays get back in on their own after a flaky connection.</strong> An overlay that lost the relay could stay lost: if the link half-died, the next try could hang with no answer and nothing ever noticed. Every overlay now replaces a stream that has said nothing for 30 seconds, or that the browser could not reopen for 45, and tries again at once when your network comes back. One that the relay turns away because it is busy keeps trying instead of giving up.</li>
         <li><strong>The guides say what happens when the connection drops.</strong> A page that was connected tries again by itself (waiting 2, 4, 8, 15 and then 30 seconds between tries), so you do not need to reload it. Whatever happened while it was away is missed.</li>
       </ul>
 

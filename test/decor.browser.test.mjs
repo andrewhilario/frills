@@ -93,7 +93,7 @@ test("the corner side, the size and the switches change what is drawn; who gets 
   assert.deepEqual({ peek: r.peek, sparks: r.sparks, rightSide: r.rightSide }, { peek: false, sparks: 0, rightSide: true });
   assert.ok(r.width >= 80, `twice the size (${r.width} px)`);
   await open("look=bubblegum&deco=neko&decoFor=mods");
-  await page.waitFor(`document.querySelector("#chat .m .ico")`, 30000); // the practice chat is random: wait until a moderator has written
+  await page.waitFor(`document.querySelector("#chat .m .ico")`, { timeout: 30000 }); // the practice chat is random: wait until a moderator has written
   const mods = await page.evaluate(`[...document.querySelectorAll("#chat .m")].map((m) => [Boolean(m.querySelector(".ico")), Boolean(m.querySelector(".deco"))])`);
   assert.ok(mods.length >= 4);
   assert.ok(mods.every(([isMod, has]) => isMod === has), "decorations only on moderators' messages");
@@ -154,7 +154,7 @@ test("the matcha page has a Pictures choice up front: Frog pond puts the frog on
   assert.deepEqual(await pressed(), ["None"]);
   assert.equal(await page.evaluate(`document.querySelectorAll(".chatbox .deco").length`), 0);
   await page.evaluate(`[...document.querySelectorAll("#decos .chip")].find((b) => b.textContent.trim() === "Frog pond").click()`);
-  await page.waitFor(`document.querySelectorAll(".chatbox .deco img.deco__corner").length >= 6`, 15000);
+  await page.waitFor(`document.querySelectorAll(".chatbox .deco img.deco__corner").length >= 6`, { timeout: 15000 });
   const seen = await page.evaluate(`[...new Set([...document.querySelectorAll(".chatbox .deco img.deco__corner")].map((i) => i.src.split("/").pop()))].sort()`);
   assert.deepEqual(seen, ["corner-lily.webp", "corner-pond.webp"], "the frog on its lily pad and the lotus both turn up");
   const rows = await page.evaluate(`[...document.querySelectorAll("#more-controls > *")].filter((r) => r.style.display !== "none").map((r) => r.querySelector(".ctl__label")?.textContent.trim())`);
