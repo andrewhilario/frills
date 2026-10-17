@@ -25,6 +25,8 @@ function loadHeaders(root) {
       const prefix = pattern.replace(/\*$/, "");
       current = { test: (p) => p.startsWith(prefix), headers: {} };
       rules.push(current);
+    } else if (current && line.trim().startsWith("!")) {
+      // "! Name": drop the header an earlier rule set (here a later rule's value simply replaces it)
     } else if (current) {
       const i = line.indexOf(":");
       current.headers[line.slice(0, i).trim()] = line.slice(i + 1).trim();

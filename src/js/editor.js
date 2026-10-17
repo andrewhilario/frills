@@ -1,7 +1,7 @@
 // The editor: pick a look, change anything, connect a channel, copy one link.
 
 import { Feed } from "./feed.js";
-import { CONTROLS, DEFAULTS, PRESETS, PRESET_NAMES, currentPreset, overlayUrl, sanitize } from "./settings.js";
+import { CONTROLS, DEFAULTS, PRESETS, PRESET_NAMES, currentPreset, fromParams, overlayUrl, sanitize } from "./settings.js";
 import { fontsReady, generalFaces, paintGeneral } from "./look.js";
 import { buildControl, chips, copyButton } from "./ui.js";
 import { mountSource } from "./source.js";
@@ -15,8 +15,9 @@ const STORE = "frills:editor:v1";
 const load = () => { try { return JSON.parse(localStorage.getItem(STORE) ?? "null"); } catch { return null; } };
 const saved = load();
 
-let settings = sanitize(saved?.settings);
-if (PRESETS[params.get("look")]) Object.assign(settings, PRESETS[params.get("look")]); // a link from the home page: start from that look
+// A link opens the editor as that link looks: a look from the home page, or a whole link copied from here or made by Quick start (anything in it
+// that is not an option, or not an acceptable value, is ignored). It wins over what was remembered.
+let settings = sanitize({ ...saved?.settings, ...fromParams(params) });
 
 const stage = $("stage");
 const preview = $("preview");

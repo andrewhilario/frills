@@ -26,7 +26,7 @@ const assetOf = (html, kind) => (new RegExp(`${kind === "css" ? 'href="(/assets/
 
 test("the pages we expect are all there", () => {
   const urls = pages.map((p) => p.url).sort();
-  assert.deepEqual(urls, ["/", "/404.html", "/admin/", "/alerts/", "/changelog/", "/editor/", "/feedback/", "/gifts/", "/goal/", "/guides/alerts/", "/guides/obs/", "/guides/setup/", "/guides/test/", "/guides/tiktok/", "/likers/", "/matcha/", "/overlay/", "/overlay/alerts/", "/overlay/gifts/", "/overlay/goal/", "/overlay/likers/", "/overlay/songs/", "/overlays/", "/overlays/faq/", "/privacy/", "/songs/", "/spotify/", "/spotify/callback/", "/twitch/", "/twitch/callback/"]);
+  assert.deepEqual(urls, ["/", "/404.html", "/admin/", "/alerts/", "/changelog/", "/editor/", "/feedback/", "/gifts/", "/goal/", "/guides/alerts/", "/guides/obs/", "/guides/setup/", "/guides/test/", "/guides/tiktok/", "/likers/", "/matcha/", "/overlay/", "/overlay/alerts/", "/overlay/gifts/", "/overlay/goal/", "/overlay/likers/", "/overlay/songs/", "/overlays/", "/overlays/faq/", "/privacy/", "/songs/", "/spotify/", "/spotify/callback/", "/start/", "/twitch/", "/twitch/callback/"]);
 });
 
 test("every indexable page has its own title and description, a canonical address, share tags and one h1", () => {
@@ -282,4 +282,28 @@ test("the setup clips page has a clip and written steps for each of the five ove
     assert.ok(pages.find((p) => p.url === "/overlays/").html.includes(`href="/guides/setup/#${anchor}"`), "the overlays page links to the " + anchor + " clip");
   }
   assert.ok(pages.find((p) => p.url === "/").html.includes('href="/guides/setup/"'), "the home page links to the clips");
+});
+
+test("only the overlay pages may be shown inside one of our own pages (the Quick start pictures); every other page, and anyone else, still may not frame anything", () => {
+  const headers = read("_headers");
+  const rule = (pattern) => new RegExp(String.raw`^${pattern.replace("*", "\\*")}\n((?:[ ]{2}.*\n?)+)`, "m").exec(headers)?.[1] ?? "";
+  const everything = rule("/*");
+  assert.ok(/Content-Security-Policy: .*frame-ancestors 'none'/.test(everything), "the default is: nobody may frame a page");
+  const overlays = rule("/overlay/*");
+  assert.ok(/^ {2}! Content-Security-Policy$/m.test(overlays), "the overlay rule first lets go of the default policy");
+  const own = /^ {2}Content-Security-Policy: (.*)$/m.exec(overlays)?.[1] ?? "";
+  assert.ok(own.includes("frame-ancestors 'self'") && !own.includes("frame-ancestors 'none'"), "and sets its own: only this site may frame an overlay");
+  const defaultPolicy = /^ {2}Content-Security-Policy: (.*)$/m.exec(everything)[1];
+  assert.equal(own, defaultPolicy.replace("frame-ancestors 'none'", "frame-ancestors 'self'"), "the rest of the policy is exactly the default");
+  for (const other of ["/matcha/*", "/admin/*", "/assets/*"]) assert.ok(!/Content-Security-Policy/.test(rule(other)), other + " keeps the default");
+  assert.ok(!/frame-ancestors (\*|http)/.test(headers), "no outside site is ever allowed to frame anything");
+});
+
+test("the Quick start page is there, is found from the home page and the footer, and brings only its own script and styles", () => {
+  const start = pages.find((p) => p.url === "/start/").html;
+  assert.equal((start.match(/<h1[ >]/g) ?? []).length, 1);
+  assert.ok(start.includes('id="start"') && /<noscript>[\s\S]*\/editor\//.test(start), "the page has its place for the questions and a way on without script");
+  assert.ok(pages.find((p) => p.url === "/").html.includes('href="/start/"'), "the home page links to it");
+  assert.ok(read("start/index.html").includes("/guides/setup/"), "and it points to the clips");
+  assert.ok(pages.every((p) => !p.html.includes("Quick start") || p.html.includes('href="/start/"') || p.url === "/start/"), "any page that names it links to it");
 });
