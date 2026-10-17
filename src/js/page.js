@@ -1,8 +1,10 @@
 // Pages with no tools on them (the guide, privacy, not found): just the nav.
 
 import { initNav } from "./nav.js";
+import { initTip } from "./tip.js";
 
 initNav();
+initTip(); // (only on the few pages it is meant for)
 
 // The setup clips play (silent, looping) only while they are on screen. With reduced motion set they stay on their first picture, and the
 // player's own controls start them. (Without script they are plain videos with controls.)

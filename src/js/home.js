@@ -1,6 +1,7 @@
 // The home page: a live stage you can change the look of, a link maker, small previews of every look, numbers that count up.
 
 import { initNav } from "./nav.js";
+import { initTip } from "./tip.js";
 import { Feed } from "./feed.js";
 import { fakeSource, SAMPLE_MESSAGES } from "./fake.js";
 import { PRESETS, PRESET_NAMES, overlayUrl, sanitize } from "./settings.js";
@@ -10,6 +11,7 @@ import { cleanChannel } from "./twitch.js";
 import { luminance } from "./color.js";
 
 initNav();
+initTip();
 
 const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 

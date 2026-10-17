@@ -252,3 +252,14 @@
 .spotify__log li { padding: var(--space-xs) var(--space-sm); border-radius: var(--radius-sm); background: var(--color-paper); font-size: var(--text-sm); overflow-wrap: anywhere; }
 .spotify__log li[data-state="ok"] { border-left: 0; background: var(--color-mint-tint); }
 .spotify__log li[data-state="error"] { background: var(--color-accent-3-tint); color: var(--color-error); }
+
+/* The Quick start suggestion (tip.js): a small card in the corner that covers nothing and can be closed. */
+.tip { position: fixed; right: var(--space-md); bottom: var(--space-md); z-index: var(--z-toast); width: min(21rem, calc(100vw - 2 * var(--space-md))); display: grid; gap: var(--space-xs); padding: var(--space-md) var(--space-lg); background: var(--color-paper); color: var(--color-ink); border: 2px solid var(--color-ink); border-radius: var(--radius-card); box-shadow: 0 6px 0 var(--color-ink); animation: tip-in 260ms var(--ease-out) both; }
+@keyframes tip-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .tip { animation: none; } }
+.tip__title { margin: 0; padding-right: 2.5rem; font-family: var(--font-display); font-size: var(--text-md); font-weight: 750; letter-spacing: -0.02em; }
+.tip__text { margin: 0; font-size: var(--text-sm); color: var(--color-ink-2); }
+.tip__row { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin-top: var(--space-2xs); }
+.tip__close { position: absolute; top: 2px; right: 2px; width: 44px; height: 44px; display: grid; place-items: center; padding: 0; font: inherit; font-size: 1.6rem; line-height: 1; color: var(--color-ink-2); background: none; border: 0; border-radius: 50%; cursor: pointer; }
+@media (hover: hover) { .tip__close:hover { background: var(--color-paper-3); color: var(--color-ink); } }
+.tip__close:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 0; }
