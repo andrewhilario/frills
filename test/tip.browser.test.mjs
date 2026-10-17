@@ -1,5 +1,5 @@
-// The Quick start suggestion in a real headless Chrome: when it shows, that it covers nothing and takes no focus, how it closes, and how often it comes
-// back. Skipped on a computer with no Chrome or Edge. `npm test` builds first.
+// The Quick start suggestion in a real headless Chrome: that it comes just after the page loads, quietly, covers nothing and takes no focus, how it closes,
+// and how often it comes back. Skipped on a computer with no Chrome or Edge. `npm test` builds first.
 
 import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
@@ -32,76 +32,65 @@ after(async () => {
 });
 
 const KEY = "frills:quickstart-tip:v1";
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 /** A fresh visitor: nothing remembered (the page is opened once on the site to be allowed to clear its storage). */
 async function fresh(path = "/") {
   await page.goto(`${base}/privacy/`, { settle: 200 });
   await page.evaluate(`localStorage.clear(); sessionStorage.clear()`);
-  await page.goto(`${base}${path}`, { settle: 400 });
+  await page.goto(`${base}${path}`, { settle: 100 });
 }
-const scrollDown = () => page.evaluate(`window.scrollTo(0, document.documentElement.scrollHeight * 0.8)`);
+const appears = () => page.waitFor(`document.querySelector(".tip")`, { timeout: 4000 });
 const tipShown = () => page.evaluate(`Boolean(document.querySelector(".tip"))`);
 const memory = () => page.evaluate(`JSON.parse(localStorage.getItem(${JSON.stringify(KEY)}) ?? "null")`);
+const stays = async (ms = 2500) => { await sleep(ms); return !(await tipShown()); };
 
-test("it does not appear at once, and appears when most of the page has been read", { skip }, async () => {
+test("it comes just after the page has loaded, by itself, with no scrolling, and fades in rather than jumping", { skip }, async () => {
   await fresh();
-  assert.equal(await tipShown(), false, "not on arrival");
-  await new Promise((r) => setTimeout(r, 2500));
-  assert.equal(await tipShown(), false, "not after a couple of seconds either");
-  await scrollDown();
-  await page.waitFor(`document.querySelector(".tip")`);
-  const tip = await page.evaluate(`(() => { const t = document.querySelector(".tip"); const r = t.getBoundingClientRect(); return { text: t.innerText.replace(/\\s+/g, " ").trim(), cta: t.querySelector("a").getAttribute("href"), ctaText: t.querySelector("a").textContent, close: Boolean(t.querySelector(".tip__close")), later: [...t.querySelectorAll("button")].some((b) => b.textContent === "Not now"), inside: r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight, width: Math.round(r.width), focus: document.activeElement.tagName, label: t.getAttribute("aria-label"), closeLabel: t.querySelector(".tip__close").getAttribute("aria-label") }; })()`);
-  assert.match(tip.text, /New here\? Answer 6 quick questions/);
+  assert.equal(await tipShown(), false, "not in the first blink");
+  await appears();
+  const tip = await page.evaluate(`(() => { const t = document.querySelector(".tip"); const r = t.getBoundingClientRect(); const s = getComputedStyle(t); return { text: t.innerText.replace(/\\s+/g, " ").trim(), cta: t.querySelector("a").getAttribute("href"), ctaText: t.querySelector("a").textContent.trim(), close: Boolean(t.querySelector(".tip__close")), later: [...t.querySelectorAll("button")].some((b) => b.textContent === "Not now"), inside: r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight, width: Math.round(r.width), height: Math.round(r.height), focus: document.activeElement.tagName, label: t.getAttribute("aria-label"), closeLabel: t.querySelector(".tip__close").getAttribute("aria-label"), scrolled: scrollY, animation: s.animationName, border: s.borderTopWidth }; })()`);
+  assert.match(tip.text, /New here\? Get your overlay links in 6 quick questions/);
   assert.equal(tip.cta, "/start/");
-  assert.equal(tip.ctaText, "Try the Quick start");
+  assert.equal(tip.ctaText, "Try the Quick start →");
   assert.ok(tip.close && tip.later, "it can be closed two ways");
-  assert.ok(tip.inside && tip.width <= 340, `a small card, fully on screen (${tip.width} px)`);
+  assert.ok(tip.inside && tip.width <= 320 && tip.height <= 120, `small and fully on screen (${tip.width} x ${tip.height} px)`);
   assert.equal(tip.focus, "BODY", "it does not take the keyboard focus");
+  assert.equal(tip.scrolled, 0, "nobody had to scroll");
   assert.ok(tip.label && tip.closeLabel, "it has names for a screen reader");
+  assert.equal(tip.animation, "tip-in", "it fades in");
+  assert.equal(tip.border, "1px", "a thin line, not a heavy box");
   assert.equal((await memory()).shown, 1, "it counts that it was shown");
 });
 
-test("it also appears by itself after 15 seconds on the page, to someone who has not scrolled", { skip }, async () => {
-  await fresh("/overlays/");
-  await new Promise((r) => setTimeout(r, 14000));
-  assert.equal(await tipShown(), false, "not yet at 14 seconds");
-  await page.waitFor(`document.querySelector(".tip")`, { timeout: 4000 });
-});
-
-test("it covers nothing that matters: the page can still be clicked and read, and the main button stays clear", { skip }, async () => {
+test("it is quiet: a small corner card with no heavy box or buttons, covering no content and no menu, and the page still scrolls under it", { skip }, async () => {
   await fresh();
-  await scrollDown();
-  await page.waitFor(`document.querySelector(".tip")`);
-  const clear = await page.evaluate(`(() => { const t = document.querySelector(".tip").getBoundingClientRect(); const cover = (el) => { const r = el.getBoundingClientRect(); return !(r.right < t.left || r.left > t.right || r.bottom < t.top || r.top > t.bottom); }; return { scrolls: document.documentElement.scrollHeight > innerHeight, sideways: document.documentElement.scrollWidth > document.documentElement.clientWidth, overNav: cover(document.querySelector("[data-nav]")), position: getComputedStyle(document.querySelector(".tip")).position, backdrop: document.querySelectorAll("[class*=overlay], [class*=backdrop], [class*=modal]").length }; })()`);
-  assert.equal(clear.sideways, false);
-  assert.equal(clear.overNav, false, "it stays out of the menu");
-  assert.equal(clear.position, "fixed");
-  await scrollDown(); // the page still scrolls under it
+  await appears();
+  const look = await page.evaluate(`(() => { const t = document.querySelector(".tip"); const r = t.getBoundingClientRect(); const nav = document.querySelector("[data-nav]").getBoundingClientRect(); const s = getComputedStyle(t); return { position: s.position, overNav: !(r.right < nav.left || r.left > nav.right || r.bottom < nav.top || r.top > nav.bottom), sideways: document.documentElement.scrollWidth > document.documentElement.clientWidth, bigButtons: t.querySelectorAll(".btn").length, area: Math.round(r.width * r.height), screen: innerWidth * innerHeight }; })()`);
+  assert.equal(look.position, "fixed");
+  assert.equal(look.overNav, false, "it stays out of the menu");
+  assert.equal(look.sideways, false);
+  assert.equal(look.bigButtons, 0, "plain text links, not big yellow buttons");
+  assert.ok(look.area / look.screen < 0.05, "a small part of the screen (under 5%)");
+  await page.evaluate(`window.scrollTo(0, 800)`);
   assert.equal(await page.evaluate(`window.scrollY > 0`), true);
 });
 
 test("Not now closes it and it stays away for a month; the close button and Escape do the same", { skip }, async () => {
   await fresh();
-  await scrollDown();
-  await page.waitFor(`document.querySelector(".tip")`);
+  await appears();
   await page.evaluate(`[...document.querySelectorAll(".tip button")].find((b) => b.textContent === "Not now").click()`);
   assert.equal(await tipShown(), false);
   const note = await memory();
   assert.ok(note.closedAt > 0 && note.shown === 1, "it remembers it was closed");
   await page.goto(`${base}/`, { settle: 300 });
-  await scrollDown();
-  await new Promise((r) => setTimeout(r, 1500));
-  assert.equal(await tipShown(), false, "closed: it does not come back");
-  // the cross
-  await fresh();
-  await scrollDown();
-  await page.waitFor(`document.querySelector(".tip")`);
+  assert.equal(await stays(), true, "closed: it does not come back");
+  await fresh(); // the cross
+  await appears();
   await page.evaluate(`document.querySelector(".tip__close").click()`);
   assert.equal(await tipShown(), false);
   assert.ok((await memory()).closedAt > 0);
-  // Escape, when the keyboard is on the card
-  await fresh();
-  await scrollDown();
-  await page.waitFor(`document.querySelector(".tip")`);
+  await fresh(); // Escape, when the keyboard is on the card
+  await appears();
   await page.evaluate(`document.querySelector(".tip a").focus()`);
   await page.evaluate(`document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }))`);
   assert.equal(await tipShown(), false, "Escape closes it");
@@ -110,67 +99,78 @@ test("Not now closes it and it stays away for a month; the close button and Esca
 
 test("it shows once in a visit even if it was ignored, and not a third time ever", { skip }, async () => {
   await fresh();
-  await scrollDown();
-  await page.waitFor(`document.querySelector(".tip")`);
+  await appears();
   await page.goto(`${base}/overlays/`, { settle: 300 }); // the visit goes on, the card was ignored
-  await scrollDown();
-  await new Promise((r) => setTimeout(r, 1500));
-  assert.equal(await tipShown(), false, "not again in the same visit");
+  assert.equal(await stays(), true, "not again in the same visit");
   assert.equal((await memory()).shown, 1);
   await page.evaluate(`sessionStorage.clear()`); // a new visit
-  await page.goto(`${base}/`, { settle: 300 });
-  await scrollDown();
-  await page.waitFor(`document.querySelector(".tip")`);
+  await page.goto(`${base}/`, { settle: 100 });
+  await appears();
   assert.equal((await memory()).shown, 2, "a second time, in a new visit");
   await page.evaluate(`sessionStorage.clear(); localStorage.setItem(${JSON.stringify(KEY)}, JSON.stringify({ shown: 2, closedAt: 0, done: false }))`);
   await page.goto(`${base}/`, { settle: 300 });
-  await scrollDown();
-  await new Promise((r) => setTimeout(r, 1500));
-  assert.equal(await tipShown(), false, "never a third time");
+  assert.equal(await stays(), true, "never a third time");
 });
 
 test("opening the Quick start from it ends it for good", { skip }, async () => {
   await fresh();
-  await scrollDown();
-  await page.waitFor(`document.querySelector(".tip")`);
+  await appears();
   await page.evaluate(`document.querySelector(".tip a").click()`);
   await page.waitFor(`location.pathname === "/start/"`);
   assert.equal((await memory()).done, true);
   await page.evaluate(`sessionStorage.clear()`);
   await page.goto(`${base}/`, { settle: 300 });
-  await scrollDown();
-  await new Promise((r) => setTimeout(r, 1500));
-  assert.equal(await tipShown(), false);
+  assert.equal(await stays(), true);
 });
 
-test("it stays away from someone who has already used an editor, from the Quick start itself, the editors, the overlays and the legal pages", { skip }, async () => {
+test("someone who has used an editor sees it too (it is for anyone who has not tried the Quick start), but only on the pages it is meant for", { skip }, async () => {
   await fresh();
   await page.evaluate(`localStorage.setItem("frills:editor:v1", "{}")`);
-  await page.goto(`${base}/`, { settle: 300 });
-  await scrollDown();
-  await new Promise((r) => setTimeout(r, 1500));
-  assert.equal(await tipShown(), false, "they have used the editor");
+  await page.goto(`${base}/`, { settle: 100 });
+  await appears();
   for (const path of ["/start/", "/editor/", "/gifts/", "/privacy/", "/changelog/", "/overlay/?demo=1"]) {
     await fresh(path);
-    await scrollDown();
-    await new Promise((r) => setTimeout(r, 1200));
+    assert.equal(await stays(1800), true, path + " stays free of it");
+  }
+});
+
+test("it waits while someone is typing, and then comes", { skip }, async () => {
+  await fresh();
+  await page.evaluate(`(() => { const i = document.createElement("input"); i.id = "typing"; document.body.prepend(i); i.focus(); })()`);
+  assert.equal(await stays(2600), true, "not while a text box has the keyboard");
+  await page.evaluate(`document.getElementById("typing").blur()`);
+  await page.waitFor(`document.querySelector(".tip")`, { timeout: 8000 });
+});
+
+test("?tip=show shows it at once to anyone, however much is remembered, and writes nothing down; only on the pages it is meant for", { skip }, async () => {
+  await fresh();
+  await page.evaluate(`localStorage.setItem(${JSON.stringify(KEY)}, JSON.stringify({ shown: 2, closedAt: Date.now(), done: true }))`);
+  await page.goto(`${base}/?tip=show`, { settle: 100 });
+  await page.waitFor(`document.querySelector(".tip")`, { timeout: 3000 });
+  const before = await page.evaluate(`localStorage.getItem(${JSON.stringify(KEY)})`);
+  await page.evaluate(`document.querySelector(".tip__close").click()`);
+  assert.equal(await tipShown(), false, "it closes");
+  assert.equal(await page.evaluate(`localStorage.getItem(${JSON.stringify(KEY)})`), before, "and nothing was written");
+  await page.goto(`${base}/guides/obs/?tip=show`, { settle: 100 });
+  await page.waitFor(`document.querySelector(".tip")`, { timeout: 3000 });
+  for (const path of ["/editor/?tip=show", "/start/?tip=show", "/privacy/?tip=show"]) {
+    await page.goto(`${base}${path}`, { settle: 600 });
     assert.equal(await tipShown(), false, path);
   }
 });
 
-test("on a phone-sized screen it is a card at the bottom that fits, and with reduced motion it just appears", { skip }, async () => {
+test("on a phone-sized screen it is a small card at the bottom that fits, with a close button for a thumb; with reduced motion it just appears", { skip }, async () => {
   await page.viewport(390, 844);
   await fresh();
-  await scrollDown();
-  await page.waitFor(`document.querySelector(".tip")`);
-  const phone = await page.evaluate(`(() => { const r = document.querySelector(".tip").getBoundingClientRect(); return { left: Math.round(r.left), right: Math.round(innerWidth - r.right), bottom: Math.round(innerHeight - r.bottom), sideways: document.documentElement.scrollWidth > document.documentElement.clientWidth, button: Math.round(document.querySelector(".tip__close").getBoundingClientRect().width) }; })()`);
+  await appears();
+  const phone = await page.evaluate(`(() => { const r = document.querySelector(".tip").getBoundingClientRect(); return { left: Math.round(r.left), right: Math.round(innerWidth - r.right), bottom: Math.round(innerHeight - r.bottom), height: Math.round(r.height), sideways: document.documentElement.scrollWidth > document.documentElement.clientWidth, button: Math.round(document.querySelector(".tip__close").getBoundingClientRect().width) }; })()`);
   assert.ok(phone.left >= 8 && phone.right >= 8 && phone.bottom >= 8, JSON.stringify(phone));
+  assert.ok(phone.height <= 170, `still small on a phone (${phone.height} px)`);
   assert.equal(phone.sideways, false);
   assert.ok(phone.button >= 44, "a close button you can hit with a thumb");
   await page.viewport(1100, 800, { reducedMotion: true });
   await fresh();
-  await scrollDown();
-  await page.waitFor(`document.querySelector(".tip")`);
+  await appears();
   assert.equal(await page.evaluate(`getComputedStyle(document.querySelector(".tip")).animationName`), "none", "no movement for people who ask for less");
   await page.viewport(1100, 800);
 });

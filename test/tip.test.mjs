@@ -2,17 +2,17 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { DELAY_MS, KEY, MAX_SHOWS, PAGES, QUIET_DAYS, USED, mayShow, readMemory, writeMemory } from "../src/js/tip.js";
+import { DELAY_MS, KEY, MAX_SHOWS, PAGES, QUIET_DAYS, mayShow, readMemory, writeMemory } from "../src/js/tip.js";
 
 const DAY = 86400000;
 const NOW = 1_800_000_000_000;
-const ask = (over = {}) => mayShow({ path: "/", memory: { shown: 0, closedAt: 0, done: false }, now: NOW, shownThisVisit: false, usedEditor: false, ...over });
+const ask = (over = {}) => mayShow({ path: "/", memory: { shown: 0, closedAt: 0, done: false }, now: NOW, shownThisVisit: false, ...over });
 const storage = () => { const data = new Map(); return { getItem: (k) => data.get(k) ?? null, setItem: (k, v) => data.set(k, v), data }; };
 
-test("it is gentle by design: a few pages, a delay, a small number of showings and a long quiet time", () => {
-  assert.equal(DELAY_MS >= 10000, true, "not at once");
-  assert.equal(MAX_SHOWS <= 2, true, "at most twice, ever");
-  assert.equal(QUIET_DAYS >= 30, true, "a month of peace once it has been closed");
+test("it is quiet by design: it comes just after the page loads, only a few times, and then keeps away for a long time", () => {
+  assert.ok(DELAY_MS >= 500 && DELAY_MS <= 3000, "a moment after load, not in the first blink and not long after");
+  assert.ok(MAX_SHOWS <= 2, "at most twice, ever");
+  assert.ok(QUIET_DAYS >= 30, "a month of peace once it has been closed");
 });
 
 test("it may appear on the home page, the overlays page and the guides, and nowhere else", () => {
@@ -23,14 +23,14 @@ test("it may appear on the home page, the overlays page and the guides, and nowh
   assert.ok(PAGES.every((p) => !/editor|overlay\/|start|admin|privacy/.test(p)));
 });
 
-test("it stays away once it has been closed (for a month), shown twice, shown this visit, or the Quick start has been opened", () => {
+test("it stays away once it has been closed (for a month), shown twice, shown this visit, or the Quick start has been opened from it", () => {
+  assert.equal(ask(), true, "a first visit");
   assert.equal(ask({ shownThisVisit: true }), false, "once in a visit");
   assert.equal(ask({ memory: { shown: MAX_SHOWS, closedAt: 0, done: false } }), false, "twice in all");
   assert.equal(ask({ memory: { shown: 1, closedAt: NOW - 5 * DAY, done: false } }), false, "closed five days ago");
   assert.equal(ask({ memory: { shown: 1, closedAt: NOW - 29 * DAY, done: false } }), false, "closed 29 days ago");
   assert.equal(ask({ memory: { shown: 1, closedAt: NOW - 31 * DAY, done: false } }), true, "a month later it may come back (once more)");
   assert.equal(ask({ memory: { shown: 0, closedAt: 0, done: true } }), false, "they opened the Quick start: never again");
-  assert.equal(ask({ usedEditor: true }), false, "someone who has used an editor is not new here");
 });
 
 test("what the browser remembers is one small note, read safely and changed one part at a time", () => {
@@ -50,9 +50,4 @@ test("what the browser remembers is one small note, read safely and changed one 
   const blocked = { getItem() { throw new Error("blocked"); }, setItem() { throw new Error("blocked"); } };
   assert.deepEqual(readMemory(blocked), { shown: 0, closedAt: 0, done: false });
   assert.doesNotThrow(() => writeMemory(blocked, { shown: 1 }), "blocked storage is not an error");
-});
-
-test("the editors' own saved keys are what tells it someone has used them", () => {
-  assert.ok(USED.includes("frills:editor:v1") && USED.includes("frills:alerts:v1") && USED.includes("frills:gifts:v1"));
-  assert.ok(USED.every((k) => /^frills:[a-z:]+:v1$/.test(k)));
 });
