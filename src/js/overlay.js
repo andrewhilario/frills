@@ -10,7 +10,7 @@ import { sanitize, fromParams } from "./settings.js";
 import { isMatchaStyle, sanitizeMatcha, matchaFromParams } from "./matcha.js";
 import { fontsReady, generalFaces, matchaFaces, paintGeneral, paintMatcha } from "./look.js";
 import { connectTo, statusText } from "./connect.js";
-import { noteFor, scoped, sourcesOf } from "./both.js";
+import { noteFor, scoped, sourcesOf, takingTurns } from "./both.js";
 import { relayForPage } from "./tiktok.js";
 import { fakeSource } from "./fake.js";
 
@@ -48,10 +48,8 @@ if (!sources.length && params.get("demo") !== "1") {
 fontsReady(faces, 1000).then(() => {
   if (params.get("demo") === "1") {
     if (both) {
-      // practice for two chats: the made-up messages take turns being TikTok's and Twitch's
-      const [first, second] = [scoped(feed, "tiktok"), scoped(feed, "twitch")];
-      let turn = 0;
-      fakeSource({ add: (m) => (turn++ % 2 ? second : first).add(m), removeById() {}, removeUser() {}, clear() {} }, practicePace);
+      // practice for two chats: the made-up messages take turns being TikTok's and Twitch's (gifts are always TikTok's)
+      fakeSource(takingTurns(scoped(feed, "tiktok"), scoped(feed, "twitch")), practicePace);
     } else fakeSource(feed, practicePace);
   } else if (both) {
     const parts = {};

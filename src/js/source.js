@@ -5,7 +5,7 @@ import { PLATFORMS, cleanName, connectTo, statusText } from "./connect.js";
 import { findTikTokSource, relayForPage } from "./tiktok.js";
 import { fakeSource, testMessage } from "./fake.js";
 import { chips } from "./ui.js";
-import { PLATFORM_NAMES, noteFor, scoped } from "./both.js";
+import { PLATFORM_NAMES, noteFor, scoped, takingTurns } from "./both.js";
 import { el } from "./feed.js";
 
 const COPY = {
@@ -80,10 +80,7 @@ export function mountSource(host, { feeds, pace, channel = "", twitch = "", plat
   const turns = new WeakMap(); // for each feed, a stand-in that gives the made-up messages to TikTok and Twitch in turn
   const alternating = (feed) => {
     if (!turns.has(feed)) {
-      const a = scoped(feed, "tiktok");
-      const b = scoped(feed, "twitch");
-      let turn = 0;
-      turns.set(feed, { add: (m) => (turn++ % 2 ? b : a).add(m), removeById() {}, removeUser() {}, clear: () => feed.clear() });
+      turns.set(feed, takingTurns(scoped(feed, "tiktok"), scoped(feed, "twitch"), () => feed.clear()));
     }
     return turns.get(feed);
   };

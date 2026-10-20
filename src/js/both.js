@@ -33,6 +33,20 @@ export function scoped(feed, platform) {
 }
 
 /**
+ * Practice chat for two platforms: the made-up messages take turns being TikTok's and Twitch's, except gifts and the gifter dot, which only TikTok
+ * has (a rose is a TikTok gift), so those always belong to TikTok. `tiktok` and `twitch` are the two scoped views of a feed; `clear` clears it.
+ */
+export function takingTurns(tiktok, twitch, clear = () => {}) {
+  let turn = 0;
+  return {
+    add: (m) => (m.gift || turn++ % 2 === 0 ? tiktok.add(m) : twitch.add({ ...m, gifter: false })),
+    removeById() {},
+    removeUser() {},
+    clear,
+  };
+}
+
+/**
  * One line about two connections: "" when each is fine, else what is wrong, with the platform named ("TikTok: waiting for a spot · Twitch:
  * connecting"). `parts` is the latest status of each ({ tiktok, twitch }), `text` turns a status into words.
  */

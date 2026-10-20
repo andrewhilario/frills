@@ -190,6 +190,10 @@ test("editor: Both asks for the two names, the link appears only when both are r
   assert.deepEqual([url.searchParams.get("tiktok"), url.searchParams.get("twitch"), url.searchParams.has("channel")], ["pond_pal", "pondpal", false]);
   await until(async () => { const platforms = new Set((await shown()).map((m) => m.platform)); return platforms.has("tiktok") && platforms.has("twitch"); }, 15000);
   assert.ok((await shown()).every((m) => m.mark), "practice chat: every message has its icon");
+  // the test message that is a gift is TikTok's: a rose is a TikTok gift, so a Twitch message never "sends a Rose"
+  for (let i = 0; i < 3; i++) { await page.evaluate(`[...document.querySelectorAll(".source__tools .btn")].find((b) => b.textContent.trim() === "Send a test message").click()`); await sleep(150); }
+  await until(async () => (await shown()).some((m) => /sent a Rose/.test(m.text)), 8000);
+  assert.ok((await shown()).filter((m) => /sent a /.test(m.text)).every((m) => m.platform === "tiktok"), "gifts only ever come from TikTok in the practice chat");
   // the icon can be turned off in the look
   await page.evaluate(`[...document.querySelectorAll(".ctl")].find((r) => r.querySelector(".ctl__label")?.textContent.trim() === "Platform icon").querySelectorAll(".chip")[1].click()`);
   await sleep(300);

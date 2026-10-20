@@ -3,7 +3,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { noteFor, scoped, sourcesOf } from "../src/js/both.js";
+import { noteFor, scoped, sourcesOf, takingTurns } from "../src/js/both.js";
 import { CONTROLS, DEFAULTS, coerce, fromParams, overlayUrl, sanitize } from "../src/js/settings.js";
 import { MATCHA_CONTROLS, MATCHA_DEFAULTS, matchaFromParams, matchaOverlayUrl, sanitizeMatcha } from "../src/js/matcha.js";
 
@@ -81,4 +81,23 @@ test("the platform icon is a setting on both kinds of look, on by default, and o
   assert.equal(MATCHA_DEFAULTS.source, "icon");
   assert.equal(sanitizeMatcha(matchaFromParams(q("style=latte&source=none"))).source, "none");
   assert.ok(!matchaOverlayUrl("https://x.test/o/", { channel: "a", settings: MATCHA_DEFAULTS }).includes("source="));
+});
+
+test("practice chat for two platforms takes turns, but a gift (and the gifter dot) is only ever TikTok's, because a rose is a TikTok gift", () => {
+  const seen = { tiktok: [], twitch: [] };
+  const view = (platform) => ({ add: (m) => seen[platform].push(m) });
+  const practice = takingTurns(view("tiktok"), view("twitch"));
+  for (let i = 0; i < 10; i++) practice.add({ id: "p" + i, text: "hello " + i, gifter: true });
+  assert.equal(seen.tiktok.length, 5, "plain messages take turns");
+  assert.equal(seen.twitch.length, 5);
+  assert.ok(seen.twitch.every((m) => m.gifter === false), "a Twitch message never carries the gifter dot");
+  assert.ok(seen.tiktok.every((m) => m.gifter === true), "TikTok's keep it");
+  for (let i = 0; i < 8; i++) practice.add({ id: "g" + i, text: "sent a Rose x1", gift: true, gifter: true });
+  assert.equal(seen.twitch.length, 5, "no gift ever goes to Twitch");
+  assert.equal(seen.tiktok.length, 13, "they all go to TikTok");
+  practice.add({ id: "after", text: "plain again" });
+  assert.equal(seen.tiktok.length + seen.twitch.length, 19, "and the turns carry on after a gift");
+  let cleared = 0;
+  takingTurns(view("tiktok"), view("twitch"), () => { cleared += 1; }).clear();
+  assert.equal(cleared, 1);
 });
