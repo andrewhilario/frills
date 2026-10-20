@@ -53,7 +53,8 @@
         <li>
           <div>
             <h2 class="subtitle">Leave the rest alone</h2>
-            <p>In OBS, keep the custom CSS that it fills in: it is what makes the page see-through. Two boxes are worth knowing about. <strong>Refresh browser when scene becomes active</strong> reconnects chat each time you switch to that scene. <strong>Shutdown source when not visible</strong> stops the overlay while its scene is off screen, which saves resources.</p>
+            <p>In OBS, keep the custom CSS that it fills in: it is what makes the page see-through. Leave the two boxes under it, <strong>Refresh browser when scene becomes active</strong> and <strong>Shutdown source when not visible</strong>, <strong>unticked</strong>, as they are for a new source. Either one makes OBS load a fresh copy of the overlay each time you switch scenes. Chat then starts empty, a goal or a top likers list starts again (unless you turned on “Remember the count”), anything that happens while the overlay is away is missed, and every switch opens a new connection. Frills reconnects by itself if the connection drops, so you do not need either box.</p>
+            <p>If an overlay ever looks stuck, open its properties in OBS and press <strong>Refresh cache of current page</strong>. To show one overlay in several scenes, add the same source to each scene with <strong>Add Existing</strong> instead of making a new one, so it stays one page and one connection.</p>
           </div>
         </li>
         <li>

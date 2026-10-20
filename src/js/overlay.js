@@ -3,7 +3,7 @@
 //   /overlay/?platform=tiktok&channel=yourname&look=frost       the same, with TikTok chat (needs the Frills helper on this PC)
 //   /overlay/?channel=yourname&style=latte&palette=sakura       a matcha style
 //   /overlay/?tiktok=yourname&twitch=yourchannel&look=frost    both chats in one, each message marked with its platform
-//   add &demo=1 to see practice messages instead of a real chat
+//   add &demo=1 to see practice messages instead of a real chat (and &pace=700 to make them come about that many milliseconds apart)
 
 import { Feed } from "./feed.js";
 import { sanitize, fromParams } from "./settings.js";
@@ -33,6 +33,9 @@ if (isMatchaStyle(params.get("style"))) {
   mark = settings.source !== "none";
 }
 
+// ?pace=700 makes the practice (demo) messages come about that many milliseconds apart: handy for trying a look, or for filming it
+const demoPace = Number(params.get("pace")) ? Math.min(10000, Math.max(300, Number(params.get("pace")))) : 0; // (no pace, or not a number: the usual speed)
+const practicePace = () => (demoPace ? [demoPace, demoPace * 1.7] : [1500, 3000]);
 // The accounts the link names: one (channel= and platform=, or tiktok= or twitch=) or two (tiktok= and twitch=).
 const sources = sourcesOf(params);
 const both = sources.length === 2;
@@ -48,8 +51,8 @@ fontsReady(faces, 1000).then(() => {
       // practice for two chats: the made-up messages take turns being TikTok's and Twitch's
       const [first, second] = [scoped(feed, "tiktok"), scoped(feed, "twitch")];
       let turn = 0;
-      fakeSource({ add: (m) => (turn++ % 2 ? second : first).add(m), removeById() {}, removeUser() {}, clear() {} }, () => [1500, 3000]);
-    } else fakeSource(feed, () => [1500, 3000]);
+      fakeSource({ add: (m) => (turn++ % 2 ? second : first).add(m), removeById() {}, removeUser() {}, clear() {} }, practicePace);
+    } else fakeSource(feed, practicePace);
   } else if (both) {
     const parts = {};
     for (const { platform, channel } of sources) {

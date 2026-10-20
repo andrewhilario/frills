@@ -17,7 +17,7 @@ import { FollowReader, validCode } from "./follow-bridge.js";
 const params = new URLSearchParams(location.search);
 const settings = sanitize(fromParams(params));
 // ?pace=1500 makes the practice (demo) events come about that many milliseconds apart: handy for trying a look, or for filming it
-const demoPace = Math.min(10000, Math.max(300, Number(params.get("pace")) || 0)) || 0;
+const demoPace = Number(params.get("pace")) ? Math.min(10000, Math.max(300, Number(params.get("pace")))) : 0; // (no pace, or not a number: the usual speed)
 const platform = params.get("platform") === "twitch" ? "twitch" : "tiktok";
 // ?only=follow,gift keeps the practice to those kinds; a Twitch overlay practises with the Twitch kinds
 const demoOnly = (params.get("only") ?? "").split(",").filter((kind) => KINDS.includes(kind));

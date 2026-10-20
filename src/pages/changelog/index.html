@@ -30,8 +30,21 @@
         <li><strong>TikTok and Twitch chat in one overlay.</strong> In the chat editor and the Matcha page there is a new <strong>Both</strong> choice next to TikTok and Twitch. Type your TikTok @name and your Twitch channel and copy one link: messages from both arrive in the same speech bubbles, each with a small TikTok or Twitch icon before the name. A message deleted by a moderator on one platform disappears only from that platform, and if one side loses its connection the line under the chat says which one. The icon can be turned off with “Platform icon”. Older links with one account work exactly as before. It is in beta, so tell us how it goes on a real LIVE: <a href="/feedback/">feedback</a>.</li>
       </ul>
 
+      <h3>The relay (the free TikTok connection)</h3>
+      <ul>
+        <li><strong>Pages are no longer turned away so easily.</strong> The free relay allowed only 8 open Frills pages from one internet address, and every overlay and every connected editor is one page, so a streamer with the five overlays and a few editors open could see “The free Frills relay turned the connection down” and wait around 20 minutes. A page whose connection had died without a word (a Wi-Fi blip, a PC that went to sleep) still counted for a long time, and a page that came back was counted next to its own old connection. The relay now allows 60 pages (for up to 12 different accounts) from one address, and a page that comes back replaces its own old connection at once.</li>
+        <li><strong>A refusal now says why.</strong> Instead of “it may be busy”, the page tells you how many pages the relay allows from your internet address, or that it cannot reach the relay at all, and keeps trying by itself. There is a new answer about it in the <a href="/overlays/faq/">overlays FAQ</a>.</li>
+      </ul>
+
+      <h3>Practice mode</h3>
+      <ul>
+        <li><strong>Practice mode is back to its normal speed.</strong> With <code>&amp;demo=1</code> on the end of a link, the alerts, last gifts, goals, top likers and song requests overlays were making up their events several times faster than intended (a made-up gift every fraction of a second). They now come at the usual pace.</li>
+        <li><strong>The chat takes <code>&amp;pace=</code> too.</strong> Like the other overlays, <code>&amp;demo=1&amp;pace=700</code> makes the practice messages come about every 700 milliseconds, which is handy for trying a look or filming it.</li>
+      </ul>
+
       <h3>Help</h3>
       <ul>
+        <li><strong>The OBS guide says what to do with the two scene boxes.</strong> Leave “Refresh browser when scene becomes active” and “Shutdown source when not visible” unticked: ticking either one reloads the overlay every time you switch scenes, so chat starts empty and goals and top likers start again. The guide also says how to show one overlay in several scenes with one connection.</li>
         <li><strong>The Quick start can do both too.</strong> The first question now has “Both at once”: it asks for both names, and gives you one chat link for the two, an alerts link for TikTok and one for Twitch, and the TikTok-only overlays (last gifts, goals, top likers) if you picked them.</li>
       </ul>
 

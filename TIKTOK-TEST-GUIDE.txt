@@ -148,8 +148,9 @@ on purpose, so an overlay never replays old chat.
   3. Paste the link into URL. Set Width and Height to the size of the chat box you want, for
      example 500 and 700. Press OK.
   4. Put the source where you want the chat. It grows upward from the bottom edge.
-  5. Check the box that says "Refresh browser when scene becomes active" if you like; leave
-     "Shutdown source when not visible" off.
+  5. Leave "Refresh browser when scene becomes active" and "Shutdown source when not visible"
+     both unticked (they are off for a new source). Ticking either one reloads the overlay
+     every time you switch scenes, so the chat starts empty and goals and likers start again.
 
 The helper and OBS must be on the SAME PC. The link only works while the helper is running.
 Until the account is live, the overlay may show a small note such as "isn't live right now". It

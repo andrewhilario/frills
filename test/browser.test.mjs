@@ -245,6 +245,33 @@ test("overlay: with no channel it says what to add, and with demo=1 it draws pra
   assert.ok(count >= 2 && count <= 3, `${count} messages showing`);
 });
 
+test("overlay: ?pace= makes the practice events come faster, and without it they come at the usual speed (chat and last gifts, like the other overlays)", { skip }, async () => {
+  // how many came in a 3-second stretch, after the first few that a practice chat starts with
+  const chatIn3Seconds = async (query) => {
+    await page.goto(`${base}/overlay/?demo=1&max=40&life=0&${query}`, { settle: 300 });
+    await sleep(1800);
+    const before = await page.evaluate(`document.querySelectorAll("#chat .m").length`);
+    await sleep(3000);
+    return (await page.evaluate(`document.querySelectorAll("#chat .m").length`)) - before;
+  };
+  const usual = await chatIn3Seconds("");
+  assert.ok(usual <= 3, `at the usual pace ${usual} new chat messages came in 3 seconds`);
+  const quick = await chatIn3Seconds("pace=300");
+  assert.ok(quick >= 6, `with pace=300 ${quick} new chat messages came in 3 seconds`);
+  // the same for the last gifts: a missing pace is the usual speed, not the fast one (it once was the fast one)
+  const giftsIn3Seconds = async (query) => {
+    await page.goto(`${base}/overlay/gifts/?demo=1&max=30&${query}`, { settle: 100 });
+    await sleep(3000);
+    return page.evaluate(`document.querySelectorAll("#gifts .gift").length`);
+  };
+  const gifts = await giftsIn3Seconds("");
+  assert.ok(gifts <= 3, `at the usual pace ${gifts} gifts showed in 3 seconds`);
+  const fast = await giftsIn3Seconds("pace=300");
+  assert.ok(fast >= 5, `with pace=300 ${fast} gifts showed in 3 seconds`);
+  // and a pace that is not a number is the usual speed too
+  assert.ok((await giftsIn3Seconds("pace=soon")) <= 3, "a pace that is not a number changes nothing");
+});
+
 test("overlay: the page is truly see-through", { skip }, async () => {
   await page.goto(base + "/overlay/?channel=notarealchannel", { settle: 600 });
   const png = await page.screenshot({ transparent: true });
