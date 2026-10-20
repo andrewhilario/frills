@@ -25,6 +25,10 @@ export function overlaysFaq({ kb = 19, relayUrl = "" } = {}) {
       a: "On TikTok, follows, gifts, shares and likes only come while your account is LIVE, and only when someone actually does them. If you just went LIVE, disconnect and connect again in the editor. A quiet chat is not a broken overlay: the editor says it is reading your LIVE as soon as it has heard anything at all. If the free relay is full, the page says you are waiting for a spot, and the line moves as people finish.",
     },
     {
+      q: "Why does it say too many Frills pages are open from my internet address?",
+      a: "The free relay limits how many Frills pages one internet address can hold open at once, so that one address cannot hog it. Every overlay (chat, alerts, last gifts, goals, top likers) and every editor that is connected counts as one page, so a full set plus a few editors adds up. Close the editors and tabs you are not using, or just wait: the page tries again by itself every few seconds, and pages left behind by a dropped connection (a Wi-Fi blip, a PC that went to sleep) clear on their own. The message says how many pages the relay allows. Some internet providers share one address between many homes, so if you keep seeing it with only your own overlays open, please <a href=\"/feedback/\">tell us</a>.",
+    },
+    {
       q: "Can I use my own images, GIFs and sounds in alerts?",
       a: "Yes. Under each alert you can upload one image or GIF and one sound, up to 300 KB each (PNG, JPEG, WebP or GIF; MP3, OGG or WAV). You have to tick that you have the right to use the file. It is stored by Frills so your link can load it, and you get a delete code once, which you need to keep to delete it yourself. Anyone who has your link can see the file, so do not upload anything private. See the <a href=\"/privacy/\">privacy page</a> for exactly what is kept.",
     },

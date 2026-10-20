@@ -3,7 +3,7 @@
 
 import test, { mock } from "node:test";
 import assert from "node:assert/strict";
-import { acceptMessage, cleanTikTokUser, connectTikTok, isAvatarUrl } from "../src/js/tiktok.js";
+import { acceptMessage, cleanTikTokUser, connectTikTok, explainRefusal, isAvatarUrl } from "../src/js/tiktok.js";
 import { cleanName, statusText } from "../src/js/connect.js";
 import { overlayUrl } from "../src/js/settings.js";
 import { matchaOverlayUrl } from "../src/js/matcha.js";
@@ -486,4 +486,159 @@ test("a stream the browser lost and cannot reopen for 45 seconds is replaced at 
     globalThis.removeEventListener = before.remove;
     mock.timers.reset();
   }
+});
+
+// ── a stream the relay turns away: which page it is, and why it was turned away ─────────────────────────────────────────────────
+
+const flush = async () => { for (let i = 0; i < 8; i++) await Promise.resolve(); }; // lets an answer that is already on its way arrive (timers are pretend here)
+const pageOf = (url) => new URL(url, "https://x.test").searchParams.get("page");
+const REASON = "Too many Frills pages are open from your internet address (this relay allows 60), so this one is waiting its turn. Trying again…";
+
+test("a connection through a relay names itself, another connection has another name, and the helper on this PC is not given one", () => {
+  const first = [];
+  const second = [];
+  const a = connectTikTok({ user: "pond.pal", base: "https://relay.example", eventSourceFactory: (url) => { first.push(url); return fakeEventSource(); } });
+  const b = connectTikTok({ user: "pond.pal", base: "https://relay.example", eventSourceFactory: (url) => { second.push(url); return fakeEventSource(); } });
+  assert.match(pageOf(first[0]), /^[a-z0-9]{8,30}$/, "a name the relay accepts (8 to 40 letters and numbers)");
+  assert.equal(new URL(first[0]).searchParams.get("user"), "pond.pal");
+  assert.notEqual(pageOf(first[0]), pageOf(second[0]), "two pages are two names");
+  a.stop();
+  b.stop();
+  const own = [];
+  connectTikTok({ user: "pond.pal", eventSourceFactory: (url) => { own.push(url); return fakeEventSource(); } }).stop();
+  assert.equal(own[0], "/tiktok/stream?user=pond.pal", "the helper on this PC has no limit to keep, so it is not told");
+});
+
+test("the same page name is sent again when the stream is opened again after a drop, so the relay can tell that the page came back", () => {
+  const urls = [];
+  const made = [];
+  mock.timers.enable({ apis: ["setTimeout", "setInterval", "Date"] });
+  const conn = connectTikTok({ user: "pond.pal", base: "https://relay.example", retryRefused: true, eventSourceFactory: (url) => { urls.push(url); const s = fakeEventSource(); made.push(s); return s; } });
+  try {
+    made[0].send("status", { state: "connected" });
+    giveUp(made[0]);
+    mock.timers.tick(2500);
+    assert.equal(made.length, 2, "a new stream");
+    assert.match(pageOf(urls[0]), /^[a-z0-9]{8,30}$/, "it has a name to begin with");
+    assert.equal(pageOf(urls[1]), pageOf(urls[0]), "under the same page name");
+    giveUp(made[1]);
+    mock.timers.tick(5000);
+    assert.equal(made.length, 3);
+    assert.equal(pageOf(urls[2]), pageOf(urls[0]), "and again the next time");
+  } finally {
+    conn.stop();
+    mock.timers.reset();
+  }
+});
+
+test("a stream the relay turns away says why once the relay has been asked, in the relay's own words", async () => {
+  const asked = [];
+  const details = [];
+  const { sources, conn } = reconnecting({ retryRefused: true, diagnose: async (address) => { asked.push(address); return REASON; }, onStatus: (s) => details.push(`${s.state}|${s.detail ?? ""}`) });
+  try {
+    giveUp(sources[0]);
+    assert.match(details.at(-1), /^refused\|The free Frills relay turned the connection down/, "at once it says the plain thing");
+    await flush();
+    assert.equal(details.at(-1), `refused|${REASON}`);
+    assert.equal(asked.length, 1);
+    assert.match(asked[0], /^https:\/\/relay\.example\/tiktok\/stream\?user=pond\.pal&page=[a-z0-9]{8,30}$/, "it asks about the very same address");
+  } finally {
+    conn.stop();
+    mock.timers.reset();
+  }
+});
+
+test("a relay that has nothing to add (an older one, or one that would let the page in now) changes nothing; the page just goes on trying", async () => {
+  for (const said of ["", null, undefined]) {
+    const details = [];
+    const { sources, conn } = reconnecting({ retryRefused: true, diagnose: async () => said, onStatus: (s) => details.push(`${s.state}|${s.detail ?? ""}`) });
+    try {
+      giveUp(sources[0]);
+      await flush();
+      assert.equal(details.length, 2, JSON.stringify(said));
+      mock.timers.tick(2500);
+      assert.equal(sources.length, 2, "and it still tries again");
+    } finally {
+      conn.stop();
+      mock.timers.reset();
+    }
+  }
+  // asking that fails is nothing to say either
+  const details = [];
+  const { sources, conn } = reconnecting({ retryRefused: true, diagnose: async () => { throw new Error("no"); }, onStatus: (s) => details.push(s.state) });
+  try {
+    giveUp(sources[0]);
+    await flush();
+    assert.deepEqual(details, ["connecting", "refused"]);
+  } finally {
+    conn.stop();
+    mock.timers.reset();
+  }
+});
+
+test("an answer about an earlier refusal never replaces the answer about a later one, or what the page says once it is in", async () => {
+  const pending = [];
+  const details = [];
+  const { sources, conn } = reconnecting({ retryRefused: true, diagnose: () => new Promise((resolve) => pending.push(resolve)), onStatus: (s) => details.push(`${s.state}|${s.detail ?? ""}`) });
+  try {
+    giveUp(sources[0]);
+    mock.timers.tick(2500);
+    giveUp(sources[1]);
+    assert.equal(pending.length, 2);
+    pending[1]("the latest answer");
+    await flush();
+    pending[0]("an older answer, late"); // the older answer comes late
+    await flush();
+    assert.equal(details.at(-1), "refused|the latest answer", "the latest refusal's answer stands");
+    mock.timers.tick(5000);
+    assert.equal(sources.length, 3);
+    giveUp(sources[2]);
+    assert.equal(pending.length, 3);
+    mock.timers.tick(10000);
+    assert.equal(sources.length, 4);
+    sources[3].send("status", { state: "connected" });
+    const connectedAt = details.length;
+    pending[2]("and one more that is late: the page is in by now");
+    await flush();
+    assert.equal(details.length, connectedAt, "once in, a late answer says nothing");
+    assert.equal(details.at(-1), "connected|");
+  } finally {
+    conn.stop();
+    mock.timers.reset();
+  }
+});
+
+test("a page that has stopped is not told why it was turned away", async () => {
+  const pending = [];
+  const details = [];
+  const { sources, conn } = reconnecting({ retryRefused: true, diagnose: () => new Promise((resolve) => pending.push(resolve)), onStatus: (s) => details.push(s.state) });
+  try {
+    giveUp(sources[0]);
+    conn.stop();
+    pending[0](REASON);
+    await flush();
+    assert.deepEqual(details, ["connecting", "refused", "stopped"]);
+  } finally {
+    conn.stop();
+    mock.timers.reset();
+  }
+});
+
+test("explainRefusal reads the relay's own words, adds nothing of its own when a relay answers, and says plainly when none can be reached", async () => {
+  const signals = [];
+  const answer = (status, body) => async (url, init) => {
+    signals.push(init.signal);
+    return { ok: status >= 200 && status < 300, status, json: async () => { if (body === undefined) throw new Error("not json"); return body; } };
+  };
+  assert.equal(await explainRefusal("https://r.test/s", answer(429, { error: "too_many_pages", open: 60, limit: 60, message: REASON })), REASON);
+  assert.equal(await explainRefusal("https://r.test/s", answer(429, { error: "too_many_pages", open: 8, limit: 8 })), "", "an older relay says nothing more than 'no'");
+  assert.equal(await explainRefusal("https://r.test/s", answer(429, undefined)), "", "or says it in words that are not data");
+  assert.equal(await explainRefusal("https://r.test/s", answer(429, { message: { html: "<b>x</b>" } })), "", "only plain text is ever shown");
+  assert.equal((await explainRefusal("https://r.test/s", answer(429, { message: "x".repeat(2000) }))).length, 300, "and never a long one");
+  assert.equal(await explainRefusal("https://r.test/s", answer(200)), "", "a relay that would let the page in has nothing to explain");
+  assert.equal(await explainRefusal("https://r.test/s", answer(403, { message: "ignored" })), "", "only a refusal for too many pages speaks");
+  assert.equal(await explainRefusal("https://r.test/s", answer(502)), "");
+  assert.match(await explainRefusal("https://r.test/s", async () => { throw new TypeError("Failed to fetch"); }), /^Can't reach the free Frills relay right now\./);
+  assert.equal(await explainRefusal("https://r.test/s", "not a function"), "Can't reach the free Frills relay right now. Check your internet. Trying again…", "nothing usable to ask with is the same as no answer");
+  assert.ok(signals.length === 8 && signals.every((s) => s.aborted), "whatever answered, the request is let go afterwards (a stream that opened must not stay open)");
 });

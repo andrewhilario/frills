@@ -72,7 +72,7 @@ export const CONTROLS = [
   { key: "size", where: "main", type: "range", label: "Text size", min: 12, max: 34, step: 1, unit: " px" },
   { key: "letter", where: "main", type: "range", label: "Letter spacing", min: -2, max: 8, step: 0.5, unit: " px" },
   { key: "align", where: "main", type: "chips", label: "Text alignment", options: list(["left", "Left"], ["center", "Center"], ["right", "Right"]) },
-  { key: "source", where: "main", type: "chips", label: "Platform icon", options: list(["icon", "A small icon"], ["none", "None"]), hint: "When one chat shows both TikTok and Twitch, a small icon before each name says where it came from." },
+  { key: "source", where: "main", type: "chips", label: "Platform icon", options: list(["icon", "A small icon"], ["none", "None"]), hint: "Shown when one chat reads both TikTok and Twitch." },
   { key: "deco", where: "main", type: "chips", label: "Decorations on the bubbles", options: DECOS, hint: "Little pictures laid over the bubbles: a scene on a corner, sparkles, a friend peeking over the top. Frog pond is green and Neko cafe is pink and cream." },
   { key: "decoSize", where: "main", needs: "deco", type: "range", label: "Decoration size", min: 50, max: 200, step: 5, unit: " %" },
   { key: "decoSide", where: "main", needs: "deco", type: "chips", label: "Corner scene sits on the", options: list(["left", "Left"], ["right", "Right"]), hint: "The friend peeking over the top goes on the other side." },

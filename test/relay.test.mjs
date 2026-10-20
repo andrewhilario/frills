@@ -36,13 +36,14 @@ const raw = (path, { method = "GET", headers = {} } = {}) => new Promise((resolv
     res.on("end", () => resolve({ status: res.statusCode, headers: res.headers, body }));
   });
   req.on("error", reject);
+  req.setTimeout(3000, () => req.destroy(new Error("the relay did not finish its answer (a stream was opened where an answer was expected?)")));
   req.end();
 });
 
 /** Listens to a stream like a page on the website would. */
-function listen(user, headers = {}, kinds = "") {
+function listen(user, headers = {}, kinds = "", page = "") {
   const events = [];
-  const req = http.get({ host: "127.0.0.1", port, path: `/tiktok/stream?user=${encodeURIComponent(user)}${kinds ? `&events=${kinds}` : ""}`, headers: { Host: "relay.example.test", Origin: SITE, ...headers } });
+  const req = http.get({ host: "127.0.0.1", port, path: `/tiktok/stream?user=${encodeURIComponent(user)}${kinds ? `&events=${kinds}` : ""}${page ? `&page=${page}` : ""}`, headers: { Host: "relay.example.test", Origin: SITE, ...headers } });
   let status = 0;
   const done = new Promise((resolve) => {
     req.on("response", (res) => {
@@ -77,6 +78,7 @@ function listen(user, headers = {}, kinds = "") {
       }
       throw new Error("Timed out. Saw: " + JSON.stringify(events.map((e) => e.data.state + (e.data.position ? ":" + e.data.position : ""))));
     },
+    ended: done, // settles when the stream is over, whoever ended it
     close: () => { req.destroy(); return done; },
   };
 }
@@ -209,5 +211,101 @@ test("the relay says when a page connects, leaves or is turned away, by kind and
   assert.ok(lines.some((l) => l === "@acct.a: a page left (follow+gift), 1 open"), lines.join(" | "));
   assert.ok(!lines.some((l) => /127\.0\.0\.1|::1|\d+\.\d+\.\d+\.\d+/.test(l)), "no address in any line");
   await chat.close();
+  await helper.close();
+});
+
+// ── how many pages one address may keep open (a streamer's own set of pages, a stream that died without a word, and shared addresses) ────
+
+const connected = (page) => page.until(() => page.states().includes("connected"));
+const health = async () => JSON.parse((await raw("/health")).body);
+
+test("a streamer's whole set of pages fits by default: a dozen streams from one address are all let in", async () => {
+  await start({ relay: { slots: 10, maxPerIp: undefined, trustProxy: true } });
+  const ip = { "cf-connecting-ip": "3.3.3.3" };
+  const pages = Array.from({ length: 12 }, () => listen("acct.a", ip));
+  await Promise.all(pages.map(connected));
+  assert.ok(pages.every((p) => p.status === 200), "none is turned away");
+  assert.equal((await health()).streams.open, 12);
+  assert.ok((await health()).streams.limit >= 40, "the limit is there to stop a runaway address, not to count one streamer's pages");
+  await Promise.all(pages.map((p) => p.close()));
+  await helper.close();
+});
+
+test("a page that comes back replaces its own earlier stream at once, so a stream the relay still thinks is open never counts against it", async () => {
+  const lines = [];
+  await start({ relay: { slots: 10, maxPerIp: 1, trustProxy: true }, log: (line) => lines.push(line) });
+  const ip = (address) => ({ "cf-connecting-ip": address });
+  const before = listen("acct.a", ip("1.1.1.1"), "", "pageone-abc");
+  await connected(before);
+  // the page's connection died without a word, so this stream still looks open here, and the page opens a new one under the same name
+  const after = listen("acct.a", ip("1.1.1.1"), "", "pageone-abc");
+  await connected(after);
+  await before.ended; // the relay ended the old one
+  assert.equal(after.status, 200);
+  assert.equal((await health()).streams.open, 1, "one page, one stream");
+  assert.ok(lines.includes("@acct.a: a page came back; its earlier stream was replaced"), lines.join(" | "));
+  // a different page from the same address is still held to the limit, and so is a name that is not one
+  assert.equal((await raw("/tiktok/stream?user=acct.a&page=pagetwo-xyz", { headers: { Origin: SITE, ...ip("1.1.1.1") } })).status, 429);
+  assert.equal((await raw("/tiktok/stream?user=acct.a&page=x", { headers: { Origin: SITE, ...ip("1.1.1.1") } })).status, 429, "a name that is too short names nobody");
+  assert.equal((await raw("/tiktok/stream?user=acct.a&page=pageone-abc%20", { headers: { Origin: SITE, ...ip("1.1.1.1") } })).status, 429, "and neither does one with odd characters");
+  // the same name from another address is another page: it replaces nothing of the first address's
+  const stranger = listen("acct.a", ip("2.2.2.2"), "", "pageone-abc");
+  await connected(stranger);
+  assert.equal((await health()).streams.open, 2);
+  const numbers = (await health()).streams;
+  assert.deepEqual([numbers.replaced, numbers.turnedAway], [1, 3]);
+  await Promise.all([after.close(), stranger.close()]);
+  await sleep(60);
+  assert.equal((await health()).streams.open, 0, "closing lets go of every one");
+  await helper.close();
+});
+
+test("one address can watch only so many different accounts, but more pages for an account it already watches are fine", async () => {
+  await start({ relay: { slots: 10, maxPerIp: 20, maxAccountsPerIp: 2, trustProxy: false } });
+  const a = listen("acct.a");
+  const b = listen("acct.b");
+  await Promise.all([connected(a), connected(b)]);
+  const refused = await raw("/tiktok/stream?user=acct.c", { headers: { Origin: SITE } });
+  assert.equal(refused.status, 429);
+  const said = JSON.parse(refused.body);
+  assert.deepEqual([said.error, said.open, said.limit], ["too_many_accounts", 2, 2]);
+  assert.match(said.message, /^This relay is already watching 2 different TikTok accounts from your internet address, so this one is waiting its turn\. Trying again…$/);
+  const more = listen("acct.a", {}, "follow,gift");
+  const again = listen("acct.b");
+  await Promise.all([connected(more), connected(again)]);
+  assert.equal((await health()).streams.open, 4);
+  await Promise.all([a.close(), b.close(), more.close(), again.close()]);
+  await helper.close();
+});
+
+test("a refusal says how many pages are open and the most allowed, in a way the website's page may read, and when to try again", async () => {
+  await start({ relay: { slots: 10, maxPerIp: 1, trustProxy: false } });
+  const one = listen("acct.a");
+  await connected(one);
+  const refused = await raw("/tiktok/stream?user=acct.a", { headers: { Origin: SITE } });
+  assert.equal(refused.status, 429);
+  assert.match(refused.headers["content-type"], /application\/json/);
+  assert.equal(refused.headers["access-control-allow-origin"], SITE, "the page is allowed to read the answer");
+  assert.equal(refused.headers["retry-after"], "30");
+  const said = JSON.parse(refused.body);
+  assert.deepEqual([said.error, said.open, said.limit], ["too_many_pages", 1, 1]);
+  assert.equal(said.message, "Too many Frills pages are open from your internet address (this relay allows 1), so this one is waiting its turn. Close Frills tabs you are not using, or wait: pages left behind by a dropped connection clear by themselves. Trying again…", "it says why in plain words, for the page to show as it is");
+  await one.close();
+  await helper.close();
+});
+
+test("the status numbers say how many pages are open, the limit, and how often pages were turned away or came back: counts only", async () => {
+  await start({ relay: { slots: 10, maxPerIp: 1, trustProxy: false } });
+  let numbers = (await health()).streams;
+  assert.deepEqual(numbers, { open: 0, limit: 1, turnedAway: 0, replaced: 0, lastTurnedAwayS: null });
+  const one = listen("acct.a");
+  await connected(one);
+  await raw("/tiktok/stream?user=acct.a", { headers: { Origin: SITE } });
+  numbers = (await health()).streams;
+  assert.deepEqual([numbers.open, numbers.limit, numbers.turnedAway, numbers.replaced], [1, 1, 1, 0]);
+  assert.ok(numbers.lastTurnedAwayS >= 0 && numbers.lastTurnedAwayS < 5);
+  assert.doesNotMatch(JSON.stringify(await health()), /127\.0\.0\.1|::1|\d+\.\d+\.\d+\.\d+/, "no address in the numbers");
+  assert.match((await raw("/health", { headers: { Accept: "text/html" } })).body, /pages turned away/, "the readable page has the numbers too");
+  await one.close();
   await helper.close();
 });

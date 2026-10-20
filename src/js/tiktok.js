@@ -126,12 +126,41 @@ export async function findTikTokSource(relayBase = "") {
 }
 
 /**
+ * A short random name for one connection. A page that opens a new stream after its connection dropped sends the same name again, so the relay
+ * can tell "this page came back" from "another page": it then lets go of the stream the page left behind (which it may think is open for many
+ * minutes) instead of counting both.
+ */
+const makePageId = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+/**
+ * Asks a relay why it turned a page away, by opening the same address and reading only the answer (a browser cannot say why an event stream
+ * failed). A relay that refuses says why in plain words, in its answer; one that cannot be reached at all gets a plain message of ours. A stream
+ * that does open is let go at once. Resolves with the text to show, or "" when there is nothing to add (an older relay, or one that would let the
+ * page in now). Never rejects.
+ */
+export async function explainRefusal(address, fetchFn = globalThis.fetch) {
+  const stop = new AbortController();
+  const timer = setTimeout(() => stop.abort(), 8000);
+  try {
+    const res = await fetchFn(address, { cache: "no-store", signal: stop.signal });
+    const said = res.status === 429 && (await res.json().catch(() => 0)).message;
+    return typeof said === "string" ? said.slice(0, 300) : "";
+  } catch {
+    return "Can't reach the free Frills relay right now. Check your internet. Trying again…"; // no answer a page may read
+  } finally {
+    clearTimeout(timer);
+    stop.abort();
+  }
+}
+
+/**
  * Reads one TikTok account's LIVE chat through the helper. Calls back like the Twitch connection does, so the pages treat both the
  * same:  onMessage(msg)  onRemove({ id })  onClear({ user })  onStatus({ state, channel, detail, fatal, platform }).
  * `events` (a list of "follow", "gift", "share") also asks for those alerts, which arrive at onAlert(alert).
- * States: connecting, connected, offline (not live yet), reconnecting, limited, helper-lost, error, stopped. Returns { stop() }.
+ * `diagnose(address)` (optional) is asked why a stream was turned away; the text it resolves with replaces the vague first message.
+ * States: connecting, connected, offline (not live yet), reconnecting, limited, helper-lost, refused, error, stopped. Returns { stop() }.
  */
-export function connectTikTok({ user, base = "", onMessage, onRemove, onClear, onStatus, onAlert, onInfo, events = [], eventSourceFactory, retryRefused = false } = {}) {
+export function connectTikTok({ user, base = "", onMessage, onRemove, onClear, onStatus, onAlert, onInfo, events = [], eventSourceFactory, retryRefused = false, diagnose } = {}) {
   const name = cleanTikTokUser(user);
   const say = (state, detail, fatal = false, extra = {}) => onStatus && onStatus({ state, channel: name, detail, fatal, platform: "tiktok", ...extra });
   if (!name) {
@@ -150,7 +179,11 @@ export function connectTikTok({ user, base = "", onMessage, onRemove, onClear, o
   let watcher = 0;
   say("connecting");
   const wanted = events.filter((kind) => ALERT_KINDS.includes(kind));
-  const address = `${base}/tiktok/stream?user=${encodeURIComponent(name)}${wanted.length ? `&events=${wanted.join(",")}` : ""}`;
+  // A relay is told which page this is (see makePageId); the helper on this PC does not count pages, so it is not.
+  const address = `${base}/tiktok/stream?user=${encodeURIComponent(name)}${wanted.length ? `&events=${wanted.join(",")}` : ""}${base ? `&page=${makePageId()}` : ""}`;
+  let refusals = 0; // how many times a stream was turned away, so only the answer about the latest one is shown
+  const lost = base ? "Lost the free Frills relay. This reconnects by itself." : "";
+  const turnedDown = "The free Frills relay turned the connection down. It may be busy, or too many pages are open from your address.";
 
   /** Opens the stream and listens. Called again to come back after the relay was restarted or went away. */
   function open() {
@@ -193,19 +226,26 @@ export function connectTikTok({ user, base = "", onMessage, onRemove, onClear, o
           if (retryRefused) {
             // The relay or helper was found a moment ago, so a stream it turns away is busy or full for this address (too many pages open from one
             // address, say), which passes. Waiting and trying again is better than giving up for good.
-            say("refused", base ? "The free Frills relay turned the connection down. It may be busy, or too many pages are open from your address. Trying again…" : "The Frills helper turned the connection down. Trying again…");
+            say("refused", base ? turnedDown + " Trying again…" : "The Frills helper turned the connection down. Trying again…");
+            if (base && diagnose) {
+              // A browser cannot say why an event stream failed, so ask the relay the same question the plain way and tell the person what it answered.
+              const attempt = ++refusals;
+              Promise.resolve(diagnose(address)).then((text) => {
+                if (text && !stopped && !heard && attempt === refusals) say("refused", text);
+              }).catch(() => {});
+            }
             comeBack();
             return;
           }
-          say("error", base ? "The free Frills relay turned the connection down. It may be busy, or too many pages are open from your address." : "The Frills helper isn't answering here. TikTok chat needs it running on this PC.", true);
+          say("error", base ? turnedDown : "The Frills helper isn't answering here. TikTok chat needs it running on this PC.", true);
           return;
         }
-        say("helper-lost", base ? "Lost the free Frills relay. This reconnects by itself." : "");
+        say("helper-lost", lost);
         comeBack();
       } else {
         // the browser is trying again by itself
         lostSince ||= Date.now();
-        say("helper-lost", base ? "Lost the free Frills relay. This reconnects by itself." : "");
+        say("helper-lost", lost);
       }
     };
   }
@@ -232,13 +272,13 @@ export function connectTikTok({ user, base = "", onMessage, onRemove, onClear, o
     if (stopped || !source) return;
     const now = Date.now();
     if (beatAt && now - beatAt > 50000) {
-      say("helper-lost", base ? "Lost the free Frills relay. This reconnects by itself." : "");
+      say("helper-lost", lost);
       comeBack(true);
     } else if (!lastEventAt && now - openedAt > 30000) {
-      say("helper-lost", base ? "Lost the free Frills relay. This reconnects by itself." : "");
+      say("helper-lost", lost);
       comeBack();
     } else if (lostSince && now - lostSince > 45000) {
-      say("helper-lost", base ? "Lost the free Frills relay. This reconnects by itself." : "");
+      say("helper-lost", lost);
       comeBack(true);
     }
   }, 5000);

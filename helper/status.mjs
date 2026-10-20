@@ -35,13 +35,16 @@ export class Signing {
 }
 
 /** Everything the page and the alerts need. `device` (processor, memory) is added only for someone on the device itself. */
-export function snapshot({ stats, startedAt, now, version, features, signing, estimate, alertAt = ALERT_AT, device = null, roster = null, ownerLogin = false }) {
+export function snapshot({ stats, startedAt, now, version, features, signing, estimate, streams = null, alertAt = ALERT_AT, device = null, roster = null, ownerLogin = false }) {
   const free = Math.max(0, stats.max - stats.used);
   return {
     ok: true, name: "frills-relay", version, features, slots: stats,
     free, level: level(stats, alertAt), alertAt, uptimeS: Math.max(0, Math.round((now - startedAt) / 1000)),
     signing: { busyRecently: signing.recent(), busy: signing.recent(2 * 60 * 1000) > 0 },
     capacity: estimate,
+    // the pages listening right now, the most one internet address may hold, how many pages were turned away because of it (and how long ago the last was),
+    // and how many came back and replaced their own earlier stream; only counts, like everything else here
+    ...(streams ? { streams } : {}),
     ...(device ? { device } : {}),
     ...(roster ? { roster } : {}), // the names: only for the owner (on the device, or with the owner's password), like `device`
     ...(ownerLogin ? { ownerLogin: true } : {}), // says only that an owner password exists, so the page can offer the box for it
@@ -97,6 +100,8 @@ td a{font-weight:700;color:var(--ink)}.pill{display:inline-block;padding:2px 10p
 <div class="card"><b id="used">${esc(s.slots.used)}</b><span>accounts connected</span></div>
 <div class="card"><b id="up">${esc(span(s.uptimeS))}</b><span>running for</span></div>
 <div class="card"><b id="signing">-</b><span>free signing service</span></div>
+<div class="card"><b id="streams">-</b><span>pages open right now</span></div>
+<div class="card"><b id="away">-</b><span id="awaynote">pages turned away</span></div>
 </div>
 <div class="card"><b id="cap">-</b><span id="capnote"></span></div>
 <section class="alarm"><label>Warn me when <input type="number" id="at" min="0" max="500" value="${esc(s.alertAt)}"> or fewer spots are left <button id="allow" type="button">Turn on notifications</button></label>
@@ -143,6 +148,7 @@ function draw(s){
   $("fill").style.width=Math.min(100,100*s.slots.used/Math.max(1,s.slots.max))+"%";
   $("state").textContent=s.slots.waiting>0?s.slots.waiting+" "+(s.slots.waiting===1?"person is":"people are")+" waiting for a spot":free===0?"Full: nobody else fits":low?"Getting full: "+free+" left":"Plenty of room";
   $("signing").textContent=s.signing.busy?"Busy right now":s.signing.busyRecently?"OK (busy "+s.signing.busyRecently+"x lately)":"OK";
+  if(s.streams){const t=s.streams;$("streams").textContent=t.open;$("away").textContent=t.turnedAway;$("awaynote").textContent="pages turned away since it started"+(t.lastTurnedAwayS===null?"":" (the last "+forText(t.lastTurnedAwayS)+" ago)")+". One internet address may keep "+t.limit+" open."+(t.replaced?" "+t.replaced+" came back and replaced their own old connection.":"")}
   const c=s.capacity;$("cap").textContent="About "+c.estimate+" accounts";$("capnote").textContent=(c.measured?"A guess from what this device uses now.":"A first guess; it improves once a few accounts are open.")+" Your internet and TikTok's free signing usually run out before the device does."+(c.estimate>s.slots.max*1.5?" You set "+s.slots.max+" spots, so there may be room to raise it.":"");
   const b=$("banner");b.dataset.on=String(low);b.textContent=s.slots.waiting>0?"People are waiting in line. Only "+free+" spots left.":free===0?"The relay is full.":"Only "+free+" spots left.";
   $("own").hidden=!s.ownerLogin;$("ownout").hidden=!(s.roster&&OWNER);

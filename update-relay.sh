@@ -7,6 +7,8 @@
 # The Cloudflare tunnel is not touched: leave its tmux session ("tunnel") running.
 # The number of spots is 50 unless you say otherwise:   RELAY_SLOTS=30 bash ~/frills/update-relay.sh
 # The warning comes at 10 spots left unless you say otherwise:   RELAY_ALERT_SPOTS=15 bash ~/frills/update-relay.sh
+# How many pages one internet address may keep open (60) and for how many different accounts (12) are set by the relay itself. To change them:
+#     RELAY_PER_IP=100 RELAY_ACCOUNTS_PER_IP=20 bash ~/frills/update-relay.sh
 
 set -e
 cd "$(dirname "$0")"
@@ -22,7 +24,7 @@ echo "3/4  Installing what the relay needs..."
 (cd helper && npm install --no-audit --no-fund)
 
 echo "4/4  Starting the relay with $SLOTS spots..."
-tmux new-session -d -s relay "cd '$PWD/helper' && RELAY_SLOTS=$SLOTS RELAY_ALERT_SPOTS=${RELAY_ALERT_SPOTS:-10} npm run relay"
+tmux new-session -d -s relay "cd '$PWD/helper' && RELAY_SLOTS=$SLOTS RELAY_ALERT_SPOTS=${RELAY_ALERT_SPOTS:-10} ${RELAY_PER_IP:+RELAY_PER_IP=$RELAY_PER_IP} ${RELAY_ACCOUNTS_PER_IP:+RELAY_ACCOUNTS_PER_IP=$RELAY_ACCOUNTS_PER_IP} npm run relay"
 
 sleep 6
 echo

@@ -181,7 +181,8 @@ Put these before `npm run relay`:
 | Setting | What it does |
 | --- | --- |
 | `RELAY_SLOTS=10` | How many TikTok accounts at once. The line forms after this. Start low. |
-| `RELAY_PER_IP=4` | How many streams one visitor address may hold open. |
+| `RELAY_PER_IP=60` | How many pages one internet address may keep open at once (60 unless you say otherwise). Each overlay (chat, alerts, last gifts, goals, top likers) and each editor that is connected is one page, and some internet providers put many homes behind one address, so keep this generous. It is there to stop one address running away, not to count one streamer's pages. |
+| `RELAY_ACCOUNTS_PER_IP=12` | How many different TikTok accounts one internet address may watch at once (12 unless you say otherwise), so one address cannot fill all the spots. More pages for an account it already watches are always fine. |
 | `RELAY_ORIGINS=...` | The website addresses allowed to use it (default `https://frills.valwidgets.live`). |
 | `EULER_API_KEY=...` | Optional: a free key from the signing service, to raise its limits. |
 | `PORT=8765` | The port it listens on (only the tunnel connects to it). |
@@ -230,7 +231,9 @@ Every time the relay connects to a TikTok account it uses a request to a free si
 ## If something goes wrong
 
 - **`curl` health works on the phone but not through `relay.valwidgets.live`:** the tunnel is not running (`tmux attach -t tunnel`), or the Public Hostname URL is not `localhost:8765`.
-- **The editor says the relay turned the connection down:** the relay is off, or the website address is not in `RELAY_ORIGINS`, or too many pages are open from one address.
+- **A page says "Too many Frills pages are open from your internet address" (older versions: "the relay turned the connection down"):** that address already holds the most pages the relay allows (the number is in the message). It passes by itself when pages close. Pages whose connection died without a word (a Wi-Fi blip, a PC that went to sleep, OBS closing badly) can still look open to the relay for many minutes, and before relay 0.5.2 the limit was 8 and a page that came back was counted next to its own ghost: that is why it used to clear only after about 20 minutes. From 0.5.2 the limit is 60 and a page that comes back replaces its own old connection at once. The status page has **pages open right now** and **pages turned away**, and the relay's window prints `a page was turned away (N pages are already open from its address)`. If it still happens, raise `RELAY_PER_IP`.
+- **A page says "Can't reach the free Frills relay":** the relay or its tunnel is not answering: `tmux attach -t tunnel` and `tmux attach -t relay`, then the first line of this list.
+- **The editor says the relay turned the connection down for another reason:** the relay is off, or the website address is not in `RELAY_ORIGINS`.
 - **Chat stops after the screen turns off:** Android killed Termux. Redo step 5 and check the lock.
 - **Everyone gets "TikTok's free connection is busy":** the signing service is limiting your home address. Lower `RELAY_SLOTS`, or set a free `EULER_API_KEY`.
 - **Nothing appears for a real account but `frills_demo` works:** the problem is between the phone and TikTok (offline account, blocked address), not in Frills. Tell me the status line you see.
@@ -243,6 +246,8 @@ Open the relay's address in a browser (`https://relay.valwidgets.live/health`, o
 - On the status page: a red bar, a short sound, and (if you press "Turn on notifications") a browser notification. Keep the page open. You can change the number on the page.
 - On the phone itself: a Termux notification. One time only, install the free **Termux:API** app from the same place you got Termux (F-Droid), then run `pkg install termux-api`. Without it, the warning is only written in the relay's window.
 - To change the number or turn it off, start the relay with `RELAY_ALERT_SPOTS=15` (or `RELAY_ALERTS=0`). `update-relay.sh` accepts the same variables: `RELAY_ALERT_SPOTS=15 bash ~/frills/update-relay.sh`.
+
+**Pages.** Two more cards (relay 0.5.2): **pages open right now** (every overlay and editor that is listening) and **pages turned away** since the relay started, with how long ago the last one was and how many pages came back and replaced their own old connection. If "turned away" keeps growing, raise `RELAY_PER_IP`.
 
 **How many can it handle?** The "About N accounts" number is a guess from the free memory and how much of one core each open account uses. It gets better once a few accounts are open. The real limit is usually your home internet and TikTok's free signing service (about 2,500 requests a day), so raise `RELAY_SLOTS` a little at a time and watch the page.
 

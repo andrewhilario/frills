@@ -3,7 +3,7 @@
 // editor, the matcha page and the overlay treat them alike.
 
 import { connect as connectTwitch, cleanChannel } from "./twitch.js";
-import { cleanTikTokUser, connectTikTok, findTikTokSource } from "./tiktok.js";
+import { cleanTikTokUser, connectTikTok, explainRefusal, findTikTokSource } from "./tiktok.js";
 
 export const PLATFORMS = ["tiktok", "twitch"];
 
@@ -41,7 +41,7 @@ export function connectTo(feeds, platform, name, onStatus, { relay = "", events 
       onStatus?.({ state: "error", channel: login, platform: "tiktok", fatal: true, detail: relay ? "Couldn't reach TikTok chat. The free Frills relay isn't answering right now. Wait a minute and try again." : "TikTok chat needs the Frills helper running on this PC. It isn't answering here." });
       return;
     }
-    inner = connectTikTok({ user: name, base: found.base, events, onAlert, onInfo, retryRefused: true, ...handlers }); // (found a moment ago, so a refusal is only busy)
+    inner = connectTikTok({ user: name, base: found.base, events, onAlert, onInfo, retryRefused: true, diagnose: explainRefusal, ...handlers }); // (found a moment ago, so a refusal is only busy or full)
   });
   return {
     stop() {
@@ -66,7 +66,7 @@ const STATUS = {
   limited: (s) => s.detail || "TikTok's free connection is busy. Trying again in a minute…",
   "helper-lost": (s) => s.detail || "Lost the Frills helper. Start it again and this reconnects by itself.",
   reconnecting: () => "Lost the connection, trying again…",
-  refused: (s) => s.detail || "The relay turned the connection down. It may be busy. Trying again…",
+  refused: (s) => s.detail || "Trying again…",
   error: (s) => s.detail || "Couldn't connect",
   stopped: () => "Disconnected",
 };

@@ -429,3 +429,106 @@ test("overlay: when every new connection attempt hangs with no answer at all (a 
     forward.close();
   }
 });
+
+// ── the hosted site and a relay on another address: what a person is told when the relay turns their page away ─────────────────────────
+
+/**
+ * The site on one address and a relay on another, like the real thing. The page is told where the relay is (the build does that for the real
+ * site). With `proxy`, the page reaches the relay through a go-between that can cut the page's side of its streams while leaving the relay's side
+ * open: what a connection that dies without a word looks like to the relay.
+ */
+async function siteAndRelay(relayOptions, { proxy = false } = {}) {
+  const files = createStatic(dist);
+  const site = http.createServer((req, res) => {
+    const writeHead = res.writeHead.bind(res);
+    // the build's security policy only lists the real relay's address, so for a relay on a test address it is left out
+    res.writeHead = (status, headers = {}) => { for (const key of Object.keys(headers)) if (key.toLowerCase() === "content-security-policy") delete headers[key]; return writeHead(status, headers); };
+    files(req, res);
+  });
+  await new Promise((resolve) => site.listen(0, "127.0.0.1", resolve));
+  const siteBase = `http://127.0.0.1:${site.address().port}`;
+  const relay = createHelper({ demoPace: [200, 400], relay: { origins: [siteBase], slots: 10, trustProxy: false, ...relayOptions } });
+  const relayPort = await relay.listen(0);
+  const relayBase = `http://127.0.0.1:${relayPort}`;
+  opened.push(relay);
+  opened.push({ close: async () => { site.closeAllConnections?.(); site.close(); } });
+  let pageRelay = relayBase;
+  const held = new Set();
+  let go;
+  if (proxy) {
+    go = http.createServer((req, res) => {
+      const up = http.request({ host: "127.0.0.1", port: relayPort, path: req.url, method: req.method, headers: req.headers }, (r) => {
+        res.writeHead(r.statusCode, r.headers);
+        r.pipe(res);
+        r.on("close", () => res.destroy());
+      });
+      up.on("error", () => res.destroy());
+      held.add({ res, up });
+      up.end(); // (when the page goes away the relay is deliberately not told, as when a connection dies without a word)
+    });
+    await new Promise((resolve) => go.listen(0, "127.0.0.1", resolve));
+    pageRelay = `http://127.0.0.1:${go.address().port}`;
+    opened.push({ close: async () => { for (const { up } of held) up.destroy(); go.closeAllConnections?.(); go.close(); } });
+  }
+  const script = await page.send("Page.addScriptToEvaluateOnNewDocument", { source: `new MutationObserver((list, watcher) => { if (document.body) { document.body.dataset.relay = ${JSON.stringify(pageRelay)}; document.body.dataset.site = location.origin; watcher.disconnect(); } }).observe(document, { childList: true, subtree: true });` });
+  return {
+    siteBase,
+    relayBase,
+    relay,
+    numbers: async () => (await (await fetch(`${relayBase}/health`, { headers: { Accept: "application/json" } })).json()).streams,
+    /** Cuts the page's side of every stream it has open, leaving the relay's side open. */
+    cutPages: () => { for (const { res } of held) res.destroy(); },
+    forget: () => page.send("Page.removeScriptToEvaluateOnNewDocument", { identifier: script.identifier }),
+  };
+}
+
+test("overlay: a page the hosted site's relay turns away is told why, in plain words with the numbers, and gets in by itself once there is room", { skip }, async () => {
+  const { siteBase, relayBase, relay, numbers, forget } = await siteAndRelay({ maxPerIp: 1 });
+  // the one page that fits: a stream held open by hand
+  const first = http.get(`${relayBase}/tiktok/stream?user=frills_demo`, { headers: { Origin: siteBase } });
+  await new Promise((resolve) => first.on("response", (res) => { res.on("data", () => {}); resolve(); }));
+  try {
+    await page.viewport(520, 400);
+    await page.goto(`${siteBase}/overlay/alerts/?channel=frills_demo&platform=tiktok`, { settle: 1500 });
+    const note = () => page.evaluate(`document.getElementById("note").hidden ? "" : document.getElementById("note").textContent`);
+    await page.waitFor(`/this relay allows 1/.test(document.getElementById("note").textContent)`, { timeout: 15000 }).catch(async () => { throw new Error("the page never said why; it says: " + (await note())); });
+    const said = await note();
+    assert.match(said, /^Too many Frills pages are open from your internet address \(this relay allows 1\), so this one is waiting its turn\./);
+    assert.match(said, /Close Frills tabs you are not using, or wait/);
+    assert.match(said, /Trying again…$/);
+    // the relay counted it, and shows it in its numbers
+    const counted = await numbers();
+    assert.ok(counted.turnedAway >= 1 && counted.limit === 1, JSON.stringify(counted));
+    // there is room now
+    first.destroy();
+    await page.waitFor(`document.getElementById("note").hidden`, { timeout: 40000 }).catch(async () => { throw new Error("the page never got in; it says: " + (await note())); });
+    assert.equal((await numbers()).open, 1, "and it is the one page the relay holds");
+  } finally {
+    first.destroy();
+    await forget();
+    await relay.close();
+  }
+});
+
+test("overlay: a page whose connection died without a word and came back is not turned away by its own old stream, even when the limit is one", { skip }, async () => {
+  const { siteBase, relay, numbers, cutPages, forget } = await siteAndRelay({ maxPerIp: 1 }, { proxy: true });
+  try {
+    await page.viewport(520, 400);
+    await page.goto(`${siteBase}/overlay/?channel=frills_demo&platform=tiktok`, { settle: 1500 });
+    await page.waitFor(`document.querySelector("#chat .m")`, { timeout: 15000 });
+    assert.deepEqual([(await numbers()).open, (await numbers()).turnedAway], [1, 0]);
+    // the page's side of the stream is cut, and the relay is not told: it still holds the old stream. The browser opens a new one by itself a few
+    // seconds later, under the same page name, so the relay lets the old one go instead of counting both.
+    cutPages();
+    const t0 = Date.now();
+    let now = await numbers();
+    while (Date.now() - t0 < 15000 && now.replaced < 1 && now.turnedAway === 0) { await sleep(250); now = await numbers(); }
+    assert.equal(now.turnedAway, 0, "not turned away by its own old stream: " + JSON.stringify(now));
+    assert.ok(now.replaced >= 1, "the old stream was replaced: " + JSON.stringify(now));
+    assert.equal(now.open, 1, "one page, one stream");
+    await page.waitFor(`document.getElementById("note").hidden && document.querySelectorAll("#chat .m").length > 0`, { timeout: 15000 }).catch(async () => { throw new Error("the page does not say all is well: " + (await page.evaluate(`document.getElementById("note").textContent`))); });
+  } finally {
+    await forget();
+    await relay.close();
+  }
+});

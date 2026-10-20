@@ -134,7 +134,8 @@ test("the only outside addresses are Twitch, the site itself, Tally and the stan
 test("the overlay stays light, and the site's own numbers are true", () => {
   const overlay = pages.find((p) => p.url === "/overlay/");
   const bytes = gz(overlay.html) + gz(readFileSync(join(dist, assetOf(overlay.html, "css")))) + gz(readFileSync(join(dist, assetOf(overlay.html, "js"))));
-  assert.ok(bytes <= 20 * 1024, `the overlay is ${(bytes / 1024).toFixed(1)} KB gzipped; the budget is 20 KB`);
+  // The budget was 20 KB. Reading TikTok and Twitch together, and saying why the relay turned a page away, cost about 0.7 KB between them (October 2026).
+  assert.ok(bytes <= 21 * 1024, `the overlay is ${(bytes / 1024).toFixed(1)} KB gzipped; the budget is 21 KB`);
   const home = pages.find((p) => p.url === "/").html;
   assert.match(home, new RegExp(`data-count="${Math.round(bytes / 1024)}"`), "the KB on the home page matches what was measured");
   assert.match(home, new RegExp(`data-count="${CONTROLS.length}"`), "the settings count matches");

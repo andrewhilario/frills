@@ -25,7 +25,7 @@ import { ALERT_AT, Signing, capacity, deviceFacts, snapshot, statusPage } from "
 import { SlotAlerts, termuxNotifier } from "./alerts.mjs";
 import { OWNER, ownerGate } from "./owner.mjs";
 
-const VERSION = "0.5.1";
+const VERSION = "0.5.2";
 /** What this program can do, so a page can tell an old one ("chat" only) from one that sends alerts. */
 const FEATURES = ["chat", "alerts", "info", "roles", "status"];
 
@@ -47,9 +47,9 @@ export async function realFactory(user, { apiKey } = {}) {
  * Builds the helper (nothing listens until listen() is called). `factory(user, { apiKey })` makes the connection to TikTok; tests pass a
  * pretend one. Anything else in `tuning` (waits, limits) goes to the Hub.
  *
- * `relay` turns it into the shared version: { origins: [the website's address], slots, maxPerIp, trustProxy }. A relay answers pages on
- * those other addresses (the website), has `slots` spots and a line for them, limits how many streams one visitor address can hold open,
- * and serves no site of its own unless a folder is given.
+ * `relay` turns it into the shared version: { origins: [the website's address], slots, maxPerIp, maxAccountsPerIp, trustProxy }. A relay
+ * answers pages on those other addresses (the website), has `slots` spots and a line for them, limits how many streams (and how many
+ * different accounts) one visitor address can hold open, and serves no site of its own unless a folder is given.
  */
 export function createHelper({ distDir, factory = realFactory, apiKey = "", log = () => {}, demoPace, relay = null, ...tuning } = {}) {
   // The one built-in account, frills_demo, never reaches TikTok: it makes up chat so the whole chain can be tested without a LIVE.
@@ -77,7 +77,8 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
   const numbers = (local) => {
     const stats = hub.stats();
     const estimate = capacity({ freeMem: os.freemem(), rss: process.memoryUsage().rss, baseRss, rooms: stats.used, cpuFraction });
-    return snapshot({ stats, startedAt, now: Date.now(), version: VERSION, features: FEATURES, signing, estimate, alertAt: relay?.alertAt ?? ALERT_AT, device: local ? deviceFacts(cpuFraction) : null, roster: local ? hub.roster() : null, ownerLogin: gate.enabled && !local });
+    const streams = relay ? { open: openCount(), limit: maxPerIp, turnedAway: away.total, replaced: away.replaced, lastTurnedAwayS: away.lastAt ? Math.round((Date.now() - away.lastAt) / 1000) : null } : null;
+    return snapshot({ stats, startedAt, now: Date.now(), version: VERSION, features: FEATURES, signing, estimate, streams, alertAt: relay?.alertAt ?? ALERT_AT, device: local ? deviceFacts(cpuFraction) : null, roster: local ? hub.roster() : null, ownerLogin: gate.enabled && !local });
   };
   const nothing = (req, res) => {
     res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
@@ -85,8 +86,16 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
   };
   const files = distDir ? createStatic(distDir) : nothing;
   const allowedOrigins = new Set((relay?.origins ?? []).map((o) => o.replace(/\/+$/, "")));
-  const perIp = new Map(); // open streams per visitor address (relay only)
-  const maxPerIp = relay?.maxPerIp ?? 8; // chat, alerts and the editor for one streamer are several open pages
+  // The streams each visitor address holds open (relay only), each { user, page, end() }. A streamer's chat, alerts, last gifts, goals and top likers
+  // in OBS, plus the editors they have open, are many pages at once, and some internet providers put many homes behind one address, so the limit is
+  // generous: it is there to stop one address from running away, not to count a streamer's own pages. How many different accounts one address can watch
+  // is limited too, so that it cannot fill the spots.
+  const open = new Map();
+  const maxPerIp = relay?.maxPerIp ?? 60;
+  const maxAccountsPerIp = relay?.maxAccountsPerIp ?? 12;
+  const away = { total: 0, replaced: 0, lastAt: 0 }; // how often a page was turned away or replaced its own earlier stream, for the status page (numbers only)
+  const PAGE_ID = /^[A-Za-z0-9_-]{8,40}$/;
+  const openCount = () => { let n = 0; for (const set of open.values()) n += set.size; return n; };
   let hosts = new Set();
   let origins = new Set();
 
@@ -150,9 +159,35 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
     const user = cleanTikTokUser(url.searchParams.get("user"));
     if (!user) return text(res, 400, "That is not a TikTok name.", cors);
     const who = relay ? visitor(req) : "";
-    if (relay && (perIp.get(who) ?? 0) >= maxPerIp) {
-      log(`@${user}: a page was turned away (${maxPerIp} pages are already open from its address)`);
-      return text(res, 429, "Too many open streams from your address.", cors);
+    const asked = url.searchParams.get("page") ?? "";
+    const page = PAGE_ID.test(asked) ? asked : "";
+    const held = relay ? (open.get(who) ?? new Set()) : null;
+    if (held) {
+      // A page that opens a new stream after its connection dropped says which page it is (`page`). The stream it left behind may still look open
+      // here for as long as the network takes to give up on it (a connection that dies without a word is not noticed for many minutes), so that
+      // one is replaced at once instead of counting against the limit.
+      if (page) {
+        for (const earlier of [...held]) {
+          if (earlier.page !== page) continue;
+          away.replaced += 1;
+          log(`@${earlier.user}: a page came back; its earlier stream was replaced`);
+          earlier.end();
+        }
+      }
+      const accounts = new Set([...held].map((s) => s.user));
+      const full = held.size >= maxPerIp ? "pages" : !accounts.has(user) && accounts.size >= maxAccountsPerIp ? "accounts" : "";
+      if (full) {
+        away.total += 1;
+        away.lastAt = Date.now();
+        log(full === "pages" ? `@${user}: a page was turned away (${held.size} pages are already open from its address)` : `@${user}: a page was turned away (pages for ${accounts.size} different accounts are already open from its address)`);
+        // The page reads this (it is allowed to), so it can tell the person what is wrong instead of a vague "busy".
+        // It says why in plain words (`message`), which the page shows as it is, so the wording can change here without changing the website.
+        const why = full === "pages"
+          ? { error: "too_many_pages", open: held.size, limit: maxPerIp, message: `Too many Frills pages are open from your internet address (this relay allows ${maxPerIp}), so this one is waiting its turn. Close Frills tabs you are not using, or wait: pages left behind by a dropped connection clear by themselves. Trying again…` }
+          : { error: "too_many_accounts", open: accounts.size, limit: maxAccountsPerIp, message: `This relay is already watching ${maxAccountsPerIp} different TikTok accounts from your internet address, so this one is waiting its turn. Trying again…` };
+        res.writeHead(429, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "Retry-After": "30", "X-Content-Type-Options": "nosniff", ...cors });
+        return res.end(JSON.stringify(why));
+      }
     }
     res.writeHead(200, {
       "Content-Type": "text/event-stream; charset=utf-8",
@@ -171,16 +206,28 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
       res.end(); // too many accounts at once: the page has been told why
       return;
     }
-    if (relay) perIp.set(who, (perIp.get(who) ?? 0) + 1);
     const kinds = events.size ? [...events].join("+") : "chat"; // which kind of page it is: chat, or the alerts it asked for
-    if (relay) log(`@${user}: a page connected (${kinds}), ${room.clients.size} open`);
-    const beat = setInterval(() => res.write("event: beat\ndata: {}\n\n"), tuning.beatMs ?? 15000); // so a page can tell a quiet chat from a dead connection (an event, because a page cannot see a comment)
-    res.on("close", () => {
+    let beat = 0;
+    let released = false;
+    const release = () => {
+      if (released) return; // a stream can be let go twice (replaced, then closed): once is enough
+      released = true;
       clearInterval(beat);
-      if (relay) perIp.set(who, Math.max(0, (perIp.get(who) ?? 1) - 1));
+      if (held) {
+        held.delete(record);
+        if (!held.size && open.get(who) === held) open.delete(who);
+      }
       room.remove(client);
       if (relay) log(`@${user}: a page left (${kinds}), ${room.clients.size} open`);
-    });
+    };
+    const record = { user, page, end() { release(); res.end(); } };
+    if (held) {
+      if (!open.has(who)) open.set(who, held);
+      held.add(record);
+    }
+    if (relay) log(`@${user}: a page connected (${kinds}), ${room.clients.size} open`);
+    beat = setInterval(() => res.write("event: beat\ndata: {}\n\n"), tuning.beatMs ?? 15000); // so a page can tell a quiet chat from a dead connection (an event, because a page cannot see a comment)
+    res.on("close", release);
   }
 
   return {
@@ -232,7 +279,7 @@ async function mainRelay() {
   const slots = numberOr(process.env.RELAY_SLOTS, 30);
   const alertAt = Number.isFinite(Number(process.env.RELAY_ALERT_SPOTS)) && process.env.RELAY_ALERT_SPOTS !== undefined && process.env.RELAY_ALERT_SPOTS !== "" ? Math.max(0, Number(process.env.RELAY_ALERT_SPOTS)) : 10;
   const ownerKey = process.env.RELAY_OWNER_KEY;
-  const relay = { origins, slots, alertAt, ownerKey, maxPerIp: numberOr(process.env.RELAY_PER_IP, 8), trustProxy: process.env.RELAY_TRUST_PROXY !== "0" };
+  const relay = { origins, slots, alertAt, ownerKey, maxPerIp: numberOr(process.env.RELAY_PER_IP, 60), maxAccountsPerIp: numberOr(process.env.RELAY_ACCOUNTS_PER_IP, 12), trustProxy: process.env.RELAY_TRUST_PROXY !== "0" };
   const port = numberOr(process.argv.find((a) => a.startsWith("--port="))?.slice(7) ?? process.env.PORT, 8765);
   const bind = process.env.RELAY_BIND ?? "127.0.0.1"; // behind a tunnel nothing else may reach it
   const helper = createHelper({ relay, apiKey: (process.env.EULER_API_KEY ?? "").trim(), log: say });
@@ -242,7 +289,7 @@ async function mainRelay() {
     console.error(error.code === "EADDRINUSE" ? `Port ${port} is already in use. Is the relay already running?` : `Couldn't start: ${error.message}`);
     process.exit(1);
   }
-  console.log(`\nFrills relay ${VERSION} is running on ${bind}:${port}.\n  Spots: ${slots}. Allowed website addresses: ${origins.join(", ")}.\n  Status page: http://${bind}:${port}/health (open it in a browser)\n  Warns you when ${alertAt} spots or fewer are left${process.env.RELAY_ALERTS === "0" ? " (alerts are off)" : ""}.\n  Owner password (to see who is connected from your PC): ${ownerState(ownerKey)}.\n`);
+  console.log(`\nFrills relay ${VERSION} is running on ${bind}:${port}.\n  Spots: ${slots}. Allowed website addresses: ${origins.join(", ")}.\n  Status page: http://${bind}:${port}/health (open it in a browser)\n  Warns you when ${alertAt} spots or fewer are left${process.env.RELAY_ALERTS === "0" ? " (alerts are off)" : ""}.\n  Owner password (to see who is connected from your PC): ${ownerState(ownerKey)}.\n  Pages one internet address may keep open: ${relay.maxPerIp} (RELAY_PER_IP), for at most ${relay.maxAccountsPerIp} different accounts (RELAY_ACCOUNTS_PER_IP).\n`);
   if (process.env.RELAY_ALERTS !== "0") {
     const alerts = new SlotAlerts({ stats: () => helper.hub.stats(), signing: helper.signing, alertAt, notify: termuxNotifier({ log: say }), log: say });
     alerts.start();

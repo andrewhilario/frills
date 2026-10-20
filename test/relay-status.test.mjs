@@ -76,6 +76,17 @@ test("the page shows the free spots big, says what to do, escapes everything, an
   assert.match(statusPage(snap({ stats: { used: 50, max: 50, waiting: 4 } })), /<span class="num" id="free">0<\/span>/);
 });
 
+test("the numbers carry the pages block when it is given (pages open, the most one address may hold, how many were turned away and how long ago, how many came back), and the page shows it", () => {
+  assert.equal("streams" in snap(), false, "a program run on a PC has no such numbers");
+  const streams = { open: 7, limit: 60, turnedAway: 2, replaced: 1, lastTurnedAwayS: 30 };
+  assert.deepEqual(snap({ streams }).streams, streams);
+  const html = statusPage(snap({ streams }));
+  assert.match(html, /pages open right now/);
+  assert.match(html, /pages turned away/);
+  assert.match(html, /"turnedAway":2/, "the numbers are in the page it starts with");
+  assert.match(html, /if\(s\.streams\)/, "and the script that draws them only runs when they are there");
+});
+
 // ── the alarm ───────────────────────────────────────────────────────────────────────────────────────────────────────
 
 function alarm(over = {}) {
@@ -192,7 +203,7 @@ test("the relay's address gives a readable page to a browser and the numbers as 
   assert.match(page.headers["content-security-policy"], /default-src 'none'/);
   assert.equal((await ask("/", { Accept: "text/html" })).status, 200, "the bare address works too");
   const json = JSON.parse((await ask("/health", { Accept: "application/json" })).body);
-  assert.deepEqual([json.name, json.version, json.free, json.level, json.slots], ["frills-relay", "0.5.1", 50, "ok", { used: 0, max: 50, waiting: 0 }]);
+  assert.deepEqual([json.name, json.version, json.free, json.level, json.slots], ["frills-relay", "0.5.2", 50, "ok", { used: 0, max: 50, waiting: 0 }]);
   assert.ok(json.features.includes("status"));
   assert.ok(json.capacity.estimate >= 1 && json.capacity.estimate <= 500);
   assert.equal(JSON.parse((await ask("/health")).body).free, 50, "no Accept header at all: JSON, as before");

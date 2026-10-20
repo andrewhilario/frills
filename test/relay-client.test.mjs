@@ -75,7 +75,7 @@ test("a TikTok connection through the relay opens the relay's address, passes on
   assert.deepEqual(status, ["connecting"], "it says connecting at once, while it looks");
   await new Promise((r) => setTimeout(r, 20));
   assert.equal(sources.length, 1);
-  assert.equal(sources[0].url, "https://relay.test/tiktok/stream?user=pond.pal");
+  assert.match(sources[0].url, /^https:\/\/relay\.test\/tiktok\/stream\?user=pond\.pal&page=[a-z0-9]{8,30}$/, "the relay is told which page it is");
   sources[0].send("status", { state: "queued", position: 2, total: 5 });
   sources[0].send("status", { state: "connected" });
   sources[0].send("chat", { id: "1", name: "Ann", text: "hello" });

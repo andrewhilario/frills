@@ -55,7 +55,7 @@ Event shapes sent to pages (all strings cleaned, lengths capped):
 
 ## 4. Page-side code (`src/js/`)
 
-Each widget is a small separate bundle (the chat overlay is held to 20 KB; each widget gets its own test budget). Plain hex/rgba colors only and no CSS nesting, so old OBS browsers draw it.
+Each widget is a small separate bundle (the chat overlay is held to 21 KB, it was 20 KB until October 2026, when reading TikTok and Twitch together and saying why the relay turned a page away added about 0.7 KB; each widget gets its own test budget). Plain hex/rgba colors only and no CSS nesting, so old OBS browsers draw it.
 
 | File | Job |
 | --- | --- |
