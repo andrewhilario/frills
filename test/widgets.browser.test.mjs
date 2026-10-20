@@ -188,15 +188,17 @@ test("editor: the goal test buttons move the bar, reaching celebrates, and the g
   await until(async () => /^5 \/ \d+$/.test(await text(".goal__numbers")), 9000);
 });
 
-test("overlays page: the live ones link to their editors, and the coming ones are listed without links", { skip }, async () => {
+test("overlays page: the live and beta ones link to their editors, and the coming ones are listed without links", { skip }, async () => {
   const { base } = await withHelper();
   await page.goto(base + "/overlays/", { settle: 600 });
   const links = await page.evaluate(`[...document.querySelectorAll(".tool:not(.tool--soon) a.btn")].map((a) => a.getAttribute("href"))`);
-  assert.deepEqual(links, ["/editor/", "/alerts/", "/gifts/", "/goal/", "/likers/"]);
+  assert.deepEqual(links, ["/editor/", "/alerts/", "/gifts/", "/goal/", "/likers/", "/editor/"], "the last is TikTok and Twitch chat together, which is the chat editor's Both");
+  const beta = await page.evaluate(`[...document.querySelectorAll(".tool:has(.tool__badge--beta) .subtitle")].map((t) => t.textContent)`);
+  assert.deepEqual(beta, ["Alerts", "Last gifts", "Goals", "Top likers", "TikTok and Twitch chat together"], "it is marked Beta, like the others that are new");
   const soon = await page.evaluate(`[...document.querySelectorAll(".tool--soon")].map((t) => [t.querySelector(".subtitle").textContent, t.querySelectorAll("a").length])`);
-  assert.deepEqual(soon.map((s) => s[0]), ["Free sound library", "Song requests", "Spotify player", "TikTok and Twitch chat together", "Like and subscriber alerts"]);
+  assert.deepEqual(soon.map((s) => s[0]), ["Free sound library", "Song requests", "Spotify player", "Like and subscriber alerts"]);
   assert.ok(soon.every((s) => s[1] === 0), "a coming-soon card links nowhere");
-  assert.equal(await page.evaluate(`document.querySelectorAll(".tool__badge--soon").length`), 5);
+  assert.equal(await page.evaluate(`document.querySelectorAll(".tool__badge--soon").length`), 4);
 });
 
 const like = (id, name, likeCount, totalLikeCount = 0) => ({ common: { msgId: id }, user: person(name.toLowerCase(), name), likeCount, totalLikeCount });

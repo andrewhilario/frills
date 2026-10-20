@@ -66,6 +66,8 @@ export function mountSource(host, { feeds, pace, channel = "", twitch = "", plat
   helperNote.hidden = true;
   const relayNote = el("p", { className: "source__hint source__relay", textContent: "TikTok chat is coming through the free Frills relay (beta). When it is full you wait in line for a spot, and the line moves as people finish." });
   relayNote.hidden = true;
+  const bothNote = el("p", { className: "source__hint source__beta", textContent: "Reading TikTok and Twitch together is in beta. It is new, so if something looks wrong on a real LIVE, please tell us on the feedback page." });
+  bothNote.hidden = current !== "both";
   if (waitlistUrl) helperNote.append(" ", el("a", { href: waitlistUrl, textContent: "Join the waitlist", rel: "noopener" }), ".");
   const testBtn = el("button", { type: "button", className: "btn btn--outline btn--sm", textContent: "Send a test message" });
   const burstBtn = el("button", { type: "button", className: "btn btn--outline btn--sm", textContent: "Try a busy chat" });
@@ -91,6 +93,7 @@ export function mountSource(host, { feeds, pace, channel = "", twitch = "", plat
   const showHelperNote = () => {
     helperNote.hidden = !(usesTikTok() && helper === false && !relay); // with a relay there is no helper to talk about
     relayNote.hidden = !(usesTikTok() && found?.kind === "relay");
+    bothNote.hidden = current !== "both";
   };
 
   /** Asks the helper whether it is there. Asked again each time while the answer is no, so starting it later works without a reload. */
@@ -269,7 +272,7 @@ export function mountSource(host, { feeds, pace, channel = "", twitch = "", plat
   input.maxLength = COPY[firstKey()].max;
   host.classList.add("source");
   if (platforms.length < 2) platformRow.hidden = true; // nothing to choose between
-  host.append(platformRow, label, el("div", { className: "source__row" }, input, go), second, status, helperNote, relayNote, hint, ...(showTools ? [tools] : []));
+  host.append(platformRow, label, el("div", { className: "source__row" }, input, go), second, status, helperNote, relayNote, bothNote, hint, ...(showTools ? [tools] : []));
   startPractice();
   if (usesTikTok()) ensureHelper();
   if (autoconnect && channel) connectNow();

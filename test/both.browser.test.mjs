@@ -175,8 +175,12 @@ test("editor: Both asks for the two names, the link appears only when both are r
   await page.viewport(1200, 900);
   await page.goto(`${base}/editor/`, { settle: 900 });
   assert.equal(await secondBox(), false, "TikTok and Twitch show one box each");
+  const betaNote = () => page.evaluate(`(() => { const n = document.querySelector("#source .source__beta"); return n ? !n.hidden : null; })()`);
+  assert.equal(await betaNote(), false, "the beta note is not shown for one platform");
   await chip("Both");
   assert.equal(await secondBox(), true, "Both shows the second box");
+  assert.equal(await betaNote(), true, "and Both says it is in beta");
+  assert.match(await page.evaluate(`document.querySelector("#source .source__beta").textContent`), /in beta/);
   assert.equal(await page.evaluate(`document.querySelector("#source label.ctl__label").textContent`), "Your TikTok @name");
   await type("source-channel", "pond_pal");
   assert.equal(await link(), "", "one name is not enough");
@@ -194,6 +198,7 @@ test("editor: Both asks for the two names, the link appears only when both are r
   // back to one platform: one box, the old kind of link
   await chip("TikTok");
   assert.equal(await secondBox(), false);
+  assert.equal(await betaNote(), false, "the beta note goes with Both");
   const single = new URL(await link());
   assert.deepEqual([single.searchParams.get("channel"), single.searchParams.get("platform"), single.searchParams.has("twitch")], ["pond_pal", "tiktok", false]);
   await chip("Twitch");

@@ -60,7 +60,7 @@ const QUESTIONS = [
       [
         { id: "tiktok", name: "TikTok LIVE", text: "Chat, alerts, gifts, goals and likers." },
         { id: "twitch", name: "Twitch", text: "Chat and alerts (subs, gifted subs, cheers, raids)." },
-        { id: "both", name: "Both at once", text: "One chat with TikTok and Twitch together, alerts for each, and TikTok's gifts, goals and likers." },
+        { id: "both", name: "Both at once", text: "One chat with TikTok and Twitch together, alerts for each, and TikTok's gifts, goals and likers. In beta." },
       ],
       answers.platform, (id) => { answers.platform = id; }, (i) => titled(i.name, i.text), { label: "Where you stream" },
     ),
