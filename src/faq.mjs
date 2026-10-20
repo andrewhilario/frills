@@ -24,6 +24,10 @@ export function faq({ kb, waitlistUrl, helperUrl, relayUrl }) {
       a: "Yes, and it needs nothing installed. Type your channel name and your browser reads the public chat, the way a viewer’s does.",
     },
     {
+      q: "Can I show my TikTok and Twitch chat together?",
+      a: "Yes, in one chat overlay. In the editor (or the Matcha page, or the <a href=\"/start/\">Quick start</a>) choose <strong>Both</strong>, type your TikTok @name and your Twitch channel, and copy the one link. Messages from both arrive in the same speech bubbles, each with a small TikTok or Twitch icon before the name (you can turn the icon off). A message a moderator deletes on one platform only disappears from that platform. Alerts are still one link for each platform, and last gifts, goals and top likers are for TikTok. This is new and in beta.",
+    },
+    {
       q: "Do I need an account?",
       a: "No. Your settings live in your browser and in the link you copy. Frills keeps a few things in a small database, but only ones you choose to send it: feedback, and any image, GIF or sound you upload for alerts. The <a href=\"/privacy/\">privacy page</a> lists all of it.",
     },

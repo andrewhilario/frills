@@ -57,6 +57,7 @@ export const MATCHA_CONTROLS = [
   { key: "speed", where: "more", type: "range", label: "Entrance speed", min: 150, max: 900, step: 10, unit: " ms", hint: "Used once you pick an entrance above." },
   general("avatar"),
   general("align"),
+  general("source"),
   general("pictures"),
   general("max"),
   general("life"),
@@ -84,6 +85,7 @@ export const MATCHA_DEFAULTS = {
   scale: 100,
   font: "",
   align: "left",
+  source: "icon",
   round: 100,
   opacity: 100,
   anim: "",
@@ -133,10 +135,15 @@ export function currentPalette(settings) {
 }
 
 /** The address a streamer pastes into OBS. A link carries only what differs from the starting point: the palette, then the colors that differ from it. */
-export function matchaOverlayUrl(base, { channel = "", settings = MATCHA_DEFAULTS, platform = "twitch" } = {}) {
+export function matchaOverlayUrl(base, { channel = "", settings = MATCHA_DEFAULTS, platform = "twitch", both = null } = {}) {
   const params = new URLSearchParams();
-  if (channel) params.set("channel", channel);
-  if (channel && platform === "tiktok") params.set("platform", "tiktok");
+  if (both?.tiktok && both?.twitch) {
+    params.set("tiktok", both.tiktok); // one chat that reads both accounts
+    params.set("twitch", both.twitch);
+  } else {
+    if (channel) params.set("channel", channel);
+    if (channel && platform === "tiktok") params.set("platform", "tiktok");
+  }
   params.set("style", settings.style);
   if (settings.palette !== MATCHA_DEFAULTS.palette) params.set("palette", settings.palette);
   const palette = paletteColors(settings.palette);

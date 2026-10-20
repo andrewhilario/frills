@@ -5,22 +5,28 @@ import { PLATFORMS, cleanName, connectTo, statusText } from "./connect.js";
 import { findTikTokSource, relayForPage } from "./tiktok.js";
 import { fakeSource, testMessage } from "./fake.js";
 import { chips } from "./ui.js";
+import { PLATFORM_NAMES, noteFor, scoped } from "./both.js";
 import { el } from "./feed.js";
 
 const COPY = {
   tiktok: { label: "Your TikTok @name", bad: "TikTok names are letters, numbers, _ and . only.", max: 100 },
   twitch: { label: "Your Twitch channel", bad: "Channel names are letters, numbers and _ only.", max: 26 },
 };
+const NO_TIKTOK_RELAY = "The free Frills relay isn’t answering right now. Wait a minute and press Connect again.";
+const NO_TIKTOK_HELPER = "TikTok chat needs the Frills helper running on this PC. It isn't answering here.";
 
 /**
  * The "where does chat come from" control. `host` is an empty element. Options: feeds, pace (a function giving [min, max] ms between
  * practice messages), platform and channel (to start with), autoconnect, waitlistUrl (shown beside the helper note when set).
  */
-export function mountSource(host, { feeds, pace, channel = "", platform = "tiktok", autoconnect = false, waitlistUrl = "", platforms = PLATFORMS, events: eventsOf = [], onAlert, onInfo, onFound, onState, tools: showTools = true, idleHint = "Until you connect, the preview shows made-up messages." } = {}) {
+export function mountSource(host, { feeds, pace, channel = "", twitch = "", platform = "tiktok", autoconnect = false, waitlistUrl = "", platforms = PLATFORMS, events: eventsOf = [], onAlert, onInfo, onFound, onState, tools: showTools = true, idleHint = "Until you connect, the preview shows made-up messages." } = {}) {
   const list = Array.isArray(feeds) ? feeds : [feeds];
-  let current = PLATFORMS.includes(platform) ? platform : "tiktok";
+  // "both": one chat that reads a TikTok account and a Twitch channel together (only where the page offers it, with platforms including "both")
+  let current = PLATFORMS.includes(platform) || (platform === "both" && platforms.includes("both")) ? platform : "tiktok";
+  const firstKey = () => (current === "both" ? "tiktok" : current); // the first box is TikTok's in "both"
+  const usesTikTok = () => current === "tiktok" || current === "both";
   const values = { tiktok: "", twitch: "" };
-  values[current] = channel;
+  if (current === "both") { values.tiktok = channel; values.twitch = twitch; } else values[current] = channel;
   let practice = null;
   let conn = null;
   const relay = relayForPage(); // the site’s shared relay for TikTok, when it has one and this is the site itself
@@ -45,6 +51,11 @@ export function mountSource(host, { feeds, pace, channel = "", platform = "tikto
   const input = el("input", { type: "text", id: "source-channel", placeholder: "yourname", autocomplete: "off", spellcheck: false, value: channel });
   input.setAttribute("autocapitalize", "none");
   input.setAttribute("aria-describedby", "source-status");
+  const label2 = el("label", { className: "ctl__label", htmlFor: "source-channel-2", textContent: COPY.twitch.label });
+  const input2 = el("input", { type: "text", id: "source-channel-2", placeholder: "yourchannel", autocomplete: "off", spellcheck: false, value: current === "both" ? twitch : "", maxLength: COPY.twitch.max });
+  input2.setAttribute("autocapitalize", "none");
+  const second = el("div", { className: "source__second" }, label2, el("div", { className: "source__row" }, input2));
+  second.hidden = current !== "both";
   const go = el("button", { type: "button", className: "btn btn--soft btn--sm", textContent: "Connect" });
   const status = el("p", { className: "source__status", id: "source-status" });
   status.setAttribute("role", "status");
@@ -64,11 +75,22 @@ export function mountSource(host, { feeds, pace, channel = "", platform = "tikto
     status.dataset.state = state;
     status.textContent = text;
   };
-  const startPractice = () => { if (!practice) practice = fakeSource(list, pace); };
+  const turns = new WeakMap(); // for each feed, a stand-in that gives the made-up messages to TikTok and Twitch in turn
+  const alternating = (feed) => {
+    if (!turns.has(feed)) {
+      const a = scoped(feed, "tiktok");
+      const b = scoped(feed, "twitch");
+      let turn = 0;
+      turns.set(feed, { add: (m) => (turn++ % 2 ? b : a).add(m), removeById() {}, removeUser() {}, clear: () => feed.clear() });
+    }
+    return turns.get(feed);
+  };
+  const practiceFeeds = () => (current === "both" ? list.map(alternating) : list);
+  const startPractice = () => { if (!practice) practice = fakeSource(practiceFeeds(), pace); };
   const stopPractice = () => { practice?.stop(); practice = null; };
   const showHelperNote = () => {
-    helperNote.hidden = !(current === "tiktok" && helper === false && !relay); // with a relay there is no helper to talk about
-    relayNote.hidden = !(current === "tiktok" && found?.kind === "relay");
+    helperNote.hidden = !(usesTikTok() && helper === false && !relay); // with a relay there is no helper to talk about
+    relayNote.hidden = !(usesTikTok() && found?.kind === "relay");
   };
 
   /** Asks the helper whether it is there. Asked again each time while the answer is no, so starting it later works without a reload. */
@@ -95,6 +117,7 @@ export function mountSource(host, { feeds, pace, channel = "", platform = "tikto
   }
 
   async function connectNow() {
+    if (current === "both") return connectBoth();
     const name = cleanName(current, input.value);
     if (!name) {
       input.setAttribute("aria-invalid", "true");
@@ -108,7 +131,7 @@ export function mountSource(host, { feeds, pace, channel = "", platform = "tikto
       const there = await ensureHelper();
       if (mine !== turn) return; // the person changed their mind while we looked
       if (!there) {
-        setStatus("error", relay ? "The free Frills relay isn’t answering right now. Wait a minute and press Connect again." : "TikTok chat needs the Frills helper running on this PC. It isn't answering here.");
+        setStatus("error", relay ? NO_TIKTOK_RELAY : NO_TIKTOK_HELPER);
         return;
       }
     }
@@ -159,24 +182,77 @@ export function mountSource(host, { feeds, pace, channel = "", platform = "tikto
     if (fatal) conn = null;
   }
 
+  /** Both chats at once: each connects on its own into the same feeds, marked as its own, and the status says which one is not ready yet. */
+  async function connectBoth() {
+    const tiktok = cleanName("tiktok", input.value);
+    const twitch = cleanName("twitch", input2.value);
+    input.toggleAttribute("aria-invalid", !tiktok);
+    input2.toggleAttribute("aria-invalid", !twitch);
+    if (!tiktok || !twitch) {
+      setStatus("error", !tiktok ? COPY.tiktok.bad : COPY.twitch.bad);
+      return;
+    }
+    const mine = ++turn;
+    setStatus("connecting", "Looking for where TikTok chat can come from…");
+    const there = await ensureHelper();
+    if (mine !== turn) return;
+    if (!there) {
+      setStatus("error", relay ? NO_TIKTOK_RELAY : NO_TIKTOK_HELPER);
+      return;
+    }
+    conn?.stop();
+    stopPractice();
+    list.forEach((f) => f.clear());
+    burstBtn.hidden = true;
+    hint.hidden = true;
+    go.textContent = "Disconnect";
+    const parts = {};
+    let fatal = false;
+    const report = () => {
+      const problem = noteFor(parts, statusText);
+      setStatus(problem ? "connecting" : "connected", problem || "Reading TikTok and Twitch chat. Their messages arrive here together.");
+      onState?.(problem ? "connecting" : "connected");
+    };
+    const join = (platform, name) => connectTo(list.map((f) => scoped(f, platform)), platform, name, (s) => {
+      parts[platform] = s;
+      if (s.fatal) {
+        fatal = true;
+        disconnect(`${PLATFORM_NAMES[platform]}: ${statusText(s)}`);
+        setStatus("error", `${PLATFORM_NAMES[platform]}: ${statusText(s)}`);
+        return;
+      }
+      report();
+    }, { relay, onInfo });
+    const a = join("tiktok", tiktok);
+    const b = join("twitch", twitch);
+    conn = { stop() { a.stop(); b.stop(); } };
+    if (fatal) conn = null;
+  }
+
   function setPlatform(id) {
     if (id === current) return;
     if (conn) disconnect();
-    values[current] = input.value;
+    const wasBoth = current === "both";
+    if (current === "both") { values.tiktok = input.value; values.twitch = input2.value; } else values[current] = input.value;
     current = id;
-    input.value = values[id];
+    if (id === "both") { input.value = values.tiktok; input2.value = values.twitch; } else input.value = values[id];
+    second.hidden = id !== "both";
     input.removeAttribute("aria-invalid");
-    label.textContent = COPY[id].label;
-    input.maxLength = COPY[id].max;
+    input2.removeAttribute("aria-invalid");
+    label.textContent = COPY[firstKey()].label;
+    input.maxLength = COPY[firstKey()].max;
     setStatus("idle", "");
     showHelperNote();
-    if (id === "tiktok" && helper !== true) ensureHelper();
+    stopPractice();
+    if (wasBoth !== (id === "both")) list.forEach((f) => f.clear()); // (the old made-up messages have no platform icon, so they go)
+    startPractice(); // (in "both" the made-up messages now take turns being TikTok's and Twitch's)
+    if (usesTikTok() && helper !== true) ensureHelper();
     changed();
   }
 
   const platformChips = chips(
     platformRow,
-    [{ id: "tiktok", name: "TikTok" }, { id: "twitch", name: "Twitch" }].filter((p) => platforms.includes(p.id)),
+    [{ id: "tiktok", name: "TikTok" }, { id: "twitch", name: "Twitch" }, { id: "both", name: "Both" }].filter((p) => platforms.includes(p.id)),
     current,
     (item) => setPlatform(item.id),
   );
@@ -184,16 +260,18 @@ export function mountSource(host, { feeds, pace, channel = "", platform = "tikto
   go.addEventListener("click", () => (conn ? disconnect() : connectNow()));
   input.addEventListener("keydown", (e) => e.key === "Enter" && (conn ? null : connectNow()));
   input.addEventListener("input", () => { input.removeAttribute("aria-invalid"); changed(); });
-  testBtn.addEventListener("click", () => list.forEach((f) => f.add(testMessage())));
+  input2.addEventListener("keydown", (e) => e.key === "Enter" && (conn ? null : connectNow()));
+  input2.addEventListener("input", () => { input2.removeAttribute("aria-invalid"); changed(); });
+  testBtn.addEventListener("click", () => practiceFeeds().forEach((f) => f.add(testMessage())));
   burstBtn.addEventListener("click", () => practice?.burst());
 
-  label.textContent = COPY[current].label;
-  input.maxLength = COPY[current].max;
+  label.textContent = COPY[firstKey()].label;
+  input.maxLength = COPY[firstKey()].max;
   host.classList.add("source");
   if (platforms.length < 2) platformRow.hidden = true; // nothing to choose between
-  host.append(platformRow, label, el("div", { className: "source__row" }, input, go), status, helperNote, relayNote, hint, ...(showTools ? [tools] : []));
+  host.append(platformRow, label, el("div", { className: "source__row" }, input, go), second, status, helperNote, relayNote, hint, ...(showTools ? [tools] : []));
   startPractice();
-  if (current === "tiktok") ensureHelper();
+  if (usesTikTok()) ensureHelper();
   if (autoconnect && channel) connectNow();
 
   return {
@@ -202,7 +280,10 @@ export function mountSource(host, { feeds, pace, channel = "", platform = "tikto
     get usesRelay() { return Boolean(relay); }, // TikTok chat comes from the site’s relay, so links work on any PC
     get platform() { return current; },
     get channel() { return input.value; },
-    cleanChannel: () => cleanName(current, input.value),
+    cleanChannel: () => cleanName(firstKey(), input.value),
+    /** In "both": the two cleaned names ({ tiktok, twitch }, each "" until it is acceptable). */
+    cleanChannels: () => ({ tiktok: cleanName("tiktok", input.value), twitch: cleanName("twitch", input2.value) }),
+    get twitchChannel() { return input2.value; },
     onChange: (fn) => listeners.add(fn),
     setPlatform: (id) => { platformChips.set(id); setPlatform(id); },
     /** Connects again (for a page whose settings changed what it waits for). Does nothing when not connected. */

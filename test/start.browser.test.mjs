@@ -196,3 +196,134 @@ test("the Quick start works with the keyboard and on a phone-sized screen", { sk
   assert.equal(await page.evaluate(`document.activeElement?.classList.contains("start__ask")`), true, "the keyboard focus is on the heading of the new page");
   await page.viewport(1100, 900);
 });
+
+// ── Both: TikTok and Twitch together ─────────────────────────────────────────────────────────────────────────────────────────────────
+const typeInto = (id, value) => page.evaluate(`(() => { const i = document.getElementById(${JSON.stringify(id)}); i.value = ${JSON.stringify(value)}; i.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+const enterIn = (id) => page.evaluate(`document.getElementById(${JSON.stringify(id)}).dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }))`);
+const startBoth = async () => {
+  await page.goto(`${base}/start/`, { settle: 600 });
+  await choose("Both at once");
+};
+
+test("Both: it asks for the TikTok name and the Twitch channel, checks each, and Enter goes from the first box to the second", { skip }, async () => {
+  await startBoth();
+  assert.equal(await ask(), "What are your TikTok @name and Twitch channel?");
+  assert.deepEqual(await page.evaluate(`[...document.querySelectorAll("#start input[data-platform]")].map((i) => i.dataset.platform + ":" + i.getAttribute("aria-label"))`), ["tiktok:Your TikTok name", "twitch:Your Twitch channel"]);
+  assert.deepEqual(await page.evaluate(`[...document.querySelectorAll("#start .start__label")].map((l) => l.textContent)`), ["Your TikTok @name", "Your Twitch channel"], "each box is labelled");
+  assert.equal(await page.evaluate(`document.activeElement.id`), "start-name", "the cursor starts in the first box");
+  await typeInto("start-name", "@Pond.Pal");
+  await enterIn("start-name");
+  assert.equal(await ask(), "What are your TikTok @name and Twitch channel?", "Enter in the first box does not go on");
+  assert.equal(await page.evaluate(`document.activeElement.id`), "start-name-2", "it moves to the second box");
+  // a Twitch name cannot have a dot, and the one that is wrong is the one marked
+  await typeInto("start-name-2", "pond.pal");
+  await enterIn("start-name-2");
+  assert.equal(await ask(), "What are your TikTok @name and Twitch channel?", "a wrong Twitch name stops it");
+  assert.deepEqual(await page.evaluate(`[...document.querySelectorAll("#start input[data-platform]")].map((i) => i.hasAttribute("aria-invalid"))`), [false, true]);
+  assert.match(await page.evaluate(`document.querySelector("#start .start__error").textContent`), /Twitch channel: letters, numbers and _ only/);
+  await typeInto("start-name-2", "PondPal");
+  await enterIn("start-name-2");
+  assert.equal(await ask(), "Which overlays do you want?", "two good names go on");
+  // the overlays say which are for what
+  const text = await page.evaluate(`JSON.stringify([...document.querySelectorAll("#start .pick--check .pick__body")].map((b) => b.textContent))`).then(JSON.parse);
+  assert.equal(text.length, 5, "every overlay is on offer");
+  assert.match(text[0], /TikTok and Twitch chat together/);
+  assert.match(text[1], /One for TikTok and one for Twitch/);
+  for (const t of text.slice(2)) assert.match(t, /TikTok only/);
+  // going back keeps what was typed
+  await press("Back");
+  assert.deepEqual(await page.evaluate(`[...document.querySelectorAll("#start input[data-platform]")].map((i) => i.value)`), ["@Pond.Pal", "PondPal"]);
+});
+
+test("Both: the links page has one chat for both, alerts for each platform, and the rest for TikTok", { skip }, async () => {
+  await startBoth();
+  await typeInto("start-name", "@Pond.Pal");
+  await typeInto("start-name-2", "PondPal");
+  await press("Next");
+  await page.evaluate(`[...document.querySelectorAll("#start .pick--check input")].forEach((b) => { if (!b.checked) b.click(); })`);
+  await press("Next");
+  await choose("Cute and pink"); await choose("A phone LIVE"); await choose("Center");
+  await page.waitFor(`document.querySelector("#start .card")`);
+  assert.equal(await ask(), "Your links are ready");
+  const list = await cards();
+  assert.deepEqual(list.map((c) => c.name), ["Chat", "Alerts (TikTok)", "Alerts (Twitch)", "Last gifts", "Goals", "Top likers"]);
+  assert.equal(list[0].link, `${base}/overlay/?tiktok=pond.pal&twitch=pondpal&look=bubblegum&deco=neko&align=center`, "one chat link names both accounts");
+  assert.equal(list[1].link, `${base}/overlay/alerts/?channel=pond.pal&platform=tiktok&look=bubblegum&align=center`);
+  assert.equal(list[2].link, `${base}/overlay/alerts/?channel=pondpal&platform=twitch&look=bubblegum&align=center`);
+  for (const c of list.slice(3)) assert.match(c.link, /channel=pond\.pal&platform=tiktok/, `${c.name} is TikTok's`);
+  assert.ok(list.every((c) => !c.copyOff && c.size === "1080 × 1920"));
+  assert.match(list[0].note, /small icon/);
+  assert.match(list[2].note, /follow alerts need one extra login/i);
+  assert.equal(list[0].edit, list[0].link.replace("/overlay/", "/editor/"), "the editor gets the very same two accounts");
+  // two name boxes on this page, each already filled in
+  assert.deepEqual(await page.evaluate(`[...document.querySelectorAll("#start .start__field--inline input")].map((i) => i.id + "=" + i.value)`), ["result-name=@Pond.Pal", "result-name-2=PondPal"]);
+  assert.match(await page.evaluate(`document.querySelector("#start .start__next").textContent`), /real chat and gifts only show while you are LIVE/);
+});
+
+test("Both: each link waits only for the names it needs, and a wrong name is explained", { skip }, async () => {
+  await startBoth();
+  await typeInto("start-name", "pond.pal");
+  await typeInto("start-name-2", "pondpal");
+  await press("Next");
+  await press("Next"); // the chat and the alerts are the two that are ticked to begin with
+  await choose("Cute and pink"); await choose("A phone LIVE"); await choose("Left");
+  await page.waitFor(`document.querySelector("#start .card")`);
+  assert.deepEqual((await cards()).map((c) => c.name), ["Chat", "Alerts (TikTok)", "Alerts (Twitch)"]);
+  // take the Twitch channel away: the chat and the Twitch alerts have nothing to read, the TikTok alerts still do
+  await typeInto("result-name-2", "");
+  let list = await cards();
+  assert.deepEqual(list.map((c) => c.link !== ""), [false, true, false]);
+  assert.deepEqual(list.map((c) => c.copyOff), [true, false, true]);
+  const holders = await page.evaluate(`JSON.stringify([...document.querySelectorAll("#start .card__input")].map((i) => i.placeholder))`).then(JSON.parse);
+  assert.deepEqual(holders, ["Type both names above to get this link", "Type your TikTok @name above to get this link", "Type your Twitch channel above to get this link"]);
+  // and the other way round
+  await typeInto("result-name-2", "pondpal");
+  await typeInto("result-name", "");
+  list = await cards();
+  assert.deepEqual(list.map((c) => c.link !== ""), [false, false, true]);
+  // a name the platform does not accept is told which rule it broke, and does not become a link
+  await typeInto("result-name", "no good!");
+  assert.match(await page.evaluate(`document.querySelector("#start .start__field--inline .start__error").textContent`), /TikTok @name: letters, numbers, _ and \. only/);
+  assert.equal(await page.evaluate(`document.getElementById("result-name").hasAttribute("aria-invalid")`), true);
+  assert.equal(await page.evaluate(`document.getElementById("result-name-2").hasAttribute("aria-invalid")`), false);
+  await typeInto("result-name", "Pond.Pal");
+  list = await cards();
+  assert.equal(list[0].link, `${base}/overlay/?tiktok=pond.pal&twitch=pondpal&look=bubblegum&deco=neko`);
+  assert.equal(await page.evaluate(`document.querySelector("#start .start__field--inline .start__error").hidden`), true);
+});
+
+test("Both: the picture of the chat shows TikTok and Twitch messages, each with its icon, and never connects", { skip }, async () => {
+  await startBoth();
+  await press("I will add them later");
+  await press("Next"); // the chat and the alerts are ticked to begin with
+  await choose("Cute and pink"); await choose("A phone LIVE"); await choose("Left");
+  await page.waitFor(`document.querySelector("#start .card__frame")`);
+  const src = await page.evaluate(`new URL(document.querySelector("#start .card__frame").src).search`);
+  assert.match(src, /demo=1/);
+  assert.match(src, /tiktok=demo&twitch=demo/);
+  // practice messages take turns being TikTok's and Twitch's, so both icons turn up
+  await page.waitFor(`(() => { try { const d = document.querySelector("#start .card__frame").contentDocument; return d.querySelector('.m[data-platform="tiktok"] .src') && d.querySelector('.m[data-platform="twitch"] .src'); } catch { return false; } })()`, { timeout: 20000 });
+  // with no names, nothing can be copied, but the editor links still open
+  const list = await cards();
+  assert.ok(list.every((c) => c.link === "" && c.copyOff));
+  assert.ok(list.every((c) => c.edit.startsWith(`${base}/`)));
+});
+
+test("Both: changing the platform afterwards keeps each name with its own platform", { skip }, async () => {
+  await startBoth();
+  await typeInto("start-name", "pond.pal");
+  await typeInto("start-name-2", "pondpal");
+  await press("Next");
+  await press("Next");
+  await choose("Cute and pink"); await choose("A phone LIVE"); await choose("Left");
+  await page.waitFor(`document.querySelector("#start .card")`);
+  await press("Change my answers");
+  assert.equal(await ask(), "Where do you stream?");
+  assert.equal(await page.evaluate(`document.querySelector("#start .pick[aria-pressed=true]").textContent.includes("Both at once")`), true, "the choice is still there");
+  await choose("Twitch");
+  assert.equal(await page.evaluate(`document.getElementById("start-name").value`), "pondpal", "the Twitch box has the Twitch channel, not the TikTok name");
+  assert.equal(await page.evaluate(`document.querySelectorAll("#start input[data-platform]").length`), 1);
+  await press("Back");
+  await choose("TikTok LIVE");
+  assert.equal(await page.evaluate(`document.getElementById("start-name").value`), "pond.pal");
+});

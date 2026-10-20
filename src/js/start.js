@@ -11,9 +11,17 @@ import { ALIGNS, SHAPES, VIBES, buildLinks, linksText, overlaysFor } from "./qui
 initNav();
 
 const host = document.getElementById("start");
-const answers = { platform: "tiktok", text: "", overlays: ["chat", "alerts"], vibe: "pink", shape: "vertical", align: "left" };
-const cleanName = () => (answers.platform === "twitch" ? cleanChannel(answers.text) : cleanTikTokUser(answers.text));
-const NAME_RULE = { tiktok: "Your TikTok @name: letters, numbers, _ and . only.", twitch: "Your Twitch channel: letters, numbers and _ only." };
+// `names` keeps what was typed for each platform, so going back and changing platform never puts a TikTok name in the Twitch box.
+const answers = { platform: "tiktok", names: { tiktok: "", twitch: "" }, overlays: ["chat", "alerts"], vibe: "pink", shape: "vertical", align: "left" };
+const NAMES = {
+  tiktok: { label: "Your TikTok @name", short: "Your TikTok name", placeholder: "@yourname", rule: "Your TikTok @name: letters, numbers, _ and . only.", clean: cleanTikTokUser },
+  twitch: { label: "Your Twitch channel", short: "Your Twitch channel", placeholder: "yourchannel", rule: "Your Twitch channel: letters, numbers and _ only.", clean: cleanChannel },
+};
+/** The accounts the answers need a name for: one, or TikTok then Twitch for "both". */
+const accounts = () => (answers.platform === "both" ? ["tiktok", "twitch"] : [answers.platform]);
+const cleanOf = (p) => NAMES[p].clean(answers.names[p]);
+// a name is optional, but one that is typed has to be one its platform accepts
+const badOf = (p) => answers.names[p].trim() !== "" && !cleanOf(p);
 
 let step = 0;
 
@@ -49,34 +57,47 @@ const QUESTIONS = [
     ask: "Where do you stream?",
     hint: "This decides which overlays you can have and how they connect. Pick one, then press Next.",
     body: () => picks(
-      [{ id: "tiktok", name: "TikTok LIVE", text: "Chat, alerts, gifts, goals and likers." }, { id: "twitch", name: "Twitch", text: "Chat and alerts (subs, gifted subs, cheers, raids)." }],
+      [
+        { id: "tiktok", name: "TikTok LIVE", text: "Chat, alerts, gifts, goals and likers." },
+        { id: "twitch", name: "Twitch", text: "Chat and alerts (subs, gifted subs, cheers, raids)." },
+        { id: "both", name: "Both at once", text: "One chat with TikTok and Twitch together, alerts for each, and TikTok's gifts, goals and likers." },
+      ],
       answers.platform, (id) => { answers.platform = id; }, (i) => titled(i.name, i.text), { label: "Where you stream" },
     ),
     needsNext: true,
   },
   {
-    ask: () => (answers.platform === "twitch" ? "What is your Twitch channel?" : "What is your TikTok @name?"),
-    hint: "It goes into your links. You can change it later, on the last page.",
+    ask: () => (answers.platform === "both" ? "What are your TikTok @name and Twitch channel?" : answers.platform === "twitch" ? "What is your Twitch channel?" : "What is your TikTok @name?"),
+    hint: () => (answers.platform === "both" ? "They go into your links, each one only where it is needed. You can change them later, on the last page." : "It goes into your links. You can change it later, on the last page."),
     body: (next) => {
-      const input = el("input", { type: "text", id: "start-name", className: "start__name", autocomplete: "off", spellcheck: false, value: answers.text });
-      input.setAttribute("aria-label", answers.platform === "twitch" ? "Your Twitch channel" : "Your TikTok name");
-      input.placeholder = answers.platform === "twitch" ? "yourchannel" : "@yourname";
-      input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); next(); } });
-      input.addEventListener("input", () => input.removeAttribute("aria-invalid"));
-      const skip = el("button", { type: "button", className: "btn btn--soft", textContent: "I will add it later" });
-      skip.addEventListener("click", () => { input.value = ""; next(); });
-      queueMicrotask(() => input.focus());
-      return el("div", { className: "start__field" }, input, el("div", { className: "start__row" }, skip));
+      const list = accounts();
+      const boxes = list.map((p, i) => {
+        const input = el("input", { type: "text", id: i ? `start-name-${i + 1}` : "start-name", className: "start__name", autocomplete: "off", spellcheck: false, value: answers.names[p] });
+        input.dataset.platform = p;
+        input.setAttribute("aria-label", NAMES[p].short);
+        input.placeholder = NAMES[p].placeholder;
+        input.addEventListener("keydown", (e) => {
+          if (e.key !== "Enter") return;
+          e.preventDefault();
+          if (i < list.length - 1) document.getElementById(`start-name-${i + 2}`)?.focus(); // Enter in the first box moves to the second
+          else next();
+        });
+        input.addEventListener("input", () => input.removeAttribute("aria-invalid"));
+        return list.length > 1 ? el("div", { className: "start__field" }, el("label", { className: "start__label", htmlFor: input.id, textContent: NAMES[p].label }), input) : input;
+      });
+      const skip = el("button", { type: "button", className: "btn btn--soft", textContent: list.length > 1 ? "I will add them later" : "I will add it later" });
+      skip.addEventListener("click", () => { for (const input of host.querySelectorAll("input[data-platform]")) input.value = ""; next(); });
+      queueMicrotask(() => host.querySelector("input[data-platform]")?.focus());
+      return el("div", { className: "start__field" }, ...boxes, el("div", { className: "start__row" }, skip));
     },
-    commit: () => { const box = document.getElementById("start-name"); if (box) answers.text = box.value; },
-    // a name is optional, but one that is typed has to be one this platform accepts
+    commit: () => { for (const input of host.querySelectorAll("input[data-platform]")) answers.names[input.dataset.platform] = input.value; },
     valid: () => {
-      const bad = answers.text.trim() !== "" && !cleanName();
-      const box = document.getElementById("start-name");
-      if (box) { box.toggleAttribute("aria-invalid", bad); if (bad) box.focus(); }
-      return !bad;
+      const bad = accounts().filter(badOf);
+      for (const input of host.querySelectorAll("input[data-platform]")) input.toggleAttribute("aria-invalid", bad.includes(input.dataset.platform));
+      host.querySelector("input[aria-invalid]")?.focus();
+      return bad.length === 0;
     },
-    problem: () => NAME_RULE[answers.platform],
+    problem: () => accounts().filter(badOf).map((p) => NAMES[p].rule).join(" "),
     needsNext: true,
   },
   {
@@ -89,7 +110,9 @@ const QUESTIONS = [
       for (const o of overlaysFor(answers.platform)) {
         const box = el("input", { type: "checkbox", checked: answers.overlays.includes(o.id) });
         box.addEventListener("change", () => { answers.overlays = box.checked ? [...new Set([...answers.overlays, o.id])] : answers.overlays.filter((id) => id !== o.id); });
-        list.append(el("label", { className: "pick pick--check" }, box, el("span", { className: "pick__body" }, ...titled(o.name, o.blurb))));
+        const both = answers.platform === "both";
+        const blurb = !both ? o.blurb : o.id === "alerts" ? `${o.blurb} One for TikTok and one for Twitch.` : o.id === "chat" ? "Your TikTok and Twitch chat together, in one set of speech bubbles." : `${o.blurb} TikTok only.`;
+        list.append(el("label", { className: "pick pick--check" }, box, el("span", { className: "pick__body" }, ...titled(o.name, blurb))));
       }
       return list;
     },
@@ -142,7 +165,7 @@ function drawQuestion() {
     forward.addEventListener("click", next);
     nav.append(forward);
   }
-  host.replaceChildren(progress, bar, heading, el("p", { className: "start__hint", textContent: q.hint }), q.body(next), problem, nav);
+  host.replaceChildren(progress, bar, heading, el("p", { className: "start__hint", textContent: typeof q.hint === "function" ? q.hint() : q.hint }), q.body(next), problem, nav);
   host.dataset.view = "question";
   if (step !== 1) heading.focus({ preventScroll: true });
 }
@@ -157,7 +180,9 @@ function go(to) {
 function drawResult() {
   const origin = location.origin;
   const cards = new Map();
-  const state = () => ({ platform: answers.platform, channel: cleanName(), overlays: answers.overlays, vibe: answers.vibe, shape: answers.shape, align: answers.align });
+  const both = answers.platform === "both";
+  // in "both" the first name is TikTok's and the second is Twitch's; for one platform there is only the first
+  const state = () => ({ platform: answers.platform, channel: cleanOf(accounts()[0]), twitch: both ? cleanOf("twitch") : "", overlays: answers.overlays, vibe: answers.vibe, shape: answers.shape, align: answers.align });
   const links = () => buildLinks(origin, state());
 
   const heading = el("h2", { className: "start__ask", tabIndex: -1, textContent: "Your links are ready" });
@@ -167,29 +192,33 @@ function drawResult() {
   draw();
 
   // the name can still be changed here, and every link follows it
-  const name = el("input", { type: "text", id: "result-name", className: "start__name", autocomplete: "off", spellcheck: false, value: answers.text });
-  name.placeholder = answers.platform === "twitch" ? "yourchannel" : "@yourname";
-  const nameLabel = el("label", { className: "start__label", htmlFor: "result-name", textContent: answers.platform === "twitch" ? "Your Twitch channel" : "Your TikTok @name" });
+  const fields = accounts().map((p, i) => {
+    const input = el("input", { type: "text", id: i ? `result-name-${i + 1}` : "result-name", className: "start__name", autocomplete: "off", spellcheck: false, value: answers.names[p] });
+    input.placeholder = NAMES[p].placeholder;
+    return { platform: p, input, label: el("label", { className: "start__label", htmlFor: input.id, textContent: NAMES[p].label }) };
+  });
   const nameNote = el("p", { className: "start__error", hidden: true });
-  const nameBox = el("div", { className: "start__field start__field--inline" }, nameLabel, name, nameNote);
+  const nameBox = el("div", { className: "start__field start__field--inline" }, ...fields.flatMap((f) => [f.label, f.input]), nameNote);
+  const waiting = (needs) => (both ? (needs.length > 1 ? "Type both names above to get this link" : `Type your ${needs[0] === "tiktok" ? "TikTok @name" : "Twitch channel"} above to get this link`) : "Type your name above to get this link");
 
   const grid = el("div", { className: "cards" });
   const allButton = el("button", { type: "button", className: "btn", disabled: true });
   copyButton(allButton, () => linksText(links()), { label: "Copy all links" });
 
   const refresh = () => {
-    answers.text = name.value;
-    const clean = cleanName();
-    const bad = answers.text.trim() !== "" && !clean;
-    nameNote.textContent = bad ? NAME_RULE[answers.platform] : "";
-    nameNote.hidden = !bad;
-    name.toggleAttribute("aria-invalid", bad);
+    for (const f of fields) {
+      answers.names[f.platform] = f.input.value;
+      f.input.toggleAttribute("aria-invalid", badOf(f.platform));
+    }
+    const problems = fields.filter((f) => badOf(f.platform)).map((f) => NAMES[f.platform].rule);
+    nameNote.textContent = problems.join(" ");
+    nameNote.hidden = problems.length === 0;
     const list = links();
     for (const link of list) {
       const card = cards.get(link.id);
       if (!card) continue;
       card.input.value = link.url;
-      card.input.placeholder = "Type your name above to get this link";
+      card.input.placeholder = waiting(link.needs);
       card.copy.disabled = !link.url;
       card.edit.href = link.editUrl;
     }
@@ -219,17 +248,17 @@ function drawResult() {
   }
 
   const again = el("button", { type: "button", className: "btn btn--soft", textContent: "Change my answers" });
-  again.addEventListener("click", () => { answers.text = name.value; go(0); });
+  again.addEventListener("click", () => { for (const f of fields) answers.names[f.platform] = f.input.value; go(0); });
   const next = el("aside", { className: "note start__next" },
     el("strong", { textContent: "What next? " }),
     "In your streaming app (OBS or similar), add a ", el("strong", { textContent: "Browser source" }), " for each link and paste it in. ",
     el("a", { href: "/guides/setup/", textContent: "Watch how, in about 20 seconds" }), " or read ", el("a", { href: "/guides/obs/", textContent: "the setup guide" }), ".",
-    answers.platform === "tiktok" ? " On TikTok, real chat and gifts only show while you are LIVE." : "",
+    answers.platform !== "twitch" ? " On TikTok, real chat and gifts only show while you are LIVE." : "",
   );
 
   host.replaceChildren(heading, summary, nameBox, el("div", { className: "start__row" }, allButton, again), grid, next);
   host.dataset.view = "result";
-  name.addEventListener("input", refresh);
+  for (const f of fields) f.input.addEventListener("input", refresh);
   refresh();
   heading.focus({ preventScroll: true });
 

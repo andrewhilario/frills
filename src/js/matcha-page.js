@@ -7,6 +7,7 @@ import { DECOS } from "./decor.js";
 import { fontsReady, matchaFaces, paintMatcha } from "./look.js";
 import { buildControl, chips, copyButton } from "./ui.js";
 import { mountSource } from "./source.js";
+import { sourcesOf } from "./both.js";
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -46,16 +47,21 @@ function paintAll() {
 }
 
 function save() {
-  try { localStorage.setItem(STORE, JSON.stringify({ settings, channel: source.channel, platform: source.platform })); } catch { /* storage can be blocked; the page still works */ }
+  try { localStorage.setItem(STORE, JSON.stringify({ settings, channel: source.channel, twitch: source.twitchChannel, platform: source.platform })); } catch { /* storage can be blocked; the page still works */ }
 }
 
 function refresh() {
   paintAll();
   for (const c of cards) c.card.dataset.picked = String(c.style.id === settings.style);
+  const both = source.platform === "both";
+  const names = both ? source.cleanChannels() : null; // in "both" the link needs each of the two accounts
   const channel = source.cleanChannel();
-  link.value = channel ? matchaOverlayUrl(`${location.origin}/overlay/`, { channel, settings, platform: source.platform }) : "";
-  copyBtn.disabled = !channel;
-  hint.textContent = !channel ? "Type your TikTok name or Twitch channel above and your link appears here." : source.platform === "tiktok" && !source.usesRelay ? "This link only works on this PC, while the Frills helper is running." : "";
+  const ready = both ? Boolean(names.tiktok && names.twitch) : Boolean(channel);
+  const on = both && settings.source !== "none"; // one chat reading TikTok and Twitch: a small icon before each name
+  for (const c of cards) c.feed.configure({ markPlatform: on });
+  link.value = ready ? matchaOverlayUrl(`${location.origin}/overlay/`, { channel, settings, platform: source.platform, both: names }) : "";
+  copyBtn.disabled = !ready;
+  hint.textContent = !ready ? (both ? "Type your TikTok name and your Twitch channel above and your link appears here." : "Type your TikTok name or Twitch channel above and your link appears here.") : (source.platform === "tiktok" || both) && !source.usesRelay ? "This link only works on this PC, while the Frills helper is running." : "";
   save();
 }
 
@@ -133,13 +139,18 @@ $("more-reset").addEventListener("click", () => {
 });
 
 // ── Where chat comes from, and the link ──────────────────────────────────────────────────────────────────────────────────
-const wanted = params.get("platform");
+// A link can name one account (channel= and platform=, or tiktok= or twitch=) or two (tiktok= and twitch=: the page then opens in "Both").
+const named = params.has("tiktok") || params.has("twitch") ? sourcesOf(params) : [];
+const wanted = named.length === 2 ? "both" : named.length === 1 ? named[0].platform : params.get("platform");
+const channelFromLink = named.length ? named[0].channel : params.get("channel") ?? "";
 const source = mountSource($("source"), {
   feeds: cards.map((c) => c.feed),
   pace: () => [900, 1900],
-  channel: params.get("channel") ?? saved?.channel ?? "",
-  platform: wanted === "twitch" || wanted === "tiktok" ? wanted : saved?.platform ?? "tiktok", // made for a TikTok streamer
-  autoconnect: Boolean(params.get("channel")),
+  channel: channelFromLink || saved?.channel || "",
+  twitch: named.length === 2 ? named[1].channel : saved?.twitch ?? "",
+  platform: wanted === "twitch" || wanted === "tiktok" || wanted === "both" ? wanted : saved?.platform ?? "tiktok", // made for a TikTok streamer
+  platforms: ["tiktok", "twitch", "both"],
+  autoconnect: Boolean(channelFromLink),
   waitlistUrl: document.body.dataset.waitlist || "",
 });
 const link = $("link");

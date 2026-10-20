@@ -57,7 +57,7 @@ export const MOD_ICONS = ["shield", "star", "leaf", "frog", "none"];
 // Decorations (a friend peeking over the bubble, a small scene on a corner, sparkles) and the name tag: off to begin with, so a look is exactly what it was until someone turns them on.
 export const DECO_DEFAULTS = { deco: "none", decoSize: 100, decoSide: "left", decoPeek: true, decoCorner: true, decoSpark: true, decoFor: "all", tag: "inside" };
 
-export const DEFAULTS = { ...PRESETS.blueberry, letter: 0, align: "left", modIcon: "shield", max: 6, life: 15, space: 8, colors: false, emotes: true, pictures: true, ...DECO_DEFAULTS };
+export const DEFAULTS = { ...PRESETS.blueberry, letter: 0, align: "left", source: "icon", modIcon: "shield", max: 6, life: 15, space: 8, colors: false, emotes: true, pictures: true, ...DECO_DEFAULTS };
 
 const list = (...pairs) => pairs.map(([id, name]) => ({ id, name }));
 
@@ -72,6 +72,7 @@ export const CONTROLS = [
   { key: "size", where: "main", type: "range", label: "Text size", min: 12, max: 34, step: 1, unit: " px" },
   { key: "letter", where: "main", type: "range", label: "Letter spacing", min: -2, max: 8, step: 0.5, unit: " px" },
   { key: "align", where: "main", type: "chips", label: "Text alignment", options: list(["left", "Left"], ["center", "Center"], ["right", "Right"]) },
+  { key: "source", where: "main", type: "chips", label: "Platform icon", options: list(["icon", "A small icon"], ["none", "None"]), hint: "When one chat shows both TikTok and Twitch, a small icon before each name says where it came from." },
   { key: "deco", where: "main", type: "chips", label: "Decorations on the bubbles", options: DECOS, hint: "Little pictures laid over the bubbles: a scene on a corner, sparkles, a friend peeking over the top. Frog pond is green and Neko cafe is pink and cream." },
   { key: "decoSize", where: "main", needs: "deco", type: "range", label: "Decoration size", min: 50, max: 200, step: 5, unit: " %" },
   { key: "decoSide", where: "main", needs: "deco", type: "chips", label: "Corner scene sits on the", options: list(["left", "Left"], ["right", "Right"]), hint: "The friend peeking over the top goes on the other side." },
@@ -144,10 +145,15 @@ export function toParams(settings, params = new URLSearchParams()) {
 }
 
 /** The address a streamer pastes into OBS. `base` is the overlay page's address. Twitch is the default, so only TikTok adds a part. */
-export function overlayUrl(base, { channel = "", settings = DEFAULTS, platform = "twitch" } = {}) {
+export function overlayUrl(base, { channel = "", settings = DEFAULTS, platform = "twitch", both = null } = {}) {
   const params = new URLSearchParams();
-  if (channel) params.set("channel", channel);
-  if (channel && platform === "tiktok") params.set("platform", "tiktok");
+  if (both?.tiktok && both?.twitch) {
+    params.set("tiktok", both.tiktok); // one chat that reads both accounts
+    params.set("twitch", both.twitch);
+  } else {
+    if (channel) params.set("channel", channel);
+    if (channel && platform === "tiktok") params.set("platform", "tiktok");
+  }
   return base + "?" + toParams(settings, params);
 }
 

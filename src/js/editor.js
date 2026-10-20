@@ -5,6 +5,7 @@ import { CONTROLS, DEFAULTS, PRESETS, PRESET_NAMES, currentPreset, fromParams, o
 import { fontsReady, generalFaces, paintGeneral } from "./look.js";
 import { buildControl, chips, copyButton } from "./ui.js";
 import { mountSource } from "./source.js";
+import { sourcesOf } from "./both.js";
 import { luminance } from "./color.js";
 
 const params = new URLSearchParams(location.search);
@@ -34,6 +35,7 @@ function change(key, value) {
   if (key === "font") fontsReady(generalFaces(settings), 600).then(paint);
   else paint();
   showNeeded(); // the settings that depend on another one (the decorations) appear and go with it
+  if (key === "source") syncMark();
   presetChips.set(currentPreset(settings));
   refreshLink();
   save();
@@ -81,14 +83,20 @@ $("reset").addEventListener("click", () => {
 });
 
 // ── Step 2: the chat ──────────────────────────────────────────────────────────────────────────────────────────────────
-const channelFromLink = params.get("channel") ?? "";
+// A link can name one account (channel= and platform=, or tiktok= or twitch=) or two (tiktok= and twitch=: the editor then opens in "Both").
+const named = params.has("tiktok") || params.has("twitch") ? sourcesOf(params) : [];
+const bothFromLink = named.length === 2;
+const channelFromLink = named.length ? named[0].channel : params.get("channel") ?? "";
+const twitchFromLink = bothFromLink ? named[1].channel : "";
 // TikTok first. A name saved before there were two platforms was a Twitch channel.
-const platformFromLink = ["tiktok", "twitch"].includes(params.get("platform")) ? params.get("platform") : "";
+const platformFromLink = bothFromLink ? "both" : named.length === 1 ? named[0].platform : ["tiktok", "twitch"].includes(params.get("platform")) ? params.get("platform") : "";
 const source = mountSource($("source"), {
   feeds: [feed],
   pace: () => [1500, 3000],
   channel: channelFromLink || saved?.channel || "",
+  twitch: twitchFromLink || saved?.twitch || "",
   platform: platformFromLink || saved?.platform || (saved?.channel ? "twitch" : "tiktok"),
+  platforms: ["tiktok", "twitch", "both"],
   autoconnect: Boolean(channelFromLink),
   waitlistUrl: document.body.dataset.waitlist || "",
 });
@@ -100,17 +108,19 @@ const linkHint = $("link-hint");
 copyButton(copyBtn, () => linkInput.value);
 
 function refreshLink() {
+  const both = source.platform === "both";
+  const names = both ? source.cleanChannels() : null; // in "both" the link needs each of the two accounts
   const channel = source.cleanChannel();
-  if (!channel) {
+  if (both ? !(names.tiktok && names.twitch) : !channel) {
     linkInput.value = "";
     copyBtn.disabled = true;
-    linkHint.textContent = "Your link appears here once you have typed your TikTok name or Twitch channel in step 2.";
+    linkHint.textContent = both ? "Your link appears here once you have typed your TikTok name and your Twitch channel in step 2." : "Your link appears here once you have typed your TikTok name or Twitch channel in step 2.";
     return;
   }
-  linkInput.value = overlayUrl(`${location.origin}/overlay/`, { channel, settings, platform: source.platform });
+  linkInput.value = overlayUrl(`${location.origin}/overlay/`, { channel, settings, platform: source.platform, both: names });
   copyBtn.disabled = false;
   // Through the site’s relay a link works anywhere. A link made with the helper points at the helper on this PC, so it only works here.
-  linkHint.replaceChildren(source.platform === "tiktok" && !source.usesRelay ? "Paste it into a Browser source in your streaming app on this PC. It only works while the Frills helper is running. " : "Paste it into a Browser source in your streaming app. ");
+  linkHint.replaceChildren((source.platform === "tiktok" || source.platform === "both") && !source.usesRelay ? "Paste it into a Browser source in your streaming app on this PC. It only works while the Frills helper is running. " : "Paste it into a Browser source in your streaming app. ");
   const guide = document.createElement("a");
   guide.href = "/guides/obs/";
   guide.textContent = "Step by step";
@@ -121,9 +131,13 @@ function refreshLink() {
 }
 linkInput.addEventListener("focus", () => linkInput.select());
 source.onChange(() => { refreshLink(); save(); });
+// When one chat reads TikTok and Twitch together, each message gets a small platform icon (unless the look turns it off).
+const syncMark = () => feed.configure({ markPlatform: source.platform === "both" && settings.source !== "none" });
+source.onChange(syncMark);
+syncMark();
 
 function save() {
-  try { localStorage.setItem(STORE, JSON.stringify({ settings, channel: source.channel, platform: source.platform })); } catch { /* storage can be blocked; the editor still works */ }
+  try { localStorage.setItem(STORE, JSON.stringify({ settings, channel: source.channel, twitch: source.twitchChannel, platform: source.platform })); } catch { /* storage can be blocked; the editor still works */ }
 }
 
 // ── The preview itself: what sits behind the chat, and how wide it is ─────────────────────────────────────────────────

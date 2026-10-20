@@ -23,6 +23,18 @@ export const ICONS = {
     '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="7" cy="8" r="4.4" fill="currentColor"/><circle cx="17" cy="8" r="4.4" fill="currentColor"/><path d="M2 15.4C2 11.9 6.6 9.8 12 9.8s10 2.1 10 5.6c0 3.5-4.5 6.1-10 6.1S2 18.9 2 15.4Z" fill="currentColor"/><circle cx="7" cy="7.8" r="1.9" fill="var(--icon-ink)"/><circle cx="17" cy="7.8" r="1.9" fill="var(--icon-ink)"/><path d="M8 16.2c2.4 1.7 5.6 1.7 8 0" fill="none" stroke="var(--icon-ink)" stroke-width="1.7" stroke-linecap="round"/></svg>',
 };
 
+/** Which platform a message came from, as a small mark before the name (when a chat reads both). Plain shapes in the look's colors. */
+const SOURCE_MARKS = {
+  tiktok: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14.5 3c.4 2.7 2 4.3 4.5 4.6v3.3c-1.6 0-3.1-.5-4.5-1.4v6.2a5.6 5.6 0 1 1-5.6-5.6c.3 0 .7 0 1 .1v3.4a2.3 2.3 0 1 0 1.3 2.1V3h3.3Z" fill="currentColor"/></svg>',
+  twitch: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3h17v11.6l-5 5h-4l-3 3v-3H4V3Zm2 2v12h4v2.2L12.2 17H16l3-3V5H6Zm4.2 2.6h2V13h-2V7.6Zm5 0h2V13h-2V7.6Z" fill="currentColor"/></svg>',
+};
+const markEl = (platform) => {
+  const span = el("span", { className: "src src--" + platform });
+  span.setAttribute("aria-hidden", "true");
+  span.innerHTML = SOURCE_MARKS[platform]; // our own fixed drawings, never anything a viewer wrote
+  return span;
+};
+
 const iconEl = (type) => {
   const node = el("span", { className: "ico" });
   node.setAttribute("role", "img");
@@ -94,6 +106,7 @@ export class Feed {
     this.colors = false; // use each viewer's own name color when the source gives one
     this.emotes = true;
     this.pictures = true; // a chatter's own profile picture in the round badge, when the source has one (TikTok does, Twitch doesn't)
+    this.markPlatform = false; // a chat that reads TikTok and Twitch together marks each message with its platform
     this.deco = "none"; // decorations on the bubbles: a pack (frog, neko) or none (see decor.js)
     this.decoFor = "all"; // who gets them: all, mods, or gifts
     this.decoPeek = true; // the friend peeking over the top
@@ -185,16 +198,18 @@ export class Feed {
   }
 
   /** Draws a message now. */
-  show({ id = "", user = "", name, text, mod = false, color = null, emotes = null, pics = null, gift = false, gifter = false, avatar = "" }) {
+  show({ id = "", user = "", name, text, mod = false, color = null, emotes = null, pics = null, gift = false, gifter = false, avatar = "", platform = "" }) {
     const showPics = this.emotes && Array.isArray(pics) && pics.length > 0;
     if (!text && !showPics) return; // a message of only pictures, with pictures turned off, has nothing to draw
     const m = el("div", { className: "m" + (gift ? " gift" : "") });
     m.dataset.id = id;
     m.dataset.user = user;
     m.dataset.mod = mod ? "1" : "0";
+    if (platform) m.dataset.platform = platform;
     const av = el("div", { className: "av", textContent: (Array.from(name)[0] ?? "?").toUpperCase() });
     if (this.pictures && avatar) av.append(picture(av, avatar));
     const who = el("div", { className: "who" });
+    if (this.markPlatform && SOURCE_MARKS[platform]) who.append(markEl(platform));
     if (mod) who.append(iconEl(this.modIcon === "none" ? "shield" : this.modIcon));
     const nm = el("span", { className: "name", textContent: name });
     if (this.colors && color) nm.style.color = color;
@@ -254,5 +269,11 @@ export class Feed {
   clear() {
     this.queue = [];
     this.host.replaceChildren();
+  }
+
+  /** Clears one platform's messages and leaves the other's (a moderator cleared the chat on that platform only). */
+  clearWhere(platform) {
+    this.queue = this.queue.filter((q) => q.platform !== platform);
+    for (const m of [...this.host.children]) if (m.dataset.platform === platform) m.remove();
   }
 }

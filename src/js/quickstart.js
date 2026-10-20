@@ -33,19 +33,35 @@ export const vibeOf = (id) => find(VIBES, id) ?? VIBES[0];
 export const overlaysFor = (platform) => OVERLAYS.filter((o) => platform !== "twitch" || o.twitch);
 
 /**
- * Everything the result page shows. `answers`: { platform: "tiktok" | "twitch", channel (already cleaned, or ""), overlays: ["chat", ...],
- * vibe, shape, align }. `origin` is the site's address. For each chosen overlay (and only those that work on the chosen platform):
+ * Everything the result page shows. `answers`: { platform: "tiktok" | "twitch" | "both", channel (already cleaned, or ""), twitch (the
+ * Twitch channel, cleaned, only when the platform is "both": then `channel` is the TikTok name), overlays: ["chat", ...], vibe, shape,
+ * align }. `origin` is the site's address. For each chosen overlay (and only those that work on the chosen platform):
  *   url      the link to paste into a streaming app ("" until there is a name)
  *   editUrl  the editor, opened with the same look and name, to fine-tune it
  *   preview  the overlay in practice mode with the same look, for a picture of it on the page
+ *   needs    which accounts the link has to name: ["tiktok"], ["twitch"] or both
+ * With "both", the chat is one overlay that reads the two accounts together, the alerts are two (one for each platform), and the rest
+ * (last gifts, goals, top likers) are TikTok's.
  */
 export function buildLinks(origin, answers) {
-  const platform = answers.platform === "twitch" ? "twitch" : "tiktok";
+  const platform = answers.platform === "twitch" || answers.platform === "both" ? answers.platform : "tiktok";
+  const both = platform === "both";
+  const names = both ? { tiktok: answers.channel ?? "", twitch: answers.twitch ?? "" } : { [platform]: answers.channel ?? "" };
   const vibe = vibeOf(answers.vibe);
   const shape = SHAPES[answers.shape] ?? SHAPES.vertical;
   const align = ALIGNS.some(([id]) => id === answers.align) ? answers.align : "left";
   const chosen = new Set(answers.overlays ?? []);
-  return overlaysFor(platform).filter((o) => chosen.has(o.id)).map((o) => {
+
+  // one entry for each link: the overlay, the platform it reads, and (for the one chat of "both") whether it reads two
+  const entries = [];
+  for (const o of overlaysFor(platform).filter((o) => chosen.has(o.id))) {
+    if (!both) entries.push({ o, id: o.id, name: o.name, platform });
+    else if (o.id === "chat") entries.push({ o, id: o.id, name: o.name, platform: "both" });
+    else if (o.id === "alerts") entries.push({ o, id: "alerts-tiktok", name: "Alerts (TikTok)", platform: "tiktok" }, { o, id: "alerts-twitch", name: "Alerts (Twitch)", platform: "twitch" });
+    else entries.push({ o, id: o.id, name: o.name, platform: "tiktok" });
+  }
+
+  return entries.map(({ o, id, name, platform: reads }) => {
     const look = new URLSearchParams(o.id === "chat" ? vibe.chat : vibe.widgets);
     if (align !== "left") look.set("align", align);
     const query = (...first) => {
@@ -54,25 +70,31 @@ export function buildLinks(origin, answers) {
       for (const [key, value] of look) params.set(key, value);
       return params.toString();
     };
-    const withName = query(["channel", answers.channel], ["platform", answers.channel ? platform : ""]);
+    const needs = reads === "both" ? ["tiktok", "twitch"] : [reads];
+    const ready = needs.every((p) => names[p]);
+    const withName = reads === "both"
+      ? query(["tiktok", names.tiktok], ["twitch", names.twitch])
+      : query(["channel", names[reads]], ["platform", names[reads] ? reads : ""]);
     // chat in a Matcha style is fine-tuned on the Matcha page, which has its own looks
     const editor = o.id === "chat" && look.has("style") ? "/matcha/" : o.editor;
-    const previewMore = o.id === "alerts" ? [["platform", platform]] : o.id === "chat" ? [] : [["pace", "1100"]];
+    const previewMore = o.id === "alerts" ? [["platform", reads]] : o.id === "chat" ? (reads === "both" ? [["tiktok", "demo"], ["twitch", "demo"]] : []) : [["pace", "1100"]];
     return {
-      id: o.id,
-      name: o.name,
+      id,
+      name,
       blurb: o.blurb,
-      url: answers.channel ? `${origin}${o.overlay}?${withName}` : "",
+      url: ready ? `${origin}${o.overlay}?${withName}` : "",
       editUrl: `${origin}${editor}?${withName}`,
       preview: `${origin}${o.overlay}?${query(["demo", "1"], ...previewMore)}`,
       size: shape.size,
-      note: noteFor(o.id, platform),
+      note: noteFor(o.id, reads),
+      needs,
     };
   });
 }
 
-function noteFor(id, platform) {
-  if (id === "alerts" && platform === "twitch") return "Twitch subs, gifted subs, cheers and raids work with this link. Follow alerts need one extra login: open this overlay in the editor and press the Twitch login button.";
+function noteFor(id, reads) {
+  if (id === "chat" && reads === "both") return "One chat for both: TikTok and Twitch messages arrive together, each with a small icon so you can tell them apart. The editor can turn the icon off.";
+  if (id === "alerts" && reads === "twitch") return "Twitch subs, gifted subs, cheers and raids work with this link. Follow alerts need one extra login: open this overlay in the editor and press the Twitch login button.";
   if (id === "goal") return "The follower goal starts from your real follower count once you are LIVE.";
   return "";
 }
