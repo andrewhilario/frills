@@ -111,7 +111,7 @@ test("it answers a ping, serves the built site with its security headers, and sa
   await start(scripted().factory);
   const ping = await raw("/tiktok/ping");
   assert.equal(ping.status, 200);
-  assert.deepEqual(JSON.parse(ping.body), { ok: true, name: "frills-helper", version: "0.5.2", features: ["chat", "alerts", "info", "roles", "status"] });
+  assert.deepEqual(JSON.parse(ping.body), { ok: true, name: "frills-helper", version: "0.5.3", features: ["chat", "alerts", "info", "roles", "status"] });
   const editor = await raw("/editor/");
   assert.equal(editor.status, 200);
   assert.match(editor.body, /Connect your chat/);
@@ -315,5 +315,59 @@ test("a chat message with emotes, and an emote-only message, reach a page as pic
     ["from nowhere", null],
   ]);
   await page.close();
+  await helper.close();
+});
+
+// ── a connection that says "connected" and then says nothing ─────────────────────────────────────────────────────────────────────
+
+test("a connection that says connected and then goes silent is let go and replaced by a fresh one, which delivers", async () => {
+  const { factory, made } = scripted();
+  await start(factory, { silentMs: 120, silentMaxMs: 480 });
+  const page = listen("pond.pal");
+  await page.until(() => page.states().includes("connected"));
+  await page.until(() => made.length === 2, 3000); // the first never says a word
+  assert.equal(made[0].conn.gone, true, "the silent one is let go");
+  await page.until(() => page.states().filter((s) => s === "connected").length === 2, 2000);
+  assert.ok(page.states().includes("reconnecting"), "the page is told it is connecting again");
+  made[1].conn.emit("chat", chat("1", "hello from the fresh one"));
+  await page.until(() => page.chats().some((c) => c.text === "hello from the fresh one"));
+  await page.close();
+  await helper.close();
+});
+
+test("a connection that keeps hearing from TikTok, even only the viewer count, is left alone", async () => {
+  const { factory, made } = scripted();
+  await start(factory, { silentMs: 150 });
+  const page = listen("pond.pal");
+  await page.until(() => page.states().includes("connected"));
+  const tick = setInterval(() => made[0].conn.emit("roomUser", { viewerCount: 3 }), 40);
+  await sleep(700); // several times the silence that would have replaced it
+  clearInterval(tick);
+  assert.equal(made.length, 1, "no new connection was made");
+  assert.equal(made[0].conn.gone, false);
+  await page.close();
+  await helper.close();
+});
+
+test("a silence that a fresh connection did not change is waited out for twice as long the next time, and a switch off is respected", async () => {
+  const { factory, made } = scripted();
+  const times = [];
+  const stamped = async (user, options) => { times.push(Date.now()); return factory(user, options); };
+  await start(stamped, { silentMs: 100, silentMaxMs: 400 });
+  const page = listen("pond.pal");
+  await page.until(() => times.length >= 4, 6000);
+  const gaps = [times[1] - times[0], times[2] - times[1], times[3] - times[2]];
+  assert.ok(gaps[1] > gaps[0] * 1.3 && gaps[2] > gaps[1] * 1.3, "each wait is longer than the last: " + gaps.join(", ") + " ms");
+  assert.ok(gaps[2] < 700, "and it stops growing at the limit: " + gaps.join(", ") + " ms");
+  await page.close();
+  await helper.close();
+
+  const off = scripted();
+  await start(off.factory, { silentMs: 0 });
+  const quiet = listen("pond.pal");
+  await quiet.until(() => quiet.states().includes("connected"));
+  await sleep(400);
+  assert.equal(off.made.length, 1, "with the watch switched off a silent connection stays");
+  await quiet.close();
   await helper.close();
 });

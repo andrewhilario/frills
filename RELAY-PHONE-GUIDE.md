@@ -239,9 +239,13 @@ cd ~/frills && git pull && (cd helper && npm install)
 tmux new-session -d -s relay "cd ~/frills && set -a && . ~/.frills-relay.env && set +a && RELAY_SLOTS=70 RELAY_ALERT_SPOTS=10 npm run relay"
 ```
 
-Then check it: `tmux attach -t relay` prints a start-up message (leave it again with Ctrl+B, then D). It says `Frills relay 0.5.2 is running` and **`Owner password (...): on`**. If it says `not set` the file was not read, and if it says `NOT USED: it has N characters and needs at least 12` the password is too short. `curl http://127.0.0.1:8765/health` should say `"version":"0.5.2"`.
+Then check it: `tmux attach -t relay` prints a start-up message (leave it again with Ctrl+B, then D). It says `Frills relay 0.5.3 is running` and **`Owner password (...): on`**. If it says `not set` the file was not read, and if it says `NOT USED: it has N characters and needs at least 12` the password is too short. `curl http://127.0.0.1:8765/health` should say `"version":"0.5.3"`.
 
 Without the owner password the same steps work with `tmux new-session -d -s relay "cd ~/frills && RELAY_SLOTS=70 npm run relay"`.
+
+## When TikTok goes quiet on a connection (relay 0.5.3)
+
+A connection to TikTok can say "connected" and then hear nothing at all, even though the account is LIVE and people are chatting (this happened once: the account was LIVE and chat was flowing for a direct connection, while the relay's connection stayed silent). A LIVE always says something every few seconds (at least the viewer count), so from 0.5.3 the relay lets go of a connection that has heard nothing for **2 minutes** and makes a fresh one, which asks TikTok again about the room. The relay's window then prints `@name: nothing from TikTok for 120 s, so it connects again`. If a fresh connection is silent too, the next wait is twice as long (4, 8, then 10 minutes at most), so a room that is really silent does not use up requests to the signing service. Pages see "Lost the connection, trying again…" for a few seconds.
 
 ## How it saves requests to the signing service
 

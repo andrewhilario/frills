@@ -38,6 +38,8 @@ export class Room {
     this.base = 0; // the account's follower count when we connected (0 when TikTok did not say)
     this.followed = 0; // follows seen since then, so a page that joins later is told a current number
     this.likeTimer = 0;
+    this.lastEventAt = 0; // when anything last came from TikTok on the connection we have
+    this.silentFor = 0; // how long a silence is put up with before the connection is replaced (grows after a silence that changed nothing)
   }
 
   add(client) {
@@ -115,6 +117,9 @@ export class Room {
   }
 
   wire(conn, finish) {
+    // Any sign of life from TikTok (a chat line, a like, someone joining, the viewer count that comes every few seconds) shows the connection is not dead.
+    const heard = () => { this.lastEventAt = Date.now(); this.silentFor = this.hub.opts.silentMs; };
+    for (const name of ["chat", "emote", "gift", "like", "follow", "share", "imDelete", "roomUser", "member"]) conn.on(name, heard);
     conn.on("chat", (d) => {
       const m = mapChat(d);
       this.noteEmotes(d, m);
@@ -200,9 +205,35 @@ export class Room {
     }
     this.readInfo(conn);
     this.setStatus("connected", conn.pretend ? "Practice chat made up by Frills. Nothing comes from TikTok." : "");
+    const watch = this.watchSilence(finish);
     const how = await ended;
+    clearInterval(watch);
     this.letGo(conn);
     return how;
+  }
+
+  /**
+   * TikTok can leave a connection open and say nothing: a dead one still looks "connected" (it did, for a LIVE that was running with people chatting). A
+   * LIVE always says something every few seconds (the viewer count), so a connection that has heard nothing at all for a while is let go and a fresh
+   * one is made, which asks TikTok again about the room. A silence that a fresh connection did not change is waited out for twice as long next time,
+   * up to a limit, so a room that is really silent does not cost a request to the signing service every two minutes.
+   */
+  watchSilence(finish) {
+    const base = this.hub.opts.silentMs;
+    if (!(base > 0)) return 0;
+    const connectedAt = Date.now();
+    this.lastEventAt = connectedAt;
+    this.silentFor ||= base;
+    const timer = setInterval(() => {
+      if (this.stopped) return;
+      const limit = this.silentFor;
+      if (Date.now() - this.lastEventAt <= limit) return;
+      this.hub.log(`@${this.user}: nothing from TikTok for ${Math.round(limit / 1000)} s, so it connects again`);
+      this.silentFor = Math.min(this.hub.opts.silentMaxMs, limit * 2);
+      finish({ kind: "dropped", wasConnected: this.lastEventAt > connectedAt });
+    }, Math.max(10, Math.min(10000, base / 4)));
+    timer.unref?.();
+    return timer;
   }
 
   letGo(conn) {
@@ -323,7 +354,7 @@ class Waiting {
 
 export class Hub {
   constructor(opts = {}) {
-    this.opts = { factory: null, apiKey: "", maxRooms: 3, queue: false, queueGraceMs: 20000, idleStopMs: 30000, offlineWaitMs: 20000, limitedWaitMs: 60000, offlineGiveUpMs: 0, backoffMs: [3000, 6000, 12000, 30000, 60000], ...opts };
+    this.opts = { factory: null, apiKey: "", maxRooms: 3, queue: false, queueGraceMs: 20000, idleStopMs: 30000, offlineWaitMs: 20000, limitedWaitMs: 60000, offlineGiveUpMs: 0, backoffMs: [3000, 6000, 12000, 30000, 60000], silentMs: 120000, silentMaxMs: 600000, ...opts };
     this.log = opts.log ?? (() => {});
     this.rooms = new Map();
     this.waiting = new Map(); // accounts in line for a spot, oldest first
