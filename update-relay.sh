@@ -24,7 +24,7 @@ echo "3/4  Installing what the relay needs..."
 (cd helper && npm install --no-audit --no-fund)
 
 echo "4/4  Starting the relay with $SLOTS spots..."
-tmux new-session -d -s relay "cd '$PWD/helper' && RELAY_SLOTS=$SLOTS RELAY_ALERT_SPOTS=${RELAY_ALERT_SPOTS:-10} ${RELAY_PER_IP:+RELAY_PER_IP=$RELAY_PER_IP} ${RELAY_ACCOUNTS_PER_IP:+RELAY_ACCOUNTS_PER_IP=$RELAY_ACCOUNTS_PER_IP} npm run relay"
+tmux new-session -d -s relay "cd '$PWD' && RELAY_SLOTS=$SLOTS RELAY_ALERT_SPOTS=${RELAY_ALERT_SPOTS:-10} ${RELAY_PER_IP:+RELAY_PER_IP=$RELAY_PER_IP} ${RELAY_ACCOUNTS_PER_IP:+RELAY_ACCOUNTS_PER_IP=$RELAY_ACCOUNTS_PER_IP} npm run relay"
 
 sleep 6
 echo

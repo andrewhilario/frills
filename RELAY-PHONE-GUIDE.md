@@ -236,12 +236,12 @@ cd ~/frills && git pull && (cd helper && npm install)
 ```
 
 ```bash
-tmux new-session -d -s relay "cd ~/frills/helper && set -a && . ~/.frills-relay.env && set +a && RELAY_SLOTS=70 RELAY_ALERT_SPOTS=10 npm run relay"
+tmux new-session -d -s relay "cd ~/frills && set -a && . ~/.frills-relay.env && set +a && RELAY_SLOTS=70 RELAY_ALERT_SPOTS=10 npm run relay"
 ```
 
 Then check it: `tmux attach -t relay` prints a start-up message (leave it again with Ctrl+B, then D). It says `Frills relay 0.5.2 is running` and **`Owner password (...): on`**. If it says `not set` the file was not read, and if it says `NOT USED: it has N characters and needs at least 12` the password is too short. `curl http://127.0.0.1:8765/health` should say `"version":"0.5.2"`.
 
-Without the owner password the same steps work with `tmux new-session -d -s relay "cd ~/frills/helper && RELAY_SLOTS=70 npm run relay"`.
+Without the owner password the same steps work with `tmux new-session -d -s relay "cd ~/frills && RELAY_SLOTS=70 npm run relay"`.
 
 ## How it saves requests to the signing service
 
@@ -252,6 +252,7 @@ Every time the relay connects to a TikTok account it uses a request to a free si
 
 ## If something goes wrong
 
+- **`npm error Missing script: "relay"`:** you are in the `helper` folder. The relay is started from the main folder: `cd ~/frills` first, then `npm run relay` (the start commands in this guide do that). Only `npm install` is run inside `helper`.
 - **`curl` health works on the phone but not through `relay.valwidgets.live`:** the tunnel is not running (`tmux attach -t tunnel`), or the Public Hostname URL is not `localhost:8765`.
 - **A page says "Too many Frills pages are open from your internet address" (older versions: "the relay turned the connection down"):** that address already holds the most pages the relay allows (the number is in the message). It passes by itself when pages close. Pages whose connection died without a word (a Wi-Fi blip, a PC that went to sleep, OBS closing badly) can still look open to the relay for many minutes, and before relay 0.5.2 the limit was 8 and a page that came back was counted next to its own ghost: that is why it used to clear only after about 20 minutes. From 0.5.2 the limit is 60 and a page that comes back replaces its own old connection at once. The status page has **pages open right now** and **pages turned away**, and the relay's window prints `a page was turned away (N pages are already open from its address)`. If it still happens, raise `RELAY_PER_IP`.
 - **A page says "Can't reach the free Frills relay":** the relay or its tunnel is not answering: `tmux attach -t tunnel` and `tmux attach -t relay`, then the first line of this list.
@@ -287,7 +288,7 @@ Open the status page **on the phone itself** (the same `http://localhost:PORT/he
 On the phone itself the table needs nothing. To see it from anywhere, through `https://relay.valwidgets.live/health`, the relay needs a password of your own: 12 or more characters, never shared and never pasted in a chat. **If the public page only offers the numbers and no "Owner?" box, the relay that is running was started without it** (the public numbers then have no `ownerLogin` line). The easy, safe way is the settings file described under "Updating" above (`~/.frills-relay.env` with a `RELAY_OWNER_KEY=` line). The same thing in one command, with the password typed into it:
 
 ```bash
-tmux kill-session -t relay; tmux new-session -d -s relay "cd ~/frills/helper && RELAY_SLOTS=100 RELAY_ALERT_SPOTS=10 RELAY_OWNER_KEY=your-password npm run relay"
+tmux kill-session -t relay; tmux new-session -d -s relay "cd ~/frills && RELAY_SLOTS=100 RELAY_ALERT_SPOTS=10 RELAY_OWNER_KEY=your-password npm run relay"
 ```
 
 Then open the public status page, type the password in the "Owner?" box and press the button. The page remembers it only until you close that tab, and sends it in a header (never in the address). Ten wrong tries in ten minutes lock that visitor out for ten minutes. Without `RELAY_OWNER_KEY` nothing changes: the public page shows only numbers. `update-relay.sh` does not carry the password, so a relay it starts has the owner login off.
