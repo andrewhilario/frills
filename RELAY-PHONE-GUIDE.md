@@ -205,9 +205,27 @@ One command does it all (stop, get the new code, install, start, health check):
 bash ~/frills/update-relay.sh
 ```
 
-It starts the relay with 50 spots. For a different number: `RELAY_SLOTS=30 bash ~/frills/update-relay.sh`. The tunnel is not touched.
+It starts the relay with 50 spots. For a different number: `RELAY_SLOTS=30 bash ~/frills/update-relay.sh`. The tunnel is not touched. **The script does not know your owner password**, so a relay it starts shows the names only on the phone itself. If you use the owner password (below), restart by hand as follows.
 
-The same steps by hand, if you ever need them:
+### Restarting by hand, with a settings file (the way to keep the owner password)
+
+Once: put your settings in a private file on the phone, so the password is never typed into a command (and not in a chat, a message or a screenshot).
+
+```bash
+nano ~/.frills-relay.env
+```
+
+Type these lines inside nano (your own password, 12 or more characters; if it has spaces or symbols, put it in single quotes), then press Ctrl+O, Enter, Ctrl+X:
+
+```text
+RELAY_OWNER_KEY=your-own-long-password
+```
+
+```bash
+chmod 600 ~/.frills-relay.env
+```
+
+Every update (leave the `tunnel` session alone):
 
 ```bash
 tmux kill-session -t relay
@@ -218,8 +236,12 @@ cd ~/frills && git pull && (cd helper && npm install)
 ```
 
 ```bash
-tmux new-session -d -s relay "cd ~/frills/helper && RELAY_SLOTS=50 npm run relay"
+tmux new-session -d -s relay "cd ~/frills/helper && set -a && . ~/.frills-relay.env && set +a && RELAY_SLOTS=70 RELAY_ALERT_SPOTS=10 npm run relay"
 ```
+
+Then check it: `tmux attach -t relay` prints a start-up message (leave it again with Ctrl+B, then D). It says `Frills relay 0.5.2 is running` and **`Owner password (...): on`**. If it says `not set` the file was not read, and if it says `NOT USED: it has N characters and needs at least 12` the password is too short. `curl http://127.0.0.1:8765/health` should say `"version":"0.5.2"`.
+
+Without the owner password the same steps work with `tmux new-session -d -s relay "cd ~/frills/helper && RELAY_SLOTS=70 npm run relay"`.
 
 ## How it saves requests to the signing service
 
@@ -262,12 +284,12 @@ Open the status page **on the phone itself** (the same `http://localhost:PORT/he
 
 ### Seeing who is connected from your PC (the owner password)
 
-On the phone itself the table needs nothing. To see it from anywhere, through `https://relay.valwidgets.live/health`, give the relay a password of your own: 12 or more characters, never shared and never pasted in a chat. Put it inside the quotes of the start command, as `RELAY_OWNER_KEY=your-password`:
+On the phone itself the table needs nothing. To see it from anywhere, through `https://relay.valwidgets.live/health`, the relay needs a password of your own: 12 or more characters, never shared and never pasted in a chat. **If the public page only offers the numbers and no "Owner?" box, the relay that is running was started without it** (the public numbers then have no `ownerLogin` line). The easy, safe way is the settings file described under "Updating" above (`~/.frills-relay.env` with a `RELAY_OWNER_KEY=` line). The same thing in one command, with the password typed into it:
 
 ```bash
 tmux kill-session -t relay; tmux new-session -d -s relay "cd ~/frills/helper && RELAY_SLOTS=100 RELAY_ALERT_SPOTS=10 RELAY_OWNER_KEY=your-password npm run relay"
 ```
 
-Then open the public status page, type the password in the "Owner?" box and press the button. The page remembers it only until you close that tab, and sends it in a header (never in the address). Ten wrong tries in ten minutes lock that visitor out for ten minutes. Without `RELAY_OWNER_KEY` nothing changes: the public page shows only numbers.
+Then open the public status page, type the password in the "Owner?" box and press the button. The page remembers it only until you close that tab, and sends it in a header (never in the address). Ten wrong tries in ten minutes lock that visitor out for ten minutes. Without `RELAY_OWNER_KEY` nothing changes: the public page shows only numbers. `update-relay.sh` does not carry the password, so a relay it starts has the owner login off.
 
 TikTok emotes (relay 0.5.1): chat messages that contain TikTok emotes, and messages that are only an emote, now reach the overlay as small pictures. Only pictures from TikTok's own picture servers are used. This is new and was tried only with made-up messages. If emotes still do not show, `tmux attach -t relay` prints a line "emotes arrived but none could be shown (picture server ...)" once per account: tell me the server name.
