@@ -11,19 +11,23 @@ import { MATCHA_CONTROLS, MATCHA_DEFAULTS, matchaFromParams, matchaOverlayUrl, s
 
 const control = (key) => CONTROLS.find((c) => c.key === key);
 
-test("the packs: none, Frog pond and Neko cafe (pictures that really exist in the site)", () => {
-  assert.deepEqual(DECO_IDS, ["none", "frog", "neko"]);
-  assert.deepEqual(Object.keys(PACKS), ["frog", "neko"]);
+test("the packs: none, Frog pond, Neko cafe, Hamster burrow and Bunny cloud (pictures that really exist in the site)", () => {
+  assert.deepEqual(DECO_IDS, ["none", "frog", "neko", "hamster", "bunny"]);
+  assert.deepEqual(Object.keys(PACKS), ["frog", "neko", "hamster", "bunny"]);
   assert.equal(DECOS[0].id, "none");
   const files = join(import.meta.dirname, "..", "public");
-  for (const name of ["frog", "neko"]) {
+  for (const name of ["frog", "neko", "hamster", "bunny"]) {
     for (const piece of [...PACKS[name].peek, ...PACKS[name].corner, ...PACKS[name].spark]) {
-      assert.match(piece.src, new RegExp(`^/decor/${name}/[a-z-]+\\.webp$`), "a picture from this site only");
+      assert.match(piece.src, new RegExp(`^/decor/${name}/[a-z0-9-]+\\.webp$`), "a picture from this site only");
       assert.ok(existsSync(join(files, piece.src)), `${piece.src} is in public/`);
     }
     assert.ok(PACKS[name].corner.length > 0 && PACKS[name].spark.length > 0);
   }
-  assert.ok(PACKS.neko.peek.length > 0 && PACKS.neko.peek.every((p) => p.ratio > 0.3 && p.ratio < 1), "the cats on top say how tall they are, so room is left for them");
+  for (const name of ["neko", "hamster", "bunny"]) {
+    assert.equal(PACKS[name].peek.length, 2, `${name}: two friends peek over the top`);
+    assert.ok(PACKS[name].peek.every((p) => p.ratio > 0.3 && p.ratio < 1), `${name}: the friends on top say how tall they are, so room is left for them`);
+    assert.equal(PACKS[name].spark.length, 8, `${name}: eight little pieces`);
+  }
 });
 
 test("a message gets the same pieces every time, different messages get different ones, and the switches leave pieces out", () => {

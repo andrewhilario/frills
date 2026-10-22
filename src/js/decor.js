@@ -1,12 +1,14 @@
 // Decorations for the chat bubbles: little pictures laid over a bubble's edges (a friend peeking over the top, a small scene on a bottom corner,
-// sparkles around it). A PACK is a set of such pieces in one mood. "Frog pond" and "Neko cafe" are pictures (loaded from this site, only when the pack is
-// chosen). More packs add a name and their pieces here.
+// sparkles around it). A PACK is a set of such pieces in one mood. "Frog pond", "Neko cafe", "Hamster burrow" and "Bunny cloud" are pictures (loaded from this
+// site, only when the pack is chosen). More packs add a name and their pieces here.
 // Pure data and small functions, so it is tested without a page.
 
 export const DECOS = [
   { id: "none", name: "None" },
   { id: "frog", name: "Frog pond" },
   { id: "neko", name: "Neko cafe" },
+  { id: "hamster", name: "Hamster burrow" },
+  { id: "bunny", name: "Bunny cloud" },
 ];
 export const DECO_IDS = DECOS.map((d) => d.id);
 
@@ -24,6 +26,18 @@ export const PACKS = {
     peek: [{ src: "/decor/neko/peeker-a.webp", ratio: 0.525 }, { src: "/decor/neko/peeker-b.webp", ratio: 0.694 }],
     corner: [{ src: "/decor/neko/corner.webp" }],
     spark: ["paw-brown", "heart-pink", "fish", "star", "paw-cream", "yarn", "heart-yellow", "cat-face"].map((name) => ({ src: `/decor/neko/${name}.webp` })),
+  },
+  hamster: {
+    // a hamster peeking over the top (one with seeds floating over its head), a hamster beside its wheel and a pile of sunflower seeds, and eight little hamster things
+    peek: [{ src: "/decor/hamster/peeker-a.webp", ratio: 0.488 }, { src: "/decor/hamster/peeker-b.webp", ratio: 0.719 }],
+    corner: [{ src: "/decor/hamster/corner.webp" }],
+    spark: [1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({ src: `/decor/hamster/confetti-${n}.webp` })),
+  },
+  bunny: {
+    // a bunny peeking over the top (a sleepy one with a moon and stars), a bunny on a cloud with a rainbow, and eight little sky and bunny things
+    peek: [{ src: "/decor/bunny/peeker-a.webp", ratio: 0.463 }, { src: "/decor/bunny/peeker-b.webp", ratio: 0.625 }],
+    corner: [{ src: "/decor/bunny/corner.webp" }],
+    spark: [1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({ src: `/decor/bunny/confetti-${n}.webp` })),
   },
 };
 

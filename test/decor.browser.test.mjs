@@ -187,6 +187,28 @@ test("neko cafe: a cat peeks over the top edge with room left for it, a kitten s
   assert.ok(r.both >= 1);
 });
 
+test("hamster burrow and bunny cloud: a friend peeks over the top edge with room left for it, a scene sits on the corner, and little things are scattered (all from the pack's own folder)", { skip }, async () => {
+  for (const pack of ["hamster", "bunny"]) {
+    await open(`look=bubblegum&deco=${pack}`);
+    await page.waitFor(`[...document.querySelectorAll("#chat .deco img")].every((i) => i.complete)`);
+    const r = await page.evaluate(`(() => {
+      const ms = [...document.querySelectorAll("#chat .m")];
+      const m = ms[2];
+      const body = m.querySelector(".body").getBoundingClientRect();
+      const box = m.querySelector("img.deco__peek").getBoundingClientRect();
+      const prev = ms[1].getBoundingClientRect();
+      return {
+        loaded: [...document.querySelectorAll("#chat .deco img")].every((i) => i.naturalWidth > 0 && i.src.includes("/decor/${pack}/")),
+        onTop: box.bottom > body.top && box.bottom - body.top <= 10,
+        clearOfNeighbor: box.top >= prev.bottom - 1,
+        corner: Boolean(m.querySelector("img.deco__corner")),
+        sparks: m.querySelectorAll(".deco__spark").length,
+      };
+    })()`);
+    assert.deepEqual(r, { loaded: true, onTop: true, clearOfNeighbor: true, corner: true, sparks: 3 }, pack);
+  }
+});
+
 test("the name tag pill never wraps a letter per line in a short message, and the cat on top keeps off the tag, whichever way the text is aligned", { skip }, async () => {
   for (const align of ["left", "center", "right"]) {
     for (const side of ["left", "right"]) {
