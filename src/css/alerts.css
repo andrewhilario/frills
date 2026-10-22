@@ -34,10 +34,124 @@
 .alerts[data-align="right"] .alert__words { text-align: right; }
 
 /* ── Card styles: the same alert in another format (the "Card style" choice, data-card on .alerts). Each one changes only the card; the words, the
-   picture and the burst stay. They come after the alignment rules so they win over them where they must (Profile is always centered). ────── */
+   picture and the burst stay. They come after the alignment rules so they win over them where they must (a trading card is always centered).
+   A card style that stands on its own (trading card, profile card, ticket, polaroid, stack, sticky note) draws its own edge and has no big-gift
+   ring: a bigger gift is a bigger card. Plain colors and gradients only, so an old streaming browser draws them. ─────────────────────────────── */
+.alert__tag { display: none; }
+
+/* Capsule: a small pill with a big picture */
 .alerts[data-card="capsule"] .alert__card { border-radius: 999px; padding: 0.3em 1.3em 0.3em 0.3em; }
 .alerts[data-card="capsule"][data-align="right"] .alert__card { padding: 0.3em 0.3em 0.3em 1.3em; }
 .alerts[data-card="capsule"] .alert__av { width: 2.7em; height: 2.7em; }
+.alerts[data-card="capsule"] .alert[data-tier="3"] .alert__card::after { border-radius: 999px; }
+
+/* Banner: a strip across the width with a bar on one side */
+.alerts[data-card="banner"] .alert, .alerts[data-card="banner"] .alert__card { width: 100%; }
+.alerts[data-card="banner"] .alert__card { padding: 0.6em 1em; border-width: 0 0 0 calc(var(--a-border, 2px) + 0.45em); border-radius: calc(var(--a-radius, 20px) * 0.3); }
+.alerts[data-card="banner"][data-align="right"] .alert__card { border-width: 0 calc(var(--a-border, 2px) + 0.45em) 0 0; }
+.alerts[data-card="banner"] .alert__av { border-radius: calc(var(--a-radius, 20px) * 0.3); }
+.alerts[data-card="banner"] .alert[data-tier="3"] .alert__card::after { border-radius: calc(var(--a-radius, 20px) * 0.3 + 0.3em); }
+
+/* Bubble: a speech bubble with a tail */
+.alerts[data-card="bubble"] .alert { margin-bottom: 0.6em; }
+.alerts[data-card="bubble"] .alert__card::before {
+  content: ""; position: absolute; left: 1.4em; bottom: -0.5em; width: 0.9em; height: 0.9em; box-sizing: border-box; transform: rotate(45deg);
+  background: var(--a-bg, #fff); border: 0 solid var(--a-accent, #fc0); border-width: 0 var(--a-border, 2px) var(--a-border, 2px) 0;
+}
+.alerts[data-card="bubble"][data-align="center"] .alert__card::before { left: 50%; margin-left: -0.45em; }
+.alerts[data-card="bubble"][data-align="right"] .alert__card::before { left: auto; right: 1.4em; }
+
+/* Neon: the edge glows, inside and out; the words stay crisp (a glow on the letters smudges them on a light card) */
+.alerts[data-card="neon"] .alert__card { box-shadow: 0 0 0.55em var(--a-accent, #fc0), inset 0 0 0.5em var(--a-accent, #fc0); }
+.alerts[data-card="neon"] .alert__av { box-shadow: 0 0 0.45em var(--a-accent, #fc0); }
+
+/* Text only: no box at all; an outline in the card color keeps the words readable on any picture behind them */
+.alerts[data-card="text"] .alert__card {
+  padding: 0; background: none; border: 0; box-shadow: none;
+  text-shadow: 0.05em 0 0 var(--a-bg, #fff), -0.05em 0 0 var(--a-bg, #fff), 0 0.05em 0 var(--a-bg, #fff), 0 -0.05em 0 var(--a-bg, #fff), 0.035em 0.035em 0 var(--a-bg, #fff), -0.035em -0.035em 0 var(--a-bg, #fff), 0.035em -0.035em 0 var(--a-bg, #fff), -0.035em 0.035em 0 var(--a-bg, #fff), 0 0.09em 0.25em rgba(0, 0, 0, 0.45);
+}
+.alerts[data-card="text"] .alert__card::after { display: none; }
+.alerts[data-card="text"] .alert__av { box-shadow: 0 0 0.08em var(--a-bg, #fff); text-shadow: none; }
+
+/* The cards that are objects of their own */
+.alerts[data-card="trading"] .alert__card::after, .alerts[data-card="profile"] .alert__card::after, .alerts[data-card="ticket"] .alert__card::after,
+.alerts[data-card="polaroid"] .alert__card::after, .alerts[data-card="stack"] .alert__card::after, .alerts[data-card="note"] .alert__card::after { display: none; }
+
+/* Trading card: a tall card with a name bar on top, a window with the picture, and the words under it, in a double frame */
+.alerts[data-card="trading"] .alert__card {
+  flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 0.4em; width: 11.5em; padding: 0.65em 0.65em 0.75em; text-align: center;
+  border-width: calc(var(--a-border, 2px) + 1px); border-radius: calc(var(--a-radius, 20px) * 0.5);
+  box-shadow: inset 0 0 0 0.16em var(--a-bg, #fff), inset 0 0 0 calc(0.16em + 2px) var(--a-accent, #fc0), 0 0.25em 0.6em rgba(0, 0, 0, 0.35);
+}
+.alerts[data-card="trading"] .alert__tag { display: block; padding: 0.3em 0.6em; border-radius: 0.5em; background: var(--a-accent, #fc0); color: var(--a-bg, #fff); font-size: 0.62em; letter-spacing: 0.14em; text-transform: uppercase; text-align: center; }
+.alerts[data-card="trading"] .alert__av, .alerts[data-card="trading"] .alert__custom--avatar { width: 100%; height: 2.7em; font-size: 2.2em; border-radius: calc(var(--a-radius, 20px) * 0.3); box-sizing: border-box; border: 0.05em solid var(--a-accent, #fc0); object-fit: cover; }
+.alerts[data-card="trading"] .alert__words { font-size: 0.85em; text-align: center; }
+.alerts[data-card="trading"] .alert__gift, .alerts[data-card="trading"] .alert__custom--beside { align-self: center; margin: 0; }
+
+/* Profile card: a colored banner across the top, the picture sitting over its lower edge, the words centered under it */
+.alerts[data-card="profile"] .alert__card { position: relative; flex-direction: column; align-items: center; justify-content: flex-start; gap: 0.3em; min-width: 9.5em; padding: 0 1.4em 0.85em; overflow: hidden; text-align: center; }
+.alerts[data-card="profile"] .alert__card::before {
+  content: ""; flex: none; align-self: stretch; height: 3em; margin: 0 -1.4em;
+  background: radial-gradient(circle at 14% 115%, rgba(255, 255, 255, 0.32) 0 1.6em, transparent 1.7em), radial-gradient(circle at 88% 10%, rgba(255, 255, 255, 0.22) 0 1.1em, transparent 1.2em), var(--a-accent, #fc0);
+}
+.alerts[data-card="profile"] .alert__tag { display: block; position: absolute; top: 0.6em; left: 0; right: 0; z-index: 1; color: var(--a-bg, #fff); font-size: 0.55em; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; text-align: center; }
+.alerts[data-card="profile"] .alert__av, .alerts[data-card="profile"] .alert__custom--avatar { flex: none; width: 2.6em; height: 2.6em; margin-top: -1.3em; font-size: 1.3em; box-sizing: border-box; border: 0.12em solid var(--a-bg, #fff); box-shadow: 0 0 0 0.08em var(--a-accent, #fc0); }
+.alerts[data-card="profile"] .alert__words { text-align: center; }
+.alerts[data-card="profile"] .alert__gift { margin: 0; }
+
+/* Ticket: a stub for the picture, a dashed tear line, the words; the notches on the tear line are really cut out */
+.alerts[data-card="ticket"] .alert__card {
+  flex-direction: row; justify-content: flex-start; gap: 0; padding: 0.7em 1.2em 0.7em 0; text-align: left; border: 0; border-radius: 0.45em; box-shadow: none;
+  background: radial-gradient(circle at 4.67em 0, transparent 0.55em, var(--a-bg, #fff) 0.6em) top / 100% 51% no-repeat, radial-gradient(circle at 4.67em 100%, transparent 0.55em, var(--a-bg, #fff) 0.6em) bottom / 100% 51% no-repeat;
+  filter: drop-shadow(0.14em 0.16em 0 var(--a-accent, #fc0));
+}
+.alerts[data-card="ticket"] .alert__av, .alerts[data-card="ticket"] .alert__custom--avatar { margin: 0 1em; }
+.alerts[data-card="ticket"] .alert__words { padding-left: 0.9em; border-left: 0.14em dashed var(--a-accent, #fc0); text-align: left; }
+.alerts[data-card="ticket"] .alert__tag + .alert__words { padding-left: 1.2em; border-left: 0; } /* no picture: no tear line */
+
+/* Polaroid: a square photo in a white frame with the words written underneath, and a piece of tape on top */
+.alerts[data-card="polaroid"] .alert__card {
+  flex-direction: column; align-items: center; justify-content: flex-start; gap: 0.5em; width: 9.2em; padding: 0.6em 0.6em 0.5em; text-align: center; border: 0; border-radius: 0.2em;
+  box-shadow: 0 0.2em 0.55em rgba(0, 0, 0, 0.4);
+}
+.alerts[data-card="polaroid"] .alert__card::before { content: ""; position: absolute; top: -0.55em; left: 50%; width: 3.2em; height: 1.05em; margin-left: -1.6em; background: var(--a-pop, #f48); opacity: 0.8; transform: rotate(-4deg); }
+.alerts[data-card="polaroid"] .alert__av, .alerts[data-card="polaroid"] .alert__custom--avatar { width: 100%; height: 2.55em; font-size: 2.2em; border-radius: 0.1em; box-sizing: border-box; object-fit: cover; box-shadow: inset 0 0 0.35em rgba(0, 0, 0, 0.3); }
+.alerts[data-card="polaroid"] .alert__words { font-size: 0.82em; text-align: center; }
+.alerts[data-card="polaroid"] .alert__gift { margin: 0; }
+
+/* Card stack: the card with more cards behind it */
+.alerts[data-card="stack"] .alert { margin: 0 1.1em 1.1em 0; }
+.alerts[data-card="stack"][data-align="right"] .alert { margin: 0 0 1.1em 1.1em; }
+.alerts[data-card="stack"] .alert__card {
+  box-shadow: 0.45em 0.45em 0 calc(-1 * var(--a-border, 2px)) var(--a-bg, #fff), 0.45em 0.45em 0 0 var(--a-accent, #fc0), 0.9em 0.9em 0 calc(-1 * var(--a-border, 2px)) var(--a-bg, #fff), 0.9em 0.9em 0 0 var(--a-accent, #fc0);
+}
+.alerts[data-card="stack"][data-align="right"] .alert__card {
+  box-shadow: -0.45em 0.45em 0 calc(-1 * var(--a-border, 2px)) var(--a-bg, #fff), -0.45em 0.45em 0 0 var(--a-accent, #fc0), -0.9em 0.9em 0 calc(-1 * var(--a-border, 2px)) var(--a-bg, #fff), -0.9em 0.9em 0 0 var(--a-accent, #fc0);
+}
+
+/* Sticky note: a paper note with a folded corner and a piece of tape on top */
+.alerts[data-card="note"] .alert { margin-top: 0.6em; }
+.alerts[data-card="note"] .alert__card {
+  padding: 0.7em 2em 0.7em 0.6em; border: 0; border-radius: 0.2em; box-shadow: none;
+  background: linear-gradient(315deg, transparent 1.2em, var(--a-bg, #fff) 1.2em);
+  filter: drop-shadow(0 0.18em 0.3em rgba(0, 0, 0, 0.4));
+}
+.alerts[data-card="note"] .alert__card::before { content: ""; position: absolute; top: -0.6em; left: 50%; width: 3.2em; height: 1.1em; margin-left: -1.6em; background: var(--a-pop, #f48); opacity: 0.75; transform: rotate(-3deg); }
+.alerts[data-card="note"] .alert__card::after { content: ""; display: block; position: absolute; right: 0; bottom: 0; width: 1.7em; height: 1.7em; border: 0; border-radius: 0; top: auto; left: auto; right: 0; bottom: 0; opacity: 1; background: linear-gradient(315deg, transparent 50%, var(--a-accent, #fc0) 50%); }
+
+/* The frog pond card (offered on the Matcha page only): the simple card, with a frog peeking over the top, a lily pad and lotus on the corner and
+   sparkles (our own pictures; see decor.js). The card gives them room. */
+.alerts[data-card="frogpond"] .alert { margin-top: calc(3.7em * var(--peek-ratio, 0.5)); margin-bottom: 1.4em; }
+.alerts[data-card="frogpond"] .alert__card { padding-left: 1em; }
+.alert__deco { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+.alert__deco > * { position: absolute; display: block; height: auto; }
+.alert__deco .deco__peek { right: 1.1em; bottom: calc(100% - 3px); width: 3.7em; }
+.alert__deco .deco__corner { left: -1.5em; bottom: -1.6em; width: 3.1em; }
+.alert__deco .deco__spark--1 { top: -0.5em; left: 32%; width: 0.9em; }
+.alert__deco .deco__spark--2 { right: 0.1em; bottom: 20%; width: 0.75em; }
+.alert__deco .deco__spark--3 { left: 58%; bottom: -0.5em; width: 0.6em; }
+
+.alert__av { width: 2.7em; height: 2.7em; }
 .alerts[data-card="capsule"] .alert[data-tier="3"] .alert__card::after { border-radius: 999px; }
 
 .alerts[data-card="banner"] .alert, .alerts[data-card="banner"] .alert__card { width: 100%; }

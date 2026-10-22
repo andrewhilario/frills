@@ -8,6 +8,7 @@ import { fontsReady, matchaFaces, paintMatcha } from "./look.js";
 import { buildControl, chips, copyButton } from "./ui.js";
 import { mountSource } from "./source.js";
 import { sourcesOf } from "./both.js";
+import { DEFAULTS as ALERT_DEFAULTS, LOOKS as ALERT_LOOKS, alertsUrl } from "./alerts-settings.js";
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -20,6 +21,22 @@ const saved = load();
 // A link (the style, the palette, anything under More options) wins over what was remembered, unless what it says isn't a number.
 const fromLink = Object.fromEntries(Object.entries(matchaFromParams(params)).filter(([, value]) => value !== null && value !== undefined && !Number.isNaN(value)));
 let settings = sanitizeMatcha({ ...saved?.settings, ...fromLink });
+
+// The frog pond alerts: the alerts page's Matcha look with the frog pond card (a card style that only this page offers).
+const ALERT_FROG = { ...ALERT_DEFAULTS, ...ALERT_LOOKS.matcha, card: "frogpond" };
+const alertsStage = $("alerts-stage");
+const alertsFrame = el("iframe", { className: "matcha-alerts__frame", title: "Frog pond alerts on made-up follows, gifts and shares", loading: "lazy", tabIndex: -1 });
+alertsFrame.setAttribute("aria-hidden", "true");
+alertsFrame.src = alertsUrl("/overlay/alerts/", { settings: ALERT_FROG }) + "&demo=1&pace=2400&maxShown=1&vpos=middle&hpos=center";
+alertsStage.append(alertsFrame);
+/** The practice alerts page is 1080 wide; shrink it to the room there is. */
+const fitAlerts = () => {
+  const k = Math.max(0.1, alertsStage.clientWidth / 1080);
+  alertsFrame.style.transform = `scale(${k.toFixed(4)})`;
+  alertsStage.style.height = Math.round(560 * k) + "px";
+};
+new ResizeObserver(fitAlerts).observe(alertsStage);
+fitAlerts();
 
 const grid = $("matcha-grid");
 const cards = MATCHA_STYLES.map((style, index) => {
@@ -61,6 +78,11 @@ function refresh() {
   for (const c of cards) c.feed.configure({ markPlatform: on });
   link.value = ready ? matchaOverlayUrl(`${location.origin}/overlay/`, { channel, settings, platform: source.platform, both: names }) : "";
   copyBtn.disabled = !ready;
+  const alertName = both ? names.tiktok : channel; // alerts come from one account: in "Both" it is the TikTok one
+  const alertPlatform = source.platform === "twitch" ? "twitch" : "tiktok";
+  alertsLink.value = alertName ? alertsUrl(`${location.origin}/overlay/alerts/`, { channel: alertName, settings: ALERT_FROG, platform: alertPlatform }) : "";
+  alertsCopy.disabled = !alertName;
+  alertsHint.textContent = alertName ? "Paste it into a Browser source in your streaming app: 1080 wide by 1920 high for a vertical LIVE." : "Type your TikTok name above and the alerts link appears here.";
   hint.textContent = !ready ? (both ? "Type your TikTok name and your Twitch channel above and your link appears here." : "Type your TikTok name or Twitch channel above and your link appears here.") : (source.platform === "tiktok" || both) && !source.usesRelay ? "This link only works on this PC, while the Frills helper is running." : "";
   save();
 }
@@ -99,7 +121,7 @@ chips(
   $("backs"),
   [{ id: "dark", name: "Dark game" }, { id: "bright", name: "Bright game" }, { id: "busy", name: "Busy scene" }],
   "dark",
-  (item) => cards.forEach((c) => { c.back.dataset.back = item.id; }),
+  (item) => { cards.forEach((c) => { c.back.dataset.back = item.id; }); $("alerts-stage").dataset.back = item.id; },
 );
 
 // ── More options: built from the same kind of list the editor uses ────────────────────────────────────────────────────────
@@ -155,9 +177,15 @@ const source = mountSource($("source"), {
 });
 const link = $("link");
 const hint = $("link-hint");
+const alertsLink = $("alerts-link");
+const alertsCopy = $("copy-alerts-link");
+const alertsHint = $("alerts-hint");
+copyButton(alertsCopy, () => alertsLink.value, { label: "Copy alerts link" });
+alertsLink.addEventListener("focus", () => alertsLink.select());
 const copyBtn = $("copy-link");
 copyButton(copyBtn, () => link.value);
 link.addEventListener("focus", () => link.select());
+$("alerts-edit").href = alertsUrl("/alerts/", { settings: ALERT_FROG });
 source.onChange(refresh);
 
 fontsReady(matchaFaces(settings), 600).then(refresh);

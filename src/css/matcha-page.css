@@ -24,3 +24,12 @@
 .matcha-link { display: grid; gap: var(--space-sm); padding: var(--space-lg); margin-bottom: var(--space-3xl); border-radius: var(--radius-card); background: var(--color-accent-tint); }
 .matcha-link input { width: 100%; font-family: var(--font-label); font-size: var(--text-sm); }
 .matcha-link__row { display: flex; flex-wrap: wrap; gap: var(--space-sm); align-items: center; }
+
+/* The frog pond alerts: the real alerts page in practice mode, shrunk to fit, with its own link. */
+.matcha-alerts { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); max-width: 62rem; padding-bottom: var(--space-lg); }
+.matcha-alerts p { max-width: 46rem; }
+.matcha-alerts__stage { overflow: hidden; border-radius: var(--radius-card); }
+.matcha-alerts__frame { position: absolute; left: 0; top: 0; width: 1080px; height: 560px; border: 0; background: transparent; color-scheme: normal; transform-origin: 0 0; pointer-events: none; }
+.matcha-alerts input { width: 100%; font-family: var(--font-label); font-size: var(--text-sm); }
+.matcha-alerts a.btn { justify-self: start; }
+.matcha-alerts__edit { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); font-size: var(--text-sm); color: var(--color-ink-2); }

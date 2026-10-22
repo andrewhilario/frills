@@ -51,7 +51,9 @@ export const LOOK_KEYS = Object.keys(LOOKS.sticker);
 const list = (...pairs) => pairs.map(([id, name]) => ({ id, name }));
 
 /** The formats an alert card can come in (the "Card style" choice). Each is drawn by alerts.css; the colors, roundness and edge still apply to all of them. */
-export const CARDS = list(["card", "Card"], ["capsule", "Capsule"], ["banner", "Banner"], ["profile", "Profile"], ["bubble", "Bubble"], ["coupon", "Coupon"], ["neon", "Neon"], ["text", "Text only"]);
+export const CARDS = list(["card", "Simple"], ["trading", "Trading card"], ["profile", "Profile card"], ["ticket", "Ticket"], ["polaroid", "Polaroid"], ["stack", "Card stack"], ["note", "Sticky note"], ["capsule", "Capsule"], ["banner", "Banner"], ["bubble", "Bubble"], ["neon", "Neon"], ["text", "Text only"]);
+/** Card styles that work from a link but are not offered in the editor (the Matcha page offers them): a link that names one is believed. */
+export const SECRET_CARDS = ["frogpond"];
 
 /** What each placeholder in a text means, for the editor's hint and for filling a template. */
 export const PLACEHOLDERS = ["name", "gift", "count", "diamonds", "total", "others"];
@@ -210,6 +212,7 @@ export function coerce(control, value) {
     if (typeof value !== "string") return undefined;
     return value.replace(/[\u0000-\u001f\u007f]+/g, " ").slice(0, control.max);
   }
+  if (control.key === "card" && SECRET_CARDS.includes(value)) return value;
   return control.options.some((o) => o.id === value) ? value : undefined;
 }
 

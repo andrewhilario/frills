@@ -200,3 +200,39 @@ test("matcha: junk in what was remembered, or in the address, can't break the pa
   assert.equal(await page.evaluate(`document.getElementById("m-matcha").value`), MATCHA_PALETTES.latte.matcha);
   await page.evaluate("localStorage.clear()");
 });
+
+test("matcha: the frog pond alerts have their own preview and link (the frog pond card, in the matcha colors), the editor link carries the style, and the backdrop choice moves the preview too", { skip }, async () => {
+  await fresh();
+  const section = await page.evaluate(`({ title: document.getElementById("alerts-title").textContent, frame: document.querySelector("#alerts-stage iframe")?.getAttribute("src"), link: document.getElementById("alerts-link").value, copyOff: document.getElementById("copy-alerts-link").disabled, edit: document.getElementById("alerts-edit").getAttribute("href") })`);
+  assert.equal(section.title, "Frog pond alerts");
+  const preview = new URL(section.frame, base);
+  assert.equal(preview.pathname, "/overlay/alerts/");
+  assert.deepEqual([preview.searchParams.get("card"), preview.searchParams.get("demo"), preview.searchParams.get("accent")], ["frogpond", "1", "#8dae5f"], "made-up alerts, the frog pond card, the matcha colors");
+  assert.deepEqual([section.link, section.copyOff], ["", true], "no link until there is a name");
+  const edit = new URL(section.edit, base);
+  assert.deepEqual([edit.pathname, edit.searchParams.get("card"), edit.searchParams.has("channel")], ["/alerts/", "frogpond", false], "the editor opens with the style picked, and does not connect by itself");
+  await set("source-channel", "pond.pal");
+  const link = new URL(await page.evaluate(`document.getElementById("alerts-link").value`));
+  assert.equal(link.pathname, "/overlay/alerts/");
+  assert.deepEqual([link.searchParams.get("channel"), link.searchParams.get("platform"), link.searchParams.get("card"), link.searchParams.get("bg"), link.searchParams.get("text")], ["pond.pal", "tiktok", "frogpond", "#f5f0e1", "#33432a"]);
+  assert.equal(await page.evaluate(`document.getElementById("copy-alerts-link").disabled`), false);
+  assert.equal(new URL(await page.evaluate(`document.getElementById("link").value`)).pathname, "/overlay/", "the chat link is still its own");
+  await click("#backs .chip", "Bright game");
+  assert.equal(await page.evaluate(`document.getElementById("alerts-stage").dataset.back`), "bright");
+  // the page shows the frog pond alerts for real: the card in the preview wears a frog
+  const wears = await page.evaluate(`new Promise((resolve) => { const t0 = Date.now(); const look = () => { const d = document.querySelector("#alerts-stage iframe").contentDocument; const peek = d?.querySelector(".alert__deco img.deco__peek"); if (peek) resolve(peek.src.includes("/decor/frog2/")); else if (Date.now() - t0 > 9000) resolve(false); else setTimeout(look, 150); }; look(); })`);
+  assert.equal(wears, true, "a frog peeks over the top of the card in the preview");
+});
+
+test("alerts editor: the frog pond style is not offered there, but opened with its link it shows and keeps it", { skip }, async () => {
+  await page.goto(base + "/alerts/", { settle: 600 });
+  await page.evaluate("localStorage.clear()");
+  await page.goto(base + "/alerts/", { settle: 700 });
+  const offered = await page.evaluate(`[...document.querySelectorAll("#look-controls .chip")].map((b) => b.textContent.trim()).join("|")`);
+  assert.equal(/frog/i.test(offered), false, "nothing about a frog among the choices");
+  await page.goto(base + "/alerts/?card=frogpond&look=matcha", { settle: 900 });
+  assert.equal(await page.evaluate(`document.getElementById("alerts").dataset.card`), "frogpond");
+  await set("source-channel", "pond.pal");
+  assert.equal(new URL(await page.evaluate(`document.getElementById("link").value`)).searchParams.get("card"), "frogpond", "the link keeps the style");
+  await page.evaluate("localStorage.clear()");
+});

@@ -224,22 +224,75 @@ test("overlay: each card style draws its own format, and a style that does not e
       const card = document.querySelector(".alert .alert__card");
       const cs = getComputedStyle(card);
       const host = document.querySelector(".alerts");
-      return { style: host.dataset.card, dir: cs.flexDirection, edge: cs.borderTopStyle, top: parseFloat(cs.borderTopWidth), left: parseFloat(cs.borderLeftWidth), bg: cs.backgroundColor, radius: parseFloat(cs.borderTopLeftRadius), shadow: cs.boxShadow, words: cs.textShadow, tail: getComputedStyle(card, "::before").content, wide: Math.round(card.parentElement.offsetWidth / host.clientWidth * 100) }; // the layout width: the entrance animation scales what getBoundingClientRect measures
+      const tag = card.querySelector(".alert__tag");
+      const av = card.querySelector(".alert__av");
+      return {
+        style: host.dataset.card, dir: cs.flexDirection, edge: cs.borderTopStyle, top: parseFloat(cs.borderTopWidth), left: parseFloat(cs.borderLeftWidth), bg: cs.backgroundColor, bgImage: cs.backgroundImage,
+        radius: parseFloat(cs.borderTopLeftRadius), shadow: cs.boxShadow, words: cs.textShadow, filter: cs.filter, width: card.offsetWidth, em: parseFloat(cs.fontSize),
+        before: getComputedStyle(card, "::before").content, after: getComputedStyle(card, "::after").content, afterShown: getComputedStyle(card, "::after").display,
+        tagShown: getComputedStyle(tag).display, tagText: tag.textContent, art: av ? av.offsetWidth / card.offsetWidth : 0,
+        wide: Math.round(card.parentElement.offsetWidth / host.clientWidth * 100), // the layout width: the entrance animation scales what getBoundingClientRect measures
+      };
     })()`);
   };
+  const IDS = ["card", "trading", "profile", "ticket", "polaroid", "stack", "note", "capsule", "banner", "bubble", "neon", "text"];
   const all = {};
-  for (const id of ["card", "capsule", "banner", "profile", "bubble", "coupon", "neon", "text"]) all[id] = await probe(id);
+  for (const id of IDS) all[id] = await probe(id);
   for (const [id, r] of Object.entries(all)) assert.equal(r.style, id);
-  assert.deepEqual([all.card.dir, all.card.edge, all.card.tail], ["row", "solid", "none"], "the plain card");
-  assert.ok(all.card.top > 0 && all.card.bg !== "rgba(0, 0, 0, 0)" && all.card.wide < 80, "with an edge, a color and the width of its words");
+  assert.deepEqual([all.card.dir, all.card.edge, all.card.tagShown], ["row", "solid", "none"], "the simple card: a row with an edge, and no label");
+  assert.ok(all.card.top > 0 && all.card.bg !== "rgba(0, 0, 0, 0)" && all.card.wide < 80, "with a color and the width of its words");
+  // the cards that are objects of their own
+  assert.equal(all.trading.dir, "column", "a trading card is tall");
+  assert.ok(all.trading.tagShown === "block" && ["Gift"].includes(all.trading.tagText), "with a name bar saying what it is: " + all.trading.tagText);
+  assert.ok(all.trading.art > 0.8 && all.trading.width < all.trading.em * 13, "and a picture window across it: " + all.trading.art);
+  assert.ok(all.trading.shadow.includes("inset") && all.trading.shadow.split("rgb").length > 3, "in a double frame");
+  assert.equal(all.profile.dir, "column", "a profile card stacks");
+  assert.ok(!["none", "normal"].includes(all.profile.before) && all.profile.tagShown === "block", "with a banner across the top and a label on it");
+  assert.ok(all.ticket.bgImage.includes("radial-gradient") && all.ticket.filter.includes("drop-shadow") && all.ticket.top === 0, "a ticket has cut-out notches and a shadow that follows its shape");
+  assert.ok(all.polaroid.dir === "column" && all.polaroid.width < all.polaroid.em * 10 && !["none", "normal"].includes(all.polaroid.before), "a polaroid is a narrow frame with tape on top");
+  assert.ok(all.stack.shadow.split("rgb").length >= 5, "a stack has cards behind it: " + all.stack.shadow);
+  assert.ok(all.note.bgImage.includes("linear-gradient") && !["none", "normal"].includes(all.note.before) && !["none", "normal"].includes(all.note.after) && all.note.afterShown === "block", "a sticky note has tape and a folded corner");
+  for (const id of ["trading", "profile", "ticket", "polaroid", "stack"]) assert.notEqual(all[id].afterShown, "block", id + ": no big-gift ring");
+  // the simpler formats
   assert.ok(all.capsule.radius >= 500, "the capsule is rounded all the way: " + all.capsule.radius);
   assert.ok(all.banner.wide >= 95 && all.banner.top === 0 && all.banner.left > all.card.top, `the banner runs across and has a bar on one side (${all.banner.wide}%)`);
-  assert.equal(all.profile.dir, "column", "the profile stacks the picture over the words");
-  assert.ok(!["none", "normal"].includes(all.bubble.tail), "the bubble has a tail: " + all.bubble.tail);
-  assert.equal(all.coupon.edge, "dashed", "the coupon has a dashed edge");
+  assert.ok(!["none", "normal"].includes(all.bubble.before), "the bubble has a tail: " + all.bubble.before);
   assert.ok(all.neon.shadow.includes("inset"), "the neon edge glows inside as well as out: " + all.neon.shadow);
   assert.ok(all.text.bg === "rgba(0, 0, 0, 0)" && all.text.top === 0 && all.text.shadow === "none" && all.text.words !== "none", "text only has no box and an outline on the words");
   assert.equal((await probe("sideways")).style, "card", "a made-up style is the plain card");
+});
+
+test("overlay: the label on a card says what the alert is (follow, gift, share)", { skip }, async () => {
+  const { base } = await withHelper();
+  const labels = [];
+  for (const only of ["follow", "gift", "share"]) {
+    await page.goto(`${base}/overlay/alerts/?demo=1&only=${only}&pace=300&maxShown=1&card=trading`, { settle: 500 });
+    await until(async () => (await cards()).length > 0, 8000);
+    labels.push(await page.evaluate(`document.querySelector(".alert__tag").textContent`));
+  }
+  assert.deepEqual(labels, ["New follower", "Gift", "Shared the LIVE"]);
+});
+
+test("overlay: the frog pond card (a style only the Matcha page offers) wears a frog on top, a lily pad on the corner and sparkles, and room is left for the frog", { skip }, async () => {
+  const { base } = await withHelper();
+  await page.goto(`${base}/overlay/alerts/?demo=1&only=follow&pace=300&maxShown=1&look=matcha&card=frogpond&vpos=middle`, { settle: 600 });
+  await until(async () => (await cards()).length > 0, 8000);
+  await until(() => page.evaluate(`document.querySelectorAll(".alert__deco img").length > 0 && [...document.querySelectorAll(".alert__deco img")].every((i) => i.complete)`), 5000);
+  const r = await page.evaluate(`(() => {
+    const alert = document.querySelector(".alert");
+    const imgs = [...alert.querySelectorAll(".alert__deco img")];
+    const peek = alert.querySelector("img.deco__peek");
+    const card = alert.querySelector(".alert__card").getBoundingClientRect();
+    const box = peek.getBoundingClientRect();
+    return { style: document.querySelector(".alerts").dataset.card, loaded: imgs.every((i) => i.naturalWidth > 0 && i.src.includes("/decor/frog2/")), peek: peek.src.split("/").pop(), corner: Boolean(alert.querySelector("img.deco__corner")), sparks: alert.querySelectorAll(".deco__spark").length, onTop: box.bottom > card.top && box.bottom - card.top <= 10, margin: parseFloat(getComputedStyle(alert).marginTop) };
+  })()`);
+  assert.deepEqual({ ...r, peek: undefined, margin: undefined }, { style: "frogpond", loaded: true, peek: undefined, corner: true, sparks: 3, onTop: true, margin: undefined });
+  assert.match(r.peek, /^peeker-[ab]\.webp$/);
+  assert.ok(r.margin > 10, "the frog has room above the card: " + r.margin);
+  await page.goto(`${base}/overlay/alerts/?demo=1&only=follow&pace=300&maxShown=1&card=trading`, { settle: 600 });
+  await until(async () => (await cards()).length > 0, 8000);
+  assert.equal(await page.evaluate(`document.querySelectorAll(".alert__deco").length`), 0, "no other style wears pictures");
+  assert.deepEqual(page.problems, [], page.problems.join(" | "));
 });
 
 test("editor: Card style is the first Look option, changing it redraws the alert, and the link carries it only when it is not the plain card", { skip }, async () => {
@@ -248,7 +301,7 @@ test("editor: Card style is the first Look option, changing it redraws the alert
   const label = await page.evaluate(`document.querySelector("#look-controls > *:first-child .ctl__label").textContent.trim()`);
   assert.equal(label, "Card style");
   const names = await page.evaluate(`[...document.querySelectorAll("#look-controls > *:first-child .chip")].map((b) => b.textContent.trim())`);
-  assert.deepEqual(names, ["Card", "Capsule", "Banner", "Profile", "Bubble", "Coupon", "Neon", "Text only"]);
+  assert.deepEqual(names, ["Simple", "Trading card", "Profile card", "Ticket", "Polaroid", "Card stack", "Sticky note", "Capsule", "Banner", "Bubble", "Neon", "Text only"], "and the frog pond is not among them");
   await type("#source-channel", "pond.pal");
   assert.equal(new URL(await page.evaluate(`document.getElementById("link").value`)).searchParams.has("card"), false, "the plain card adds nothing to the link");
   await click('[data-test="follow"]');

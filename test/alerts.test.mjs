@@ -3,7 +3,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { CARDS, CONTROLS, DEFAULTS, LOOKS, alertsUrl, alertVars, coerce, currentLook, fromParams, sanitize, toParams } from "../src/js/alerts-settings.js";
+import { CARDS, CONTROLS, SECRET_CARDS, DEFAULTS, LOOKS, alertsUrl, alertVars, coerce, currentLook, fromParams, sanitize, toParams } from "../src/js/alerts-settings.js";
 import { AlertQueue, fillTemplate, makeAlert, tierOf, wording } from "../src/js/alerts.js";
 
 // ── settings ────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -351,8 +351,8 @@ test("Twitch alerts outrank follows when the line is too long, and are never joi
   assert.ok(!shown.some((l) => l.includes("F2")), "a follow was dropped before the Twitch alerts");
 });
 
-test("card styles: eight formats, the plain card is the default, only a known one is accepted, and a starting look never changes it", () => {
-  assert.deepEqual(CARDS.map((c) => c.id), ["card", "capsule", "banner", "profile", "bubble", "coupon", "neon", "text"]);
+test("card styles: twelve formats, the plain card is the default, only a known one is accepted, and a starting look never changes it", () => {
+  assert.deepEqual(CARDS.map((c) => c.id), ["card", "trading", "profile", "ticket", "polaroid", "stack", "note", "capsule", "banner", "bubble", "neon", "text"]);
   assert.equal(DEFAULTS.card, "card");
   assert.equal(CONTROLS.find((c) => c.key === "card").section, "look");
   assert.equal(sanitize({ card: "banner" }).card, "banner");
@@ -360,7 +360,18 @@ test("card styles: eight formats, the plain card is the default, only a known on
   assert.equal(sanitize({ card: "<img>" }).card, "card");
   assert.equal(sanitize(fromParams(new URLSearchParams("card=neon"))).card, "neon", "a link can carry it");
   assert.equal(alertsUrl("https://x.test/o/", { settings: { ...DEFAULTS } }), "https://x.test/o/?", "the plain card adds nothing to a link");
-  assert.equal(new URL(alertsUrl("https://x.test/o/", { channel: "a", settings: { ...DEFAULTS, card: "coupon" } })).searchParams.get("card"), "coupon");
+  assert.equal(new URL(alertsUrl("https://x.test/o/", { channel: "a", settings: { ...DEFAULTS, card: "ticket" } })).searchParams.get("card"), "ticket");
   for (const id of Object.keys(LOOKS)) assert.equal(sanitize(fromParams(new URLSearchParams(`card=text&look=${id}`))).card, "text", `the ${id} look leaves the card style alone`);
   assert.equal(currentLook({ ...DEFAULTS, card: "bubble" }), "sticker", "a card style is not part of a look");
+});
+
+test("a card style the editor does not offer (the frog pond, from the Matcha page) still works from a link, and nothing else gets in that way", () => {
+  assert.deepEqual(SECRET_CARDS, ["frogpond"]);
+  assert.equal(CARDS.some((c) => SECRET_CARDS.includes(c.id)), false, "it is not in the list the editor shows");
+  assert.equal(sanitize({ card: "frogpond" }).card, "frogpond");
+  assert.equal(sanitize(fromParams(new URLSearchParams("card=frogpond"))).card, "frogpond");
+  assert.equal(new URL(alertsUrl("https://x.test/o/", { channel: "a", settings: { ...DEFAULTS, card: "frogpond" } })).searchParams.get("card"), "frogpond", "and it stays in a link");
+  assert.equal(sanitize({ card: "frogpond2" }).card, "card");
+  assert.equal(sanitize({ font: "frogpond" }).font, DEFAULTS.font, "the allowance is for the card setting only");
+  assert.equal(coerce(CONTROLS.find((c) => c.key === "font"), "frogpond"), undefined);
 });
