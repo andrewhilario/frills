@@ -3,15 +3,19 @@
 //
 // Who can do what: anyone can upload a small file once they tick that they have the right to use it; they get back an id (goes in the
 // alert link) and a delete code (shown once, never stored: only its hash is). Anyone with the link can see the file, like any picture
-// on a website; nobody can list the files. Limits: 300 KB a file, png jpg webp gif mp3 ogg wav (the file's own first bytes decide, not
-// what the browser says), an hourly cap on uploads, and a ceiling on the total stored.
+// on a website; nobody can list the files. Limits: 1 MB for a picture or GIF and 300 KB for a sound, png jpg webp gif mp3 ogg wav (the file's
+// own first bytes decide, not what the browser says), an hourly cap on uploads (how many, and how many bytes), and a ceiling on the total stored.
 //
-// The file is kept as base64 text, because that behaves the same in D1 and in the SQLite stand-in used by tests and `npm run dev`.
+// The file is kept as base64 text, because that behaves the same in D1 and in the SQLite stand-in used by tests and `npm run dev`. Base64 is a
+// third bigger than the file, and D1 takes at most 2,000,000 bytes in one value, so a file can be at most 1,499,999 bytes: 1 MB (1,398,104
+// characters) fits, and a test keeps it so. A free D1 database holds 500 MB in all, hence a ceiling of 300 MB of files (400 MB as text).
 
 export const MEDIA = {
-  maxBytes: 300 * 1024,
+  maxBytes: 300 * 1024, // a sound
+  maxImageBytes: 1024 * 1024, // a picture or a GIF
   perHour: 120,
-  totalBytes: 2 * 1024 * 1024 * 1024,
+  perHourBytes: 40 * 1024 * 1024,
+  totalBytes: 300 * 1024 * 1024,
   idPattern: /^[A-Za-z0-9_-]{16}$/,
 };
 
@@ -53,17 +57,19 @@ const sameOrigin = (request) => {
 export async function uploadMedia(request, env, { now = Date.now() } = {}) {
   if (!sameOrigin(request)) return json(403, { ok: false, error: "wrong_origin" });
   if (request.headers.get("x-consent") !== "yes") return json(400, { ok: false, error: "no_consent" });
+  const biggest = Math.max(MEDIA.maxBytes, MEDIA.maxImageBytes);
   const declared = Number(request.headers.get("content-length"));
-  if (declared > MEDIA.maxBytes) return json(413, { ok: false, error: "too_big" });
+  if (declared > biggest) return json(413, { ok: false, error: "too_big" });
   const bytes = new Uint8Array(await request.arrayBuffer());
-  if (bytes.length > MEDIA.maxBytes) return json(413, { ok: false, error: "too_big" });
   const found = sniff(bytes);
+  if (bytes.length > biggest) return json(413, { ok: false, error: "too_big", kind: found?.kind });
   if (!found) return json(415, { ok: false, error: "bad_type" });
+  if (bytes.length > (found.kind === "image" ? MEDIA.maxImageBytes : MEDIA.maxBytes)) return json(413, { ok: false, error: "too_big", kind: found.kind });
   if (!env?.DB) return json(503, { ok: false, error: "not_ready" });
   try {
     const since = new Date(now - 3600 * 1000).toISOString();
-    const recent = await env.DB.prepare("SELECT COUNT(*) AS n FROM media WHERE created > ?").bind(since).first();
-    if ((recent?.n ?? 0) >= MEDIA.perHour) return json(429, { ok: false, error: "busy" }, { "retry-after": "600" });
+    const recent = await env.DB.prepare("SELECT COUNT(*) AS n, COALESCE(SUM(size), 0) AS bytes FROM media WHERE created > ?").bind(since).first();
+    if ((recent?.n ?? 0) >= MEDIA.perHour || (recent?.bytes ?? 0) + bytes.length > MEDIA.perHourBytes) return json(429, { ok: false, error: "busy" }, { "retry-after": "600" });
     const stored = await env.DB.prepare("SELECT COALESCE(SUM(size), 0) AS total FROM media").first();
     if ((stored?.total ?? 0) + bytes.length > MEDIA.totalBytes) return json(507, { ok: false, error: "full" });
     const id = random(12);

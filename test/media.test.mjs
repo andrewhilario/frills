@@ -57,14 +57,43 @@ test("anything else is refused: scripts, pictures that can run code, documents, 
   assert.equal(env.DB.raw.prepare("SELECT COUNT(*) AS n FROM media").get().n, 0);
 });
 
-test("a file over 300 KB is refused, whether or not it says how big it is", async () => {
+const padded = (file, size) => { const out = new Uint8Array(size); out.set(file); return out; };
+
+test("a picture or GIF can be up to 1 MB and a sound up to 300 KB, and a file over its limit is refused whether or not it says how big it is", async () => {
+  assert.deepEqual([MEDIA.maxImageBytes, MEDIA.maxBytes], [1024 * 1024, 300 * 1024]);
   const env = fresh();
-  const big = new Uint8Array(MEDIA.maxBytes + 1);
-  big.set(FILES.png);
-  assert.equal((await upload(big, env)).status, 413);
-  const exact = new Uint8Array(MEDIA.maxBytes);
-  exact.set(FILES.png);
-  assert.equal((await upload(exact, env)).status, 201, "exactly the limit is fine");
+  const tooBigPicture = await upload(padded(FILES.png, MEDIA.maxImageBytes + 1), env);
+  assert.deepEqual([tooBigPicture.status, tooBigPicture.body.error, tooBigPicture.body.kind], [413, "too_big", "image"]);
+  const tooBigSound = await upload(padded(FILES.wav, MEDIA.maxBytes + 1), env);
+  assert.deepEqual([tooBigSound.status, tooBigSound.body.error, tooBigSound.body.kind], [413, "too_big", "sound"], "300 KB is still the most for a sound");
+  assert.equal((await upload(padded(FILES.gif, 900 * 1024), env)).status, 201, "a 900 KB GIF is fine now");
+  const exactPicture = await upload(padded(FILES.png, MEDIA.maxImageBytes), env);
+  assert.deepEqual([exactPicture.status, exactPicture.body.size], [201, MEDIA.maxImageBytes], "exactly the limit is fine");
+  const back = await get(exactPicture.body.id, env);
+  assert.equal((await back.arrayBuffer()).byteLength, MEDIA.maxImageBytes, "and the whole file comes back");
+  assert.equal((await upload(padded(FILES.ogg, MEDIA.maxBytes), env)).status, 201);
+  const declared = await handleMedia(new Request(`${SITE}/api/media`, { method: "POST", headers: { origin: SITE, "x-consent": "yes", "content-length": String(MEDIA.maxImageBytes * 2) }, body: FILES.png }), env);
+  assert.equal(declared.status, 413, "a file that says it is far too big is turned away before it is read");
+});
+
+test("the biggest picture still fits in one D1 value once it is text (D1 takes 2,000,000 bytes in a value)", () => {
+  const asText = Math.ceil(MEDIA.maxImageBytes / 3) * 4;
+  assert.ok(asText < 2_000_000, `a ${MEDIA.maxImageBytes}-byte file is ${asText} characters as base64`);
+});
+
+test("uploads are also capped by how many bytes came in the last hour, and the ceiling on everything stored is under what a free D1 database holds", async () => {
+  assert.ok(MEDIA.totalBytes * (4 / 3) < 500 * 1024 * 1024, "300 MB of files is 400 MB as text, under the 500 MB of a free database");
+  const env = fresh();
+  const before = MEDIA.perHourBytes;
+  MEDIA.perHourBytes = 2500;
+  try {
+    const now = Date.parse("2026-10-22T12:00:00Z");
+    assert.equal((await upload(padded(FILES.png, 1200), env, { now })).status, 201);
+    assert.equal((await upload(padded(FILES.png, 1200), env, { now: now + 1000 })).status, 201);
+    const third = await upload(padded(FILES.png, 1200), env, { now: now + 2000 });
+    assert.deepEqual([third.status, third.body.error], [429, "busy"], "the third would take it over the hour's bytes");
+    assert.equal((await upload(padded(FILES.png, 1200), env, { now: now + 3700 * 1000 })).status, 201, "an hour later there is room again");
+  } finally { MEDIA.perHourBytes = before; }
 });
 
 test("the upload needs the rights tick and comes from this site's own page", async () => {

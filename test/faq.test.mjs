@@ -74,7 +74,7 @@ test("the overlays FAQ keeps its promises: Twitch support as it is, uploads desc
   const answer = (q) => items.find((i) => i.q === q).a;
   assert.match(answer("Do the overlays work with Twitch?"), /chat overlay and the alerts do/);
   assert.match(answer("Do the overlays work with Twitch?"), /Last gifts, goals and top likers are for TikTok LIVE only/);
-  assert.match(answer("Can I use my own images, GIFs and sounds in alerts?"), /300 KB/);
+  assert.match(answer("Can I use my own images, GIFs and sounds in alerts?"), /1 MB.*300 KB/);
   assert.match(answer("Can I use my own images, GIFs and sounds in alerts?"), /delete code/);
   assert.ok(answer("Can I use my own images, GIFs and sounds in alerts?").includes('href="/privacy/"'));
   assert.ok(answer("What does Frills keep about me and my viewers?").includes('href="/privacy/"'));

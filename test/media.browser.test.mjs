@@ -112,16 +112,20 @@ test("a sound is uploaded and played, a picture in the sound place is refused, a
   assert.equal(await page.evaluate(`fetch("/api/media/${id}").then((r) => r.status)`), 404, "gone from the server");
 });
 
-test("a file that is too big is turned away in the page, before any upload", { skip }, async () => {
+test("a file that is too big is turned away in the page, before any upload: a picture over 1 MB, a sound over 300 KB", { skip }, async () => {
   await page.goto(`${base}/alerts/`, { settle: 700 });
-  await page.evaluate(`(() => {
-    const picker = document.querySelectorAll(".media")[0];
-    document.getElementById("media-ok").click();
+  const offer = (selector, size, name, type) => page.evaluate(`(() => {
+    const picker = [...document.querySelectorAll(".media")].find((m) => m.querySelector(${JSON.stringify(selector)}));
+    if (!document.getElementById("media-ok").checked) document.getElementById("media-ok").click();
     const dt = new DataTransfer();
-    dt.items.add(new File([new Uint8Array(300 * 1024 + 1)], "big.png", { type: "image/png" }));
+    dt.items.add(new File([new Uint8Array(${size})], ${JSON.stringify(name)}, { type: ${JSON.stringify(type)} }));
     const input = picker.querySelector("input[type=file]");
     input.files = dt.files;
     input.dispatchEvent(new Event("change"));
   })()`);
-  assert.match(await status(0), /over 300 KB/);
+  await offer("input[accept*=image]", 1024 * 1024 + 1, "big.png", "image/png");
+  assert.match(await status(0), /picture is over 1 MB/);
+  const sounds = await page.evaluate(`[...document.querySelectorAll(".media")].findIndex((m) => m.querySelector("input[accept*=audio]"))`);
+  await offer("input[accept*=audio]", 300 * 1024 + 1, "long.wav", "audio/wav");
+  assert.match(await status(sounds), /sound is over 300 KB/);
 });

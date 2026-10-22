@@ -30,7 +30,7 @@ export function overlaysFaq({ kb = 19, relayUrl = "" } = {}) {
     },
     {
       q: "Can I use my own images, GIFs and sounds in alerts?",
-      a: "Yes. Under each alert you can upload one image or GIF and one sound, up to 300 KB each (PNG, JPEG, WebP or GIF; MP3, OGG or WAV). You have to tick that you have the right to use the file. It is stored by Frills so your link can load it, and you get a delete code once, which you need to keep to delete it yourself. Anyone who has your link can see the file, so do not upload anything private. See the <a href=\"/privacy/\">privacy page</a> for exactly what is kept.",
+      a: "Yes. Under each alert you can upload one image or GIF and one sound, a picture or GIF up to 1 MB and a sound up to 300 KB (PNG, JPEG, WebP or GIF; MP3, OGG or WAV). You have to tick that you have the right to use the file. It is stored by Frills so your link can load it, and you get a delete code once, which you need to keep to delete it yourself. Anyone who has your link can see the file, so do not upload anything private. See the <a href=\"/privacy/\">privacy page</a> for exactly what is kept.",
     },
     {
       q: "Why is there no sound in my streaming app?",

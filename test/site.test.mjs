@@ -212,7 +212,7 @@ test("the privacy page says what the database keeps (feedback, uploaded files an
   const html = read("privacy/index.html").replace(/\s+/g, " ");
   assert.doesNotMatch(html, /no database/i);
   assert.doesNotMatch(html, /no accounts and no database/i);
-  for (const phrase of ["What Frills keeps on its server", "Feedback you send.", "Images, GIFs and sounds you upload for alerts.", "delete code", "300 KB", "do not store your name or your address", "New Twitch followers", "kept for one day", "The song playing", "Song names in Song requests", "Cloudflare", "private page"]) {
+  for (const phrase of ["What Frills keeps on its server", "Feedback you send.", "Images, GIFs and sounds you upload for alerts.", "delete code", "1 MB", "300 KB", "do not store your name or your address", "New Twitch followers", "kept for one day", "The song playing", "Song names in Song requests", "Cloudflare", "private page"]) {
     assert.ok(html.includes(phrase), `the privacy page says "${phrase}"`);
   }
 });

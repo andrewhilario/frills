@@ -5,16 +5,20 @@
 import { el } from "./feed.js";
 import { MEDIA_ID, mediaUrl } from "./alerts-settings.js";
 
-const MAX = 300 * 1024;
+const MAX = { image: 1024 * 1024, sound: 300 * 1024 }; // a picture or GIF may be up to 1 MB, a sound up to 300 KB
 const ACCEPT = { image: "image/png,image/jpeg,image/webp,image/gif", sound: "audio/mpeg,audio/ogg,audio/wav,.mp3,.ogg,.wav" };
 const WORDS = {
-  too_big: "That file is over 300 KB. Make it smaller (a shorter sound, or a smaller GIF) and try again.",
   bad_type: "Frills takes png, jpg, webp or gif pictures and mp3, ogg or wav sounds.",
   busy: "A lot of files were uploaded in the last hour. Please try again in a few minutes.",
   full: "Frills has no room for more files right now.",
   not_ready: "Uploads are not working right now. Please try again later.",
   no_consent: "Please tick that you have the right to use this file.",
   wrong_origin: "Uploads only work from the Frills website.",
+};
+
+const TOO_BIG = {
+  image: "That picture is over 1 MB. Make it smaller (a smaller GIF, or fewer frames) and try again.",
+  sound: "That sound is over 300 KB. Make it shorter and try again.",
 };
 
 const STORE = "frills:alerts:media:v1"; // { id: deleteCode }
@@ -66,12 +70,12 @@ export function mountMediaPicker({ kind, label, hint, value, onSet, consentBox }
     const file = input.files?.[0];
     input.value = "";
     if (!file) return;
-    if (file.size > MAX) return say(WORDS.too_big, true);
+    if (file.size > MAX[kind]) return say(TOO_BIG[kind], true);
     say("Uploading…");
     try {
       const res = await fetch("/api/media", { method: "POST", headers: { "content-type": "application/octet-stream", "x-consent": consentBox.checked ? "yes" : "no" }, body: file });
       const body = await res.json().catch(() => ({}));
-      if (!res.ok || body.ok !== true) return say(WORDS[body.error] ?? "Sorry, that did not upload. Please try again.", true);
+      if (!res.ok || body.ok !== true) return say(body.error === "too_big" ? TOO_BIG[body.kind ?? kind] : WORDS[body.error] ?? "Sorry, that did not upload. Please try again.", true);
       if (body.kind !== kind) {
         // the wrong kind of file for this place (a sound where an image goes): take it back out again
         await fetch(`/api/media/${body.id}`, { method: "DELETE", headers: { "x-delete-code": body.deleteCode } }).catch(() => {});
