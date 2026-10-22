@@ -273,25 +273,45 @@ test("overlay: the label on a card says what the alert is (follow, gift, share)"
   assert.deepEqual(labels, ["New follower", "Gift", "Shared the LIVE"]);
 });
 
-test("overlay: the frog pond card (a style only the Matcha page offers) wears a frog on top, a lily pad on the corner and sparkles, and room is left for the frog", { skip }, async () => {
+test("overlay: the pictures (the frog pond pack here) stay on every card style, sit on its top edge and corner, are never clipped, and leave room above the alert", { skip }, async () => {
   const { base } = await withHelper();
-  await page.goto(`${base}/overlay/alerts/?demo=1&only=follow&pace=300&maxShown=1&look=matcha&card=frogpond&vpos=middle`, { settle: 600 });
-  await until(async () => (await cards()).length > 0, 8000);
-  await until(() => page.evaluate(`document.querySelectorAll(".alert__deco img").length > 0 && [...document.querySelectorAll(".alert__deco img")].every((i) => i.complete)`), 5000);
-  const r = await page.evaluate(`(() => {
-    const alert = document.querySelector(".alert");
-    const imgs = [...alert.querySelectorAll(".alert__deco img")];
-    const peek = alert.querySelector("img.deco__peek");
-    const card = alert.querySelector(".alert__card").getBoundingClientRect();
-    const box = peek.getBoundingClientRect();
-    return { style: document.querySelector(".alerts").dataset.card, loaded: imgs.every((i) => i.naturalWidth > 0 && i.src.includes("/decor/frog2/")), peek: peek.src.split("/").pop(), corner: Boolean(alert.querySelector("img.deco__corner")), sparks: alert.querySelectorAll(".deco__spark").length, onTop: box.bottom > card.top && box.bottom - card.top <= 10, margin: parseFloat(getComputedStyle(alert).marginTop) };
-  })()`);
-  assert.deepEqual({ ...r, peek: undefined, margin: undefined }, { style: "frogpond", loaded: true, peek: undefined, corner: true, sparks: 3, onTop: true, margin: undefined });
-  assert.match(r.peek, /^peeker-[ab]\.webp$/);
-  assert.ok(r.margin > 10, "the frog has room above the card: " + r.margin);
-  await page.goto(`${base}/overlay/alerts/?demo=1&only=follow&pace=300&maxShown=1&card=trading`, { settle: 600 });
-  await until(async () => (await cards()).length > 0, 8000);
-  assert.equal(await page.evaluate(`document.querySelectorAll(".alert__deco").length`), 0, "no other style wears pictures");
+  const IDS = ["card", "trading", "profile", "ticket", "polaroid", "stack", "note", "capsule", "banner", "bubble", "neon", "text"];
+  const look = async (query) => {
+    await page.goto(`${base}/overlay/alerts/?demo=1&only=follow&pace=300&maxShown=1&look=matcha&vpos=middle&${query}`, { settle: 600 });
+    await until(async () => (await cards()).length > 0, 8000);
+    await sleep(150);
+    return page.evaluate(`(async () => {
+      const alert = document.querySelector(".alert");
+      const imgs = [...alert.querySelectorAll(".alert__deco img")];
+      await Promise.all(imgs.map((i) => (i.complete ? 1 : new Promise((r) => { i.onload = i.onerror = r; }))));
+      const peek = alert.querySelector("img.deco__peek");
+      const card = alert.querySelector(".alert__card").getBoundingClientRect();
+      const box = peek?.getBoundingClientRect();
+      const clippedBy = [];
+      for (let n = peek?.parentElement; n && !n.classList.contains("alerts"); n = n.parentElement) if (getComputedStyle(n).overflow !== "visible") clippedBy.push(n.className);
+      return {
+        card: document.querySelector(".alerts").dataset.card, deco: document.querySelector(".alerts").dataset.deco, pieces: imgs.length,
+        loaded: imgs.length > 0 && imgs.every((i) => i.naturalWidth > 0 && i.src.includes("/decor/frog2/")), peek: peek ? peek.src.split("/").pop() : null,
+        corner: Boolean(alert.querySelector("img.deco__corner")), sparks: alert.querySelectorAll(".deco__spark").length,
+        onTop: Boolean(box) && box.bottom > card.top && box.bottom - card.top <= 10, clippedBy, margin: parseFloat(getComputedStyle(alert).marginTop), dressed: alert.classList.contains("alert--dressed"),
+      };
+    })()`);
+  };
+  for (const id of IDS) {
+    const r = await look(`card=${id}&deco=frog2`);
+    assert.deepEqual({ ...r, peek: undefined, margin: undefined }, { card: id, deco: "frog2", pieces: 5, loaded: true, peek: undefined, corner: true, sparks: 3, onTop: true, clippedBy: [], margin: undefined, dressed: true }, `the frog pond pictures on the ${id} card`);
+    assert.match(r.peek, /^peeker-[ab]\.webp$/, id);
+    assert.ok(r.margin > 10, `${id}: room above the alert for the frog: ${r.margin}`);
+  }
+  // the card style "frogpond", made before the pictures were their own choice, is the simple card wearing the same pack
+  const old = await look("card=frogpond");
+  assert.deepEqual([old.card, old.deco, old.loaded, old.corner, old.dressed], ["frogpond", "frog2", true, true, true]);
+  // without them, or with them switched off, nothing is added
+  for (const query of ["card=trading", "card=trading&deco=none"]) {
+    await page.goto(`${base}/overlay/alerts/?demo=1&only=follow&pace=300&maxShown=1&${query}`, { settle: 600 });
+    await until(async () => (await cards()).length > 0, 8000);
+    assert.equal(await page.evaluate(`document.querySelectorAll(".alert__deco").length + document.querySelectorAll(".alert--dressed").length`), 0, query);
+  }
   assert.deepEqual(page.problems, [], page.problems.join(" | "));
 });
 

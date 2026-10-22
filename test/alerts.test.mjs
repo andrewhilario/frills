@@ -375,3 +375,20 @@ test("a card style the editor does not offer (the frog pond, from the Matcha pag
   assert.equal(sanitize({ font: "frogpond" }).font, DEFAULTS.font, "the allowance is for the card setting only");
   assert.equal(coerce(CONTROLS.find((c) => c.key === "font"), "frogpond"), undefined);
 });
+
+test("the pictures on a card are their own secret setting: none to begin with, any pack of the chat's, never shown by the public editor, and in a link only when set", () => {
+  assert.equal(DEFAULTS.deco, "none");
+  const control = CONTROLS.find((c) => c.key === "deco");
+  assert.equal(control.secret, true, "the public editor leaves out what is marked secret");
+  assert.deepEqual(CONTROLS.filter((c) => c.secret).map((c) => c.key), ["deco"], "and nothing else is");
+  assert.deepEqual(control.options.map((o) => o.id), ["none", "frog", "frog2", "neko", "hamster", "bunny"]);
+  assert.equal(sanitize({ deco: "frog2" }).deco, "frog2");
+  assert.equal(sanitize({ deco: "dragons" }).deco, "none");
+  assert.equal(sanitize({ deco: "<img>" }).deco, "none");
+  assert.equal(sanitize(fromParams(new URLSearchParams("deco=frog2&card=trading"))).deco, "frog2", "from a link, on any card style");
+  const plain = new URL(alertsUrl("https://x.test/o/", { channel: "a", settings: { ...DEFAULTS } }));
+  assert.equal(plain.searchParams.has("deco"), false);
+  const dressed = new URL(alertsUrl("https://x.test/o/", { channel: "a", settings: { ...DEFAULTS, deco: "frog2", card: "ticket" } }));
+  assert.deepEqual([dressed.searchParams.get("deco"), dressed.searchParams.get("card")], ["frog2", "ticket"]);
+  assert.equal(currentLook({ ...DEFAULTS, deco: "frog2" }), "sticker", "a starting look does not touch them");
+});

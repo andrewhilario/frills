@@ -89,9 +89,9 @@
 .alerts[data-card="trading"] .alert__gift, .alerts[data-card="trading"] .alert__custom--beside { align-self: center; margin: 0; }
 
 /* Profile card: a colored banner across the top, the picture sitting over its lower edge, the words centered under it */
-.alerts[data-card="profile"] .alert__card { position: relative; flex-direction: column; align-items: center; justify-content: flex-start; gap: 0.3em; min-width: 9.5em; padding: 0 1.4em 0.85em; overflow: hidden; text-align: center; }
+.alerts[data-card="profile"] .alert__card { position: relative; flex-direction: column; align-items: center; justify-content: flex-start; gap: 0.3em; min-width: 9.5em; padding: 0 1.4em 0.85em; text-align: center; }
 .alerts[data-card="profile"] .alert__card::before {
-  content: ""; flex: none; align-self: stretch; height: 3em; margin: 0 -1.4em;
+  content: ""; flex: none; align-self: stretch; height: 3em; margin: 0 -1.4em; border-radius: calc(var(--a-radius, 20px) - var(--a-border, 2px)) calc(var(--a-radius, 20px) - var(--a-border, 2px)) 0 0;
   background: radial-gradient(circle at 14% 115%, rgba(255, 255, 255, 0.32) 0 1.6em, transparent 1.7em), radial-gradient(circle at 88% 10%, rgba(255, 255, 255, 0.22) 0 1.1em, transparent 1.2em), var(--a-accent, #fc0);
 }
 .alerts[data-card="profile"] .alert__tag { display: block; position: absolute; top: 0.6em; left: 0; right: 0; z-index: 1; color: var(--a-bg, #fff); font-size: 0.55em; font-weight: 800; letter-spacing: 0.16em; text-transform: uppercase; text-align: center; }
@@ -139,10 +139,11 @@
 .alerts[data-card="note"] .alert__card::before { content: ""; position: absolute; top: -0.6em; left: 50%; width: 3.2em; height: 1.1em; margin-left: -1.6em; background: var(--a-pop, #f48); opacity: 0.75; transform: rotate(-3deg); }
 .alerts[data-card="note"] .alert__card::after { content: ""; display: block; position: absolute; right: 0; bottom: 0; width: 1.7em; height: 1.7em; border: 0; border-radius: 0; top: auto; left: auto; right: 0; bottom: 0; opacity: 1; background: linear-gradient(315deg, transparent 50%, var(--a-accent, #fc0) 50%); }
 
-/* The frog pond card (offered on the Matcha page only): the simple card, with a frog peeking over the top, a lily pad and lotus on the corner and
-   sparkles (our own pictures; see decor.js). The card gives them room. */
-.alerts[data-card="frogpond"] .alert { margin-top: calc(3.7em * var(--peek-ratio, 0.5)); margin-bottom: 1.4em; }
-.alerts[data-card="frogpond"] .alert__card { padding-left: 1em; }
+/* The little pictures an alert can wear (the Matcha editor's "Pictures on the card", on any card style; the old "frogpond" card is the simple card with the
+   frog pond pack): a friend peeking over the top, a scene on a corner and sparkles (our own pictures; see decor.js). The alert makes room for them. */
+/* (one more class than a card style's own margins, so the room for the pictures is not lost to them) */
+.alerts .alert.alert--dressed { margin-top: calc(3.7em * var(--peek-ratio, 0.5)); margin-bottom: 1.4em; }
+.alert--dressed .alert__card { padding-left: 1em; }
 .alert__deco { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
 .alert__deco > * { position: absolute; display: block; height: auto; }
 .alert__deco .deco__peek { right: 1.1em; bottom: calc(100% - 3px); width: 3.7em; }

@@ -207,13 +207,13 @@ test("matcha: the frog pond alerts have their own preview and link (the frog pon
   assert.equal(section.title, "Frog pond alerts");
   const preview = new URL(section.frame, base);
   assert.equal(preview.pathname, "/overlay/alerts/");
-  assert.deepEqual([preview.searchParams.get("card"), preview.searchParams.get("demo"), preview.searchParams.get("accent")], ["frogpond", "1", "#8dae5f"], "made-up alerts, the frog pond card, the matcha colors");
+  assert.deepEqual([preview.searchParams.get("deco"), preview.searchParams.has("card"), preview.searchParams.get("demo"), preview.searchParams.get("accent")], ["frog2", false, "1", "#8dae5f"], "made-up alerts, the frog pond pictures on the plain card, the matcha colors");
   assert.deepEqual([section.link, section.copyOff], ["", true], "no link until there is a name");
   assert.equal(section.edit, "/matcha/alerts/", "the button opens the private Matcha alerts editor, not the public one");
   await set("source-channel", "pond.pal");
   const link = new URL(await page.evaluate(`document.getElementById("alerts-link").value`));
   assert.equal(link.pathname, "/overlay/alerts/");
-  assert.deepEqual([link.searchParams.get("channel"), link.searchParams.get("platform"), link.searchParams.get("card"), link.searchParams.get("bg"), link.searchParams.get("text")], ["pond.pal", "tiktok", "frogpond", "#f5f0e1", "#33432a"]);
+  assert.deepEqual([link.searchParams.get("channel"), link.searchParams.get("platform"), link.searchParams.get("deco"), link.searchParams.get("bg"), link.searchParams.get("text")], ["pond.pal", "tiktok", "frog2", "#f5f0e1", "#33432a"]);
   assert.equal(await page.evaluate(`document.getElementById("copy-alerts-link").disabled`), false);
   assert.equal(new URL(await page.evaluate(`document.getElementById("link").value`)).pathname, "/overlay/", "the chat link is still its own");
   await click("#backs .chip", "Bright game");
@@ -223,40 +223,60 @@ test("matcha: the frog pond alerts have their own preview and link (the frog pon
   assert.equal(wears, true, "a frog peeks over the top of the card in the preview");
 });
 
-test("the Matcha alerts editor is its own private page: it starts with the Matcha look and the frog pond card, keeps its own settings, and the public editor never shows that card", { skip }, async () => {
-  const chipsOf = () => page.evaluate(`[...document.querySelectorAll("#look-controls > *:first-child .chip")].map((b) => b.textContent.trim() + (b.getAttribute("aria-pressed") === "true" ? "*" : ""))`);
+test("the Matcha alerts editor is its own private page: it starts with the Matcha look and the frog pond pictures, which stay on every card style, keeps its own settings, and the public editor never shows them", { skip }, async () => {
+  const rowOf = (label) => `[...document.querySelectorAll("#look-controls > *")].find((r) => r.querySelector(".ctl__label")?.textContent.trim() === ${JSON.stringify(label)})`;
+  const chipsOf = (label) => page.evaluate(`[...(${rowOf(label)}?.querySelectorAll(".chip") ?? [])].map((b) => b.textContent.trim() + (b.getAttribute("aria-pressed") === "true" ? "*" : ""))`);
+  const chooseIn = (label, name) => page.evaluate(`${rowOf(label)}.querySelectorAll(".chip").forEach((b) => b.textContent.trim() === ${JSON.stringify(name)} && b.click())`);
+  const wears = () => page.evaluate(`document.querySelectorAll("#alerts .alert__deco img.deco__peek").length > 0`);
   await page.goto(base + "/alerts/", { settle: 600 });
   await page.evaluate("localStorage.clear()");
-  // the public editor: no frog pond among the choices, and a link that asks for it gets the plain card
-  await page.goto(base + "/alerts/?card=frogpond&look=matcha", { settle: 900 });
-  assert.equal((await chipsOf()).some((c) => /frog/i.test(c)), false, "nothing about a frog among the public choices");
-  assert.equal(await page.evaluate(`document.getElementById("alerts").dataset.card`), "card", "and the card is the plain one");
+  // the public editor: no pictures row at all, and a link that asks for them (or for the old frog pond card) gets the plain card with none
+  await page.goto(base + "/alerts/?deco=frog2&card=frogpond&look=matcha", { settle: 900 });
+  assert.deepEqual(await chipsOf("Pictures on the card"), [], "no pictures row in the public editor");
+  assert.equal(await page.evaluate(`document.getElementById("alerts").dataset.card + "/" + document.getElementById("alerts").dataset.deco`), "card/none");
   await set("source-channel", "pond.pal");
-  assert.equal(new URL(await page.evaluate(`document.getElementById("link").value`)).searchParams.has("card"), false, "the public link does not carry it");
+  const publicLink = new URL(await page.evaluate(`document.getElementById("link").value`));
+  assert.deepEqual([publicLink.searchParams.has("card"), publicLink.searchParams.has("deco")], [false, false], "the public link carries neither");
   // the Matcha editor (starting from empty browser memory, so what it saves can be told apart)
   await page.evaluate("localStorage.clear()");
   await page.goto(base + "/matcha/alerts/", { settle: 900 });
-  const names = await chipsOf();
-  assert.equal(names[0], "Frog pond*", "the frog pond is the first choice and the one picked: " + names.join("|"));
-  assert.equal(await page.evaluate(`document.getElementById("alerts").dataset.card`), "frogpond");
+  assert.equal((await chipsOf("Card style"))[0], "Simple*", "the card is the plain one");
+  assert.deepEqual((await chipsOf("Pictures on the card")).slice(0, 3), ["None", "Frog pond", "Frog pond V2*"], "and the frog pond V2 pictures are picked");
   assert.equal(await page.evaluate(`[...document.querySelectorAll("#looks .chip")].find((b) => b.getAttribute("aria-pressed") === "true")?.textContent.trim()`), "Matcha", "in the Matcha look");
   assert.match(await page.evaluate(`document.querySelector(".panel .note").textContent`), /^Matcha alerts\. A private editor/);
   await set("source-channel", "pond.pal");
   const link = new URL(await page.evaluate(`document.getElementById("link").value`));
   assert.equal(link.pathname, "/overlay/alerts/");
-  assert.deepEqual([link.searchParams.get("channel"), link.searchParams.get("card"), link.searchParams.get("bg")], ["pond.pal", "frogpond", "#f5f0e1"]);
+  assert.deepEqual([link.searchParams.get("channel"), link.searchParams.get("deco"), link.searchParams.has("card"), link.searchParams.get("bg")], ["pond.pal", "frog2", false, "#f5f0e1"]);
   await page.evaluate(`document.querySelector('[data-test="gift-1"]').click()`);
   await page.waitFor(`document.querySelector("#alerts .alert__deco img.deco__peek")`, { timeout: 6000 });
-  // another card, remembered here and nowhere else; Reset goes back to the frog pond
-  await click("#look-controls > *:first-child .chip", "Trading card");
+  // another card style keeps the pictures, on the alert already showing and on the next one
+  await chooseIn("Card style", "Trading card");
   assert.equal(await page.evaluate(`document.getElementById("alerts").dataset.card`), "trading");
+  assert.equal(await wears(), true, "the frog is still on the alert that was showing");
+  await page.evaluate(`document.querySelector('[data-test="gift-1"]').click()`);
+  await page.waitFor(`document.querySelectorAll("#alerts .alert").length >= 2`, { timeout: 6000 });
+  assert.equal(await page.evaluate(`[...document.querySelectorAll("#alerts .alert")].every((a) => a.querySelector("img.deco__peek"))`), true, "and on the next one");
+  assert.equal(new URL(await page.evaluate(`document.getElementById("link").value`)).searchParams.get("card"), "trading");
+  // switching the pictures off takes them off the alerts showing, and back on puts them back
+  await chooseIn("Pictures on the card", "None");
+  assert.equal(await wears(), false);
+  assert.equal(new URL(await page.evaluate(`document.getElementById("link").value`)).searchParams.has("deco"), false, "none is the usual, so the link says nothing");
+  await chooseIn("Pictures on the card", "Frog pond V2");
+  assert.equal(await wears(), true);
+  assert.equal(new URL(await page.evaluate(`document.getElementById("link").value`)).searchParams.get("deco"), "frog2");
+  // remembered here and nowhere else; Reset goes back to the plain card with the frog pond pictures
   assert.equal(await page.evaluate(`JSON.parse(localStorage.getItem("frills:alerts:matcha:v1")).settings.card`), "trading");
   assert.equal(await page.evaluate(`localStorage.getItem("frills:alerts:v1")`), null, "the public editor's saved settings are not touched");
   await page.goto(base + "/matcha/alerts/", { settle: 900 });
-  assert.ok((await chipsOf()).includes("Trading card*"), "remembered after a reload");
+  assert.ok((await chipsOf("Card style")).includes("Trading card*"), "remembered after a reload");
   await click("#reset");
-  assert.equal(await page.evaluate(`document.getElementById("alerts").dataset.card`), "frogpond");
-  assert.equal(await page.evaluate(`[...document.querySelectorAll("#looks .chip")].find((b) => b.getAttribute("aria-pressed") === "true")?.textContent.trim()`), "Matcha");
+  assert.equal(await page.evaluate(`document.getElementById("alerts").dataset.card + "/" + document.getElementById("alerts").dataset.deco`), "card/frog2");
+  // an older saved setting or link with the "frogpond" card becomes the plain card with the pictures
+  await page.evaluate(`localStorage.setItem("frills:alerts:matcha:v1", JSON.stringify({ settings: { card: "frogpond" } }))`);
+  await page.goto(base + "/matcha/alerts/", { settle: 900 });
+  assert.equal(await page.evaluate(`document.getElementById("alerts").dataset.card + "/" + document.getElementById("alerts").dataset.deco`), "card/frog2");
+  assert.equal((await chipsOf("Card style"))[0], "Simple*");
   assert.deepEqual(page.problems, [], page.problems.join(" | "));
   await page.evaluate("localStorage.clear()");
 });

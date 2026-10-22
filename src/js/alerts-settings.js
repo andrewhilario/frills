@@ -3,6 +3,7 @@
 
 import { HEX } from "./color.js";
 import { FONTS } from "./settings.js";
+import { DECOS } from "./decor.js";
 
 /** An uploaded file is named by 16 random characters (made by the Worker); "" means none. */
 export const MEDIA_ID = /^[A-Za-z0-9_-]{16}$/;
@@ -62,6 +63,8 @@ export const DEFAULTS = {
   ...LOOKS.sticker,
   // the format of the card (see CARDS)
   card: "card",
+  // little pictures on the card (a pack from decor.js); only the private Matcha editor offers them
+  deco: "none",
   // the space between letters, in pixels (negative pulls them closer)
   letterSpacing: 0,
   // text alignment: left, center or right
@@ -98,6 +101,8 @@ const media = (key, label, what, hint) => ({ key, type: "media", media: what, la
 export const CONTROLS = [
   // look
   { section: "look", ...chipsOf("card", "Card style", CARDS), hint: "The shape of the alert. Your colors, roundness and edge thickness still apply to every one." },
+  // `secret`: the public editor does not show it, and strips it from a link or a saved setting; the overlay draws it from a link
+  { section: "look", ...chipsOf("deco", "Pictures on the card", list(["none", "None"], ...DECOS.filter((d) => d.id !== "none").map((d) => [d.id, d.name]))), hint: "Little pictures on any card style: a friend peeking over the top, a scene on a corner, sparkles.", secret: true },
   { section: "look", key: "accent", type: "color", label: "Accent color" },
   { section: "look", key: "bg", type: "color", label: "Card color" },
   { section: "look", key: "text", type: "color", label: "Text color" },

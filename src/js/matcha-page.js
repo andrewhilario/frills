@@ -22,8 +22,8 @@ const saved = load();
 const fromLink = Object.fromEntries(Object.entries(matchaFromParams(params)).filter(([, value]) => value !== null && value !== undefined && !Number.isNaN(value)));
 let settings = sanitizeMatcha({ ...saved?.settings, ...fromLink });
 
-// The frog pond alerts: the alerts page's Matcha look with the frog pond card (a card style that only this page offers).
-const ALERT_FROG = { ...ALERT_DEFAULTS, ...ALERT_LOOKS.matcha, card: "frogpond" };
+// The frog pond alerts: the alerts page's Matcha look wearing the frog pond pictures (a setting that only the Matcha editor offers).
+const ALERT_FROG = { ...ALERT_DEFAULTS, ...ALERT_LOOKS.matcha, deco: "frog2" };
 const alertsStage = $("alerts-stage");
 const alertsFrame = el("iframe", { className: "matcha-alerts__frame", title: "Frog pond alerts on made-up follows, gifts and shares", loading: "lazy", tabIndex: -1 });
 alertsFrame.setAttribute("aria-hidden", "true");

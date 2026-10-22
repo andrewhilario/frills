@@ -10,8 +10,10 @@ import { decoPieces, hasDeco, seedOf } from "./decor.js";
 const BURST = [10, 18, 30]; // particles for a small, medium and big alert
 /** The small label some card styles show along the top (a trading card's name bar, a profile card's banner). */
 const KIND_TAGS = { follow: "New follower", gift: "Gift", share: "Shared the LIVE", sub: "New sub", subgift: "Gifted subs", bits: "Bits", raid: "Raid" };
-/** Card styles that wear a pack of little pictures, by the pack. Only the Matcha page offers them. */
-const CARD_PACKS = { frogpond: "frog2" };
+/** The card style "frogpond" (made before the pictures were their own choice) means the simple card wearing this pack. */
+const LEGACY_PACKS = { frogpond: "frog2" };
+/** The pack of little pictures the alerts wear: the `deco` setting, else what an old card style implied, else none. */
+const packOf = (c) => (c.deco && c.deco !== "none" ? c.deco : LEGACY_PACKS[c.card] ?? "none");
 const reducedMotion = () => globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 const rand = (min, max) => min + Math.random() * (max - min);
 
@@ -23,11 +25,13 @@ export function createAlertView(host) {
   host.classList.add("alerts");
   let config = null;
   const cards = new Map();
+  const shown = new Map(); // what each alert on screen is made of, so its pictures can change with the settings
 
   function apply(next) {
     config = next;
     for (const [name, value] of Object.entries(alertVars(next))) host.style.setProperty(name, value);
     host.dataset.card = next.card || "card";
+    host.dataset.deco = packOf(next);
     host.dataset.vpos = next.vpos;
     host.dataset.hpos = next.hpos;
     host.dataset.enter = next.enter;
@@ -35,6 +39,7 @@ export function createAlertView(host) {
     host.dataset.idle = next.idle;
     host.dataset.align = next.align || "left";
     host.style.setProperty("--a-dir", next.hpos === "right" ? "1" : "-1");
+    for (const { item, card, node } of shown.values()) dress(item, card, node, packOf(next)); // the alerts already showing change too
   }
 
   function avatar(item) {
@@ -49,9 +54,15 @@ export function createAlertView(host) {
     return node;
   }
 
-  /** The pictures a card wears (a frog peeking over the top, a scene on the corner, sparkles): our own, never anything a viewer wrote. */
+  /**
+   * The pictures a card wears (a frog peeking over the top, a scene on the corner, sparkles): our own, never anything a viewer wrote. Any earlier
+   * ones come off first, so this also takes them away (pack "none") or swaps them. The pieces depend only on the alert, so they stay the same.
+   */
   function dress(item, card, node, pack) {
-    const pieces = decoPieces(pack, seedOf(item.key));
+    card.querySelector(".alert__deco")?.remove();
+    node.classList.remove("alert--dressed");
+    node.style.removeProperty("--peek-ratio");
+    const pieces = pack === "none" ? null : decoPieces(pack, seedOf(item.key));
     if (!hasDeco(pieces)) return;
     const layer = el("span", { className: "alert__deco" });
     layer.setAttribute("aria-hidden", "true");
@@ -66,6 +77,7 @@ export function createAlertView(host) {
     if (pieces.corner) piece(pieces.corner, "deco__corner");
     pieces.spark.forEach((what, i) => piece(what, `deco__spark deco__spark--${i + 1}`));
     card.append(layer);
+    node.classList.add("alert--dressed"); // the alert makes room for them
     if (pieces.peek?.ratio) node.style.setProperty("--peek-ratio", String(pieces.peek.ratio)); // the room the friend on top needs
   }
 
@@ -106,7 +118,8 @@ export function createAlertView(host) {
     if (config.giftPicture && item.picture) card.append(el("img", { className: "alert__gift", src: item.picture, alt: "", referrerPolicy: "no-referrer" }));
     const node = el("div", { className: "alert alert--in" }, burst(item), card);
     if (custom && config.imageMode === "sticker") node.append(custom);
-    if (CARD_PACKS[config.card]) dress(item, card, node, CARD_PACKS[config.card]);
+    dress(item, card, node, packOf(config));
+    shown.set(item.key, { item, card, node });
     node.dataset.kind = item.kind;
     node.dataset.tier = String(item.tier);
     node.setAttribute("role", "status");
@@ -118,6 +131,7 @@ export function createAlertView(host) {
     const node = cards.get(item.key);
     if (!node) return;
     cards.delete(item.key);
+    shown.delete(item.key);
     node.classList.remove("alert--in");
     node.classList.add("alert--out");
     setTimeout(() => node.remove(), (config?.speed ?? 500) + 80);
@@ -126,6 +140,7 @@ export function createAlertView(host) {
   function clear() {
     for (const node of cards.values()) node.remove();
     cards.clear();
+    shown.clear();
   }
 
   return { apply, show, hide, clear };

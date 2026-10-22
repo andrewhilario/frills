@@ -2,7 +2,7 @@
 
 import { AlertQueue, makeAlert } from "./alerts.js";
 import { createAlertView } from "./alerts-view.js";
-import { CARDS, CONTROLS, DEFAULTS, KINDS, LOOKS, LOOK_NAMES, PLATFORM_KINDS, SECRET_CARDS, TWITCH_CHAT_KINDS, alertsUrl, currentLook, fromParams, mediaUrl, sanitize } from "./alerts-settings.js";
+import { CONTROLS, DEFAULTS, KINDS, LOOKS, LOOK_NAMES, PLATFORM_KINDS, SECRET_CARDS, TWITCH_CHAT_KINDS, alertsUrl, currentLook, fromParams, mediaUrl, sanitize } from "./alerts-settings.js";
 import { mountMediaPicker } from "./alerts-media.js";
 import { createSounds } from "./sounds.js";
 import { fakeAlert, fakeCrowd } from "./fake-alerts.js";
@@ -19,8 +19,8 @@ const $ = (id) => document.getElementById(id);
 // The private Matcha alerts editor (/matcha/alerts/) is this same editor, starting from the Matcha look with the frog pond card, offering that card
 // (the public editor never does), and keeping its own saved settings apart from the public one.
 const MATCHA = $("main")?.dataset.mode === "matcha";
-const BASE = MATCHA ? { ...DEFAULTS, ...LOOKS.matcha, card: "frogpond" } : DEFAULTS;
-const CONTROL_LIST = MATCHA ? CONTROLS.map((c) => (c.key === "card" ? { ...c, options: [{ id: "frogpond", name: "Frog pond" }, ...CARDS] } : c)) : CONTROLS;
+const BASE = MATCHA ? { ...DEFAULTS, ...LOOKS.matcha, deco: "frog2" } : DEFAULTS;
+const CONTROL_LIST = MATCHA ? CONTROLS : CONTROLS.filter((c) => !c.secret);
 
 // What is remembered in this browser: the settings and the account. Nothing leaves the page.
 const STORE = MATCHA ? "frills:alerts:matcha:v1" : "frills:alerts:v1";
@@ -28,14 +28,23 @@ const load = () => { try { return JSON.parse(localStorage.getItem(STORE) ?? "nul
 const saved = load();
 
 let settings = sanitize({ ...BASE, ...saved?.settings, ...fromParams(params) });
-if (!MATCHA && SECRET_CARDS.includes(settings.card)) settings.card = DEFAULTS.card; // a style only the Matcha editor offers is not shown here, even from an old link or a saved setting
+if (MATCHA && SECRET_CARDS.includes(settings.card)) {
+  // an older link or saved setting with the "frogpond" card: the simple card, wearing the frog pond pictures, which are their own choice now
+  settings.card = DEFAULTS.card;
+  if (settings.deco === "none") settings.deco = "frog2";
+}
+if (!MATCHA) {
+  // what only the Matcha editor offers is not shown here, even from an old link or a saved setting
+  if (SECRET_CARDS.includes(settings.card)) settings.card = DEFAULTS.card;
+  settings.deco = DEFAULTS.deco;
+}
 if (MATCHA) {
   const note = document.createElement("p");
   note.className = "note note--warm";
   note.setAttribute("role", "note");
   const lead = document.createElement("strong");
   lead.textContent = "Matcha alerts. ";
-  note.append(lead, "A private editor, not listed on the site. It starts with the Matcha look and the frog pond card, and keeps its settings apart from the public alerts editor.");
+  note.append(lead, "A private editor, not listed on the site. It starts with the Matcha look and the frog pond pictures, which stay on whichever card style you pick, and keeps its settings apart from the public alerts editor.");
   document.querySelector(".panel")?.prepend(note);
 }
 
