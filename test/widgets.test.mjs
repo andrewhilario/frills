@@ -231,8 +231,8 @@ test("a count is kept per account in the browser's storage, and bad or missing s
 
 // ── top likers ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 
-import { LIKERS, LikeBoard, likersKey, loadLikers, saveLikers } from "../src/js/likers.js";
-import { fakeLike } from "../src/js/fake-alerts.js";
+import { LIKERS, LikeBoard, MIN_MILESTONE, likersKey, loadLikers, saveLikers } from "../src/js/likers.js";
+import { demoLikers, fakeLike } from "../src/js/fake-alerts.js";
 
 const like = (user, count, extra = {}) => ({ kind: "like", id: "", user, name: user.toUpperCase(), avatar: "", count, total: 0, ...extra });
 const names = (board) => board.top.map((p) => `${p.rank}:${p.name}:${p.count}`);
@@ -358,4 +358,107 @@ test("alignment is an adjustment every overlay shares: chat, alerts, gifts, goal
   const matchaParams = new URL(matchaUrl).searchParams;
   assert.equal(matchaParams.get("align"), "center");
   assert.equal(sanitizeMatcha(matchaFromParams(matchaParams)).align, "center");
+});
+
+// ── a like milestone ────────────────────────────────────────────────────────────────────────────────────────────────────
+
+const milestones = (settings = {}, entries = []) => {
+  const seen = [];
+  const board = new LikeBoard({ ...LIKERS.defaults, ...settings }, { entries, onMilestone: (m) => seen.push(m) });
+  return { board, seen };
+};
+
+test("the top liker passing a milestone is celebrated once, with their total, the milestone and their place", () => {
+  const { board, seen } = milestones();
+  board.add(like("ann", 990));
+  assert.deepEqual(seen, [], "not there yet");
+  board.add(like("ann", 25));
+  assert.deepEqual(seen, [{ key: "ann", name: "ANN", avatar: "", count: 1015, milestone: 1000, rank: 1 }]);
+  board.add(like("ann", 400));
+  assert.equal(seen.length, 1, "1,415 is between two milestones: nothing new");
+  board.add(like("ann", 600));
+  assert.deepEqual([seen.length, seen[1].count, seen[1].milestone], [2, 2015, 2000], "the next multiple is celebrated too");
+});
+
+test("a big batch that passes several milestones is one celebration, for the highest", () => {
+  const { board, seen } = milestones();
+  board.add(like("ann", 3500));
+  assert.deepEqual(seen.map((m) => [m.count, m.milestone]), [[3500, 3000]]);
+});
+
+test("only the top liker is celebrated unless everyone on the list is asked for, and someone not on the list never is", () => {
+  const { board, seen } = milestones({ max: 3 });
+  board.add(like("ann", 5000));
+  board.add(like("ben", 1200));
+  assert.deepEqual(seen.map((m) => m.key), ["ann"], "Ben passed 1,000 but is second");
+  const all = milestones({ max: 3, celebrateWho: "any" });
+  all.board.add(like("ann", 5000));
+  all.board.add(like("ben", 1200));
+  assert.deepEqual(all.seen.map((m) => [m.key, m.rank]), [["ann", 1], ["ben", 2]], "everyone on the list");
+  const small = milestones({ max: 3, celebrateWho: "any" });
+  for (const [user, count] of [["ann", 9000], ["ben", 8000], ["cat", 7000]]) small.board.add(like(user, count));
+  small.seen.length = 0;
+  small.board.add(like("dan", 1100));
+  assert.deepEqual(small.seen, [], "Dan is fourth and the list shows three");
+  const tie = milestones();
+  tie.board.add(like("ann", 1000));
+  tie.board.add(like("ben", 1000));
+  assert.deepEqual(tie.seen.map((m) => m.key), ["ann"], "Ben is level with Ann but got there second, so he is not the top");
+});
+
+test("the milestone is never smaller than 1,000, can be more, and the celebration can be switched off", () => {
+  assert.equal(MIN_MILESTONE, 1000);
+  const small = milestones({ milestone: 300 });
+  small.board.add(like("ann", 400));
+  assert.deepEqual(small.seen, [], "300 is taken as 1,000");
+  small.board.add(like("ann", 650));
+  assert.equal(small.seen.length, 1);
+  const big = milestones({ milestone: 5000 });
+  big.board.add(like("ann", 4900));
+  assert.deepEqual(big.seen, []);
+  big.board.add(like("ann", 150));
+  assert.deepEqual([big.seen.length, big.seen[0].milestone], [1, 5000]);
+  const off = milestones({ celebrate: false });
+  off.board.add(like("ann", 5000));
+  assert.deepEqual(off.seen, []);
+  for (const bad of [undefined, "x", NaN, -5]) {
+    const odd = milestones({ milestone: bad });
+    odd.board.add(like("ann", 1000));
+    assert.equal(odd.seen.length, 1, `a milestone of ${String(bad)} falls back to 1,000`);
+  }
+});
+
+test("likes remembered from before do not celebrate again, but the next milestone does", () => {
+  const { board, seen } = milestones({}, [{ user: "ann", name: "ANN", avatar: "", count: 1700 }]);
+  assert.deepEqual(seen, [], "restoring does not celebrate");
+  board.add(like("ann", 100));
+  assert.deepEqual(seen, [], "1,800 is the same milestone as before");
+  board.add(like("ann", 250));
+  assert.deepEqual(seen.map((m) => m.milestone), [2000]);
+});
+
+test("the milestone settings are checked: the smallest is 1,000, an unknown 'who' falls back, words are cleaned, and a link carries only what changed", () => {
+  assert.deepEqual([LIKERS.defaults.celebrate, LIKERS.defaults.milestone, LIKERS.defaults.celebrateWho, LIKERS.defaults.celebrateTime, LIKERS.defaults.celebrateSound], [true, 1000, "top", 7, "fanfare"]);
+  assert.equal(LIKERS.sanitize({ milestone: 300 }).milestone, 1000);
+  assert.equal(LIKERS.sanitize({ milestone: 7500 }).milestone, 7500);
+  assert.equal(LIKERS.sanitize({ celebrateWho: "everybody" }).celebrateWho, "top");
+  assert.equal(LIKERS.sanitize({ celebrateWho: "any" }).celebrateWho, "any");
+  assert.equal(LIKERS.sanitize({ celebrateTime: 99 }).celebrateTime, 15);
+  assert.equal(LIKERS.sanitize({ celebrateSound: "no-such-sound" }).celebrateSound, "fanfare");
+  assert.equal(LIKERS.sanitize({ celebrateText: "Well done! " }).celebrateText.includes(" "), false);
+  const link = new URL(LIKERS.url("https://x.test/o/", { channel: "a", settings: { ...LIKERS.defaults } }));
+  for (const key of ["celebrate", "milestone", "celebrateWho", "celebrateText", "celebrateTime", "celebrateSound"]) assert.equal(link.searchParams.has(key), false, `${key} is not in a link unless changed`);
+  const changed = new URL(LIKERS.url("https://x.test/o/", { channel: "a", settings: { ...LIKERS.defaults, celebrate: false, milestone: 5000, celebrateWho: "any" } }));
+  assert.deepEqual([changed.searchParams.get("celebrate"), changed.searchParams.get("milestone"), changed.searchParams.get("celebrateWho")], ["0", "5000", "any"]);
+});
+
+test("the practice likers start the first one just short of a milestone, and at least 1,000 whatever is asked", () => {
+  const first = demoLikers(1000)[0];
+  assert.ok(first.count < 1000 && first.count > 950, String(first.count));
+  assert.equal(demoLikers(5000)[0].count, 4988);
+  assert.equal(demoLikers(10)[0].count, 988, "a smaller milestone is taken as 1,000");
+  const { board, seen } = milestones({}, demoLikers(1000));
+  board.add(like("Pond Pal", 20));
+  assert.deepEqual(seen.map((m) => m.key), ["Pond Pal"], "the practice names are the ones the made-up likes use");
+  assert.equal(seen.length, 1, "a few likes from the first practice liker reach the milestone");
 });

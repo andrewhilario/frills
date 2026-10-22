@@ -5,7 +5,8 @@
 import { LIKERS, LikeBoard, loadLikers, saveLikers } from "./likers.js";
 import { createLikersView } from "./widgets-view.js";
 import { channelFromParams, connectEvents } from "./widget-overlay.js";
-import { fakeLikeSource } from "./fake-alerts.js";
+import { demoLikers, fakeLikeSource } from "./fake-alerts.js";
+import { createSounds } from "./sounds.js";
 import { fontsReady, generalFaces } from "./look.js";
 
 const params = new URLSearchParams(location.search);
@@ -20,9 +21,12 @@ const demo = params.get("demo") === "1";
 
 const view = createLikersView(document.getElementById("likers"));
 view.apply(settings);
+const sounds = createSounds();
 let saving = 0;
 const board = new LikeBoard(settings, {
-  entries: settings.keep && channel ? loadLikers(globalThis.localStorage, channel) : [],
+  // the practice page starts with a few likers, the first just short of a milestone, so the celebration can be seen
+  entries: demo ? demoLikers(settings.milestone) : settings.keep && channel ? loadLikers(globalThis.localStorage, channel) : [],
+  onMilestone: (person) => view.celebrate(person, { onStart: () => sounds.play(settings.celebrateSound, { volume: 70, tier: 3 }) }),
   onChange: (top) => {
     view.render(top);
     if (settings.keep && channel && !saving) saving = setTimeout(() => { saving = 0; saveLikers(globalThis.localStorage, channel, board); }, 1500);

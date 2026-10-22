@@ -64,6 +64,13 @@ export function fakeLike({ name, count } = {}) {
   return { kind: "like", id: "", user: who, name: who, avatar: "", count: count ?? 1 + Math.floor(Math.random() * 15), total: 0 };
 }
 
+/** Practice likers for the Top Likers overlay's demo: the first is a few likes short of a milestone, so the celebration shows soon after the page opens. */
+export function demoLikers(every = 1000) {
+  const base = Math.max(1000, every);
+  return [["Pond Pal", base - 12], ["Mochi Bun", 0.62], ["frogfan 🐸", 0.41], ["Mattcha", 0.3], ["Little Lily", 0.19], ["Croaker", 0.11]]
+    .map(([name, share]) => ({ user: name, name, avatar: "", count: share < 1 ? Math.round(base * share) : share }));
+}
+
 /** Sends practice likes to `push` every moment, from a handful of people, so a ranking fills and changes. Returns { stop() }. */
 export function fakeLikeSource(push, getPace = () => [350, 900]) {
   let stopped = false;

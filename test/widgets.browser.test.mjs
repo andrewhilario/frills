@@ -238,3 +238,83 @@ test("editor: the likers test buttons fill and re-order the ranking, and the lin
   assert.equal(url.searchParams.get("max"), "5");
   assert.ok(before);
 });
+
+// ── a like milestone ────────────────────────────────────────────────────────────────────────────────────────────────────
+
+const party = () => page.evaluate(`(() => {
+  const p = document.querySelector(".likers__party");
+  return p ? { who: p.querySelector(".likers__who")?.textContent, num: p.querySelector(".likers__num")?.textContent, total: p.querySelector(".likers__total")?.textContent, cheer: p.querySelector(".likers__cheer")?.textContent, crown: Boolean(p.querySelector("svg.likers__crown")), pic: Boolean(p.querySelector(".likers__pic")) } : null;
+})()`);
+const noParty = async (ms = 1800) => { await sleep(ms); assert.equal(await party(), null, "no celebration"); };
+
+test("overlay: the top liker passing 1,000 likes zooms in with a crown, their name and likes, then it goes; someone who is not on top is not celebrated", { skip }, async () => {
+  const { base, made } = await withHelper();
+  await page.goto(`${base}/overlay/likers/?channel=pond_cafe&platform=tiktok&celebrateTime=3&celebrateText=Well+done`, { settle: 800 });
+  await until(() => made.length === 1);
+  await sleep(150);
+  made[0].emit("like", like("1", "Ann", 400));
+  await until(async () => (await ranking()).length === 1, 4000);
+  await noParty(300);
+  made[0].emit("like", like("2", "Ann", 650));
+  await until(async () => (await party()) !== null, 5000);
+  assert.deepEqual(await party(), { who: "Ann", num: "1,050", total: "1,050 likes", cheer: "Well done", crown: true, pic: true });
+  await until(async () => (await party()) === null, 6000);
+  made[0].emit("like", like("3", "Ben", 1100));
+  await until(async () => (await party())?.who === "Ben", 5000);
+  assert.equal((await party()).num, "1,100", "the next top liker to pass a milestone is celebrated too");
+  await until(async () => (await party()) === null, 6000);
+  made[0].emit("like", like("4", "Dan", 1010));
+  await until(async () => (await ranking()).length === 3, 5000);
+  await noParty();
+  assert.deepEqual(page.problems, [], page.problems.join(" | "));
+});
+
+test("overlay: a bigger milestone waits for it, and the celebration can be switched off", { skip }, async () => {
+  const { base, made } = await withHelper();
+  await page.goto(`${base}/overlay/likers/?channel=pond_cafe&platform=tiktok&celebrateTime=3&milestone=2000`, { settle: 800 });
+  await until(() => made.length === 1);
+  await sleep(150);
+  made[0].emit("like", like("1", "Ann", 1500));
+  await until(async () => (await ranking()).length === 1, 4000);
+  await noParty();
+  made[0].emit("like", like("2", "Ann", 600));
+  await until(async () => (await party()) !== null, 5000);
+  assert.equal((await party()).num, "2,100");
+  const off = await withHelper(); // a helper of its own, so the page really gets a new connection to talk to
+  await page.goto(`${off.base}/overlay/likers/?channel=pond_cafe&platform=tiktok&celebrate=0`, { settle: 800 });
+  await until(() => off.made.length === 1);
+  await sleep(150);
+  off.made[0].emit("like", like("1", "Ann", 5000));
+  await until(async () => (await ranking()).length === 1, 4000);
+  await noParty();
+});
+
+test("overlay: in practice mode the first liker is just short of a milestone, so the celebration shows by itself", { skip }, async () => {
+  const { base } = await withHelper();
+  await page.goto(`${base}/overlay/likers/?demo=1&pace=300&celebrateTime=3`, { settle: 500 });
+  await until(async () => (await party()) !== null, 30000);
+  const shown = await party();
+  assert.equal(shown.who, "Pond Pal");
+  assert.match(shown.total, /^1,0\d\d likes$/);
+  assert.equal(shown.crown, true);
+  assert.deepEqual(page.problems, [], page.problems.join(" | "));
+});
+
+test("editor: the milestone choices are there, the test button shows the celebration (never under 1,000 likes), and the link carries what was changed", { skip }, async () => {
+  const { base } = await withHelper();
+  await page.goto(base + "/likers/", { settle: 800 });
+  const labels = await page.evaluate(`[...document.querySelectorAll("#opt-controls .ctl__label")].map((l) => l.textContent.trim())`);
+  for (const label of ["Celebrate a like milestone", "Celebrate every", "Who is celebrated", "Words under the name", "Seconds on screen", "Sound"]) assert.ok(labels.includes(label), label);
+  await type("#c-milestone", "300");
+  await click('[data-test="milestone"]');
+  await until(async () => (await party()) !== null, 3000);
+  const shown = await party();
+  assert.equal(shown.crown, true);
+  assert.ok(Number(shown.num.replace(/,/g, "")) >= 1000, `300 is taken as 1,000: ${shown.num}`);
+  await type("#c-milestone", "5000");
+  await type("#source-channel", "pond.pal");
+  const url = new URL(await page.evaluate(`document.getElementById("link").value`));
+  assert.equal(url.searchParams.get("milestone"), "5000");
+  assert.equal(url.searchParams.has("celebrate"), false, "switched on is the usual, so it is not in the link");
+  assert.deepEqual(page.problems, [], page.problems.join(" | "));
+});

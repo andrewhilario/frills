@@ -153,7 +153,29 @@ export function createGoalView(host) {
   };
 }
 
-/** The Top Likers ranking. Rows slide to their new places when the order changes. Returns { apply(settings), render(top), clear() }. */
+const SVG = "http://www.w3.org/2000/svg";
+/** A little gold crown (drawn here so it is the same on every look), for the person being celebrated. */
+function crownIcon() {
+  const svg = document.createElementNS(SVG, "svg");
+  svg.setAttribute("viewBox", "0 0 64 48");
+  svg.setAttribute("class", "likers__crown");
+  svg.setAttribute("aria-hidden", "true");
+  const add = (tag, attrs) => { const n = document.createElementNS(SVG, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); svg.append(n); };
+  add("path", { d: "M6 40 L10 12 L24 26 L32 6 L40 26 L54 12 L58 40 Z", fill: "#ffd23f", stroke: "#b8860b", "stroke-width": "3", "stroke-linejoin": "round" });
+  add("rect", { x: "6", y: "40", width: "52", height: "7", rx: "2.5", fill: "#ffc107", stroke: "#b8860b", "stroke-width": "3" });
+  add("circle", { cx: "10", cy: "12", r: "4", fill: "#ff5f86" });
+  add("circle", { cx: "32", cy: "6", r: "4", fill: "#59d4ff" });
+  add("circle", { cx: "54", cy: "12", r: "4", fill: "#7be06a" });
+  return svg;
+}
+
+const PARTY_WAITING = 3; // celebrations that can wait their turn; when more pile up, the rest are skipped
+
+/**
+ * The Top Likers ranking. Rows slide to their new places when the order changes. Returns { apply(settings), render(top), clear(),
+ * celebrate(person, { onStart }) }. `celebrate` zooms a person in (picture, name, their likes, a crown, confetti) over the list for the
+ * seconds the settings say; one at a time, the next waits. It resolves to whether it was shown (false when too many are already waiting).
+ */
 export function createLikersView(host) {
   const root = el("div", { className: "likers" });
   host.append(root);
@@ -163,6 +185,55 @@ export function createLikersView(host) {
   const nodes = new Map(); // person -> { node, count }
   let settings = null;
   let last = [];
+  const waiting = [];
+  let showing = false;
+
+  /** One celebration: the card that zooms in, with the confetti behind it. */
+  function party(person, ms) {
+    const node = el("div", { className: "likers__party likers__party--in" });
+    node.style.setProperty("--party-ms", ms + "ms");
+    const fx = el("span", { className: "alert__fx likers__fx" });
+    fx.setAttribute("aria-hidden", "true");
+    if (!reducedMotion()) {
+      fx.dataset.fx = "confetti";
+      for (let i = 0; i < 46; i++) {
+        const p = el("i");
+        const angle = Math.random() * Math.PI * 2;
+        const far = 150 + Math.random() * 190;
+        p.style.setProperty("--x", Math.round(Math.cos(angle) * far * 1.5) + "px");
+        p.style.setProperty("--y", Math.round(Math.sin(angle) * far) + "px");
+        p.style.setProperty("--r", Math.round(Math.random() * 400 - 200) + "deg");
+        p.style.setProperty("--d", Math.round(350 + Math.random() * 350) + "ms");
+        p.style.setProperty("--s", (0.7 + Math.random() * 0.8).toFixed(2));
+        fx.append(p);
+      }
+    }
+    const pic = el("span", { className: "likers__pic", textContent: [...(person.name || "?")][0].toUpperCase() });
+    pic.setAttribute("aria-hidden", "true");
+    if (person.avatar) {
+      const img = el("img", { className: "gift__avimg", src: person.avatar, alt: "", referrerPolicy: "no-referrer" });
+      img.addEventListener("load", () => pic.classList.add("likers__pic--pic"));
+      img.addEventListener("error", () => img.remove());
+      pic.append(img);
+    }
+    const card = el("div", { className: "likers__trophy" }, crownIcon(), pic, el("strong", { className: "likers__who", textContent: person.name }));
+    card.append(el("span", { className: "likers__total" }, el("span", { className: "likers__num", textContent: Number(person.count).toLocaleString("en-US") }), document.createTextNode(" likes")));
+    if (settings?.celebrateText) card.append(el("span", { className: "likers__cheer", textContent: settings.celebrateText }));
+    node.append(fx, card);
+    return node;
+  }
+
+  function nextParty() {
+    if (showing || !waiting.length) return;
+    showing = true;
+    const { person, onStart, done } = waiting.shift();
+    const ms = Math.max(3, Number(settings?.celebrateTime) || 7) * 1000;
+    const node = party(person, ms);
+    root.append(node);
+    onStart?.();
+    setTimeout(() => { node.classList.remove("likers__party--in"); node.classList.add("likers__party--out"); }, ms - 450);
+    setTimeout(() => { node.remove(); showing = false; done(true); nextParty(); }, ms);
+  }
 
   /** Puts each row at its place: a row is placed by its rank, so changing the order is just changing the numbers. */
   function layout() {
@@ -233,6 +304,10 @@ export function createLikersView(host) {
       nodes.clear();
       last = [];
       layout();
+    },
+    celebrate(person, { onStart } = {}) {
+      if (!settings || waiting.length >= PARTY_WAITING) return Promise.resolve(false);
+      return new Promise((resolve) => { waiting.push({ person, onStart, done: resolve }); nextParty(); });
     },
   };
 }
