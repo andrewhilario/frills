@@ -315,6 +315,82 @@ test("overlay: the pictures (the frog pond pack here) stay on every card style, 
   assert.deepEqual(page.problems, [], page.problems.join(" | "));
 });
 
+test("overlay: on a narrow overlay the words of every card style wrap at the spaces, never inside a word, and nothing sticks out of the card (with or without the gift's picture)", { skip }, async () => {
+  const { base } = await withHelper();
+  const IDS = ["card", "trading", "profile", "ticket", "polaroid", "stack", "note", "capsule", "banner", "bubble", "neon", "text"];
+  const ROW = IDS.filter((id) => !["trading", "profile", "polaroid"].includes(id)); // the tall cards stack their parts, the others lay them out in a row
+  const TEXTS = [
+    { id: "follow", tier: 1, gift: false, text: "Little Lily just followed!" },
+    { id: "gift", tier: 2, gift: true, text: "Mochi Bun sent Finger Heart ×5" },
+    { id: "big gift", tier: 3, gift: true, text: "Mattcha sent Lion ×1!!" },
+    { id: "crowd", tier: 1, gift: false, text: "Pond Pal and 12 others followed!" },
+    { id: "long name", tier: 1, gift: false, text: "xX_the_froggiest_frog_of_all_Xx just followed!", long: true }, // a word wider than the card: the only one that may break
+  ];
+  /** Draws every card style with every text at every size on a page `width` wide (the real alert, copied, so the real stylesheet and markup are used) and measures them. */
+  const measure = async (width, sizes) => {
+    await page.viewport(width, 900);
+    await page.goto(`${base}/overlay/alerts/?demo=1&only=gift&pace=300&maxShown=1`, { settle: 500 });
+    await until(async () => (await cards()).length > 0, 8000);
+    return page.evaluate(`(() => {
+      const host = document.querySelector(".alerts");
+      const source = document.querySelector(".alert");
+      source.style.display = "none";
+      const brokenWords = (node) => {
+        const out = [];
+        const walk = document.createTreeWalker(node, NodeFilter.SHOW_TEXT);
+        for (let t = walk.nextNode(); t; t = walk.nextNode()) {
+          for (const m of t.data.matchAll(/\\S+/g)) {
+            const r = document.createRange();
+            r.setStart(t, m.index);
+            r.setEnd(t, m.index + m[0].length);
+            if (r.getClientRects().length > 1) out.push(m[0]); // a word drawn on more than one line
+          }
+        }
+        return out;
+      };
+      const rows = [];
+      for (const card of ${JSON.stringify(IDS)}) for (const size of ${JSON.stringify(sizes)}) for (const t of ${JSON.stringify(TEXTS)}) for (const withGift of t.gift ? [true, false] : [false]) {
+        host.dataset.card = card;
+        host.style.setProperty("--a-size", size + "px");
+        const node = source.cloneNode(true);
+        node.classList.remove("alert--in", "alert--out");
+        node.style.cssText = "animation: none";
+        node.dataset.tier = String(t.tier);
+        const words = node.querySelector(".alert__words");
+        words.textContent = t.text;
+        if (!withGift) node.querySelector(".alert__gift")?.remove();
+        host.append(node);
+        const box = node.querySelector(".alert__card").getBoundingClientRect();
+        const parts = [...node.querySelector(".alert__card").children].filter((k) => getComputedStyle(k).display !== "none").map((k) => { const r = k.getBoundingClientRect(); return { name: k.className.replace("alert__", ""), left: r.left, right: r.right, middle: (r.top + r.bottom) / 2 }; });
+        const middle = parts.find((p) => p.name === "words").middle;
+        rows.push({
+          where: card + " at " + size + "px, " + t.id + (withGift ? " with the gift picture" : ""), card, size, text: t.id, long: Boolean(t.long),
+          broken: brokenWords(words), out: Math.max(0, ...parts.map((p) => p.right - box.right), ...parts.map((p) => box.left - p.left)),
+          oneRow: parts.every((p) => Math.abs(p.middle - middle) < 2),
+        });
+        node.remove();
+      }
+      return rows;
+    })()`);
+  };
+  try {
+    const narrow = await measure(480, [28, 40, 48]);
+    assert.equal(narrow.length, IDS.length * 3 * 7, "every combination was measured");
+    for (const r of narrow) {
+      // a word may only be broken when it is wider than the card, and then only that one
+      const wanted = r.long ? ["xX_the_froggiest_frog_of_all_Xx"] : [];
+      assert.ok(r.broken.every((word) => wanted.includes(word)), `${r.where}: broke ${r.broken.join(", ")} (a column about a letter wide)`);
+      assert.ok(r.out < 1, `${r.where}: something sticks out of the card by ${r.out}px`);
+    }
+    // wide enough: nothing is moved, the person's picture, the words and the gift's picture stay on one row as they always did
+    const wide = await measure(800, [28]);
+    for (const r of wide.filter((r) => ROW.includes(r.card) && !r.long)) assert.ok(r.oneRow && !r.broken.length, `${r.where}: a card that fits stays on one row`);
+    assert.deepEqual(page.problems, [], page.problems.join(" | "));
+  } finally {
+    await page.viewport(1280, 900);
+  }
+});
+
 test("editor: Card style is the first Look option, changing it redraws the alert, and the link carries it only when it is not the plain card", { skip }, async () => {
   const { base } = await withHelper();
   await page.goto(base + "/alerts/", { settle: 700 });

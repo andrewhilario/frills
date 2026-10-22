@@ -27,6 +27,12 @@
 .alert[data-tier="3"] .alert__card::after { content: ""; position: absolute; inset: -0.3em; border: 0.12em solid var(--a-accent, #fc0); border-radius: calc(var(--a-radius, 20px) + 0.3em); opacity: 0.55; }
 .alert__mark { color: var(--a-pop, #f48); font-weight: 800; }
 .alert__words { min-width: 0; text-align: var(--a-align, left); }
+/* In a card laid out in a row (every style but the three tall ones: trading, profile, polaroid) the words never get narrower than their longest word.
+   When the person's picture, that word and the gift picture do not fit on one line, the gift wraps to a line of its own instead of squeezing the words
+   into a column a letter wide. `break-word` (not the card's `anywhere`) keeps that longest word in the minimum, and still breaks a word that is wider than the
+   whole card (a very long name). The words grow only up to their own text, so a wide banner keeps them next to the picture. */
+.alerts:not([data-card="trading"]):not([data-card="profile"]):not([data-card="polaroid"]) .alert__card { flex-wrap: wrap; }
+.alerts:not([data-card="trading"]):not([data-card="profile"]):not([data-card="polaroid"]) .alert__words { flex: 1 1 min-content; max-width: max-content; overflow-wrap: break-word; }
 
 .alerts[data-align="center"] .alert__card { justify-content: center; text-align: center; }
 .alerts[data-align="center"] .alert__words { text-align: center; }
