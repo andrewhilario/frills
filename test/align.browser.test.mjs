@@ -1,6 +1,6 @@
 // Text alignment (left, center, right) in a real headless Chrome: the chat, the alerts, last gifts, goals, top likers and song requests, each in
 // their practice mode. Left is the default and changes nothing; center puts the words in the middle; right puts them at the right edge and swaps
-// the sides (the picture or the rank moves to the other end). Skipped on a computer with no Chrome or Edge. `npm test` builds first.
+// the sides (the picture or the rank moves to the other end). The chat's bubbles fill the row in all three; only the words and the picture move. Skipped on a computer with no Chrome or Edge. `npm test` builds first.
 
 import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
@@ -39,24 +39,46 @@ async function look(path, align, waitFor, probe) {
   return page.evaluate(`(() => { const css = (sel, prop) => { const n = document.querySelector(sel); return n ? getComputedStyle(n)[prop] : null; }; return (${probe})(css); })()`);
 }
 
-test("chat: left fills the row, center puts every message in the middle, right puts it at the right edge with the picture on the far side", { skip }, async () => {
+test("chat: left, center and right all fill the row, the words follow the alignment, and right puts the picture on the far side", { skip }, async () => {
   const geometry = (align) => look("/overlay/?demo=1&look=blueberry", align, `document.querySelectorAll("#chat .m").length >= 3`, `() => {
     const box = document.getElementById("chat").getBoundingClientRect();
     const ms = [...document.querySelectorAll("#chat .m")].map((m) => m.getBoundingClientRect());
     const av = document.querySelector("#chat .m .av").getBoundingClientRect();
     const body = document.querySelector("#chat .m .body").getBoundingClientRect();
-    return { stage: document.getElementById("stage").dataset.align, offCenter: Math.max(...ms.map((r) => Math.abs((r.left + r.right) / 2 - (box.left + box.right) / 2))), gapRight: Math.min(...ms.map((r) => box.right - r.right)), gapLeft: Math.min(...ms.map((r) => r.left - box.left)), avatarOnRight: av.left > body.left };
+    return { stage: document.getElementById("stage").dataset.align, box: box.width, narrowest: Math.min(...ms.map((r) => r.width)), gapRight: Math.min(...ms.map((r) => box.right - r.right)), gapLeft: Math.min(...ms.map((r) => r.left - box.left)), words: getComputedStyle(document.querySelector("#chat .m .txt")).textAlign, avatarOnRight: av.left > body.left };
   }`);
   const left = await geometry("left");
-  assert.equal(left.stage, "left");
-  assert.ok(left.gapLeft <= 2 && left.avatarOnRight === false);
   const center = await geometry("center");
-  assert.equal(center.stage, "center");
-  assert.ok(center.offCenter <= 4, `every message is centered (off by ${center.offCenter})`);
   const right = await geometry("right");
-  assert.equal(right.stage, "right");
-  assert.ok(right.gapRight <= 2, `the messages end at the right edge (${right.gapRight})`);
-  assert.equal(right.avatarOnRight, true, "and the picture is on the right");
+  assert.deepEqual([left.stage, center.stage, right.stage], ["left", "center", "right"]);
+  for (const [name, g] of [["left", left], ["center", center], ["right", right]]) {
+    assert.ok(g.narrowest >= g.box - 2, `${name}: every message is as wide as the chat (${g.narrowest} of ${g.box})`);
+    assert.ok(g.gapLeft <= 2 && g.gapRight <= 2, `${name}: and touches both edges (${g.gapLeft}, ${g.gapRight})`);
+  }
+  assert.ok(["start", "left"].includes(left.words), `left: the words start at the left (${left.words})`);
+  assert.equal(center.words, "center");
+  assert.equal(right.words, "right");
+  assert.equal(left.avatarOnRight, false);
+  assert.equal(center.avatarOnRight, false);
+  assert.equal(right.avatarOnRight, true, "right: the picture is on the right");
+});
+
+test("chat: the decorations never stick out past the page's edges, whatever the alignment, the side of the scene or the pack", { skip }, async () => {
+  const worst = [];
+  for (const deco of ["frog", "neko"]) {
+    for (const side of ["left", "right"]) {
+      for (const align of ["left", "center", "right"]) {
+        const out = await look(`/overlay/?demo=1&look=matcha&deco=${deco}&decoSide=${side}&tag=pill&pace=400`, align, `document.querySelectorAll("#chat .m .deco__corner").length >= 3`, `() => {
+          const w = document.documentElement.clientWidth;
+          let past = 0;
+          for (const e of document.querySelectorAll("#chat .m [class*='deco']")) { const b = e.getBoundingClientRect(); if (b.width < 1) continue; past = Math.max(past, -b.left, b.right - w); }
+          return Math.round(past);
+        }`);
+        if (out > 1) worst.push(`${deco}, scene on the ${side}, ${align}: ${out} px`);
+      }
+    }
+  }
+  assert.deepEqual(worst, [], "pictures cut off by the page's edge");
 });
 
 test("an unknown alignment in a link is ignored, and the chat stays as it was", { skip }, async () => {

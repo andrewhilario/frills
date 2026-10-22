@@ -142,7 +142,7 @@ function save() {
 
 // ── The preview itself: what sits behind the chat, and how wide it is ─────────────────────────────────────────────────
 $("backdrop").addEventListener("change", (event) => { preview.dataset.back = event.target.value; });
-const width = buildControl({ key: "previewW", type: "range", label: "Preview width", min: 280, max: 720, step: 10, unit: " px" }, 440, (value) => $("chat").style.setProperty("--preview-w", value + "px"), { id: "c-previewW" });
+const width = buildControl({ key: "previewW", type: "range", label: "Width", min: 280, max: 720, step: 10, unit: " px" }, 440, (value) => $("chat").style.setProperty("--preview-w", value + "px"), { id: "c-previewW" });
 $("preview-width").append(width.row);
 
 paint();

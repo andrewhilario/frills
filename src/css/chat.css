@@ -21,13 +21,12 @@
 .look[data-avatar="off"] .m { grid-template-columns: minmax(0, 1fr); }
 .look[data-avatar="off"] .av { display: none; }
 
-/* Text and message alignment */
-.look[data-align="center"] .chatbox { align-items: center; }
+/* Text alignment. Every message fills the row, whichever way the words go (the chat box stretches its messages; it is not told to shrink them to their
+   text and push them to the middle or the right), so Left, Center and Right all have the same bubbles and only the words and the picture move. */
 .look[data-align="center"] .m { text-align: center; }
 .look[data-align="center"] .m .who { justify-content: center; }
 .look[data-align="center"] .m .txt { text-align: center; }
 
-.look[data-align="right"] .chatbox { align-items: flex-end; }
 .look[data-align="right"] .m { grid-template-columns: minmax(0, 1fr) auto; text-align: right; }
 .look[data-align="right"] .m .av { order: 2; }
 .look[data-align="right"] .m .body { order: 1; text-align: right; }
@@ -63,6 +62,11 @@
 .look[data-deco-side="right"] .m .deco__spark--1 { left: auto; right: 30%; }
 .look[data-deco-side="right"] .m .deco__spark--2 { right: auto; left: -0.4em; }
 .look[data-deco-side="right"] .m .deco__spark--3 { left: auto; right: 55%; }
+/* Full-width bubbles reach the page's edge on the side the round picture is not on, and anything hanging out past a bubble is cut off there (the page is the window the
+   streaming app shows). So on that side the corner scene and the sparkle sit flush with the edge instead of hanging out of it. */
+.look[data-align="right"]:not([data-deco-side="right"]) .m .deco__corner { left: 0; }
+.look[data-deco-side="right"]:not([data-align="right"]) .m .deco__corner { right: 0; }
+.look[data-deco-side="right"][data-align="right"] .m .deco__spark--2 { left: 0; }
 /* room for what sticks out of the bubble, so a neighbor is never covered */
 .m { margin-top: calc(var(--m-top-peek, 0px) + var(--m-top-tag, 0px)); }
 .m.has-peek { --m-top-peek: calc(4.4em * var(--peek-ratio, 0.5) * var(--deco-scale, 1)); } /* as tall as the picture on top (4.4em wide) */
@@ -79,10 +83,10 @@
 /* the friend on top goes to the side the tag is not on, so the two never sit on each other */
 .look[data-tag="pill"][data-align="left"] .m .deco__peek { left: auto; right: 0.9em; }
 .look[data-tag="pill"][data-align="right"] .m .deco__peek { right: auto; left: 0.9em; }
-/* a short message is kept wide enough for the tag and the friend on top to sit side by side (the tag is 9em at most, the friend 4.4em); centered, the tag stays in the middle and the friend hangs on its corner */
+/* a short message is kept wide enough for the tag and the friend on top to sit side by side (the tag is 9em at most, the friend 4.4em); centered, the tag stays in the middle and the friend sits at the end of the bubble, flush with its edge */
 .look[data-tag="pill"] .m.has-peek .body { min-width: 15em; }
-.look[data-tag="pill"][data-align="center"] .m .deco__peek { right: -0.4em; left: auto; }
-.look[data-tag="pill"][data-align="center"][data-deco-side="right"] .m .deco__peek { left: -0.4em; right: auto; }
+.look[data-tag="pill"][data-align="center"] .m .deco__peek { right: 0; left: auto; }
+.look[data-tag="pill"][data-align="center"][data-deco-side="right"] .m .deco__peek { left: 0; right: auto; }
 
 /* A message leaves by fading up, then it is removed from the page. */
 .m.leaving { animation: out 300ms var(--ease-in) forwards !important; }

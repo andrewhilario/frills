@@ -195,6 +195,26 @@ test("editor: it remembers you, and Reset puts the defaults back", { skip }, asy
   await page.evaluate("localStorage.clear()");
 });
 
+test("editor: the preview's width slider is in the bar above the preview, and it changes the preview's width", { skip }, async () => {
+  await page.goto(base + "/editor/?look=matcha", { settle: 700 });
+  const where = await page.evaluate(`(() => {
+    const slider = document.getElementById("c-previewW");
+    const bar = document.querySelector(".preview__bar");
+    return { inBar: Boolean(slider && bar && bar.contains(slider)), aboveStage: slider.getBoundingClientRect().bottom <= document.getElementById("stage").getBoundingClientRect().top + 1, oldCardGone: !document.querySelector(".preview-tools"), label: bar.querySelector(".ctl__label").textContent.trim() };
+  })()`);
+  assert.deepEqual(where, { inBar: true, aboveStage: true, oldCardGone: true, label: "Width" });
+  const widthAt = async (value) => {
+    await page.evaluate(`(() => { const i = document.getElementById("c-previewW"); i.value = ${value}; i.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+    return page.evaluate(`({ prop: document.getElementById("chat").style.getPropertyValue("--preview-w"), width: Math.round(document.getElementById("chat").getBoundingClientRect().width) })`);
+  };
+  const narrow = await widthAt(300);
+  assert.equal(narrow.prop, "300px");
+  assert.ok(narrow.width <= 302, `the chat is about 300 px wide (${narrow.width})`);
+  const wide = await widthAt(600);
+  assert.equal(wide.prop, "600px");
+  assert.ok(wide.width > narrow.width + 100, `and gets wider with the slider (${narrow.width} -> ${wide.width})`);
+});
+
 test("editor: junk in saved settings or the address can't break the page", { skip }, async () => {
   await page.goto(base + "/editor/", { settle: 500 });
   await page.evaluate(`localStorage.setItem("frills:editor:v1", JSON.stringify({ settings: { accent: "red", radius: 9999, font: "Comic Sans", avatar: "yes", modIcon: "<img>", max: -4 }, channel: "<script>" }))`);

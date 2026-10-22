@@ -9,6 +9,14 @@
 .preview[data-back="bright"] { background: var(--color-stage-bright); }
 .preview[data-back="busy"] { background: repeating-linear-gradient(135deg, var(--color-stage-busy-a) 0 22px, var(--color-stage-busy-b) 22px 44px); }
 .preview[data-back="checker"] { background: conic-gradient(var(--color-stage) 25%, var(--color-stage-2) 0 50%, var(--color-stage) 0 75%, var(--color-stage-2) 0) 0 0 / 24px 24px; }
+/* The preview's width slider sits in the bar at the top of the preview: the tag on the left, the slider, then the backdrop choice. */
+.preview__bar { flex-wrap: wrap; }
+.preview__tag { margin-right: auto; }
+.preview__bar #preview-width { flex: 0 1 15rem; min-width: 9rem; }
+.preview__bar .ctl { display: flex; align-items: center; gap: var(--space-xs); color: var(--color-stage-ink); }
+.preview__bar .ctl__label { font-family: var(--font-label); font-size: var(--text-xs); letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-stage-ink); opacity: 0.8; }
+.preview__bar .ctl output { order: 3; min-width: 3.4em; text-align: right; font-size: var(--text-xs); color: var(--color-stage-ink); }
+.preview__bar .ctl input[type="range"] { flex: 1 1 5rem; min-width: 0; width: auto; }
 .preview__tag { font-family: var(--font-label); font-size: var(--text-xs); letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-stage-ink); opacity: 0.8; }
 
 .panel { display: grid; gap: var(--space-lg); align-content: start; padding: var(--space-lg) var(--page-gutter) var(--space-3xl); background: var(--color-paper-2); }
@@ -67,6 +75,7 @@
 .linkfield__hint[data-state="error"] { color: var(--color-error); }
 .linkfield__hint a { font-weight: 600; }
 
+/* The widget and alerts editors keep their "Preview as" picker in a card under the link; the chat editor has none (its width slider is in the preview bar). */
 .preview-tools { display: grid; gap: var(--space-sm); padding: var(--space-md) var(--space-lg); border-radius: var(--radius-card); background: var(--color-paper-2); }
 
 /* Wide screens: the panel on the left, the preview filling the rest and staying put while the panel scrolls. */
