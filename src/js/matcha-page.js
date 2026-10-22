@@ -185,7 +185,6 @@ alertsLink.addEventListener("focus", () => alertsLink.select());
 const copyBtn = $("copy-link");
 copyButton(copyBtn, () => link.value);
 link.addEventListener("focus", () => link.select());
-$("alerts-edit").href = alertsUrl("/alerts/", { settings: ALERT_FROG });
 source.onChange(refresh);
 
 fontsReady(matchaFaces(settings), 600).then(refresh);

@@ -5,7 +5,7 @@
 import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
-import { existsSync } from "node:fs";
+import fs, { existsSync } from "node:fs";
 import { join } from "node:path";
 import { findChrome, launch, sleep } from "../scripts/lib/chrome.mjs";
 import { createStatic } from "../scripts/lib/static.mjs";
@@ -209,8 +209,7 @@ test("matcha: the frog pond alerts have their own preview and link (the frog pon
   assert.equal(preview.pathname, "/overlay/alerts/");
   assert.deepEqual([preview.searchParams.get("card"), preview.searchParams.get("demo"), preview.searchParams.get("accent")], ["frogpond", "1", "#8dae5f"], "made-up alerts, the frog pond card, the matcha colors");
   assert.deepEqual([section.link, section.copyOff], ["", true], "no link until there is a name");
-  const edit = new URL(section.edit, base);
-  assert.deepEqual([edit.pathname, edit.searchParams.get("card"), edit.searchParams.has("channel")], ["/alerts/", "frogpond", false], "the editor opens with the style picked, and does not connect by itself");
+  assert.equal(section.edit, "/matcha/alerts/", "the button opens the private Matcha alerts editor, not the public one");
   await set("source-channel", "pond.pal");
   const link = new URL(await page.evaluate(`document.getElementById("alerts-link").value`));
   assert.equal(link.pathname, "/overlay/alerts/");
@@ -224,15 +223,48 @@ test("matcha: the frog pond alerts have their own preview and link (the frog pon
   assert.equal(wears, true, "a frog peeks over the top of the card in the preview");
 });
 
-test("alerts editor: the frog pond style is not offered there, but opened with its link it shows and keeps it", { skip }, async () => {
+test("the Matcha alerts editor is its own private page: it starts with the Matcha look and the frog pond card, keeps its own settings, and the public editor never shows that card", { skip }, async () => {
+  const chipsOf = () => page.evaluate(`[...document.querySelectorAll("#look-controls > *:first-child .chip")].map((b) => b.textContent.trim() + (b.getAttribute("aria-pressed") === "true" ? "*" : ""))`);
   await page.goto(base + "/alerts/", { settle: 600 });
   await page.evaluate("localStorage.clear()");
-  await page.goto(base + "/alerts/", { settle: 700 });
-  const offered = await page.evaluate(`[...document.querySelectorAll("#look-controls .chip")].map((b) => b.textContent.trim()).join("|")`);
-  assert.equal(/frog/i.test(offered), false, "nothing about a frog among the choices");
+  // the public editor: no frog pond among the choices, and a link that asks for it gets the plain card
   await page.goto(base + "/alerts/?card=frogpond&look=matcha", { settle: 900 });
-  assert.equal(await page.evaluate(`document.getElementById("alerts").dataset.card`), "frogpond");
+  assert.equal((await chipsOf()).some((c) => /frog/i.test(c)), false, "nothing about a frog among the public choices");
+  assert.equal(await page.evaluate(`document.getElementById("alerts").dataset.card`), "card", "and the card is the plain one");
   await set("source-channel", "pond.pal");
-  assert.equal(new URL(await page.evaluate(`document.getElementById("link").value`)).searchParams.get("card"), "frogpond", "the link keeps the style");
+  assert.equal(new URL(await page.evaluate(`document.getElementById("link").value`)).searchParams.has("card"), false, "the public link does not carry it");
+  // the Matcha editor (starting from empty browser memory, so what it saves can be told apart)
   await page.evaluate("localStorage.clear()");
+  await page.goto(base + "/matcha/alerts/", { settle: 900 });
+  const names = await chipsOf();
+  assert.equal(names[0], "Frog pond*", "the frog pond is the first choice and the one picked: " + names.join("|"));
+  assert.equal(await page.evaluate(`document.getElementById("alerts").dataset.card`), "frogpond");
+  assert.equal(await page.evaluate(`[...document.querySelectorAll("#looks .chip")].find((b) => b.getAttribute("aria-pressed") === "true")?.textContent.trim()`), "Matcha", "in the Matcha look");
+  assert.match(await page.evaluate(`document.querySelector(".panel .note").textContent`), /^Matcha alerts\. A private editor/);
+  await set("source-channel", "pond.pal");
+  const link = new URL(await page.evaluate(`document.getElementById("link").value`));
+  assert.equal(link.pathname, "/overlay/alerts/");
+  assert.deepEqual([link.searchParams.get("channel"), link.searchParams.get("card"), link.searchParams.get("bg")], ["pond.pal", "frogpond", "#f5f0e1"]);
+  await page.evaluate(`document.querySelector('[data-test="gift-1"]').click()`);
+  await page.waitFor(`document.querySelector("#alerts .alert__deco img.deco__peek")`, { timeout: 6000 });
+  // another card, remembered here and nowhere else; Reset goes back to the frog pond
+  await click("#look-controls > *:first-child .chip", "Trading card");
+  assert.equal(await page.evaluate(`document.getElementById("alerts").dataset.card`), "trading");
+  assert.equal(await page.evaluate(`JSON.parse(localStorage.getItem("frills:alerts:matcha:v1")).settings.card`), "trading");
+  assert.equal(await page.evaluate(`localStorage.getItem("frills:alerts:v1")`), null, "the public editor's saved settings are not touched");
+  await page.goto(base + "/matcha/alerts/", { settle: 900 });
+  assert.ok((await chipsOf()).includes("Trading card*"), "remembered after a reload");
+  await click("#reset");
+  assert.equal(await page.evaluate(`document.getElementById("alerts").dataset.card`), "frogpond");
+  assert.equal(await page.evaluate(`[...document.querySelectorAll("#looks .chip")].find((b) => b.getAttribute("aria-pressed") === "true")?.textContent.trim()`), "Matcha");
+  assert.deepEqual(page.problems, [], page.problems.join(" | "));
+  await page.evaluate("localStorage.clear()");
+});
+
+test("the Matcha alerts editor is private: not in the sitemap, not linked from the menu or the footer, and asks search engines to stay away", async () => {
+  const sitemap = fs.readFileSync(join(dist, "sitemap.xml"), "utf8");
+  assert.equal(sitemap.includes("/matcha/"), false);
+  const html = fs.readFileSync(join(dist, "matcha", "alerts", "index.html"), "utf8");
+  assert.match(html, /<meta name="robots" content="noindex, nofollow">/);
+  for (const file of ["index.html", "overlays/index.html", "alerts/index.html"]) assert.equal(fs.readFileSync(join(dist, file), "utf8").includes("/matcha/alerts"), false, file + " does not link to it");
 });

@@ -26,7 +26,7 @@ const assetOf = (html, kind) => (new RegExp(`${kind === "css" ? 'href="(/assets/
 
 test("the pages we expect are all there", () => {
   const urls = pages.map((p) => p.url).sort();
-  assert.deepEqual(urls, ["/", "/404.html", "/admin/", "/alerts/", "/changelog/", "/editor/", "/feedback/", "/gifts/", "/goal/", "/guides/alerts/", "/guides/obs/", "/guides/setup/", "/guides/test/", "/guides/tiktok/", "/likers/", "/matcha/", "/overlay/", "/overlay/alerts/", "/overlay/gifts/", "/overlay/goal/", "/overlay/likers/", "/overlay/songs/", "/overlays/", "/overlays/faq/", "/privacy/", "/songs/", "/spotify/", "/spotify/callback/", "/start/", "/twitch/", "/twitch/callback/"]);
+  assert.deepEqual(urls, ["/", "/404.html", "/admin/", "/alerts/", "/changelog/", "/editor/", "/feedback/", "/gifts/", "/goal/", "/guides/alerts/", "/guides/obs/", "/guides/setup/", "/guides/test/", "/guides/tiktok/", "/likers/", "/matcha/", "/matcha/alerts/", "/overlay/", "/overlay/alerts/", "/overlay/gifts/", "/overlay/goal/", "/overlay/likers/", "/overlay/songs/", "/overlays/", "/overlays/faq/", "/privacy/", "/songs/", "/spotify/", "/spotify/callback/", "/start/", "/twitch/", "/twitch/callback/"]);
 });
 
 test("every indexable page has its own title and description, a canonical address, share tags and one h1", () => {
@@ -55,7 +55,7 @@ test("every indexable page has its own title and description, a canonical addres
 
 test("pages that should stay out of search say so, in the page and in the headers", () => {
   const headers = read("_headers");
-  for (const url of ["/overlay/", "/matcha/", "/404.html"]) {
+  for (const url of ["/overlay/", "/matcha/", "/matcha/alerts/", "/404.html"]) {
     assert.match(pages.find((p) => p.url === url).html, /<meta name="robots" content="noindex, nofollow">/, url);
   }
   assert.match(headers, /\/overlay\/\*\n  X-Robots-Tag: noindex, nofollow/);

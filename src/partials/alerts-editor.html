@@ -1,0 +1,148 @@
+  <section class="preview" id="preview" data-back="dark" aria-label="Live preview of your alerts">
+    <div class="preview__bar">
+      <span class="preview__tag">Preview</span>
+      <label class="visually-hidden" for="backdrop">What sits behind the alerts</label>
+      <select id="backdrop">
+        <option value="dark">Dark game</option>
+        <option value="bright">Bright game</option>
+        <option value="busy">Busy scene</option>
+        <option value="checker">See-through</option>
+      </select>
+    </div>
+    <div class="chatstage" id="stage" aria-hidden="true"><div id="alerts"></div></div>
+    <div class="preview__tests" role="group" aria-label="Try an alert">
+      <button class="btn btn--soft btn--sm" type="button" data-test="follow" data-platform="tiktok twitch">Test follow</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="gift-1" data-platform="tiktok">Test gift</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="gift-3" data-platform="tiktok">Test big gift</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="share" data-platform="tiktok">Test share</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="crowd" data-platform="tiktok">Test a crowd</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="sub" data-platform="twitch" hidden>Test sub</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="resub" data-platform="twitch" hidden>Test resub</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="subgift" data-platform="twitch" hidden>Test gifted subs</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="bits" data-platform="twitch" hidden>Test bits</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="bits-big" data-platform="twitch" hidden>Test big cheer</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="raid" data-platform="twitch" hidden>Test raid</button>
+      <span class="preview__sound" id="sound-state" role="status"></span>
+    </div>
+  </section>
+
+  <div class="panel">
+    <noscript><p class="note">Frills needs JavaScript to draw your alerts. Turn it on for this page and reload.</p></noscript>
+    <p class="watch"><a href="/guides/setup/#alerts"><span aria-hidden="true">▶</span> New here? Watch the 20-second setup</a></p>
+
+    <section class="step-card" aria-labelledby="s1">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">1</span>
+        <h1 class="step-card__title" id="s1">Pick a look</h1>
+        <button class="btn btn--soft btn--sm step-card__aside" type="button" id="reset">Reset</button>
+      </div>
+      <div class="chips" id="looks" role="group" aria-label="Starting looks"></div>
+      <div class="stack" id="look-controls"></div>
+    </section>
+
+    <section class="step-card" aria-labelledby="s2">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">2</span>
+        <h2 class="step-card__title" id="s2">Words, sounds and effects</h2>
+      </div>
+      <p class="ctl__hint">Use <code>{name}</code> and <code>{count}</code> in a text. On TikTok gifts also have <code>{gift}</code>, <code>{diamonds}</code> and <code>{total}</code>, and a crowd text can use <code>{others}</code>. Press a test button above after each change to hear it.</p>
+      <label class="media__consent"><input type="checkbox" id="media-ok"> I have the right to use any image, GIF or sound I upload here. Pictures and GIFs can be up to 1 MB, sounds up to 300 KB.</label>
+      <details class="more" open data-platform="tiktok">
+        <summary>Gifts</summary>
+        <div class="stack" id="gift-controls"></div>
+      </details>
+      <details class="more" data-platform="tiktok twitch">
+        <summary>Follows</summary>
+        <div class="stack" id="follow-controls"></div>
+      </details>
+      <details class="more" data-platform="tiktok">
+        <summary>Shares</summary>
+        <div class="stack" id="share-controls"></div>
+      </details>
+      <details class="more" open data-platform="twitch" hidden>
+        <summary>Subs and resubs</summary>
+        <div class="stack" id="sub-controls"></div>
+      </details>
+      <details class="more" data-platform="twitch" hidden>
+        <summary>Gifted subs</summary>
+        <div class="stack" id="subgift-controls"></div>
+      </details>
+      <details class="more" data-platform="twitch" hidden>
+        <summary>Bits</summary>
+        <div class="stack" id="bits-controls"></div>
+      </details>
+      <details class="more" data-platform="twitch" hidden>
+        <summary>Raids</summary>
+        <div class="stack" id="raid-controls"></div>
+      </details>
+    </section>
+
+    <section class="step-card" aria-labelledby="s3">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">3</span>
+        <h2 class="step-card__title" id="s3">Where it sits and how it moves</h2>
+      </div>
+      <div class="stack" id="move-controls"></div>
+      <details class="more">
+        <summary>Crowds, line and volume</summary>
+        <div class="stack" id="queue-controls"></div>
+      </details>
+    </section>
+
+    <section class="step-card" aria-labelledby="s4">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">4</span>
+        <h2 class="step-card__title" id="s4">Connect your account</h2>
+      </div>
+      <div id="source"></div>
+      <div class="followbox" data-platform="twitch" hidden>
+        <h3 class="seen__title">Follows on Twitch</h3>
+        <p class="ctl__hint">Twitch only tells a logged-in streamer who follows them. Log in with Twitch below to listen for new followers while this editor is open. Nothing else on your Twitch is read.</p>
+        <div class="followbox__auth" id="tw-auth-card">
+          <p class="followbox__status" id="tw-status" role="status">Checking Twitch login…</p>
+          <div class="followbox__actions">
+            <button class="btn btn--sm" type="button" id="tw-login-btn">Log in with Twitch</button>
+            <button class="btn btn--soft btn--sm" type="button" id="tw-logout-btn" hidden>Log out</button>
+            <button class="btn btn--soft btn--sm" type="button" id="tw-test-follower" hidden>Send test follower</button>
+          </div>
+        </div>
+        <label class="form__choice"><input type="checkbox" id="follows-on"> Show Twitch follows in my alerts link</label>
+        <p class="ctl__hint" id="follows-state" role="status"></p>
+        <p class="ctl__hint followbox__aside"><small>Streaming without this editor open? Keep the <a href="/twitch/" target="_blank" rel="noopener">Twitch follows background page</a> open instead.</small></p>
+      </div>
+      <div class="seen" aria-labelledby="seen-title">
+        <h3 class="seen__title" id="seen-title">What Frills sees</h3>
+        <p class="ctl__hint" data-platform="tiktok">Counted since you pressed Connect. Follow your own account from another account, or send a 1 coin gift, and watch the numbers move.</p>
+        <p class="ctl__hint" data-platform="twitch" hidden>Counted since you pressed Connect. Ask a friend to cheer 1 bit or gift a sub and watch the numbers move. Follows are not counted here: they arrive through the Twitch follows page instead (see below).</p>
+        <dl class="seen__list">
+          <div data-platform="tiktok"><dt>Follows</dt><dd id="seen-follow">0</dd></div>
+          <div data-platform="tiktok"><dt>Gifts</dt><dd id="seen-gift">0</dd></div>
+          <div data-platform="tiktok"><dt>Shares</dt><dd id="seen-share">0</dd></div>
+          <div data-platform="twitch" hidden><dt>Subs</dt><dd id="seen-sub">0</dd></div>
+          <div data-platform="twitch" hidden><dt>Gifted subs</dt><dd id="seen-subgift">0</dd></div>
+          <div data-platform="twitch" hidden><dt>Bits</dt><dd id="seen-bits">0</dd></div>
+          <div data-platform="twitch" hidden><dt>Raids</dt><dd id="seen-raid">0</dd></div>
+        </dl>
+        <p class="ctl__hint" id="seen-note" role="status"></p>
+      </div>
+    </section>
+
+    <section class="step-card" aria-labelledby="s5">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">5</span>
+        <h2 class="step-card__title" id="s5">Add it to your stream</h2>
+      </div>
+      <div class="linkfield">
+        <label class="ctl__label" for="link">Your link</label>
+        <input type="text" id="link" readonly placeholder="Appears once you type a name" spellcheck="false" autocomplete="off">
+        <div class="linkfield__actions">
+          <button class="btn" type="button" id="copy-link" disabled>Copy link</button>
+        </div>
+        <p class="linkfield__hint" id="link-hint" role="status"></p>
+      </div>
+    </section>
+
+    <section class="preview-tools" aria-label="Preview options">
+      <div id="preview-canvas"></div>
+    </section>
+  </div>
