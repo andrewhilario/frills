@@ -65,10 +65,52 @@
       <p class="ctl__hint" id="relay-note" role="status"></p>
     </section>
 
-    <section class="step-card" aria-labelledby="s4">
+    <section class="step-card spx" id="spotify-step" aria-labelledby="s4" data-client="{{spotifyClientId}}" data-ticker="{{tickerJs}}" hidden>
       <div class="step-card__head">
         <span class="step-card__num" aria-hidden="true">4</span>
-        <h2 class="step-card__title" id="s4">Add it to your stream</h2>
+        <h2 class="step-card__title" id="s4">Connect Spotify <span class="spx__optional">(optional)</span></h2>
+      </div>
+      <p class="ctl__hint">Show the song that is playing on your Spotify on your stream, and let viewers add songs to your Spotify queue with <code>!sr</code>. You do not need this for the song list: viewers can ask for songs without it.</p>
+      <p class="spx__status" id="spx-status" role="status"></p>
+      <div class="spx__row">
+        <button class="btn" type="button" id="spx-login">Log in with Spotify</button>
+        <button class="btn btn--soft" type="button" id="spx-logout" hidden>Disconnect</button>
+      </div>
+      <div id="spx-on" hidden>
+        <div class="spx__now">
+          <img class="spx__cover" id="spx-cover" alt="" width="64" height="64" hidden>
+          <div>
+            <p class="spx__title" id="spx-title">Checking what is playing…</p>
+            <p class="spx__artist" id="spx-artist"></p>
+          </div>
+        </div>
+        <p class="spx__note" id="spx-now-note" role="status"></p>
+        <div class="stack" id="spx-switches"></div>
+        <p class="ctl__hint spx__note" id="spx-share-note" role="status"></p>
+        <p class="ctl__hint spx__note" id="spx-queue-note" role="status"></p>
+        <p class="ctl__hint">Frills reads Spotify from this page, so keep it open in a browser tab while you stream (it can be in the background).</p>
+      </div>
+      <form class="spx__try" id="spx-try" autocomplete="off">
+        <h3 class="spx__sub">Try it as a viewer</h3>
+        <div class="stack" id="spx-viewer-fields"></div>
+        <button class="btn btn--soft" type="submit">Send</button>
+        <ul class="spx__log" id="spx-log" aria-live="polite" aria-label="What happened"></ul>
+      </form>
+      <details class="spx__help">
+        <summary>Having trouble?</summary>
+        <ul>
+          <li>Songs only go to your Spotify queue with <strong>Spotify Premium</strong>, and Spotify has to be open and playing on a phone or computer.</li>
+          <li>While Frills is in testing, Spotify lets only a short list of people log in. If Spotify says you are not registered, tell us on the <a href="/feedback/">feedback page</a> and we will add you.</li>
+          <li>Your Spotify password is never seen by Frills, and the login stays in this browser. Only the song’s name, artist, cover and position are passed on, and only while the first switch is on. <strong>Disconnect</strong> forgets the login.</li>
+          <li>If the song on your stream stops updating, check that this page is still open and that Spotify is playing.</li>
+        </ul>
+      </details>
+    </section>
+
+    <section class="step-card" aria-labelledby="s5">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">5</span>
+        <h2 class="step-card__title" id="s5">Add it to your stream</h2>
       </div>
       <div class="linkfield">
         <label class="ctl__label" for="link">Your link</label>

@@ -6,6 +6,7 @@ import { startWidgetEditor } from "./widget-editor.js";
 import { fakeLookup, fakeRequest } from "./fake-alerts.js";
 import { spotifyLayer } from "./songs-spotify.js";
 import { sharedCode } from "./spotify-bridge.js";
+import { mountSpotify } from "./spotify-connect.js";
 
 // Adopt the streamer's Spotify code if they enabled sharing on the /spotify/ page
 try {
@@ -31,17 +32,20 @@ startWidgetEditor({
   create(host, settings, ctx) {
     const view = createSongsView(host);
     const real = makeLookup(); // what chat asks for goes to the real catalog; the test buttons use the practice one
-    settings.spotify = sharedCode(); // sharing what is playing is turned on in the Spotify step; its code rides in the link by itself
     let layer = null;
     const queue = new SongQueue(settings, { lookup: real, onChange: () => layer?.render() });
+    // the Spotify step: log in, share the song playing, add chat's songs to the streamer's Spotify queue, try it with a pretend viewer
+    const spotify = mountSpotify(document.getElementById("spotify-step"), { hear: (message) => queue.handle(message, ctx.channel()), refresh: ctx.refresh, channel: ctx.channel });
+    spotify.setSettings(settings);
+    settings.spotify = sharedCode(); // sharing what is playing is turned on in the Spotify step; its code rides in the link by itself
     layer = spotifyLayer({ queue, view });
     view.apply(settings);
     layer.apply(settings);
     layer.render();
     setInterval(() => { if (!layer.playing) queue.tick(); }, 1000);
     return {
-      apply(next) { next.spotify = sharedCode(); view.apply(next); queue.setSettings(next); layer.apply(next); },
-      onChat: (message) => queue.handle(message, ctx.channel()),
+      apply(next) { next.spotify = sharedCode(); view.apply(next); queue.setSettings(next); layer.apply(next); spotify.setSettings(next); },
+      onChat: (message) => { queue.handle(message, ctx.channel()); spotify.handle(message); },
       tests: {
         one: () => queue.request({ ...fakeRequest({ avoid: queue.items.map((i) => i.query), busy: queue.items.map((i) => i.name) }), via: fakeLookup }),
         three: () => { for (let i = 0; i < 3; i++) setTimeout(() => queue.request({ ...fakeRequest({ avoid: queue.items.map((item) => item.query), busy: queue.items.map((item) => item.name) }), via: fakeLookup }), i * 350); },

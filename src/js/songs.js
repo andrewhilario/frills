@@ -234,6 +234,26 @@ export function makeLookup(fetchImpl = globalThis.fetch?.bind(globalThis), base 
   };
 }
 
+/** What the on-screen queue did with a message, in words a streamer understands (null when it needs no words). */
+export function onScreenWords(result) {
+  if (!result) return null;
+  if (result.kind === "request") return "Added to the song list on your stream.";
+  if (result.kind === "next") return "Skipped to the next song on your stream.";
+  if (result.kind === "remove") return "Took that viewer's song off the list on your stream.";
+  const why = {
+    "not a command": "That is not a command, so nothing happened. A viewer types !sr and a song name.",
+    "queue full": "The song list is full, so it was not added.",
+    "too many from this person": "That viewer already has as many songs waiting as they are allowed.",
+    "already in the queue": "That song is already on the list.",
+    "not allowed": "Only you and your moderators can skip songs.",
+    "nothing playing": "There was nothing playing to skip.",
+    "nothing of theirs": "That viewer has no song waiting to take off.",
+    repeat: "That message was already handled.",
+    empty: "There was no song name to look for.",
+  }[result.why];
+  return why ?? "Nothing happened.";
+}
+
 /** Where a queue is kept between page loads (only when the person turned that on), per account. */
 export const songsKey = (channel) => `frills:songs:${channel}`;
 export function loadSongs(storage, channel) {

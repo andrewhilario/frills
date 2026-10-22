@@ -41,3 +41,27 @@
 
 /* what belongs to the other place you stream (TikTok or Twitch) is hidden, even where a rule above gives it a display of its own */
 [data-platform][hidden] { display: none !important; }
+
+/* The Song requests editor's Spotify step. */
+.spx[hidden], .spx [hidden] { display: none; }
+.spx__optional { font-weight: 500; color: var(--color-ink-2); font-size: 0.7em; }
+.spx__status { margin: 0; overflow-wrap: anywhere; }
+.spx__status[data-state="error"], .spx__note[data-state="error"] { color: var(--color-error); font-weight: 600; }
+.spx__row { display: flex; flex-wrap: wrap; gap: var(--space-sm); align-items: center; }
+.spx__now { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-md); align-items: center; padding: var(--space-sm); border-radius: var(--radius-card); background: var(--color-paper-2); }
+.spx__cover { width: 4rem; height: 4rem; border-radius: var(--radius-sm); object-fit: cover; background: var(--color-paper-3); }
+.spx__title { margin: 0; font-weight: 800; overflow-wrap: anywhere; }
+.spx__artist, .spx__note { margin: 0; font-size: var(--text-sm); color: var(--color-ink-2); overflow-wrap: anywhere; }
+.spx__note:empty { display: none; }
+.spx__try { display: grid; gap: var(--space-sm); margin-top: var(--space-sm); padding-top: var(--space-sm); border-top: 2px solid var(--color-rule); }
+.spx__try .btn { justify-self: start; }
+.spx__sub { margin: 0; font-size: var(--text-md); }
+.spx__log { display: grid; gap: var(--space-2xs); margin: 0; padding: 0; list-style: none; max-height: 16rem; overflow: auto; }
+.spx__log:empty { display: none; }
+.spx__log li { padding: var(--space-xs) var(--space-sm); border-radius: var(--radius-sm); background: var(--color-paper-2); font-size: var(--text-sm); overflow-wrap: anywhere; }
+.spx__log li[data-state="ok"] { background: var(--color-mint-tint); }
+.spx__log li[data-state="error"] { background: var(--color-accent-3-tint); color: var(--color-error); }
+.spx__help { font-size: var(--text-sm); }
+.spx__help summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
+.spx__help ul { margin: var(--space-xs) 0 0; padding-left: 1.2em; display: grid; gap: var(--space-xs); }
+.spx #spx-on:not([hidden]) { display: grid; gap: var(--space-sm); }

@@ -22,7 +22,8 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
   let settings = widget.sanitize({ ...saved?.settings, ...widget.fromParams(params) });
   let source = null;
   // `ctx.restart()` reconnects (for an overlay whose settings change what it waits for); `ctx.info(fn)` is for what the account says.
-  const api = create($("widget"), settings, { restart: () => source?.restart(), channel: () => source?.cleanChannel() ?? "", features: () => source?.features ?? null });
+  let ready = false; // the editor is whole once everything below has been made
+  const api = create($("widget"), settings, { restart: () => source?.restart(), channel: () => source?.cleanChannel() ?? "", features: () => source?.features ?? null, refresh: () => { if (ready) { paint(); refreshLink(); } } });
 
   // ── the look and the options ────────────────────────────────────────────────────────────────────────────────────
   const swatch = (p) => (luminance(p.accent) < 0.08 ? p.bg : p.accent);
@@ -145,5 +146,6 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
   fontsReady(generalFaces(settings), 900).then(paint);
   paint();
   refreshLink();
+  ready = true;
   return { settings: () => settings };
 }

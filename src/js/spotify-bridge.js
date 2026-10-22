@@ -106,3 +106,39 @@ export function watchSpotify(code, onSong, { fetchImpl = globalThis.fetch?.bind(
   poll();
   return { stop() { stopped = true; clearTimer(timer); } };
 }
+
+/**
+ * A clock that is not slowed down in a background tab: a worker (its address is the site's own ticker script) calls `fn` every `every` ms. If
+ * workers are not allowed the page's own timer does it instead. Returns { stop() }.
+ */
+export function startClock(url, fn, every) {
+  try {
+    const worker = new Worker(url);
+    worker.onmessage = fn;
+    worker.postMessage({ every });
+    return { stop: () => worker.terminate() };
+  } catch {
+    const id = setInterval(fn, every);
+    return { stop: () => clearInterval(id) };
+  }
+}
+
+// Where Spotify's login sends the person back to: the page they pressed "Log in" on. Only these two addresses are ever used (never one read from
+// the address bar), so the callback page cannot be turned into a redirect to somewhere else.
+const RETURN = "frills:spotify:return";
+export const RETURN_PATHS = ["/songs/", "/spotify/"];
+
+export function rememberReturn(path, storage = globalThis.sessionStorage) {
+  try { if (RETURN_PATHS.includes(path)) storage.setItem(RETURN, path); } catch { /* storage can be blocked: the person lands on the test page instead */ }
+}
+
+/** The page to go back to after the login, once: the remembered one when it is allowed, else the test page. */
+export function takeReturn(storage = globalThis.sessionStorage) {
+  try {
+    const path = storage.getItem(RETURN);
+    storage.removeItem(RETURN);
+    return RETURN_PATHS.includes(path) ? path : "/spotify/";
+  } catch {
+    return "/spotify/";
+  }
+}

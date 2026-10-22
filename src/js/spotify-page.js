@@ -5,7 +5,7 @@ import { REDIRECT_PATH, SpotifyClient } from "./spotify.js";
 import { SpotifyRequests } from "./spotify-requests.js";
 import { cleanName, connectTo, statusText } from "./connect.js";
 import { relayForPage } from "./tiktok.js";
-import { Publisher, bridgeIdentity } from "./spotify-bridge.js";
+import { Publisher, bridgeIdentity, startClock, takeReturn } from "./spotify-bridge.js";
 
 const root = document.getElementById("spotify");
 const $ = (id) => document.getElementById(id);
@@ -13,7 +13,7 @@ const status = $("sp-status");
 const clientId = root.dataset.client || "";
 const client = new SpotifyClient({ clientId, redirectUri: location.origin + REDIRECT_PATH });
 const say = (el, text, bad = false) => { el.textContent = text; el.dataset.state = bad ? "error" : ""; };
-const clock = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
+const mmss = (ms) => { const s = Math.max(0, Math.round(ms / 1000)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
 
 // A Spotify cover is drawn only from Spotify's own picture server.
 const safeCover = (address) => (/^https:\/\/i\.scdn\.co\//.test(address) ? address : "");
@@ -24,7 +24,7 @@ async function callback() {
   if (result.error) return say(status, result.error, true);
   say(status, "Connected. Taking you back…");
   history.replaceState(null, "", REDIRECT_PATH); // the code in the address is used once and is not kept
-  setTimeout(() => location.replace("/spotify/"), 600);
+  setTimeout(() => location.replace(takeReturn()), 600); // back to the page the person pressed Log in on
 }
 
 function main() {
@@ -35,7 +35,7 @@ function main() {
   const chatCard = $("sp-chat-card");
   const shareCard = $("sp-share-card");
   let timer = 0;
-  let clock = null; // what keeps refreshing the song, even with this tab in the background
+  let ticker = null; // what keeps refreshing the song, even with this tab in the background
   let listening = null; // the connection to the chat, while it is on
 
   const facts = () => {
@@ -81,19 +81,7 @@ function main() {
   $("sp-sharing").addEventListener("change", showLink);
   $("sp-link").addEventListener("focus", (event) => event.target.select());
 
-  /** A clock from a worker, which browsers do not slow down in a background tab; the page's own timer is the fallback. */
-  function startClock(fn, every) {
-    try {
-      const worker = new Worker(root.dataset.ticker);
-      worker.onmessage = fn;
-      worker.postMessage({ every });
-      return { stop: () => worker.terminate() };
-    } catch {
-      const id = setInterval(fn, every);
-      return { stop: () => clearInterval(id) };
-    }
-  }
-  const stopClock = () => { clock?.stop(); clock = null; };
+  const stopClock = () => { ticker?.stop(); ticker = null; };
 
   async function refreshNow() {
     const now = await client.nowPlaying();
@@ -112,7 +100,7 @@ function main() {
     } else {
       $("sp-title").textContent = now.title;
       $("sp-artist").textContent = now.artist + (now.playing ? "" : " (paused)");
-      $("sp-time").textContent = `${clock(now.progressMs)} / ${clock(now.durationMs)}`;
+      $("sp-time").textContent = `${mmss(now.progressMs)} / ${mmss(now.durationMs)}`;
       $("sp-bar").style.width = now.durationMs ? Math.min(100, (now.progressMs / now.durationMs) * 100).toFixed(1) + "%" : "0";
     }
     facts();
@@ -134,7 +122,7 @@ function main() {
     if (me.error) say(status, me.error, true); else say(status, `Logged in as ${me.name || "your Spotify account"}.`);
     await refreshNow();
     stopClock();
-    clock = startClock(refreshNow, 3000);
+    ticker = startClock(root.dataset.ticker, refreshNow, 3000);
   }
 
   loginBtn.addEventListener("click", async () => {

@@ -6,7 +6,8 @@ import assert from "node:assert/strict";
 import { handleNowPlaying, tidy } from "../worker/nowplaying.mjs";
 import worker from "../worker/index.mjs";
 import { localDatabase } from "../scripts/lib/d1-sqlite.mjs";
-import { Publisher, bridgeIdentity, validCode, watchSpotify } from "../src/js/spotify-bridge.js";
+import { Publisher, RETURN_PATHS, bridgeIdentity, rememberReturn, takeReturn, validCode, watchSpotify } from "../src/js/spotify-bridge.js";
+import { onScreenWords } from "../src/js/songs.js";
 import { isPlaying, spotifyLayer, withSpotify } from "../src/js/songs-spotify.js";
 
 const SITE = "https://frills.example";
@@ -221,4 +222,32 @@ test("the overlay link gets the Spotify code by itself, only while this browser 
   assert.equal(control.hidden, true, "the editor does not show a box for it");
   assert.equal(SONGS.sanitize({ spotify: CODE }).spotify, CODE, "but an overlay link that has it is still read");
   assert.equal(new URL(SONGS.url("https://x.example/o/", { settings: SONGS.sanitize({ spotify: CODE }) })).searchParams.get("spotify"), CODE);
+});
+
+const memory = () => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, String(v)), removeItem: (k) => m.delete(k) }; };
+
+test("after the Spotify login the person goes back to the page they started on, once, and only to a page Frills chose", () => {
+  assert.deepEqual(RETURN_PATHS, ["/songs/", "/spotify/"]);
+  const storage = memory();
+  assert.equal(takeReturn(storage), "/spotify/", "nothing remembered: the test page");
+  rememberReturn("/songs/", storage);
+  assert.equal(takeReturn(storage), "/songs/");
+  assert.equal(takeReturn(storage), "/spotify/", "used once");
+  rememberReturn("//evil.example/", storage);
+  rememberReturn("https://evil.example/", storage);
+  assert.equal(takeReturn(storage), "/spotify/", "an address that is not one of ours is never remembered");
+  storage.setItem("frills:spotify:return", "//evil.example/");
+  assert.equal(takeReturn(storage), "/spotify/", "and one planted in storage is not followed");
+  const blocked = { getItem() { throw new Error("blocked"); }, setItem() { throw new Error("blocked"); }, removeItem() { throw new Error("blocked"); } };
+  assert.doesNotThrow(() => rememberReturn("/songs/", blocked));
+  assert.equal(takeReturn(blocked), "/spotify/");
+});
+
+test("what the song list did with a pretend viewer's message is said in plain words", () => {
+  assert.match(onScreenWords({ kind: "request" }), /Added to the song list/);
+  assert.match(onScreenWords({ kind: "next" }), /Skipped/);
+  assert.match(onScreenWords({ kind: "ignored", why: "not a command" }), /not a command/);
+  assert.match(onScreenWords({ kind: "ignored", why: "queue full" }), /full/);
+  assert.match(onScreenWords({ kind: "ignored", why: "something new" }), /Nothing happened/, "an unknown reason still gets words");
+  assert.equal(onScreenWords(null), null);
 });
