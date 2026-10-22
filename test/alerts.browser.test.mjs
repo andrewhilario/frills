@@ -213,6 +213,53 @@ test("overlay: an old relay that cannot send alerts is called out on the page, a
   await until(async () => (await cards()).length > 0, 6000);
 });
 
+// ── Card styles ───────────────────────────────────────────────────────────────────────────────────────────────────────
+
+test("overlay: each card style draws its own format, and a style that does not exist is ignored", { skip }, async () => {
+  const { base } = await withHelper();
+  const probe = async (card) => {
+    await page.goto(`${base}/overlay/alerts/?demo=1&only=gift&pace=300&maxShown=1&hpos=left&offset=0&card=${card}`, { settle: 500 });
+    await until(async () => (await cards()).length > 0, 8000);
+    return page.evaluate(`(() => {
+      const card = document.querySelector(".alert .alert__card");
+      const cs = getComputedStyle(card);
+      const host = document.querySelector(".alerts");
+      return { style: host.dataset.card, dir: cs.flexDirection, edge: cs.borderTopStyle, top: parseFloat(cs.borderTopWidth), left: parseFloat(cs.borderLeftWidth), bg: cs.backgroundColor, radius: parseFloat(cs.borderTopLeftRadius), shadow: cs.boxShadow, words: cs.textShadow, tail: getComputedStyle(card, "::before").content, wide: Math.round(card.parentElement.offsetWidth / host.clientWidth * 100) }; // the layout width: the entrance animation scales what getBoundingClientRect measures
+    })()`);
+  };
+  const all = {};
+  for (const id of ["card", "capsule", "banner", "profile", "bubble", "coupon", "neon", "text"]) all[id] = await probe(id);
+  for (const [id, r] of Object.entries(all)) assert.equal(r.style, id);
+  assert.deepEqual([all.card.dir, all.card.edge, all.card.tail], ["row", "solid", "none"], "the plain card");
+  assert.ok(all.card.top > 0 && all.card.bg !== "rgba(0, 0, 0, 0)" && all.card.wide < 80, "with an edge, a color and the width of its words");
+  assert.ok(all.capsule.radius >= 500, "the capsule is rounded all the way: " + all.capsule.radius);
+  assert.ok(all.banner.wide >= 95 && all.banner.top === 0 && all.banner.left > all.card.top, `the banner runs across and has a bar on one side (${all.banner.wide}%)`);
+  assert.equal(all.profile.dir, "column", "the profile stacks the picture over the words");
+  assert.ok(!["none", "normal"].includes(all.bubble.tail), "the bubble has a tail: " + all.bubble.tail);
+  assert.equal(all.coupon.edge, "dashed", "the coupon has a dashed edge");
+  assert.ok(all.neon.shadow.includes("inset"), "the neon edge glows inside as well as out: " + all.neon.shadow);
+  assert.ok(all.text.bg === "rgba(0, 0, 0, 0)" && all.text.top === 0 && all.text.shadow === "none" && all.text.words !== "none", "text only has no box and an outline on the words");
+  assert.equal((await probe("sideways")).style, "card", "a made-up style is the plain card");
+});
+
+test("editor: Card style is the first Look option, changing it redraws the alert, and the link carries it only when it is not the plain card", { skip }, async () => {
+  const { base } = await withHelper();
+  await page.goto(base + "/alerts/", { settle: 700 });
+  const label = await page.evaluate(`document.querySelector("#look-controls > *:first-child .ctl__label").textContent.trim()`);
+  assert.equal(label, "Card style");
+  const names = await page.evaluate(`[...document.querySelectorAll("#look-controls > *:first-child .chip")].map((b) => b.textContent.trim())`);
+  assert.deepEqual(names, ["Card", "Capsule", "Banner", "Profile", "Bubble", "Coupon", "Neon", "Text only"]);
+  await type("#source-channel", "pond.pal");
+  assert.equal(new URL(await page.evaluate(`document.getElementById("link").value`)).searchParams.has("card"), false, "the plain card adds nothing to the link");
+  await click('[data-test="follow"]');
+  await page.evaluate(`[...document.querySelectorAll("#look-controls > *:first-child .chip")].find((b) => b.textContent.trim() === "Banner").click()`);
+  assert.equal(await page.evaluate(`document.getElementById("alerts").dataset.card`), "banner");
+  assert.equal(new URL(await page.evaluate(`document.getElementById("link").value`)).searchParams.get("card"), "banner");
+  await click('#looks .chip:nth-child(3)'); // choosing a starting look keeps the card style
+  assert.equal(await page.evaluate(`document.getElementById("alerts").dataset.card`), "banner");
+  assert.deepEqual(page.problems, [], page.problems.join(" | "));
+});
+
 // ── Twitch ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
 const shown = (selector) => page.evaluate(`[...document.querySelectorAll(${JSON.stringify(selector)})].filter((n) => !n.hidden).map((n) => n.dataset.test ?? n.querySelector("summary")?.textContent)`);

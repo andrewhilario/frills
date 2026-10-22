@@ -50,11 +50,16 @@ export const LOOK_KEYS = Object.keys(LOOKS.sticker);
 
 const list = (...pairs) => pairs.map(([id, name]) => ({ id, name }));
 
+/** The formats an alert card can come in (the "Card style" choice). Each is drawn by alerts.css; the colors, roundness and edge still apply to all of them. */
+export const CARDS = list(["card", "Card"], ["capsule", "Capsule"], ["banner", "Banner"], ["profile", "Profile"], ["bubble", "Bubble"], ["coupon", "Coupon"], ["neon", "Neon"], ["text", "Text only"]);
+
 /** What each placeholder in a text means, for the editor's hint and for filling a template. */
 export const PLACEHOLDERS = ["name", "gift", "count", "diamonds", "total", "others"];
 
 export const DEFAULTS = {
   ...LOOKS.sticker,
+  // the format of the card (see CARDS)
+  card: "card",
   // the space between letters, in pixels (negative pulls them closer)
   letterSpacing: 0,
   // text alignment: left, center or right
@@ -90,6 +95,7 @@ const media = (key, label, what, hint) => ({ key, type: "media", media: what, la
  */
 export const CONTROLS = [
   // look
+  { section: "look", ...chipsOf("card", "Card style", CARDS), hint: "The shape of the alert. Your colors, roundness and edge thickness still apply to every one." },
   { section: "look", key: "accent", type: "color", label: "Accent color" },
   { section: "look", key: "bg", type: "color", label: "Card color" },
   { section: "look", key: "text", type: "color", label: "Text color" },

@@ -65,7 +65,7 @@ test("chat: left, center and right all fill the row, the words follow the alignm
 
 test("chat: the decorations never stick out past the page's edges, whatever the alignment, the side of the scene or the pack", { skip }, async () => {
   const worst = [];
-  for (const deco of ["frog", "neko", "hamster", "bunny"]) {
+  for (const deco of ["frog", "frog2", "neko", "hamster", "bunny"]) {
     for (const side of ["left", "right"]) {
       for (const align of ["left", "center", "right"]) {
         const out = await look(`/overlay/?demo=1&look=matcha&deco=${deco}&decoSide=${side}&tag=pill&pace=400`, align, `document.querySelectorAll("#chat .m .deco__corner").length >= 3`, `() => {

@@ -22,6 +22,7 @@ export function createAlertView(host) {
   function apply(next) {
     config = next;
     for (const [name, value] of Object.entries(alertVars(next))) host.style.setProperty(name, value);
+    host.dataset.card = next.card || "card";
     host.dataset.vpos = next.vpos;
     host.dataset.hpos = next.hpos;
     host.dataset.enter = next.enter;

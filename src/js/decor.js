@@ -1,11 +1,12 @@
 // Decorations for the chat bubbles: little pictures laid over a bubble's edges (a friend peeking over the top, a small scene on a bottom corner,
-// sparkles around it). A PACK is a set of such pieces in one mood. "Frog pond", "Neko cafe", "Hamster burrow" and "Bunny cloud" are pictures (loaded from this
+// sparkles around it). A PACK is a set of such pieces in one mood. "Frog pond", "Frog pond V2", "Neko cafe", "Hamster burrow" and "Bunny cloud" are pictures (loaded from this
 // site, only when the pack is chosen). More packs add a name and their pieces here.
 // Pure data and small functions, so it is tested without a page.
 
 export const DECOS = [
   { id: "none", name: "None" },
   { id: "frog", name: "Frog pond" },
+  { id: "frog2", name: "Frog pond V2" },
   { id: "neko", name: "Neko cafe" },
   { id: "hamster", name: "Hamster burrow" },
   { id: "bunny", name: "Bunny cloud" },
@@ -19,6 +20,12 @@ export const PACKS = {
     peek: [], // the peeking frogs are still to come (see ASSET-PROMPTS.txt)
     corner: [{ src: "/decor/frog/corner-pond.webp" }, { src: "/decor/frog/corner-lily.webp" }], // the frog on its lily pad, and the lotus (each message gets one)
     spark: [{ src: "/decor/frog/sparkle-a.webp" }, { src: "/decor/frog/sparkle-b.webp" }, { src: "/decor/frog/sparkle-c.webp" }],
+  },
+  frog2: {
+    // the second frog pond (the first stays as it was): a frog peeking over the top (one with hearts above its head), a frog on a lily pad with a lotus, and eight little pond things
+    peek: [{ src: "/decor/frog2/peeker-a.webp", ratio: 0.413 }, { src: "/decor/frog2/peeker-b.webp", ratio: 0.597 }],
+    corner: [{ src: "/decor/frog2/corner.webp" }],
+    spark: [1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({ src: `/decor/frog2/confetti-${n}.webp` })),
   },
   neko: {
     // a cat peeking over the top (ratio = how tall the picture is for its width, so the stylesheet can leave room above the bubble), a sleeping kitten

@@ -187,8 +187,8 @@ test("neko cafe: a cat peeks over the top edge with room left for it, a kitten s
   assert.ok(r.both >= 1);
 });
 
-test("hamster burrow and bunny cloud: a friend peeks over the top edge with room left for it, a scene sits on the corner, and little things are scattered (all from the pack's own folder)", { skip }, async () => {
-  for (const pack of ["hamster", "bunny"]) {
+test("frog pond V2, hamster burrow and bunny cloud: a friend peeks over the top edge with room left for it, a scene sits on the corner, and little things are scattered (all from the pack's own folder)", { skip }, async () => {
+  for (const pack of ["frog2", "hamster", "bunny"]) {
     await open(`look=bubblegum&deco=${pack}`);
     await page.waitFor(`[...document.querySelectorAll("#chat .deco img")].every((i) => i.complete)`);
     const r = await page.evaluate(`(() => {

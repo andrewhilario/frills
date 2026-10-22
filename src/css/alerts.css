@@ -33,6 +33,49 @@
 .alerts[data-align="right"] .alert__card { justify-content: flex-end; flex-direction: row-reverse; text-align: right; }
 .alerts[data-align="right"] .alert__words { text-align: right; }
 
+/* ── Card styles: the same alert in another format (the "Card style" choice, data-card on .alerts). Each one changes only the card; the words, the
+   picture and the burst stay. They come after the alignment rules so they win over them where they must (Profile is always centered). ────── */
+.alerts[data-card="capsule"] .alert__card { border-radius: 999px; padding: 0.3em 1.3em 0.3em 0.3em; }
+.alerts[data-card="capsule"][data-align="right"] .alert__card { padding: 0.3em 0.3em 0.3em 1.3em; }
+.alerts[data-card="capsule"] .alert__av { width: 2.7em; height: 2.7em; }
+.alerts[data-card="capsule"] .alert[data-tier="3"] .alert__card::after { border-radius: 999px; }
+
+.alerts[data-card="banner"] .alert, .alerts[data-card="banner"] .alert__card { width: 100%; }
+.alerts[data-card="banner"] .alert__card { padding: 0.6em 1em; border-width: 0 0 0 calc(var(--a-border, 2px) + 0.45em); border-radius: calc(var(--a-radius, 20px) * 0.3); }
+.alerts[data-card="banner"][data-align="right"] .alert__card { border-width: 0 calc(var(--a-border, 2px) + 0.45em) 0 0; }
+.alerts[data-card="banner"] .alert__av { border-radius: calc(var(--a-radius, 20px) * 0.3); }
+.alerts[data-card="banner"] .alert[data-tier="3"] .alert__card::after { border-radius: calc(var(--a-radius, 20px) * 0.3 + 0.3em); }
+
+.alerts[data-card="profile"] .alert__card { flex-direction: column; justify-content: center; gap: 0.35em; min-width: 8em; padding: 1em 1.5em 0.8em; text-align: center; }
+.alerts[data-card="profile"] .alert__words { text-align: center; }
+.alerts[data-card="profile"] .alert__av { width: 3.6em; height: 3.6em; font-size: 1.25em; border: var(--a-border, 2px) solid var(--a-bg, #fff); box-shadow: 0 0 0 var(--a-border, 2px) var(--a-accent, #fc0); }
+.alerts[data-card="profile"] .alert__gift { margin-left: 0; }
+
+.alerts[data-card="bubble"] .alert { margin-bottom: 0.6em; }
+.alerts[data-card="bubble"] .alert__card::before {
+  content: ""; position: absolute; left: 1.4em; bottom: -0.5em; width: 0.9em; height: 0.9em; box-sizing: border-box; transform: rotate(45deg);
+  background: var(--a-bg, #fff); border: 0 solid var(--a-accent, #fc0); border-width: 0 var(--a-border, 2px) var(--a-border, 2px) 0;
+}
+.alerts[data-card="bubble"][data-align="center"] .alert__card::before { left: 50%; margin-left: -0.45em; }
+.alerts[data-card="bubble"][data-align="right"] .alert__card::before { left: auto; right: 1.4em; }
+
+.alerts[data-card="coupon"] .alert__card { border-style: dashed; border-width: calc(var(--a-border, 2px) + 1px); border-radius: calc(var(--a-radius, 20px) * 0.35); }
+.alerts[data-card="coupon"] .alert__words:not(:first-child) { padding-left: 0.7em; border-left: 0.12em dotted var(--a-accent, #fc0); }
+.alerts[data-card="coupon"][data-align="right"] .alert__words:not(:first-child) { padding: 0 0.7em 0 0; border-left: 0; border-right: 0.12em dotted var(--a-accent, #fc0); }
+.alerts[data-card="coupon"] .alert[data-tier="3"] .alert__card::after { border-radius: calc(var(--a-radius, 20px) * 0.35 + 0.3em); border-style: dashed; }
+
+/* Neon: the edge glows, inside and out; the words stay crisp (a glow on the letters smudges them on a light card). */
+.alerts[data-card="neon"] .alert__card { box-shadow: 0 0 0.55em var(--a-accent, #fc0), inset 0 0 0.5em var(--a-accent, #fc0); }
+.alerts[data-card="neon"] .alert__av { box-shadow: 0 0 0.45em var(--a-accent, #fc0); }
+
+/* Text only: no box at all; an outline in the card color keeps the words readable on any picture behind them. */
+.alerts[data-card="text"] .alert__card {
+  padding: 0; background: none; border: 0; box-shadow: none;
+  text-shadow: 0 0 0.12em var(--a-bg, #fff), 0.06em 0.06em 0 var(--a-bg, #fff), -0.06em -0.06em 0 var(--a-bg, #fff), 0.06em -0.06em 0 var(--a-bg, #fff), -0.06em 0.06em 0 var(--a-bg, #fff), 0 0.1em 0.3em rgba(0, 0, 0, 0.45);
+}
+.alerts[data-card="text"] .alert__card::after { display: none; }
+.alerts[data-card="text"] .alert__av { box-shadow: 0 0 0 0.08em var(--a-bg, #fff); text-shadow: none; }
+
 .alert__av {
   position: relative; flex: none; display: grid; place-items: center; width: 2.3em; height: 2.3em; border-radius: 50%; overflow: hidden;
   background: var(--a-accent, #fc0); color: var(--a-bg, #fff); font-size: 0.95em; font-weight: 800;

@@ -3,7 +3,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { CONTROLS, DEFAULTS, LOOKS, alertsUrl, alertVars, coerce, currentLook, fromParams, sanitize, toParams } from "../src/js/alerts-settings.js";
+import { CARDS, CONTROLS, DEFAULTS, LOOKS, alertsUrl, alertVars, coerce, currentLook, fromParams, sanitize, toParams } from "../src/js/alerts-settings.js";
 import { AlertQueue, fillTemplate, makeAlert, tierOf, wording } from "../src/js/alerts.js";
 
 // ── settings ────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -349,4 +349,18 @@ test("Twitch alerts outrank follows when the line is too long, and are never joi
   assert.ok(shown.some((l) => l.includes("R1")), "the raid was kept");
   assert.ok(!shown.some((l) => l.includes("(+")), "no crowd was made out of subs or bits");
   assert.ok(!shown.some((l) => l.includes("F2")), "a follow was dropped before the Twitch alerts");
+});
+
+test("card styles: eight formats, the plain card is the default, only a known one is accepted, and a starting look never changes it", () => {
+  assert.deepEqual(CARDS.map((c) => c.id), ["card", "capsule", "banner", "profile", "bubble", "coupon", "neon", "text"]);
+  assert.equal(DEFAULTS.card, "card");
+  assert.equal(CONTROLS.find((c) => c.key === "card").section, "look");
+  assert.equal(sanitize({ card: "banner" }).card, "banner");
+  assert.equal(sanitize({ card: "sideways" }).card, "card", "a made-up style falls back to the card");
+  assert.equal(sanitize({ card: "<img>" }).card, "card");
+  assert.equal(sanitize(fromParams(new URLSearchParams("card=neon"))).card, "neon", "a link can carry it");
+  assert.equal(alertsUrl("https://x.test/o/", { settings: { ...DEFAULTS } }), "https://x.test/o/?", "the plain card adds nothing to a link");
+  assert.equal(new URL(alertsUrl("https://x.test/o/", { channel: "a", settings: { ...DEFAULTS, card: "coupon" } })).searchParams.get("card"), "coupon");
+  for (const id of Object.keys(LOOKS)) assert.equal(sanitize(fromParams(new URLSearchParams(`card=text&look=${id}`))).card, "text", `the ${id} look leaves the card style alone`);
+  assert.equal(currentLook({ ...DEFAULTS, card: "bubble" }), "sticker", "a card style is not part of a look");
 });
