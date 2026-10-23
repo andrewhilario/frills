@@ -1,0 +1,55 @@
+<!--
+{
+  "title": "TikTok chat not showing in your overlay? Fixes | Frills",
+  "description": "Your TikTok LIVE chat overlay is blank or says it is waiting? Go through these checks one by one: LIVE status, the relay, your link and your streaming app.",
+  "path": "/guides/not-showing/",
+  "css": "page",
+  "js": "page",
+  "bodyClass": "page-guide",
+  "chrome": "nav",
+  "footer": true,
+  "jsonld": [
+    "breadcrumb:Chat not showing"
+  ]
+}
+-->
+<main id="main">
+  <article class="article shell">
+    <ol class="crumbs" aria-label="Breadcrumb">
+      <li><a href="/">Frills</a></li>
+      <li aria-current="page">Chat not showing</li>
+    </ol>
+    <header class="article__head">
+      <h1 class="display">TikTok chat not showing in your overlay?</h1>
+      <p class="lede">A blank overlay is almost always one of the few things below. Go down the list in order: the first ones are the most common.</p>
+    </header>
+
+    <div class="article__body">
+      <h2 class="title">1. Are you LIVE right now?</h2>
+      <p>TikTok lets an overlay connect to an account that is not LIVE, and then nothing arrives. The editor says it is connected until it has heard something, then it changes to "Reading your LIVE chat". If you just went LIVE, press <strong>Disconnect</strong> and then <strong>Connect</strong> in the <a href="/editor/">editor</a>, or reload the source in your streaming app.</p>
+
+      <h2 class="title">2. Is the chat just quiet?</h2>
+      <p>A quiet chat is not a broken overlay. Ask someone to type a message, or test with the practice account: type <code>frills_demo</code> as the name and made-up chat starts to scroll. The <a href="/guides/test/">test guide</a> shows how to check your overlay in your streaming app without going LIVE.</p>
+
+      <h2 class="title">3. Does it say it is waiting for a spot?</h2>
+      <p>TikTok chat comes through the free Frills relay, which is a beta with a limited number of spots. When it is full you wait in line, and the page tells you your place ("Waiting for a spot: 3 of 12"). Leave the source open: it connects by itself when a spot frees up.</p>
+
+      <h2 class="title">4. Does it say too many Frills pages are open?</h2>
+      <p>The relay limits how many Frills pages one internet address can hold open at once. Every overlay (chat, alerts, last gifts, goals, top likers) and every editor tab that is connected counts as one. Close the editors and tabs you are not using, or wait a minute: pages left behind by a dropped connection clear on their own.</p>
+
+      <h2 class="title">5. Is the name right?</h2>
+      <p>TikTok names are letters, numbers, underscores and dots only. You can type the name, an @name, or a link to your LIVE. Check that the link you copied has the same name you typed, and that you pasted the newest link into your streaming app.</p>
+
+      <h2 class="title">6. Does your streaming app reload the page?</h2>
+      <p>In OBS, leave <strong>Refresh browser when scene becomes active</strong> and <strong>Shutdown source when not visible</strong> unticked. Either one reloads the overlay every time you switch scenes, so chat empties and goals and rankings start again. If you changed your link, refresh the source once so it loads the new one. The <a href="/guides/obs/">setup guide</a> has the other settings.</p>
+
+      <h2 class="title">7. Blank at your next LIVE, after a break?</h2>
+      <p>If your last LIVE ended a while ago, the overlay may have stopped waiting for the next one. Reload the source in your streaming app and it looks for your LIVE straight away. If it still says you are not LIVE while you are, check the name again.</p>
+
+      <h2 class="title">Still stuck?</h2>
+      <p>Tell us what the overlay says and which streaming app you use on the <a href="/feedback/">feedback page</a>. We have tried Frills in a browser and not in every streaming app, so it helps to know yours. You can also read <a href="/overlays/faq/">the overlays questions</a>.</p>
+
+      <p class="article__foot"><a class="btn" href="/editor/">Open the editor <span class="btn__arrow" aria-hidden="true">→</span></a></p>
+    </div>
+  </article>
+</main>

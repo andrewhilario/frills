@@ -90,3 +90,12 @@
 /* A small link at the top of each editor to the setup clip, for people who have not used it before. */
 .watch { margin: 0 0 var(--space-md); font-size: var(--text-sm); }
 .watch a { display: inline-flex; align-items: center; gap: var(--space-xs); font-weight: 600; }
+
+/* The heading and one line at the top of an editor's panel, and a short explanation at the bottom of it: words for people, and for search engines. */
+.panel__intro { display: grid; gap: var(--space-xs); }
+.panel__title { font-size: var(--text-lg); font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; text-wrap: balance; }
+.panel__lede { margin: 0; font-size: var(--text-sm); color: var(--color-ink-2); }
+.about { display: grid; gap: var(--space-sm); padding-top: var(--space-lg); border-top: 2px dashed var(--color-rule-2); font-size: var(--text-sm); line-height: 1.55; }
+.about p { margin: 0; }
+.about h3 { margin-top: var(--space-xs); font-size: var(--text-sm); font-weight: 700; }
+.about ol, .about ul { display: grid; gap: var(--space-xs); margin: 0; padding-left: 1.25rem; }

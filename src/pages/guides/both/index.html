@@ -1,0 +1,56 @@
+<!--
+{
+  "title": "Show TikTok and Twitch chat in one overlay | Frills",
+  "description": "Stream to TikTok and Twitch at once? Show both chats in one overlay, each message with a small platform icon. Free, one link, no account.",
+  "path": "/guides/both/",
+  "css": "page",
+  "js": "page",
+  "bodyClass": "page-guide",
+  "chrome": "nav",
+  "footer": true,
+  "jsonld": [
+    "breadcrumb:TikTok and Twitch together"
+  ]
+}
+-->
+<main id="main">
+  <article class="article shell">
+    <ol class="crumbs" aria-label="Breadcrumb">
+      <li><a href="/">Frills</a></li>
+      <li aria-current="page">TikTok and Twitch together</li>
+    </ol>
+    <header class="article__head">
+      <h1 class="display">Show TikTok and Twitch chat in one overlay</h1>
+      <p class="lede">If you stream to TikTok and Twitch at the same time, you do not need two chat overlays. Frills can read both accounts into the same speech bubbles, with a small icon on each message so you can tell where it came from. It is free, it is one link, and there is no account to make. This part of Frills is in beta.</p>
+    </header>
+
+    <div class="article__body">
+      <h2 class="title">How to set it up</h2>
+      <ol>
+        <li>Open the <a href="/editor/">chat editor</a> and pick a look.</li>
+        <li>Under the account, choose <strong>Both</strong>. Type your TikTok @name and your Twitch channel.</li>
+        <li>Press the test message button. In practice chat the made-up messages take turns being TikTok’s and Twitch’s, so you can see the icons.</li>
+        <li>Copy your link and add it to your streaming app as one Browser source (some apps call it a web page or link source). The <a href="/guides/obs/">setup guide</a> has every step.</li>
+      </ol>
+      <p>Prefer questions? The <a href="/start/">Quick start</a> has a "Both at once" choice and makes the links for you.</p>
+
+      <h2 class="title">What you get</h2>
+      <ul>
+        <li><strong>One chat, one source.</strong> TikTok and Twitch messages arrive in the same list, in the order they came.</li>
+        <li><strong>A small platform icon</strong> on every message. You can switch it off under <em>Platform icon</em>.</li>
+        <li><strong>Each platform on its own.</strong> A message that a Twitch moderator deletes, or a timeout, only touches that person’s Twitch messages, never someone with the same name on TikTok.</li>
+        <li><strong>If one is not ready, the other keeps working.</strong> A short line says which side is waiting, for example that your TikTok is not LIVE yet, and the other chat carries on.</li>
+      </ul>
+
+      <h2 class="title">Good to know</h2>
+      <ul>
+        <li>TikTok chat comes through the free Frills relay, which is a beta with a limited number of spots, so it can make you wait when it is busy. Twitch is read straight from your browser.</li>
+        <li>Gifts (and the gifter dot) only exist on TikTok, so they only ever show for TikTok. A rose is a TikTok gift.</li>
+        <li>The alerts overlay, last gifts, goals and top likers are separate overlays with their own links. Alerts work for both platforms; the others are TikTok only for now. See <a href="/overlays/">more overlays</a>.</li>
+        <li>Nothing shows? Go through the <a href="/guides/not-showing/">fixes for a chat that is not showing</a>.</li>
+      </ul>
+
+      <p class="article__foot"><a class="btn" href="/editor/">Open the chat editor <span class="btn__arrow" aria-hidden="true">→</span></a></p>
+    </div>
+  </article>
+</main>

@@ -1,13 +1,16 @@
 <!--
 {
-  "title": "Chat overlay editor | Frills",
+  "title": "TikTok and Twitch chat overlay editor | Frills",
   "description": "Pick a look, change every color, font and corner, connect your TikTok or Twitch chat, and copy one link for your stream. Free, no account.",
   "path": "/editor/",
   "css": "editor",
   "js": "editor",
   "bodyClass": "page-editor",
   "chrome": "appbar",
-  "footer": false
+  "footer": false,
+  "intro": "intro-chat",
+  "about": "about-chat",
+  "jsonld": ["webapp"]
 }
 -->
 <main class="workspace" id="main">
@@ -28,12 +31,13 @@
 
   <div class="panel">
     <noscript><p class="note">Frills needs JavaScript to draw your chat. Turn it on for this page and reload.</p></noscript>
+    {{{intro}}}
     <p class="watch"><a href="/guides/setup/#chat"><span aria-hidden="true">▶</span> New here? Watch the 20-second setup</a></p>
 
     <section class="step-card" aria-labelledby="s1">
       <div class="step-card__head">
         <span class="step-card__num" aria-hidden="true">1</span>
-        <h1 class="step-card__title" id="s1">Pick a look</h1>
+        <h2 class="step-card__title" id="s1">Pick a look</h2>
         <button class="btn btn--soft btn--sm step-card__aside" type="button" id="reset">Reset</button>
       </div>
       <div class="chips" id="presets" role="group" aria-label="Starting looks"></div>
@@ -68,5 +72,6 @@
       </div>
     </section>
 
+    {{{about}}}
   </div>
 </main>

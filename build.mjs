@@ -174,6 +174,7 @@ function jsonLd(meta, canonical, faqItems, overlayItems = []) {
   for (const kind of meta.jsonld ?? []) {
     if (kind === "website") nodes.push({ "@type": "WebSite", name: site.name, url: `${site.url}/`, description: site.description });
     if (kind === "software") nodes.push({ "@type": "SoftwareApplication", name: site.name, url: `${site.url}/`, description: site.description, applicationCategory: "MultimediaApplication", operatingSystem: "Any (runs in a web browser)", offers: { "@type": "Offer", price: "0", priceCurrency: "USD" } });
+    if (kind === "webapp") nodes.push({ "@type": "WebApplication", name: meta.title.replace(/ \| Frills$/, ""), url: canonical, description: meta.description, applicationCategory: "MultimediaApplication", operatingSystem: "Any (runs in a web browser)", isAccessibleForFree: true, offers: { "@type": "Offer", price: "0", priceCurrency: "USD" }, isPartOf: { "@type": "WebSite", name: site.name, url: `${site.url}/` } });
     if (kind === "faq") nodes.push({ "@type": "FAQPage", mainEntity: faqItems.map((i) => ({ "@type": "Question", name: i.q, acceptedAnswer: { "@type": "Answer", text: i.text } })) });
     if (kind === "faq-overlays") nodes.push({ "@type": "FAQPage", mainEntity: overlayItems.map((i) => ({ "@type": "Question", name: i.q, acceptedAnswer: { "@type": "Answer", text: i.text } })) });
     if (kind.startsWith("breadcrumb:")) nodes.push({ "@type": "BreadcrumbList", itemListElement: [{ "@type": "ListItem", position: 1, name: site.name, item: `${site.url}/` }, { "@type": "ListItem", position: 2, name: kind.slice(11), item: canonical }] });
@@ -184,6 +185,8 @@ function jsonLd(meta, canonical, faqItems, overlayItems = []) {
 function renderPage(page, stats) {
   const { meta } = page;
   const canonical = site.url + meta.path;
+  const vars0 = { ...shared, stats };
+  const where0 = relative(root, page.file);
   const faqItems = faq({ kb: stats.kb, waitlistUrl: site.waitlistUrl, helperUrl: site.helperUrl, relayUrl: site.relayUrl });
   const overlayItems = overlaysFaq({ kb: stats.kb, relayUrl: site.relayUrl });
   const vars = {
@@ -198,6 +201,10 @@ function renderPage(page, stats) {
     js: assets.js[meta.js],
     bodyClass: meta.bodyClass ?? "",
     jsonld: jsonLd(meta, canonical, faqItems, overlayItems),
+    // A page can ask for two blocks of its own by partial name: "intro" (a heading and a line at the top of an editor's panel) and "about" (a
+    // short explanation at the bottom of it). Pages that share a template (the alerts editor and the private Matcha one) differ only by these.
+    intro: meta.intro ? render(partials[meta.intro], vars0, partials, `${where0} > ${meta.intro}`) : "",
+    about: meta.about ? render(partials[meta.about], vars0, partials, `${where0} > ${meta.about}`) : "",
     navGuide: meta.navGuide ? ' aria-current="page"' : "",
     navTikTok: meta.navTikTok ? ' aria-current="page"' : "",
     navTest: meta.navTest ? ' aria-current="page"' : "",

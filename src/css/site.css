@@ -220,6 +220,16 @@
 .tools { display: grid; gap: var(--space-lg); grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr)); margin: var(--space-md) 0 var(--space-xl); padding: 0; list-style: none; }
 .tool { display: grid; align-content: start; gap: var(--space-sm); padding: var(--space-lg); background: var(--color-paper); border: 2.5px solid var(--color-ink); border-radius: var(--radius-card); box-shadow: 0 5px 0 var(--color-ink); }
 .tool .subtitle { margin: 0; }
+
+/* The looks page: practice chats in small dark boxes, one card each. The frame fills its box, so the chat is drawn at its normal size. */
+.article__body .packs { padding-left: 0; }
+.packs { display: grid; gap: var(--space-lg); grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr)); margin: var(--space-md) 0 var(--space-xl); padding: 0; list-style: none; }
+.pack { display: grid; align-content: start; gap: var(--space-sm); padding: var(--space-md); background: var(--color-paper); border: 2.5px solid var(--color-ink); border-radius: var(--radius-card); box-shadow: 0 5px 0 var(--color-ink); }
+.pack .subtitle { margin: 0; }
+.pack p { margin: 0; color: var(--color-ink-2); }
+.pack .btn { justify-self: start; }
+.pack__stage { position: relative; height: 15rem; overflow: hidden; border-radius: var(--radius-card); background: #151a26; border: 2px solid var(--color-ink); }
+.pack__frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: transparent; color-scheme: normal; pointer-events: none; }
 .tool p { margin: 0; color: var(--color-ink-2); }
 .tool .btn { justify-self: start; margin-top: var(--space-xs); }
 .tool--soon { border-style: dashed; box-shadow: none; background: var(--color-paper-2); }

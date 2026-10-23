@@ -1,13 +1,16 @@
 <!--
 {
   "title": "Last gifts overlay for TikTok LIVE | Frills",
-  "description": "Show your most recent TikTok LIVE gifts as a list on your stream, with your own colors, words and size. Pick a look, test it, and copy one link. Free, no account.",
+  "description": "Show your latest TikTok LIVE gifts as a list on your stream, with your own colors, words and size. Pick a look, test it, copy one link. Free.",
   "path": "/gifts/",
   "css": "widget",
   "js": "gifts",
   "bodyClass": "page-editor page-alerts",
   "chrome": "appbar",
-  "footer": false
+  "footer": false,
+  "intro": "intro-gifts",
+  "about": "about-gifts",
+  "jsonld": ["webapp"]
 }
 -->
 <main class="workspace" id="main">
@@ -33,12 +36,13 @@
 
   <div class="panel">
     <noscript><p class="note">Frills needs JavaScript to draw your overlay. Turn it on for this page and reload.</p></noscript>
+    {{{intro}}}
     <p class="watch"><a href="/guides/setup/#gifts"><span aria-hidden="true">▶</span> New here? Watch the 20-second setup</a></p>
 
     <section class="step-card" aria-labelledby="s1">
       <div class="step-card__head">
         <span class="step-card__num" aria-hidden="true">1</span>
-        <h1 class="step-card__title" id="s1">Pick a look</h1>
+        <h2 class="step-card__title" id="s1">Pick a look</h2>
         <button class="btn btn--soft btn--sm step-card__aside" type="button" id="reset">Reset</button>
       </div>
       <div class="chips" id="looks" role="group" aria-label="Starting looks"></div>
@@ -76,6 +80,8 @@
         <p class="linkfield__hint" id="link-hint" role="status"></p>
       </div>
     </section>
+
+    {{{about}}}
 
     <section class="preview-tools" aria-label="Preview options">
       <div id="preview-canvas"></div>
