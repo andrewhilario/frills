@@ -58,5 +58,5 @@ export function paintMatcha(stage, settings) {
   stage.dataset.align = settings.align || "left";
   Object.assign(stage.dataset, decoAttrs(settings));
   for (const [name, value] of Object.entries(decoVars(settings))) stage.style.setProperty(name, value);
-  return { max: settings.max, life: settings.life * 1000, modIcon: settings.modIcon, colors: settings.colors, emotes: settings.emotes, pictures: settings.pictures, ...decoFeed(settings) };
+  return { max: settings.max, life: settings.stay ? 0 : settings.life * 1000, modIcon: settings.modIcon, colors: settings.colors, emotes: settings.emotes, pictures: settings.pictures, ...decoFeed(settings) };
 }

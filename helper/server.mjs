@@ -25,7 +25,7 @@ import { ALERT_AT, Signing, capacity, deviceFacts, snapshot, statusPage } from "
 import { SlotAlerts, termuxNotifier } from "./alerts.mjs";
 import { OWNER, ownerGate } from "./owner.mjs";
 
-const VERSION = "0.5.3";
+const VERSION = "0.5.4";
 /** What this program can do, so a page can tell an old one ("chat" only) from one that sends alerts. */
 const FEATURES = ["chat", "alerts", "info", "roles", "status"];
 
@@ -55,8 +55,11 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
   // The one built-in account, frills_demo, never reaches TikTok: it makes up chat so the whole chain can be tested without a LIVE.
   const make = (user, options) => (user === DEMO_USER ? new DemoConnection({ pace: demoPace }) : factory(user, options));
   // Each connect to TikTok costs a request to the free signing service (a few thousand a day at most), so a shared relay keeps an account
-  // for 10 minutes after its last page leaves (coming back is free), looks for an offline account every 3 minutes, and gives up after 30.
-  const shared = relay ? { queue: true, idleStopMs: 600000, offlineWaitMs: 180000, offlineGiveUpMs: 1800000, maxRooms: relay.slots ?? 30 } : {};
+  // for 10 minutes after its last page leaves (coming back is free), and looks for an offline account every 3 minutes, then every 10 minutes after
+  // the first half hour and every 30 minutes after the first 3 hours. It never gives up while a page is listening: an overlay in OBS has no button
+  // to press, so one that was given up on stayed blank until someone reloaded it, and a streamer's next LIVE (after a break, or the next day with OBS
+  // left open) never showed. A page that opens meanwhile makes it look at once (Room.add). A page left open all night costs about 70 requests.
+  const shared = relay ? { queue: true, idleStopMs: 600000, offlineWaitMs: 180000, offlineGiveUpMs: 0, offlineSlowSteps: [[1800000, 600000], [10800000, 1800000]], maxRooms: relay.slots ?? 30 } : {};
   const signing = new Signing();
   const startedAt = Date.now();
   const hub = new Hub({ factory: make, apiKey, log, onLimited: () => signing.note(), ...shared, ...tuning });

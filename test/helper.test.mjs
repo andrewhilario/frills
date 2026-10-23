@@ -111,7 +111,7 @@ test("it answers a ping, serves the built site with its security headers, and sa
   await start(scripted().factory);
   const ping = await raw("/tiktok/ping");
   assert.equal(ping.status, 200);
-  assert.deepEqual(JSON.parse(ping.body), { ok: true, name: "frills-helper", version: "0.5.3", features: ["chat", "alerts", "info", "roles", "status"] });
+  assert.deepEqual(JSON.parse(ping.body), { ok: true, name: "frills-helper", version: "0.5.4", features: ["chat", "alerts", "info", "roles", "status"] });
   const editor = await raw("/editor/");
   assert.equal(editor.status, 200);
   assert.match(editor.body, /Connect your chat/);
@@ -292,6 +292,44 @@ test("an account that never goes live is looked for only so long, and a new conn
   const again = listen("pond.pal");
   await again.until(() => made.length > looks, 3000);
   await again.close();
+  await helper.close();
+});
+
+test("an account that stays offline is looked at less and less often, never given up on while a page listens, and found by itself when it goes LIVE", async () => {
+  class UserOfflineError extends Error {}
+  const offline = Array.from({ length: 12 }, () => ({ failWith: new UserOfflineError("not live") }));
+  const { factory, made } = scripted(...offline);
+  // 20 ms between looks, then 120 ms once 150 ms have passed (the real relay: 3 minutes, then 10 after half an hour, then 30 after 3 hours)
+  await start(factory, { offlineWaitMs: 20, offlineGiveUpMs: 0, offlineSlowSteps: [[150, 120]], wakeGapMs: 1e9 });
+  const page = listen("pond.pal");
+  await page.until(() => /Looking again every/.test(helper.hub.rooms.get("pond.pal")?.status.detail ?? ""), 3000);
+  const room = helper.hub.rooms.get("pond.pal");
+  assert.match(room.status.detail, /^Not live yet. Looking again every (second|d+ seconds). Opening this link again looks right away.$/);
+  assert.equal(room.running, true, "it is still looking");
+  const before = made.length;
+  await sleep(300);
+  assert.ok(made.length - before <= 4, "at the slow pace there are only a few looks in 300 ms: " + (made.length - before));
+  // the twelve offline answers run out, so a later look finds the LIVE with nobody pressing anything
+  await page.until(() => room.status.state === "connected", 4000);
+  assert.ok(!page.events.some((e) => e.name === "status" && /stopped looking/.test(e.data.detail ?? "")), "it never said it had stopped looking");
+  await page.close();
+  await helper.close();
+});
+
+test("a page that opens while the account is offline makes the relay look right away, but not again within the gap", async () => {
+  class UserOfflineError extends Error {}
+  const offline = Array.from({ length: 30 }, () => ({ failWith: new UserOfflineError("not live") }));
+  const { factory, made } = scripted(...offline);
+  await start(factory, { offlineWaitMs: 100000, offlineGiveUpMs: 0, wakeGapMs: 300 });
+  const first = listen("pond.pal");
+  await first.until(() => made.length === 1 && helper.hub.rooms.get("pond.pal")?.status.state === "offline", 3000);
+  await sleep(350); // past the gap
+  const second = listen("pond.pal");
+  await second.until(() => made.length === 2, 3000); // it did not wait out its 100 seconds
+  const third = listen("pond.pal"); // straight after a look: inside the gap
+  await sleep(150);
+  assert.equal(made.length, 2, "a page opened right after a look does not make another one");
+  await Promise.all([first.close(), second.close(), third.close()]);
   await helper.close();
 });
 

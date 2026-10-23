@@ -70,7 +70,10 @@ for (const control of CONTROLS) {
 }
 /** The settings that only matter once something is picked (the decoration's size and place) are hidden until it is. */
 function showNeeded() {
-  for (const control of CONTROLS) if (control.needs) rows[control.key].style.display = settings[control.needs] === "none" ? "none" : "";
+  for (const control of CONTROLS) {
+    if (control.needs) rows[control.key].style.display = settings[control.needs] === "none" ? "none" : "";
+    if (control.hideWhen) rows[control.key].style.display = settings[control.hideWhen] === true ? "none" : "";
+  }
 }
 showNeeded();
 

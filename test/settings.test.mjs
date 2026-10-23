@@ -116,3 +116,20 @@ test("chat letter spacing: 0 by default, in half pixels, kept between -2 and 8, 
   assert.equal(sanitize(fromParams(params)).letter, 2);
   assert.equal(toParams(sanitize({})).has("letter"), false, "the default is not written into the link");
 });
+
+test("Keep messages on screen: off by default, carried in the link, and it makes the feed keep every message whatever Time on screen says", () => {
+  assert.equal(DEFAULTS.stay, false);
+  assert.equal(lookVars(DEFAULTS).feed.life, 15000, "off: messages leave after Time on screen");
+  const kept = sanitize(fromParams(new URLSearchParams("stay=1&life=30")));
+  assert.equal(kept.stay, true);
+  assert.equal(kept.life, 30);
+  assert.equal(lookVars(kept).feed.life, 0, "on: 0 means a message never leaves by itself (Feed)");
+  const url = new URL(overlayUrl("https://frills.app/overlay/", { channel: "somename", settings: kept }));
+  assert.equal(url.searchParams.get("stay"), "1");
+  assert.equal(overlayUrl("https://frills.app/overlay/", { channel: "somename" }), "https://frills.app/overlay/?channel=somename", "off adds nothing to the link");
+  const stay = CONTROLS.find((c) => c.key === "stay");
+  assert.equal(stay.type, "toggle");
+  assert.equal(stay.where, "main", "up front, not under More options");
+  assert.equal(CONTROLS.find((c) => c.key === "life").hideWhen, "stay", "the Time on screen row is hidden while messages are kept");
+  assert.equal(coerce(stay, "yes"), undefined, "only a real on or off is accepted");
+});

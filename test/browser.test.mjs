@@ -265,6 +265,21 @@ test("overlay: with no channel it says what to add, and with demo=1 it draws pra
   assert.ok(count >= 2 && count <= 3, `${count} messages showing`);
 });
 
+test("overlay: with Keep messages on screen (stay=1) messages never fade, in a general look and a matcha one; without it they leave after their time", { skip }, async () => {
+  const count = () => page.evaluate(`[...document.querySelectorAll("#chat .m")].filter((m) => !m.classList.contains("leaving")).length`);
+  // a one-second life and a quick practice chat: without stay the list stays short, with stay it fills to max
+  for (const look of ["", "style=latte&palette=sakura&"]) {
+    await page.goto(`${base}/overlay/?demo=1&pace=300&max=12&life=1&${look}`, { settle: 300 });
+    await sleep(5000);
+    const fading = await count();
+    assert.ok(fading <= 4, `without stay (${look || "general"}) ${fading} messages showing after 5 s with a life of 1 s`);
+    await page.goto(`${base}/overlay/?demo=1&pace=300&max=12&life=1&stay=1&${look}`, { settle: 300 });
+    await sleep(5000);
+    const kept = await count();
+    assert.ok(kept >= 7, `with stay (${look || "general"}) ${kept} messages showing after 5 s`);
+  }
+});
+
 test("overlay: ?pace= makes the practice events come faster, and without it they come at the usual speed (chat and last gifts, like the other overlays)", { skip }, async () => {
   // how many came in a 3-second stretch, after the first few that a practice chat starts with
   const chatIn3Seconds = async (query) => {

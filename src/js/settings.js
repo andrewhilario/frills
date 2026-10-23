@@ -57,7 +57,7 @@ export const MOD_ICONS = ["shield", "star", "leaf", "frog", "none"];
 // Decorations (a friend peeking over the bubble, a small scene on a corner, sparkles) and the name tag: off to begin with, so a look is exactly what it was until someone turns them on.
 export const DECO_DEFAULTS = { deco: "none", decoSize: 100, decoSide: "left", decoPeek: true, decoCorner: true, decoSpark: true, decoFor: "all", tag: "inside" };
 
-export const DEFAULTS = { ...PRESETS.blueberry, letter: 0, align: "left", source: "icon", modIcon: "shield", max: 6, life: 15, space: 8, colors: false, emotes: true, pictures: true, ...DECO_DEFAULTS };
+export const DEFAULTS = { ...PRESETS.blueberry, letter: 0, align: "left", source: "icon", modIcon: "shield", max: 6, life: 15, stay: false, space: 8, colors: false, emotes: true, pictures: true, ...DECO_DEFAULTS };
 
 const list = (...pairs) => pairs.map(([id, name]) => ({ id, name }));
 
@@ -81,6 +81,7 @@ export const CONTROLS = [
   { key: "decoSpark", where: "main", needs: "deco", type: "toggle", label: "Sparkles" },
   { key: "decoFor", where: "main", needs: "deco", type: "chips", label: "Who gets decorations", options: list(["all", "Everyone"], ["mods", "Mods only"], ["gifts", "Gift messages"]) },
   { key: "tag", where: "main", type: "chips", label: "Name tag", options: list(["inside", "Inside the bubble"], ["pill", "A pill on the edge"]), hint: "A pill puts the name in a small rounded label that overlaps the top-left edge of the bubble, in your look's accent color." },
+  { key: "stay", where: "main", type: "toggle", label: "Keep messages on screen", hint: "Messages never fade by themselves. The oldest one leaves only when newer ones need the room (see Messages on screen under More options)." },
   { key: "text", where: "more", type: "color", label: "Text color" },
   { key: "pop", where: "more", type: "color", label: "Gift color" },
   { key: "shape", where: "more", type: "chips", label: "Box", options: list(["filled", "Filled"], ["outline", "Outline"], ["none", "Text only"]) },
@@ -93,7 +94,7 @@ export const CONTROLS = [
   { key: "pictures", where: "more", type: "toggle", label: "Use profile pictures", hint: "TikTok chatters pick their own pictures, so turn this off if you would rather not risk showing one you didn't choose. Twitch has no pictures to show." },
   { key: "modIcon", where: "more", type: "chips", label: "Moderator icon", options: MOD_ICONS.map((id) => ({ id, name: id[0].toUpperCase() + id.slice(1) })) },
   { key: "max", where: "more", type: "range", label: "Messages on screen", min: 2, max: 12, step: 1, unit: "" },
-  { key: "life", where: "more", type: "range", label: "Time on screen", min: 0, max: 60, step: 1, unit: " s", zero: "stays" },
+  { key: "life", where: "more", hideWhen: "stay", type: "range", label: "Time on screen", min: 0, max: 60, step: 1, unit: " s", zero: "stays" },
   { key: "space", where: "more", type: "range", label: "Spacing", min: 0, max: 24, step: 1, unit: " px" },
   { key: "colors", where: "more", type: "toggle", label: "Viewers' own name colors" },
   { key: "emotes", where: "more", type: "toggle", label: "Show emotes" },
@@ -200,6 +201,6 @@ export function lookVars(s) {
   return {
     vars,
     attrs: { shape: s.shape, avatar: s.avatar ? "on" : "off", ...decoAttrs(s) },
-    feed: { max: s.max, life: s.life * 1000, modIcon: s.modIcon, colors: s.colors, emotes: s.emotes, pictures: s.pictures, ...decoFeed(s) },
+    feed: { max: s.max, life: s.stay ? 0 : s.life * 1000, modIcon: s.modIcon, colors: s.colors, emotes: s.emotes, pictures: s.pictures, ...decoFeed(s) },
   };
 }

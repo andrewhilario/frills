@@ -18,6 +18,16 @@ export function classify(err) {
   return { kind: "failed", detail: "Couldn't reach TikTok. Trying again…" };
 }
 
+/** A wait in plain words for a page to show: "minute", "10 minutes", "30 seconds". */
+export function lengthOf(ms) {
+  if (ms >= 60000) {
+    const minutes = Math.round(ms / 60000);
+    return minutes === 1 ? "minute" : `${minutes} minutes`;
+  }
+  const seconds = Math.max(1, Math.round(ms / 1000));
+  return seconds === 1 ? "second" : `${seconds} seconds`;
+}
+
 export class Room {
   constructor(user, hub) {
     this.user = user;
@@ -38,6 +48,7 @@ export class Room {
     this.base = 0; // the account's follower count when we connected (0 when TikTok did not say)
     this.followed = 0; // follows seen since then, so a page that joins later is told a current number
     this.likeTimer = 0;
+    this.lastLookAt = 0; // when we last asked TikTok whether the account is LIVE (see add)
     this.lastEventAt = 0; // when anything last came from TikTok on the connection we have
     this.silentFor = 0; // how long a silence is put up with before the connection is replaced (grows after a silence that changed nothing)
   }
@@ -48,6 +59,10 @@ export class Room {
     client.send("status", this.status);
     if (this.base > 0 || this.live) client.send("info", this.info());
     if (!this.running) this.start();
+    // A page that opens while the room is between two looks for a LIVE (the account is offline, and looked at less and less often the longer
+    // that lasts) makes it look right now, so a streamer who just went LIVE and reloads the overlay is not made to wait. Not more than once
+    // every wakeGapMs, because each look costs a request to the signing service and a page can be opened as often as anyone likes.
+    else if (this.sleeper && this.status.state === "offline" && Date.now() - this.lastLookAt >= this.hub.opts.wakeGapMs) this.sleeper();
   }
 
   /** What the room knows about the account itself: whether it is LIVE, and its follower count when TikTok gave one (0 when not). */
@@ -184,6 +199,7 @@ export class Room {
   /** One try: connect, then wait until the connection ends. Resolves with how it ended. */
   async once() {
     let conn;
+    this.lastLookAt = Date.now();
     try {
       conn = await this.hub.opts.factory(this.user, { apiKey: this.hub.opts.apiKey });
     } catch (err) {
@@ -257,7 +273,7 @@ export class Room {
       if (c.chat || c.gift || c.follow || c.share) this.hub.log(`@${this.user}: ${c.chat} chat, ${c.gift} gifts, ${c.follow} follows and ${c.share} shares in the last minute`);
       this.counts = { chat: 0, gift: 0, follow: 0, share: 0 };
     }, 60000);
-    const { offlineWaitMs, offlineGiveUpMs, limitedWaitMs, backoffMs } = this.hub.opts;
+    const { offlineWaitMs, offlineGiveUpMs, offlineSlowSteps, limitedWaitMs, backoffMs } = this.hub.opts;
     let attempt = 0;
     let offlineSince = 0; // when this wait for a LIVE began; each look at TikTok costs a request, so it does not go on for ever
     let quiet = false; // while waiting for a LIVE to start, keep saying so instead of flickering to "connecting" at every look
@@ -273,13 +289,18 @@ export class Room {
         break;
       } else if (how.kind === "offline") {
         offlineSince ||= Date.now();
-        if (offlineGiveUpMs > 0 && Date.now() - offlineSince >= offlineGiveUpMs) {
+        const waited = Date.now() - offlineSince;
+        if (offlineGiveUpMs > 0 && waited >= offlineGiveUpMs) {
           // Stop looking. A page that connects again (or the person pressing Connect) starts the wait afresh.
           this.setStatus("offline", "Still not live after a long wait, so Frills stopped looking. Press Disconnect, then Connect again when you go LIVE.");
           break;
         }
-        this.setStatus("offline", how.detail ?? "");
-        await this.sleep(offlineWaitMs);
+        // The longer an account stays offline, the less often it is looked at: a page that stays open all night costs a few requests, not hundreds,
+        // and it still finds the next LIVE by itself, which a relay that gave up could not do (an overlay in OBS has no button to press).
+        let every = offlineWaitMs;
+        for (const [after, wait] of offlineSlowSteps) if (waited >= after) every = wait;
+        this.setStatus("offline", every > offlineWaitMs ? `Not live yet. Looking again every ${lengthOf(every)}. Opening this link again looks right away.` : how.detail ?? "");
+        await this.sleep(every);
       } else if (how.kind === "limited") {
         this.setStatus("limited");
         this.hub.opts.onLimited?.();
@@ -354,7 +375,7 @@ class Waiting {
 
 export class Hub {
   constructor(opts = {}) {
-    this.opts = { factory: null, apiKey: "", maxRooms: 3, queue: false, queueGraceMs: 20000, idleStopMs: 30000, offlineWaitMs: 20000, limitedWaitMs: 60000, offlineGiveUpMs: 0, backoffMs: [3000, 6000, 12000, 30000, 60000], silentMs: 120000, silentMaxMs: 600000, ...opts };
+    this.opts = { factory: null, apiKey: "", maxRooms: 3, queue: false, queueGraceMs: 20000, idleStopMs: 30000, offlineWaitMs: 20000, limitedWaitMs: 60000, offlineGiveUpMs: 0, offlineSlowSteps: [], wakeGapMs: 30000, backoffMs: [3000, 6000, 12000, 30000, 60000], silentMs: 120000, silentMaxMs: 600000, ...opts };
     this.log = opts.log ?? (() => {});
     this.rooms = new Map();
     this.waiting = new Map(); // accounts in line for a spot, oldest first

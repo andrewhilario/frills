@@ -125,3 +125,14 @@ test("the variables follow the settings: sizes, corners, box opacity and the col
   assert.equal(plain["--m-scale"], "1");
   assert.equal(plain["--bg-fill"], "rgba(245,240,225,1)", "full opacity is the design");
 });
+
+test("Keep messages on screen works in a matcha look too, and is carried in its link", () => {
+  assert.equal(MATCHA_DEFAULTS.stay, false);
+  assert.ok(MATCHA_CONTROLS.some((c) => c.key === "stay"), "it is offered under More options");
+  const raw = matchaFromParams(new URLSearchParams("style=latte&stay=1"));
+  assert.equal(sanitizeMatcha(raw).stay, true);
+  assert.equal(sanitizeMatcha({ stay: "yes" }).stay, false, "a value that is not a real on or off is ignored");
+  const url = new URL(matchaOverlayUrl("https://frills.app/overlay/", { channel: "somename", settings: sanitizeMatcha(raw) }));
+  assert.equal(url.searchParams.get("stay"), "1");
+  assert.equal(new URL(matchaOverlayUrl("https://frills.app/overlay/", { channel: "somename" })).searchParams.has("stay"), false);
+});
