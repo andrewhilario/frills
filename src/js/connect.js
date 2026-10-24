@@ -12,9 +12,10 @@ export const cleanName = (platform, input) => (platform === "tiktok" ? cleanTikT
 
 /**
  * Sends one account's chat into one or more feeds. Returns the connection: stop() ends it. For TikTok it first looks for where the chat
- * can come from (the helper on this PC, else the site's relay, `relay` being its address); with neither it says so.
+ * can come from (the helper on this PC, else the site's relay, `relay` being its address); with neither it says so. With `assumeRelay` the relay is
+ * used without asking first.
  */
-export function connectTo(feeds, platform, name, onStatus, { relay = "", events = [], onAlert, onInfo, onFound, onFirstMessage } = {}) {
+export function connectTo(feeds, platform, name, onStatus, { relay = "", assumeRelay = false, events = [], onAlert, onInfo, onFound, onFirstMessage } = {}) {
   const list = Array.isArray(feeds) ? feeds : [feeds];
   let sawChat = false;
   const handlers = {
@@ -34,7 +35,10 @@ export function connectTo(feeds, platform, name, onStatus, { relay = "", events 
   let inner = null;
   let stopped = false;
   onStatus?.({ state: "connecting", channel: login, platform: "tiktok" });
-  findTikTokSource(relay).then((found) => {
+  // `assumeRelay` (the chat overlay, which needs nothing but chat) skips the question "what answers here?" when the site's relay is known: it saves a round
+  // trip through the tunnel before the stream is even asked for. If the relay is down the stream says so, as it does for any lost connection.
+  const looked = assumeRelay && relay ? Promise.resolve({ kind: "relay", base: relay.replace(/\/+$/, ""), features: ["chat"] }) : findTikTokSource(relay);
+  looked.then((found) => {
     if (stopped) return;
     onFound?.(found);
     if (!found) {

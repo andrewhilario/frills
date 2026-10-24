@@ -199,7 +199,8 @@ export class Room {
   /** One try: connect, then wait until the connection ends. Resolves with how it ended. */
   async once() {
     let conn;
-    this.lastLookAt = Date.now();
+    const began = Date.now();
+    this.lastLookAt = began;
     try {
       conn = await this.hub.opts.factory(this.user, { apiKey: this.hub.opts.apiKey });
     } catch (err) {
@@ -219,6 +220,7 @@ export class Room {
       this.letGo(conn);
       return { kind: "stopped" };
     }
+    this.hub.log(`@${this.user}: connected in ${((Date.now() - began) / 1000).toFixed(1)} s`);
     this.readInfo(conn);
     this.setStatus("connected", conn.pretend ? "Practice chat made up by Frills. Nothing comes from TikTok." : "");
     const watch = this.watchSilence(finish);

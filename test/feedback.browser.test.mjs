@@ -9,7 +9,7 @@ import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
-import { findChrome, launch, sleep } from "../scripts/lib/chrome.mjs";
+import { findChrome, launch, sleep, waitForServer } from "../scripts/lib/chrome.mjs";
 
 const root = join(import.meta.dirname, "..");
 if (!existsSync(join(root, "dist", "feedback", "index.html"))) throw new Error("dist/ has no feedback page. Run `npm run build` first (`npm test` does that for you).");
@@ -35,7 +35,7 @@ const click = (selector) => page.evaluate(`document.querySelector(${JSON.stringi
 before(async () => {
   if (skip) return;
   server = spawn(process.execPath, ["scripts/serve.mjs", String(port)], { cwd: root, stdio: "ignore", env: { ...process.env, FEEDBACK_DB: file } });
-  await sleep(900);
+  await waitForServer(base);
   page = await launch();
   await page.viewport(1100, 900);
 });

@@ -45,27 +45,43 @@ if (!sources.length && params.get("demo") !== "1") {
   note.textContent = "Add ?channel=yourname to this link.";
 }
 // Fetch the look's typeface first (for at most a second), so the first message is drawn in it rather than in a stand-in.
-fontsReady(faces, 1000).then(() => {
-  if (params.get("demo") === "1") {
+const fonts = fontsReady(faces, 1000);
+if (params.get("demo") === "1") {
+  fonts.then(() => {
     if (both) {
       // practice for two chats: the made-up messages take turns being TikTok's and Twitch's (gifts are always TikTok's)
       fakeSource(takingTurns(scoped(feed, "tiktok"), scoped(feed, "twitch")), practicePace);
     } else fakeSource(feed, practicePace);
-  } else if (both) {
+  });
+} else if (sources.length) {
+  // A real chat starts connecting at once instead of waiting for the typeface (connecting takes seconds, and the typeface is nearly always in by then).
+  // What arrives before the typeface is in waits its turn, in order, so the first message is still drawn in the right face.
+  let ready = false;
+  const waiting = [];
+  fonts.then(() => { ready = true; waiting.splice(0).forEach((run) => run()); });
+  const later = (run) => (...args) => (ready ? run(...args) : waiting.push(() => run(...args)));
+  const held = {
+    add: later((m) => feed.add(m)),
+    removeById: later((id) => feed.removeById(id)),
+    removeUser: later((user) => feed.removeUser(user)),
+    clear: later(() => feed.clear()),
+    clearWhere: later((platform) => feed.clearWhere(platform)),
+  };
+  if (both) {
     const parts = {};
     for (const { platform, channel } of sources) {
-      connectTo([scoped(feed, platform)], platform, channel, (status) => {
+      connectTo([scoped(held, platform)], platform, channel, (status) => {
         parts[platform] = status;
         const text = noteFor(parts, statusText);
         note.hidden = text === "";
         note.textContent = text;
-      }, { relay: relayForPage() });
+      }, { relay: relayForPage(), assumeRelay: true });
     }
-  } else if (sources.length === 1) {
+  } else {
     const [{ platform, channel }] = sources;
-    connectTo([feed], platform, channel, (status) => {
+    connectTo([held], platform, channel, (status) => {
       note.hidden = status.state === "connected" || status.state === "stopped";
       note.textContent = statusText(status);
-    }, { relay: relayForPage() });
+    }, { relay: relayForPage(), assumeRelay: true });
   }
-});
+}

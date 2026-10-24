@@ -38,6 +38,7 @@
 
       <h3>TikTok</h3>
       <ul>
+        <li><strong>Chat shows up sooner after you go LIVE.</strong> If you open your overlay before you go LIVE, the relay now looks for your LIVE every 20 seconds at first (it was every 3 minutes), then every minute, and your chat starts as soon as it finds it. The overlay also starts connecting straight away instead of waiting for its font, and no longer asks the relay "who are you?" first. We are also looking at a faster server for the relay. The relay change applies when the relay is updated.</li>
         <li><strong>The free relay keeps looking for your next LIVE.</strong> When your LIVE ended and the next one was more than half an hour away, the relay gave up, and an overlay left open in OBS (which has no button to press) stayed blank until you reloaded it. It now keeps looking for as long as the overlay is open, less and less often (every 3 minutes at first, then every 10, then every 30). Opening the overlay again looks right away. This is a change on the relay itself, so it applies as soon as the relay is updated.</li>
       </ul>
 

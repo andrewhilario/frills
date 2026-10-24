@@ -122,7 +122,9 @@ export async function findTikTokSource(relayBase = "") {
     } catch { /* nothing answered there */ }
     return null;
   };
-  return (await ask("")) ?? (relayBase ? await ask(relayBase.replace(/\/+$/, "")) : null);
+  // Both are asked at once (not one after the other, which cost a round trip to the relay on every connect); the page's own address wins when it answers.
+  const [own, shared] = await Promise.all([ask(""), relayBase ? ask(relayBase.replace(/\/+$/, "")) : null]);
+  return own ?? shared;
 }
 
 /**

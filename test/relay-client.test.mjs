@@ -108,3 +108,50 @@ test("stopping before the search for a source has finished opens nothing, and no
   await new Promise((r) => setTimeout(r, 20));
   assert.match(withRelay.at(-1).detail, /relay isn’t answering|relay isn't answering/);
 });
+
+test("the page's own address and the relay are asked at the same time, not one after the other (that cost a round trip on every connect)", { timeout: 4000 }, async (t) => {
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  const asked = [];
+  t.mock.method(globalThis, "fetch", async (url) => {
+    asked.push(url);
+    if (url === "/tiktok/ping") {
+      await gate; // the page's own address only answers once the relay has been asked: asked one after the other, this would wait for ever
+      return answer({ ok: false, name: "frills-site" });
+    }
+    release();
+    return answer({ ok: true, name: "frills-relay" });
+  });
+  assert.deepEqual(await findTikTokSource("https://relay.test"), { kind: "relay", base: "https://relay.test", features: ["chat"] });
+  assert.deepEqual(asked, ["/tiktok/ping", "https://relay.test/tiktok/ping"]);
+});
+
+test("the chat overlay can go straight to the site's relay (assumeRelay) without asking what answers; everything else still asks first", async (t) => {
+  const opened = [];
+  const real = globalThis.EventSource;
+  globalThis.EventSource = class { constructor(url) { opened.push(url); } addEventListener() {} close() {} };
+  try {
+    const asked = pretendFetch(t, { "https://relay.test/tiktok/ping": answer({ ok: true, name: "frills-relay" }), "/tiktok/ping": answer({ ok: false, name: "frills-site" }) });
+    const quick = connectTo([{ add() {}, removeById() {}, removeUser() {}, clear() {} }], "tiktok", "pond.pal", () => {}, { relay: "https://relay.test/", assumeRelay: true });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.deepEqual(asked, [], "nothing was asked first");
+    assert.equal(opened.length, 1);
+    assert.match(opened[0], /^https:\/\/relay\.test\/tiktok\/stream\?user=pond\.pal&page=/, "the stream was opened on the relay at once, with the tidied address");
+    quick.stop();
+
+    const slow = connectTo([{ add() {}, removeById() {}, removeUser() {}, clear() {} }], "tiktok", "pond.pal", () => {}, { relay: "https://relay.test" });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.deepEqual(asked, ["/tiktok/ping", "https://relay.test/tiktok/ping"], "without assumeRelay it asks first, as before");
+    slow.stop();
+
+    // no relay named (a helper on this PC): assumeRelay changes nothing, the page's own address is asked
+    const local = pretendFetch(t, { "/tiktok/ping": answer({ ok: true, name: "frills-helper" }) });
+    const own = connectTo([{ add() {}, removeById() {}, removeUser() {}, clear() {} }], "tiktok", "pond.pal", () => {}, { relay: "", assumeRelay: true });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.deepEqual(local, ["/tiktok/ping"]);
+    own.stop();
+  } finally {
+    if (real === undefined) delete globalThis.EventSource;
+    else globalThis.EventSource = real;
+  }
+});

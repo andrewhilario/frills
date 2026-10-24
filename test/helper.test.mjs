@@ -111,7 +111,7 @@ test("it answers a ping, serves the built site with its security headers, and sa
   await start(scripted().factory);
   const ping = await raw("/tiktok/ping");
   assert.equal(ping.status, 200);
-  assert.deepEqual(JSON.parse(ping.body), { ok: true, name: "frills-helper", version: "0.5.4", features: ["chat", "alerts", "info", "roles", "status"] });
+  assert.deepEqual(JSON.parse(ping.body), { ok: true, name: "frills-helper", version: "0.5.5", features: ["chat", "alerts", "info", "roles", "status"] });
   const editor = await raw("/editor/");
   assert.equal(editor.status, 200);
   assert.match(editor.body, /Connect your chat/);
@@ -331,6 +331,26 @@ test("a page that opens while the account is offline makes the relay look right 
   assert.equal(made.length, 2, "a page opened right after a look does not make another one");
   await Promise.all([first.close(), second.close(), third.close()]);
   await helper.close();
+});
+
+test("the relay writes how long each connection to TikTok took", async () => {
+  const lines = [];
+  const { factory } = scripted();
+  await start(factory, { log: (line) => lines.push(line) });
+  const page = listen("pond.pal");
+  await page.until(() => page.states().includes("connected"));
+  assert.ok(lines.some((line) => /^@pond\.pal: connected in \d+\.\d s$/.test(line)), "a line says how long it took: " + JSON.stringify(lines));
+  await page.close();
+  await helper.close();
+});
+
+test("the shared relay looks for an account that is not LIVE often at first and less often later, and never gives up", () => {
+  const relay = createHelper({ relay: { origins: ["https://site.test"], slots: 3, maxPerIp: 5, trustProxy: false }, factory: async () => ({}) });
+  const { offlineWaitMs, offlineGiveUpMs, offlineSlowSteps } = relay.hub.opts;
+  assert.equal(offlineWaitMs, 20000, "every 20 seconds at first, when a streamer has just opened the overlay and is about to go LIVE");
+  assert.deepEqual(offlineSlowSteps, [[180000, 60000], [1800000, 180000], [10800000, 600000]], "a minute after 3 minutes, 3 minutes after half an hour, 10 minutes after 3 hours");
+  assert.equal(offlineGiveUpMs, 0, "never gives up while a page listens");
+  assert.ok(offlineSlowSteps.every(([after, every], i) => every > (offlineSlowSteps[i - 1]?.[1] ?? offlineWaitMs) && after > (offlineSlowSteps[i - 1]?.[0] ?? 0)), "each step is later and slower than the one before");
 });
 
 test("a chat message with emotes, and an emote-only message, reach a page as pictures with their places", async () => {

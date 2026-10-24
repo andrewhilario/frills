@@ -239,7 +239,7 @@ cd ~/frills && git pull && (cd helper && npm install)
 tmux new-session -d -s relay "cd ~/frills && set -a && . ~/.frills-relay.env && set +a && RELAY_SLOTS=70 RELAY_ALERT_SPOTS=10 npm run relay"
 ```
 
-Then check it: `tmux attach -t relay` prints a start-up message (leave it again with Ctrl+B, then D). It says `Frills relay 0.5.4 is running` and **`Owner password (...): on`**. If it says `not set` the file was not read, and if it says `NOT USED: it has N characters and needs at least 12` the password is too short. `curl http://127.0.0.1:8765/health` should say `"version":"0.5.3"`.
+Then check it: `tmux attach -t relay` prints a start-up message (leave it again with Ctrl+B, then D). It says `Frills relay 0.5.5 is running` and **`Owner password (...): on`**. If it says `not set` the file was not read, and if it says `NOT USED: it has N characters and needs at least 12` the password is too short. `curl http://127.0.0.1:8765/health` should say `"version":"0.5.3"`.
 
 Without the owner password the same steps work with `tmux new-session -d -s relay "cd ~/frills && RELAY_SLOTS=70 npm run relay"`.
 
@@ -252,7 +252,7 @@ A connection to TikTok can say "connected" and then hear nothing at all, even th
 Every time the relay connects to a TikTok account it uses a request to a free signing service, which allows only so many a day. So:
 
 - An account stays connected for **10 minutes** after its last page closes. Opening it again in that time costs nothing and connects at once.
-- An account that is **not live yet** is looked for every **3 minutes**, every **10 minutes** once half an hour has passed, and every **30 minutes** after 3 hours. From 0.5.4 it **never stops looking while a page is open** (it used to stop after 30 minutes, and an overlay in OBS, which has no Disconnect button, stayed blank at the streamer's next LIVE until someone reloaded it). A page left open all night costs about 70 requests. A page that **opens** while the account is offline makes the relay look at once (at most once every 30 seconds), so reloading the overlay right after going LIVE does not mean waiting for the next look.
+- An account that is **not live yet** is looked for every **20 seconds** for the first 3 minutes (when a streamer has just opened the overlay and is about to go LIVE), every **minute** until half an hour, every **3 minutes** until 3 hours and then every **10 minutes** (0.5.5; it was every 3 minutes, which made a streamer wait up to 3 minutes for chat after going LIVE). A look at an account that is not LIVE only asks TikTok's own pages (two requests, about 0.9 seconds, measured with the connector we use) and **none to the signing service**, which is asked once, when the LIVE is found. From 0.5.4 it **never stops looking while a page is open** (it used to stop after 30 minutes, and an overlay in OBS, which has no Disconnect button, stayed blank at the streamer's next LIVE until someone reloaded it). A page left open all night costs about 70 requests. A page that **opens** while the account is offline makes the relay look at once (at most once every 30 seconds), so reloading the overlay right after going LIVE does not mean waiting for the next look.
 
 ## If something goes wrong
 

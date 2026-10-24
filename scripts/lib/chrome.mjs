@@ -20,6 +20,23 @@ const CANDIDATES = [
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Waits until a server just started answers (any answer will do), for at most `ms`. The tests that start scripts/serve.mjs used to sleep a fixed
+ * 900 ms and hope: on a busy computer that was not always enough, and the first request failed.
+ */
+export async function waitForServer(url, ms = 20000) {
+  const started = Date.now();
+  for (;;) {
+    try {
+      await fetch(url, { method: "HEAD", signal: AbortSignal.timeout(1500) });
+      return;
+    } catch {
+      if (Date.now() - started > ms) throw new Error(`The server at ${url} did not answer within ${ms} ms`);
+      await sleep(100);
+    }
+  }
+}
+
 export function findChrome() {
   const found = CANDIDATES.find((p) => existsSync(p));
   if (!found) throw new Error("No Chrome or Edge found. Set CHROME_PATH to its executable.");

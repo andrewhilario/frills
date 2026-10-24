@@ -25,7 +25,7 @@ import { ALERT_AT, Signing, capacity, deviceFacts, snapshot, statusPage } from "
 import { SlotAlerts, termuxNotifier } from "./alerts.mjs";
 import { OWNER, ownerGate } from "./owner.mjs";
 
-const VERSION = "0.5.4";
+const VERSION = "0.5.5";
 /** What this program can do, so a page can tell an old one ("chat" only) from one that sends alerts. */
 const FEATURES = ["chat", "alerts", "info", "roles", "status"];
 
@@ -55,11 +55,13 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
   // The one built-in account, frills_demo, never reaches TikTok: it makes up chat so the whole chain can be tested without a LIVE.
   const make = (user, options) => (user === DEMO_USER ? new DemoConnection({ pace: demoPace }) : factory(user, options));
   // Each connect to TikTok costs a request to the free signing service (a few thousand a day at most), so a shared relay keeps an account
-  // for 10 minutes after its last page leaves (coming back is free), and looks for an offline account every 3 minutes, then every 10 minutes after
-  // the first half hour and every 30 minutes after the first 3 hours. It never gives up while a page is listening: an overlay in OBS has no button
-  // to press, so one that was given up on stayed blank until someone reloaded it, and a streamer's next LIVE (after a break, or the next day with OBS
-  // left open) never showed. A page that opens meanwhile makes it look at once (Room.add). A page left open all night costs about 70 requests.
-  const shared = relay ? { queue: true, idleStopMs: 600000, offlineWaitMs: 180000, offlineGiveUpMs: 0, offlineSlowSteps: [[1800000, 600000], [10800000, 1800000]], maxRooms: relay.slots ?? 30 } : {};
+  // for 10 minutes after its last page leaves (coming back is free). It looks for an offline account every 20 seconds for the first 3 minutes (the time
+  // when a streamer has just opened OBS and is about to go LIVE), every minute until half an hour, every 3 minutes until 3 hours, then every 10 minutes.
+  // A look at an account that is not LIVE only asks TikTok's own pages (measured with the connector we use: two requests, about 0.9 s, and none to the
+  // signing service, which is asked once, when the LIVE is found), so looking often is cheap. It never gives up while a page is listening: an overlay in
+  // OBS has no button to press, so one that was given up on stayed blank until someone reloaded it. A page that opens meanwhile makes it look at once
+  // (Room.add).
+  const shared = relay ? { queue: true, idleStopMs: 600000, offlineWaitMs: 20000, offlineGiveUpMs: 0, offlineSlowSteps: [[180000, 60000], [1800000, 180000], [10800000, 600000]], maxRooms: relay.slots ?? 30 } : {};
   const signing = new Signing();
   const startedAt = Date.now();
   const hub = new Hub({ factory: make, apiKey, log, onLimited: () => signing.note(), ...shared, ...tuning });
@@ -292,6 +294,7 @@ async function mainRelay() {
     console.error(error.code === "EADDRINUSE" ? `Port ${port} is already in use. Is the relay already running?` : `Couldn't start: ${error.message}`);
     process.exit(1);
   }
+  import("tiktok-live-connector").catch(() => {}); // warm it up now: the first account to connect should not wait for the library to load
   console.log(`\nFrills relay ${VERSION} is running on ${bind}:${port}.\n  Spots: ${slots}. Allowed website addresses: ${origins.join(", ")}.\n  Status page: http://${bind}:${port}/health (open it in a browser)\n  Warns you when ${alertAt} spots or fewer are left${process.env.RELAY_ALERTS === "0" ? " (alerts are off)" : ""}.\n  Owner password (to see who is connected from your PC): ${ownerState(ownerKey)}.\n  Pages one internet address may keep open: ${relay.maxPerIp} (RELAY_PER_IP), for at most ${relay.maxAccountsPerIp} different accounts (RELAY_ACCOUNTS_PER_IP).\n`);
   if (process.env.RELAY_ALERTS !== "0") {
     const alerts = new SlotAlerts({ stats: () => helper.hub.stats(), signing: helper.signing, alertAt, notify: termuxNotifier({ log: say }), log: say });
