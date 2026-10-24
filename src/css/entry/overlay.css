@@ -10,6 +10,8 @@ html { color-scheme: normal; background: transparent; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; }
 
 .chatstage { position: fixed; inset: 0; display: flex; align-items: flex-end; overflow: hidden; }
+/* Chat position: Top starts the messages at the top of the window and grows them downward. */
+.chatstage[data-place="top"] { align-items: flex-start; }
 
 /* A small note that only shows while connecting or when something is wrong, so a typo in the channel doesn't fail silently. */
 .note-live { position: fixed; right: 8px; bottom: 6px; max-width: 80vw; margin: 0; padding: 2px 8px; border-radius: 6px; font: 600 12px/1.4 var(--look-font-system); color: var(--look-note-ink); background: var(--look-note-bg); }

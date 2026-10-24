@@ -133,3 +133,15 @@ test("Keep messages on screen: off by default, carried in the link, and it makes
   assert.equal(CONTROLS.find((c) => c.key === "life").hideWhen, "stay", "the Time on screen row is hidden while messages are kept");
   assert.equal(coerce(stay, "yes"), undefined, "only a real on or off is accepted");
 });
+
+test("Chat position: bottom by default, top on request, carried in the link only when it is not the default, and nothing else is accepted", () => {
+  assert.equal(DEFAULTS.place, "bottom");
+  const place = CONTROLS.find((c) => c.key === "place");
+  assert.equal(place.where, "main", "up front, not under More options");
+  assert.deepEqual(place.options.map((o) => o.id), ["bottom", "top"]);
+  const top = sanitize(fromParams(new URLSearchParams("place=top")));
+  assert.equal(top.place, "top");
+  assert.equal(sanitize({ place: "middle" }).place, "bottom", "a value that is not one of the two falls back to the default");
+  assert.equal(new URL(overlayUrl("https://frills.app/overlay/", { channel: "somename", settings: top })).searchParams.get("place"), "top");
+  assert.equal(overlayUrl("https://frills.app/overlay/", { channel: "somename" }), "https://frills.app/overlay/?channel=somename", "the default adds nothing to the link");
+});

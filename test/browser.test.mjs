@@ -280,6 +280,22 @@ test("overlay: with Keep messages on screen (stay=1) messages never fade, in a g
   }
 });
 
+test("overlay: Chat position puts the messages at the bottom of the window (the default) or at the top, in a general look and a matcha one", { skip }, async () => {
+  const edges = () => page.evaluate(`(() => { const r = document.getElementById("chat").getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(innerHeight - r.bottom), height: Math.round(r.height), window: innerHeight }; })()`);
+  for (const look of ["", "style=latte&palette=sakura&"]) {
+    await page.goto(`${base}/overlay/?demo=1&pace=300&max=3&life=0&${look}`, { settle: 300 });
+    await page.waitFor(`document.querySelectorAll("#chat .m").length >= 2`, { timeout: 6000 });
+    await sleep(600);
+    const bottom = await edges();
+    assert.ok(bottom.bottom <= 12 && bottom.top > 40, `by default (${look || "general"}) the chat is at the bottom: ${JSON.stringify(bottom)}`);
+    await page.goto(`${base}/overlay/?demo=1&pace=300&max=3&life=0&place=top&${look}`, { settle: 300 });
+    await page.waitFor(`document.querySelectorAll("#chat .m").length >= 2`, { timeout: 6000 });
+    await sleep(600);
+    const top = await edges();
+    assert.ok(top.top <= 12 && top.bottom > 40, `with place=top (${look || "general"}) the chat is at the top: ${JSON.stringify(top)}`);
+  }
+});
+
 test("overlay: ?pace= makes the practice events come faster, and without it they come at the usual speed (chat and last gifts, like the other overlays)", { skip }, async () => {
   // how many came in a 3-second stretch, after the first few that a practice chat starts with
   const chatIn3Seconds = async (query) => {

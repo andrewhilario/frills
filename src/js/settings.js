@@ -57,7 +57,7 @@ export const MOD_ICONS = ["shield", "star", "leaf", "frog", "none"];
 // Decorations (a friend peeking over the bubble, a small scene on a corner, sparkles) and the name tag: off to begin with, so a look is exactly what it was until someone turns them on.
 export const DECO_DEFAULTS = { deco: "none", decoSize: 100, decoSide: "left", decoPeek: true, decoCorner: true, decoSpark: true, decoFor: "all", tag: "inside" };
 
-export const DEFAULTS = { ...PRESETS.blueberry, letter: 0, align: "left", source: "icon", modIcon: "shield", max: 6, life: 15, stay: false, space: 8, colors: false, emotes: true, pictures: true, ...DECO_DEFAULTS };
+export const DEFAULTS = { ...PRESETS.blueberry, letter: 0, align: "left", place: "bottom", source: "icon", modIcon: "shield", max: 6, life: 15, stay: false, space: 8, colors: false, emotes: true, pictures: true, ...DECO_DEFAULTS };
 
 const list = (...pairs) => pairs.map(([id, name]) => ({ id, name }));
 
@@ -72,6 +72,7 @@ export const CONTROLS = [
   { key: "size", where: "main", type: "range", label: "Text size", min: 12, max: 34, step: 1, unit: " px" },
   { key: "letter", where: "main", type: "range", label: "Letter spacing", min: -2, max: 8, step: 0.5, unit: " px" },
   { key: "align", where: "main", type: "chips", label: "Text alignment", options: list(["left", "Left"], ["center", "Center"], ["right", "Right"]) },
+  { key: "place", where: "main", type: "chips", label: "Chat position", options: list(["bottom", "Bottom"], ["top", "Top"]), hint: "Where the messages sit in your overlay: at the bottom, growing upward (as now), or at the top, growing downward. Make the browser source as tall as the space you want to give the chat." },
   { key: "source", where: "main", type: "chips", label: "Platform icon", options: list(["icon", "A small icon"], ["none", "None"]), hint: "Shown when one chat reads both TikTok and Twitch." },
   { key: "deco", where: "main", type: "chips", label: "Decorations on the bubbles", options: DECOS, hint: "Little pictures laid over the bubbles: a scene on a corner, sparkles, a friend peeking over the top. Frog pond and Frog pond V2 are green (V2 has a frog peeking over the top), Neko cafe is pink and cream, Hamster burrow is honey orange and Bunny cloud is lavender and white." },
   { key: "decoSize", where: "main", needs: "deco", type: "range", label: "Decoration size", min: 50, max: 200, step: 5, unit: " %" },

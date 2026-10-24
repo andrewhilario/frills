@@ -19,6 +19,7 @@
 .matcha-card__stage[data-back="bright"] { background: var(--color-stage-bright); }
 .matcha-card__stage[data-back="busy"] { background: repeating-linear-gradient(135deg, var(--color-stage-busy-a) 0 22px, var(--color-stage-busy-b) 22px 44px); }
 .matcha-card__stage .chatstage { position: absolute; inset: 0; display: flex; align-items: flex-end; padding: var(--space-md); overflow: hidden; }
+.matcha-card__stage .chatstage[data-place="top"] { align-items: flex-start; }
 .matcha-card__foot { padding: var(--space-sm) var(--space-md) var(--space-md); }
 
 .matcha-link { display: grid; gap: var(--space-sm); padding: var(--space-lg); margin-bottom: var(--space-3xl); border-radius: var(--radius-card); background: var(--color-accent-tint); }

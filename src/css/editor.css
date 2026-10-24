@@ -5,6 +5,7 @@
 .preview__bar { flex: none; display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); padding: var(--space-2xs) var(--space-md); }
 .preview .chatstage { position: relative; flex: 1 1 0; min-height: 0; display: flex; align-items: flex-end; padding: 0 var(--space-md) var(--space-md); overflow: hidden; }
 .preview .chatbox { width: min(100%, var(--preview-w, 440px)); max-height: 100%; }
+.preview .chatstage[data-place="top"] { align-items: flex-start; padding-top: var(--space-md); padding-bottom: 0; }
 .preview[data-back="dark"] { background: var(--color-stage); }
 .preview[data-back="bright"] { background: var(--color-stage-bright); }
 .preview[data-back="busy"] { background: repeating-linear-gradient(135deg, var(--color-stage-busy-a) 0 22px, var(--color-stage-busy-b) 22px 44px); }

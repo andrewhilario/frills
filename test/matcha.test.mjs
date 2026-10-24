@@ -136,3 +136,13 @@ test("Keep messages on screen works in a matcha look too, and is carried in its 
   assert.equal(url.searchParams.get("stay"), "1");
   assert.equal(new URL(matchaOverlayUrl("https://frills.app/overlay/", { channel: "somename" })).searchParams.has("stay"), false);
 });
+
+test("Chat position works in a matcha look too: bottom by default, top on request, carried in its link only when it is not the default", () => {
+  assert.equal(MATCHA_DEFAULTS.place, "bottom");
+  assert.ok(MATCHA_CONTROLS.some((c) => c.key === "place"), "it is offered under More options");
+  const top = sanitizeMatcha(matchaFromParams(new URLSearchParams("style=latte&place=top")));
+  assert.equal(top.place, "top");
+  assert.equal(sanitizeMatcha({ place: "middle" }).place, "bottom");
+  assert.equal(new URL(matchaOverlayUrl("https://frills.app/overlay/", { channel: "somename", settings: top })).searchParams.get("place"), "top");
+  assert.equal(new URL(matchaOverlayUrl("https://frills.app/overlay/", { channel: "somename" })).searchParams.has("place"), false);
+});
