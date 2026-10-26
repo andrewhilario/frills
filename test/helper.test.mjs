@@ -111,7 +111,7 @@ test("it answers a ping, serves the built site with its security headers, and sa
   await start(scripted().factory);
   const ping = await raw("/tiktok/ping");
   assert.equal(ping.status, 200);
-  assert.deepEqual(JSON.parse(ping.body), { ok: true, name: "frills-helper", version: "0.5.5", features: ["chat", "alerts", "info", "roles", "status"] });
+  assert.deepEqual(JSON.parse(ping.body), { ok: true, name: "frills-helper", version: "0.5.6", features: ["chat", "alerts", "info", "roles", "status"] });
   const editor = await raw("/editor/");
   assert.equal(editor.status, 200);
   assert.match(editor.body, /Connect your chat/);
@@ -196,6 +196,70 @@ test("when TikTok's free connection is busy it says so and tries again", async (
   await page.until(() => page.states().includes("connected"));
   assert.deepEqual(page.states(), ["connecting", "limited", "connected"]);
   await page.close();
+  await helper.close();
+});
+
+test("when the signing service says busy, the account waits a pause that doubles each time in a row, and a good connection starts it over", async () => {
+  class SignatureRateLimitError extends Error {}
+  const busy = () => ({ failWith: new SignatureRateLimitError("slow down") });
+  const calls = [];
+  const scripts = [busy(), busy(), {}];
+  await start(async () => { calls.push(Date.now()); return new FakeConnection(scripts.shift() ?? {}); }, { limitedWaitMs: 150, limitedMaxMs: 1000, offlineWaitMs: 5000 });
+  const page = listen("first.pal");
+  await page.until(() => page.states().includes("connected"), 4000);
+  assert.equal(calls.length, 3, "three attempts");
+  assert.ok(calls[1] - calls[0] >= 140, "it waited out the first pause (about 150 ms): " + (calls[1] - calls[0]));
+  assert.ok(calls[2] - calls[1] >= 280, "the second pause was about twice the first: " + (calls[2] - calls[1]));
+  assert.equal(helper.hub.strikes, 0, "a good connection started the pauses over");
+  await page.close();
+  await helper.close();
+});
+
+test("after a busy, the rooms do not all try again at the same moment: one goes first, and the others follow once it went through", async () => {
+  class SignatureRateLimitError extends Error {}
+  let inFlight = 0;
+  const seen = []; // for each attempt: the busy count in a row when it began, and how many attempts were under way then (itself included)
+  let failures = 4; // all four accounts hear "busy" together the first time
+  const factory = async () => {
+    const conn = new FakeConnection();
+    conn.connect = async () => {
+      inFlight += 1;
+      seen.push([helper.hub.strikes, inFlight]);
+      await sleep(60);
+      inFlight -= 1;
+      if (failures > 0) { failures -= 1; throw new SignatureRateLimitError("slow down"); }
+    };
+    return conn;
+  };
+  await start(factory, { maxRooms: 10, limitedWaitMs: 200, offlineWaitMs: 5000 });
+  const pages = ["a.pal", "b.pal", "c.pal", "d.pal"].map((name) => listen(name));
+  await Promise.all(pages.map((page) => page.until(() => page.states().includes("connected"), 6000)));
+  const during = seen.filter(([strikes]) => strikes > 0);
+  assert.ok(during.length >= 1, "something was tried while the pause counted");
+  assert.ok(during.every(([, active]) => active === 1), "while it counted, only one attempt at a time: " + JSON.stringify(seen));
+  assert.equal(helper.hub.strikes, 0);
+  await Promise.all(pages.map((page) => page.close()));
+  await helper.close();
+});
+
+test("only a few attempts to connect are under way at once, so a restart does not send every account to the signing service together", async () => {
+  let now = 0;
+  let most = 0;
+  const factory = async () => {
+    const conn = new FakeConnection();
+    conn.connect = async () => {
+      now += 1;
+      most = Math.max(most, now);
+      await sleep(120);
+      now -= 1;
+    };
+    return conn;
+  };
+  await start(factory, { maxRooms: 10, connectAtOnce: 2, offlineWaitMs: 5000 });
+  const pages = ["a.pal", "b.pal", "c.pal", "d.pal", "e.pal"].map((name) => listen(name));
+  await Promise.all(pages.map((page) => page.until(() => page.states().includes("connected"), 5000)));
+  assert.equal(most, 2, "two at a time, never more");
+  await Promise.all(pages.map((page) => page.close()));
   await helper.close();
 });
 

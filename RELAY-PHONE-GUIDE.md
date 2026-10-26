@@ -184,7 +184,7 @@ Put these before `npm run relay`:
 | `RELAY_PER_IP=60` | How many pages one internet address may keep open at once (60 unless you say otherwise). Each overlay (chat, alerts, last gifts, goals, top likers) and each editor that is connected is one page, and some internet providers put many homes behind one address, so keep this generous. It is there to stop one address running away, not to count one streamer's pages. |
 | `RELAY_ACCOUNTS_PER_IP=12` | How many different TikTok accounts one internet address may watch at once (12 unless you say otherwise), so one address cannot fill all the spots. More pages for an account it already watches are always fine. |
 | `RELAY_ORIGINS=...` | The website addresses allowed to use it (default `https://frills.valwidgets.live`). |
-| `EULER_API_KEY=...` | Optional: a free key from the signing service, to raise its limits. |
+| `EULER_API_KEY=...` | A key from the signing service (Euler Stream). **Without one the relay shares the signing service's anonymous limits with everyone else who uses it, and that is what makes TikTok "busy" at night.** The free Community key gives you 2,500 requests a day of your own. Put it in the settings file below, never on a command line. |
 | `PORT=8765` | The port it listens on (only the tunnel connects to it). |
 | `RELAY_BIND=127.0.0.1` | Leave this alone: it keeps the relay reachable only through the tunnel. |
 
@@ -205,7 +205,7 @@ One command does it all (stop, get the new code, install, start, health check):
 bash ~/frills/update-relay.sh
 ```
 
-It starts the relay with 50 spots. For a different number: `RELAY_SLOTS=30 bash ~/frills/update-relay.sh`. The tunnel is not touched. **The script does not know your owner password**, so a relay it starts shows the names only on the phone itself. If you use the owner password (below), restart by hand as follows.
+It starts the relay with 50 spots. For a different number: `RELAY_SLOTS=70 bash ~/frills/update-relay.sh`. The tunnel is not touched. **From relay 0.5.6 the script reads the settings file `~/.frills-relay.env` if it exists** (it says `using the settings in ~/.frills-relay.env`), so your owner password and your signing-service key (`EULER_API_KEY`) survive an update. Before 0.5.6 it did not, and a relay it started had no owner password and no key. To make the file, see below.
 
 ### Restarting by hand, with a settings file (the way to keep the owner password)
 
@@ -239,7 +239,7 @@ cd ~/frills && git pull && (cd helper && npm install)
 tmux new-session -d -s relay "cd ~/frills && set -a && . ~/.frills-relay.env && set +a && RELAY_SLOTS=70 RELAY_ALERT_SPOTS=10 npm run relay"
 ```
 
-Then check it: `tmux attach -t relay` prints a start-up message (leave it again with Ctrl+B, then D). It says `Frills relay 0.5.5 is running` and **`Owner password (...): on`**. If it says `not set` the file was not read, and if it says `NOT USED: it has N characters and needs at least 12` the password is too short. `curl http://127.0.0.1:8765/health` should say `"version":"0.5.3"`.
+Then check it: `tmux attach -t relay` prints a start-up message (leave it again with Ctrl+B, then D). It says `Frills relay 0.5.6 is running` and **`Owner password (...): on`**. If it says `not set` the file was not read, and if it says `NOT USED: it has N characters and needs at least 12` the password is too short. `curl http://127.0.0.1:8765/health` should say `"version":"0.5.6"`.
 
 Without the owner password the same steps work with `tmux new-session -d -s relay "cd ~/frills && RELAY_SLOTS=70 npm run relay"`.
 
@@ -262,7 +262,7 @@ Every time the relay connects to a TikTok account it uses a request to a free si
 - **A page says "Can't reach the free Frills relay":** the relay or its tunnel is not answering: `tmux attach -t tunnel` and `tmux attach -t relay`, then the first line of this list.
 - **The editor says the relay turned the connection down for another reason:** the relay is off, or the website address is not in `RELAY_ORIGINS`.
 - **Chat stops after the screen turns off:** Android killed Termux. Redo step 5 and check the lock.
-- **Everyone gets "TikTok's free connection is busy":** the signing service is limiting your home address. Lower `RELAY_SLOTS`, or set a free `EULER_API_KEY`.
+- **Everyone gets "TikTok's free connection is busy" (in the Philippines it was worst between midnight and 4 am):** the signing service is limiting your relay's address. See "When the signing service is busy at night" below.
 - **Nothing appears for a real account but `frills_demo` works:** the problem is between the phone and TikTok (offline account, blocked address), not in Frills. Tell me the status line you see.
 
 ## The status page and the warning (relay 0.5.0)
@@ -295,6 +295,39 @@ On the phone itself the table needs nothing. To see it from anywhere, through `h
 tmux kill-session -t relay; tmux new-session -d -s relay "cd ~/frills && RELAY_SLOTS=100 RELAY_ALERT_SPOTS=10 RELAY_OWNER_KEY=your-password npm run relay"
 ```
 
-Then open the public status page, type the password in the "Owner?" box and press the button. The page remembers it only until you close that tab, and sends it in a header (never in the address). Ten wrong tries in ten minutes lock that visitor out for ten minutes. Without `RELAY_OWNER_KEY` nothing changes: the public page shows only numbers. `update-relay.sh` does not carry the password, so a relay it starts has the owner login off.
+Then open the public status page, type the password in the "Owner?" box and press the button. The page remembers it only until you close that tab, and sends it in a header (never in the address). Ten wrong tries in ten minutes lock that visitor out for ten minutes. Without `RELAY_OWNER_KEY` nothing changes: the public page shows only numbers. From 0.5.6 `update-relay.sh` reads `~/.frills-relay.env`, so the owner login stays on after an update (older versions of the script did not carry it).
+
+## When the signing service is busy at night (relay 0.5.6)
+
+TikTok's own pages do not limit the relay. What limits it is the **signing service** (Euler Stream) the connector asks once for every connection. Without a key of your own, the relay is in the service's anonymous tier, where every relay and every streamer who has no key share a small allowance per internet address, and the service says "busy" when it runs out. That is most likely why it gets worst in the Philippine night (midnight to about 4 am, which is 4 pm to 8 pm UTC): that is when a lot of streamers go LIVE at once. This is what we know and what we do not:
+
+- **Known:** the relay can show whether it has a key. Open `https://relay.valwidgets.live/health`: the "Signing service" line now says `own key` or `NO key (shared limits)`, and `N connects in 24 h`. The same numbers are in the JSON as `signing.key`, `signing.connectsHour` and `signing.connectsDay`.
+- **Not known:** exactly how many connections the anonymous tier allows, and whether the relay on your phone is running without a key right now. The status line tells you the second one; the first is the service's own and can change.
+
+**What to do (you do this, never paste the key in a chat):**
+
+1. Make a free account at the signing service's own website and copy the **Community API key** (2,500 requests a day, 25 websockets at the same time).
+2. Add one line to the settings file on the phone (the same file as the owner password):
+
+   ```bash
+   nano ~/.frills-relay.env
+   ```
+
+   ```text
+   EULER_API_KEY=your-key-here
+   ```
+
+   then Ctrl+O, Enter, Ctrl+X, and `chmod 600 ~/.frills-relay.env`.
+3. Restart with `RELAY_SLOTS=70 bash ~/frills/update-relay.sh` (from 0.5.6 it reads the file). The status page should now say `own key`.
+4. Watch `N connects in 24 h` for a few days. A connection uses one request, so 2,500 a day is about 2,500 connections. If the number goes near that, the Business plan ($50 a month, 10,000 a day and 100 websockets, as last checked) is the next step. Check the service's own pricing page before paying, because it can change.
+
+**What 0.5.6 changes by itself, with or without a key:**
+
+- When the service says "busy", the whole relay now pauses together instead of each account waiting its own minute and then asking again at the same moment. The pause doubles each time in a row (1 minute, 2, 4, up to 10) with a little random extra, and starts over after a connection goes through. The relay's window prints `the signing service is busy: waiting about N s before asking it again`.
+- After a "busy" only **one** connection tries first, to see if the service has calmed down. The rest follow once it has gone through.
+- At most **5** connections are being made at the same moment (a restart used to send every account together).
+- Viewers see "TikTok's free connection is busy" while this happens, and it clears by itself.
+
+None of this raises the service's limit. A key of your own does. A relay on a server (DigitalOcean) has its own address, which helps for the same reason, but it is not a substitute for a key.
 
 TikTok emotes (relay 0.5.1): chat messages that contain TikTok emotes, and messages that are only an emote, now reach the overlay as small pictures. Only pictures from TikTok's own picture servers are used. This is new and was tried only with made-up messages. If emotes still do not show, `tmux attach -t relay` prints a line "emotes arrived but none could be shown (picture server ...)" once per account: tell me the server name.

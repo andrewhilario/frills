@@ -198,12 +198,21 @@ export class Room {
 
   /** One try: connect, then wait until the connection ends. Resolves with how it ended. */
   async once() {
+    // Every attempt takes a turn first: at most a few at once, and none at all while the signing service has said "busy" (see Hub.turn).
+    await this.hub.turn();
+    let turn = true;
+    const give = () => { if (turn) { turn = false; this.hub.release(); } };
+    if (this.stopped) {
+      give();
+      return { kind: "stopped" };
+    }
     let conn;
     const began = Date.now();
     this.lastLookAt = began;
     try {
       conn = await this.hub.opts.factory(this.user, { apiKey: this.hub.opts.apiKey });
     } catch (err) {
+      give();
       return classify(err);
     }
     this.conn = conn;
@@ -213,13 +222,18 @@ export class Room {
     try {
       await conn.connect();
     } catch (err) {
+      give();
       this.letGo(conn);
-      return classify(err);
+      const how = classify(err);
+      if (how.kind === "limited") this.hub.busy();
+      return how;
     }
+    give();
     if (this.stopped) {
       this.letGo(conn);
       return { kind: "stopped" };
     }
+    if (!conn.pretend) this.hub.signed(); // (the practice account makes chat up: it never asked the signing service)
     this.hub.log(`@${this.user}: connected in ${((Date.now() - began) / 1000).toFixed(1)} s`);
     this.readInfo(conn);
     this.setStatus("connected", conn.pretend ? "Practice chat made up by Frills. Nothing comes from TikTok." : "");
@@ -275,7 +289,7 @@ export class Room {
       if (c.chat || c.gift || c.follow || c.share) this.hub.log(`@${this.user}: ${c.chat} chat, ${c.gift} gifts, ${c.follow} follows and ${c.share} shares in the last minute`);
       this.counts = { chat: 0, gift: 0, follow: 0, share: 0 };
     }, 60000);
-    const { offlineWaitMs, offlineGiveUpMs, offlineSlowSteps, limitedWaitMs, backoffMs } = this.hub.opts;
+    const { offlineWaitMs, offlineGiveUpMs, offlineSlowSteps, backoffMs } = this.hub.opts;
     let attempt = 0;
     let offlineSince = 0; // when this wait for a LIVE began; each look at TikTok costs a request, so it does not go on for ever
     let quiet = false; // while waiting for a LIVE to start, keep saying so instead of flickering to "connecting" at every look
@@ -306,7 +320,7 @@ export class Room {
       } else if (how.kind === "limited") {
         this.setStatus("limited");
         this.hub.opts.onLimited?.();
-        await this.sleep(limitedWaitMs);
+        await this.sleep(Math.min(this.hub.cooldownLeft(), 1000)); // the shared pause is waited out in Hub.turn at the next attempt
       } else {
         if (how.kind === "failed") this.setStatus("error", how.detail);
         else this.setStatus("reconnecting");
@@ -377,10 +391,63 @@ class Waiting {
 
 export class Hub {
   constructor(opts = {}) {
-    this.opts = { factory: null, apiKey: "", maxRooms: 3, queue: false, queueGraceMs: 20000, idleStopMs: 30000, offlineWaitMs: 20000, limitedWaitMs: 60000, offlineGiveUpMs: 0, offlineSlowSteps: [], wakeGapMs: 30000, backoffMs: [3000, 6000, 12000, 30000, 60000], silentMs: 120000, silentMaxMs: 600000, ...opts };
+    this.opts = { factory: null, apiKey: "", maxRooms: 3, queue: false, queueGraceMs: 20000, idleStopMs: 30000, offlineWaitMs: 20000, limitedWaitMs: 60000, limitedMaxMs: 600000, connectAtOnce: 5, offlineGiveUpMs: 0, offlineSlowSteps: [], wakeGapMs: 30000, backoffMs: [3000, 6000, 12000, 30000, 60000], silentMs: 120000, silentMaxMs: 600000, ...opts };
     this.log = opts.log ?? (() => {});
     this.rooms = new Map();
     this.waiting = new Map(); // accounts in line for a spot, oldest first
+    this.cooldownUntil = 0; // while it is later than now, nobody asks the signing service (it said "busy")
+    this.strikes = 0; // how many "busy" in a row, which sets how long the next pause is
+    this.active = 0; // attempts to connect that are under way
+    this.line = []; // attempts waiting for a turn
+  }
+
+  /** What is left of the pause after the signing service said "busy" (0 when there is none). */
+  cooldownLeft(now = Date.now()) {
+    return Math.max(0, this.cooldownUntil - now);
+  }
+
+  /**
+   * The free signing service said "busy". Nobody asks it again for a while, and the while grows with each "busy" in a row (the base wait, doubled
+   * each time, up to `limitedMaxMs`, with up to a quarter more so the rooms do not all come back at the same moment). Before this, every room waited
+   * a minute on its own and tried again at the same moment as the others, which kept it busy. Several rooms hearing "busy" in the same burst count once.
+   */
+  busy(now = Date.now()) {
+    if (now < this.cooldownUntil) return this.cooldownLeft(now);
+    const { limitedWaitMs, limitedMaxMs } = this.opts;
+    const wait = Math.min(limitedMaxMs, limitedWaitMs * 2 ** Math.min(this.strikes, 10));
+    this.strikes += 1;
+    this.cooldownUntil = now + wait * (1 + Math.random() * 0.25);
+    this.log(`the signing service is busy: waiting about ${Math.round(wait / 1000)} s before asking it again (${this.strikes} in a row)`);
+    return this.cooldownLeft(now);
+  }
+
+  /** A connection went through: the signing service is fine, so the pauses start over, and this counts as one use of it. */
+  signed() {
+    this.strikes = 0;
+    this.opts.onSigned?.();
+  }
+
+  /** Waits for a turn to connect: until any pause is over, and until fewer than `connectAtOnce` attempts are under way. Give it back with release(). */
+  async turn() {
+    for (;;) {
+      const wait = this.cooldownLeft();
+      if (wait > 0) {
+        await new Promise((resolve) => setTimeout(resolve, wait + 10).unref?.());
+        continue;
+      }
+      // after a "busy" only one goes first, to find out whether the service has calmed down; the rest follow once it has (strikes back to 0)
+      const room = this.strikes > 0 ? 1 : this.opts.connectAtOnce;
+      if (this.active < room) {
+        this.active += 1;
+        return;
+      }
+      await new Promise((resolve) => this.line.push(resolve));
+    }
+  }
+
+  release() {
+    this.active = Math.max(0, this.active - 1);
+    this.line.shift()?.();
   }
 
   /** How full it is. Numbers only: no account names. */

@@ -23,8 +23,15 @@ git pull
 echo "3/4  Installing what the relay needs..."
 (cd helper && npm install --no-audit --no-fund)
 
+# The settings file, if there is one (the owner password and the Euler key live there, never on a command line), is read before the relay starts.
+LOAD=""
+if [ -f "$HOME/.frills-relay.env" ]; then
+  LOAD="set -a && . '$HOME/.frills-relay.env' && set +a && "
+  echo "     (using the settings in ~/.frills-relay.env)"
+fi
+
 echo "4/4  Starting the relay with $SLOTS spots..."
-tmux new-session -d -s relay "cd '$PWD' && RELAY_SLOTS=$SLOTS RELAY_ALERT_SPOTS=${RELAY_ALERT_SPOTS:-10} ${RELAY_PER_IP:+RELAY_PER_IP=$RELAY_PER_IP} ${RELAY_ACCOUNTS_PER_IP:+RELAY_ACCOUNTS_PER_IP=$RELAY_ACCOUNTS_PER_IP} npm run relay"
+tmux new-session -d -s relay "cd '$PWD' && ${LOAD}RELAY_SLOTS=$SLOTS RELAY_ALERT_SPOTS=${RELAY_ALERT_SPOTS:-10} ${RELAY_PER_IP:+RELAY_PER_IP=$RELAY_PER_IP} ${RELAY_ACCOUNTS_PER_IP:+RELAY_ACCOUNTS_PER_IP=$RELAY_ACCOUNTS_PER_IP} npm run relay"
 
 sleep 6
 echo

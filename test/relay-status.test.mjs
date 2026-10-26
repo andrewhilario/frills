@@ -53,7 +53,7 @@ const snap = (over = {}) => snapshot({ stats: { used: 45, max: 50, waiting: 2 },
 test("the numbers: free spots, the level, the line, uptime, and the device only when it is given", () => {
   const s = snap();
   assert.deepEqual([s.free, s.level, s.slots.waiting, s.uptimeS, s.alertAt], [5, "low", 2, 11520, 10]);
-  assert.deepEqual(s.signing, { busyRecently: 0, busy: false });
+  assert.deepEqual(s.signing, { busyRecently: 0, busy: false, connectsHour: 0, connectsDay: 0 });
   assert.equal(s.capacity.estimate, 120);
   assert.equal("device" in s, false, "the public numbers never carry the device's details");
   assert.equal(snap({ device: deviceFacts(0.12) }).device.cores >= 1, true);
@@ -203,7 +203,7 @@ test("the relay's address gives a readable page to a browser and the numbers as 
   assert.match(page.headers["content-security-policy"], /default-src 'none'/);
   assert.equal((await ask("/", { Accept: "text/html" })).status, 200, "the bare address works too");
   const json = JSON.parse((await ask("/health", { Accept: "application/json" })).body);
-  assert.deepEqual([json.name, json.version, json.free, json.level, json.slots], ["frills-relay", "0.5.5", 50, "ok", { used: 0, max: 50, waiting: 0 }]);
+  assert.deepEqual([json.name, json.version, json.free, json.level, json.slots], ["frills-relay", "0.5.6", 50, "ok", { used: 0, max: 50, waiting: 0 }]);
   assert.ok(json.features.includes("status"));
   assert.ok(json.capacity.estimate >= 1 && json.capacity.estimate <= 500);
   assert.equal(JSON.parse((await ask("/health")).body).free, 50, "no Accept header at all: JSON, as before");
@@ -227,7 +227,27 @@ test("the alarm number is the owner's to set, and the server counts the signing 
   assert.equal(JSON.parse((await ask("/health", { Accept: "application/json" })).body).alertAt, 25);
   helper.signing.note();
   const json = JSON.parse((await ask("/health", { Accept: "application/json" })).body);
-  assert.deepEqual(json.signing, { busyRecently: 1, busy: true });
+  assert.deepEqual(json.signing, { busyRecently: 1, busy: true, connectsHour: 0, connectsDay: 0, key: false });
+});
+
+test("the status numbers say how many connections went through the signing service, and whether the relay has its own key", async () => {
+  await start();
+  helper.signing.use();
+  helper.signing.use();
+  const none = JSON.parse((await ask("/health", { Accept: "application/json" })).body);
+  assert.deepEqual([none.signing.connectsHour, none.signing.connectsDay, none.signing.key], [2, 2, false], "started without a key");
+  const keyed = createHelper({ factory: async () => new FakeConnection(), apiKey: "a-key", relay: { origins: ["https://site.example"], slots: 5 }, idleStopMs: 50 });
+  const keyedPort = await keyed.listen(0);
+  const res = await fetch(`http://127.0.0.1:${keyedPort}/health`, { headers: { Accept: "application/json", Host: "relay.example.test" } });
+  assert.equal((await res.json()).signing.key, true, "started with a key");
+  await keyed.close();
+  // the time windows: a use from two hours ago is in the day's count, not the hour's
+  let t = 10_000_000;
+  const signing = new Signing(() => t);
+  signing.use();
+  t += 2 * 3600 * 1000;
+  signing.use();
+  assert.deepEqual([signing.usedIn(3600000), signing.usedIn(86400000)], [1, 2]);
 });
 
 // ── who is connected: names, for the owner's own screen only ───────────────────────────────────────────────────────────────────

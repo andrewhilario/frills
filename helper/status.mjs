@@ -29,18 +29,21 @@ export function capacity({ freeMem, rss, baseRss, rooms, cpuFraction }) {
 
 /** Keeps a short record of when the free signing service said "busy", so "busy right now" has a meaning. */
 export class Signing {
-  constructor(now = () => Date.now()) { this.now = now; this.times = []; }
+  constructor(now = () => Date.now()) { this.now = now; this.times = []; this.uses = []; }
   note() { this.times.push(this.now()); if (this.times.length > 200) this.times.shift(); }
   recent(windowMs = 10 * 60 * 1000) { const from = this.now() - windowMs; return this.times.filter((t) => t >= from).length; }
+  /** One connection that went through the signing service (each one is a request to it, which a free key only allows so many of a day). */
+  use() { this.uses.push(this.now()); if (this.uses.length > 5000) this.uses.shift(); }
+  usedIn(windowMs) { const from = this.now() - windowMs; return this.uses.filter((t) => t >= from).length; }
 }
 
 /** Everything the page and the alerts need. `device` (processor, memory) is added only for someone on the device itself. */
-export function snapshot({ stats, startedAt, now, version, features, signing, estimate, streams = null, alertAt = ALERT_AT, device = null, roster = null, ownerLogin = false }) {
+export function snapshot({ stats, startedAt, now, version, features, signing, estimate, streams = null, alertAt = ALERT_AT, device = null, roster = null, ownerLogin = false, keyed = null }) {
   const free = Math.max(0, stats.max - stats.used);
   return {
     ok: true, name: "frills-relay", version, features, slots: stats,
     free, level: level(stats, alertAt), alertAt, uptimeS: Math.max(0, Math.round((now - startedAt) / 1000)),
-    signing: { busyRecently: signing.recent(), busy: signing.recent(2 * 60 * 1000) > 0 },
+    signing: { busyRecently: signing.recent(), busy: signing.recent(2 * 60 * 1000) > 0, ...(signing.usedIn ? { connectsHour: signing.usedIn(3600000), connectsDay: signing.usedIn(86400000) } : {}), ...(keyed === null ? {} : { key: keyed }) },
     capacity: estimate,
     // the pages listening right now, the most one internet address may hold, how many pages were turned away because of it (and how long ago the last was),
     // and how many came back and replaced their own earlier stream; only counts, like everything else here
@@ -147,7 +150,7 @@ function draw(s){
   $("free").textContent=free;$("of").textContent="free spots of "+s.slots.max;$("waiting").textContent=s.slots.waiting;$("used").textContent=s.slots.used;$("up").textContent=asText(s.uptimeS);
   $("fill").style.width=Math.min(100,100*s.slots.used/Math.max(1,s.slots.max))+"%";
   $("state").textContent=s.slots.waiting>0?s.slots.waiting+" "+(s.slots.waiting===1?"person is":"people are")+" waiting for a spot":free===0?"Full: nobody else fits":low?"Getting full: "+free+" left":"Plenty of room";
-  $("signing").textContent=s.signing.busy?"Busy right now":s.signing.busyRecently?"OK (busy "+s.signing.busyRecently+"x lately)":"OK";
+  $("signing").textContent=(s.signing.busy?"Busy right now":s.signing.busyRecently?"OK (busy "+s.signing.busyRecently+"x lately)":"OK")+(s.signing.key===undefined?"":s.signing.key?" · own key":" · NO key (shared limits)")+(s.signing.connectsDay===undefined?"":" · "+s.signing.connectsDay+" connects in 24 h");
   if(s.streams){const t=s.streams;$("streams").textContent=t.open;$("away").textContent=t.turnedAway;$("awaynote").textContent="pages turned away since it started"+(t.lastTurnedAwayS===null?"":" (the last "+forText(t.lastTurnedAwayS)+" ago)")+". One internet address may keep "+t.limit+" open."+(t.replaced?" "+t.replaced+" came back and replaced their own old connection.":"")}
   const c=s.capacity;$("cap").textContent="About "+c.estimate+" accounts";$("capnote").textContent=(c.measured?"A guess from what this device uses now.":"A first guess; it improves once a few accounts are open.")+" Your internet and TikTok's free signing usually run out before the device does."+(c.estimate>s.slots.max*1.5?" You set "+s.slots.max+" spots, so there may be room to raise it.":"");
   const b=$("banner");b.dataset.on=String(low);b.textContent=s.slots.waiting>0?"People are waiting in line. Only "+free+" spots left.":free===0?"The relay is full.":"Only "+free+" spots left.";
