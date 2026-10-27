@@ -96,6 +96,12 @@ test("song requests: logged out, the Spotify step offers the login, hides the re
   assert.equal(await page.evaluate('document.querySelector("#s5").textContent'), "Add it to your stream", "the link step is step 5 now");
 });
 
+test("song requests: the overlays page links to #spotify-step, and opening it scrolls the Spotify step into view", { skip }, async () => {
+  await open("/songs/#spotify-step", { login: false });
+  await page.waitFor(`(() => { const r = document.getElementById("spotify-step").getBoundingClientRect(); return r.top >= -5 && r.top < window.innerHeight; })()`);
+  assert.equal(await page.evaluate("document.getElementById(\"spotify-step\").hidden"), false);
+});
+
 test("song requests: logged in, it says who, shows the song, starts sharing the first time, and the link carries the code only while sharing", { skip }, async () => {
   await open("/songs/", { login: true });
   await connected();

@@ -6,7 +6,7 @@ export function overlaysFaq({ kb = 19, relayUrl = "" } = {}) {
   const items = [
     {
       q: "Which overlays are there?",
-      a: "The <a href=\"/editor/\">chat overlay</a>, <a href=\"/alerts/\">alerts</a>, <a href=\"/gifts/\">last gifts</a>, <a href=\"/goal/\">goals</a> (followers, gifts or likes) and <a href=\"/likers/\">top likers</a>. Each has its own editor, its own look and its own link. All of them are free, with no Frills account. The overlays other than chat are in beta. Song requests are coming soon and are not open to everyone yet.",
+      a: "The <a href=\"/editor/\">chat overlay</a>, <a href=\"/alerts/\">alerts</a>, <a href=\"/gifts/\">last gifts</a>, <a href=\"/goal/\">goals</a> (followers, gifts or likes) and <a href=\"/likers/\">top likers</a>, and <a href=\"/songs/\">song requests</a> (with an optional Spotify player). Each has its own editor, its own look and its own link. All of them are free, with no Frills account. The overlays other than chat are in beta.",
     },
     {
       q: "Do the overlays work with Twitch?",
@@ -47,6 +47,10 @@ export function overlaysFaq({ kb = 19, relayUrl = "" } = {}) {
     {
       q: "Why are some gifts, follows or likes missing?",
       a: "A few things can hold an alert back: that kind is switched off in the editor, a gift is smaller than the smallest gift you chose to show, or many alerts arrived at once. When the line is longer than you allowed, the oldest follows and shares are dropped first and gifts are kept longest, and a crowd of follows is joined into one alert. TikTok also sends gift streaks (one gift tapped again and again) in pieces, and only the finished streak is shown, once.",
+    },
+    {
+      q: "How do song requests and the Spotify player work?",
+      a: "Viewers type <strong>!sr</strong> and a song name in your TikTok LIVE chat. Frills looks the song up and adds it to the queue on your overlay, with its cover, and you or a moderator type <strong>!next</strong> for the next one. That part needs nothing but your TikTok name. The Spotify step is optional: log in to Spotify on the <a href=\"/songs/\">song requests page</a> and your overlay can show the song playing on your Spotify, and your viewers\u2019 requests can go straight into your Spotify queue. Adding to the queue needs Spotify Premium and Spotify open and playing on one of your devices, and the Frills page has to stay open in a browser tab while you stream. While Frills is in testing, Spotify lets only a short list of people log in, so there are only a few places, and you may need to ask us on the <a href=\"/feedback/\">feedback page</a>. Both are in beta. See <a href=\"/privacy/\">what Frills keeps</a> about the song and the words viewers type.",
     },
     {
       q: "How do the goals and the top likers count?",

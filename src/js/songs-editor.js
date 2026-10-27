@@ -36,6 +36,7 @@ startWidgetEditor({
     const queue = new SongQueue(settings, { lookup: real, onChange: () => layer?.render() });
     // the Spotify step: log in, share the song playing, add chat's songs to the streamer's Spotify queue, try it with a pretend viewer
     const spotify = mountSpotify(document.getElementById("spotify-step"), { hear: (message) => queue.handle(message, ctx.channel()), refresh: ctx.refresh, channel: ctx.channel });
+    if (location.hash === "#spotify-step") requestAnimationFrame(() => document.getElementById("spotify-step")?.scrollIntoView()); // the step stays hidden until it is mounted, so the browser’s own jump to the address missed it
     spotify.setSettings(settings);
     settings.spotify = sharedCode(); // sharing what is playing is turned on in the Spotify step; its code rides in the link by itself
     layer = spotifyLayer({ queue, view });

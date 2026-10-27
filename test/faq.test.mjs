@@ -80,7 +80,12 @@ test("the overlays FAQ keeps its promises: Twitch support as it is, uploads desc
   assert.ok(answer("What does Frills keep about me and my viewers?").includes('href="/privacy/"'));
   assert.ok(answer("How do follow alerts work on Twitch, and why do they need a login?").includes('href="/twitch/"'));
   assert.doesNotMatch(items.map((i) => i.text).join(" "), /no database|stores nothing|nothing is stored/i, "it never claims there is no database");
-  assert.match(answer("Which overlays are there?"), /Song requests are coming soon/);
+  assert.match(answer("Which overlays are there?"), /song requests/);
+  assert.doesNotMatch(answer("Which overlays are there?"), /coming soon/i, "song requests are in beta now, nothing in that list is only planned");
+  const songs = answer("How do song requests and the Spotify player work?");
+  assert.match(songs, /Spotify Premium/);
+  assert.match(songs, /short list of people log in/, "the Spotify login limit is said plainly");
+  assert.ok(songs.includes('href="/privacy/"'));
 });
 
 test("the main FAQ no longer claims there is no database or that nothing is stored", () => {
