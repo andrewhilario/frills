@@ -60,3 +60,24 @@ CREATE TABLE IF NOT EXISTS twitch_follows (
   at INTEGER NOT NULL,
   PRIMARY KEY (code, seq)
 );
+
+-- The Spotify login Frills keeps for a streamer, so the Spotify player works with the Frills page closed (see worker/spotify.mjs). Run this part once.
+-- The login itself (secret) is encrypted with a key that is NOT in the database (the SPOTIFY_TOKEN_KEY secret of the Worker); without that key the
+-- rows are unreadable. A row is deleted when the streamer presses Disconnect, and by the daily clean-up after 14 days without use.
+CREATE TABLE IF NOT EXISTS spotify_logins (
+  code TEXT PRIMARY KEY,        -- the same 16 random characters as in nowplaying, in the overlay link
+  key_hash TEXT NOT NULL,       -- sha-256 of the key that may change it (the key itself is never stored)
+  secret TEXT NOT NULL,         -- the login (refresh token, access token, expiry), encrypted with AES-GCM: iv + ciphertext, base64
+  state TEXT NOT NULL DEFAULT 'ok', -- ok, or expired when Spotify no longer accepts the login
+  name TEXT NOT NULL DEFAULT '',    -- the Spotify account's display name, for "Connected as ..."
+  share INTEGER NOT NULL DEFAULT 1, -- 1: the song playing is shown on the stream
+  queue INTEGER NOT NULL DEFAULT 0, -- 1: songs viewers ask for (!sr) are added to the streamer's Spotify queue
+  recent TEXT NOT NULL DEFAULT '[]', -- songs added lately, so one is not added twice in a row: [[uri, at], ...] (JSON)
+  log TEXT NOT NULL DEFAULT '[]',    -- what happened lately, newest first, for the streamer to read: [{ at, state, text }, ...] (JSON)
+  last_act INTEGER NOT NULL DEFAULT 0,   -- when a song was last added or skipped (ms since 1970)
+  hour_start INTEGER NOT NULL DEFAULT 0, -- the hour the count below is for
+  hour_count INTEGER NOT NULL DEFAULT 0, -- adds and skips in that hour, so a leaked overlay link cannot flood the queue
+  hold_until INTEGER NOT NULL DEFAULT 0, -- Spotify asked us to slow down: no questions to Spotify before this time
+  created_at INTEGER NOT NULL,
+  used_at INTEGER NOT NULL      -- last time the login was used; the clean-up deletes rows idle for 14 days
+);

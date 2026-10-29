@@ -66,17 +66,19 @@
       <p class="ctl__hint" id="relay-note" role="status"></p>
     </section>
 
-    <section class="step-card spx" id="spotify-step" aria-labelledby="s4" data-client="{{spotifyClientId}}" data-ticker="{{tickerJs}}" hidden>
+    <section class="step-card spx" id="spotify-step" aria-labelledby="s4" data-client="{{spotifyClientId}}" hidden>
       <div class="step-card__head">
         <span class="step-card__num" aria-hidden="true">4</span>
         <h2 class="step-card__title" id="s4">Connect Spotify <span class="spx__optional">(optional)</span></h2>
       </div>
-      <p class="ctl__hint">Show the song that is playing on your Spotify on your stream, and let viewers add songs to your Spotify queue with <code>!sr</code>. You do not need this for the song list: viewers can ask for songs without it.</p>
+      <p class="ctl__hint">Show the song that is playing on your Spotify on your stream, and let viewers add songs to your Spotify queue with <code>!sr</code>. Once it is connected you can close this page. You do not need this for the song list: viewers can ask for songs without it.</p>
       <p class="spx__status" id="spx-status" role="status"></p>
       <div class="spx__row">
         <button class="btn" type="button" id="spx-login">Log in with Spotify</button>
+        <button class="btn" type="button" id="spx-keep" hidden>Let Frills keep my login</button>
         <button class="btn btn--soft" type="button" id="spx-logout" hidden>Disconnect</button>
       </div>
+      <p class="ctl__hint spx__note" id="spx-keep-note" hidden>When you log in, Frills keeps your Spotify login on its server, encrypted, so the Spotify player works with this page closed. <strong>Disconnect</strong> deletes it at once, and it is deleted after 14 days without use.</p>
       <div id="spx-on" hidden>
         <div class="spx__now">
           <img class="spx__cover" id="spx-cover" alt="" width="64" height="64" hidden>
@@ -89,7 +91,7 @@
         <div class="stack" id="spx-switches"></div>
         <p class="ctl__hint spx__note" id="spx-share-note" role="status"></p>
         <p class="ctl__hint spx__note" id="spx-queue-note" role="status"></p>
-        <p class="ctl__hint">Frills reads Spotify from this page, so keep it open in a browser tab while you stream (it can be in the background).</p>
+        <p class="ctl__hint">You can close this page now: Frills reads Spotify for you. Keep your song requests overlay open in your streaming app, because it is what passes your viewers’ <code>!sr</code> and <code>!next</code> on.</p>
       </div>
       <form class="spx__try" id="spx-try" autocomplete="off">
         <h3 class="spx__sub">Try it as a viewer</h3>
@@ -100,10 +102,10 @@
       <details class="spx__help">
         <summary>Having trouble?</summary>
         <ul>
-          <li>Songs only go to your Spotify queue with <strong>Spotify Premium</strong>, and Spotify has to be open and playing on a phone or computer.</li>
+          <li>Songs only go to your Spotify queue with <strong>Spotify Premium</strong>, and Spotify has to be open and playing on a phone or computer (it does not have to be this computer).</li>
           <li>While Frills is in testing, Spotify lets only a short list of people log in. If Spotify says you are not registered, tell us on the <a href="/feedback/">feedback page</a>. Spotify allows only a few people, so we can add you only if there is room.</li>
-          <li>Your Spotify password is never seen by Frills, and the login stays in this browser. Only the song’s name, artist, cover and position are passed on, and only while the first switch is on. <strong>Disconnect</strong> forgets the login.</li>
-          <li>If the song on your stream stops updating, check that this page is still open and that Spotify is playing.</li>
+          <li>Your Spotify password is never seen by Frills. Frills keeps your Spotify login on its server, encrypted, and uses it only to read what is playing, and (when you have switched that on) to add songs to your queue and skip. <strong>Disconnect</strong> deletes it at once, and it is deleted after 14 days without use. You can also remove Frills at spotify.com/account/apps. Only the song’s name, artist, cover and position reach your overlay.</li>
+          <li>If the song on your stream stops updating, check that Spotify is playing and that your song requests overlay is open in your streaming app. If this step says your login ran out, log in again.</li>
         </ul>
       </details>
     </section>

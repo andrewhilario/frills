@@ -34,8 +34,9 @@ startWidgetEditor({
     const real = makeLookup(); // what chat asks for goes to the real catalog; the test buttons use the practice one
     let layer = null;
     const queue = new SongQueue(settings, { lookup: real, onChange: () => layer?.render() });
-    // the Spotify step: log in, share the song playing, add chat's songs to the streamer's Spotify queue, try it with a pretend viewer
-    const spotify = mountSpotify(document.getElementById("spotify-step"), { hear: (message) => queue.handle(message, ctx.channel()), refresh: ctx.refresh, channel: ctx.channel });
+    // the Spotify step: log in, let Frills keep the login, share the song playing, add chat's songs to the streamer's Spotify queue, try it with a
+    // pretend viewer. Frills' Worker does the Spotify work from then on (the overlay in the streaming app passes chat on), so this page can close.
+    const spotify = mountSpotify(document.getElementById("spotify-step"), { hear: (message) => queue.handle(message, ctx.channel()), refresh: ctx.refresh });
     if (location.hash === "#spotify-step") requestAnimationFrame(() => document.getElementById("spotify-step")?.scrollIntoView()); // the step stays hidden until it is mounted, so the browser’s own jump to the address missed it
     spotify.setSettings(settings);
     settings.spotify = sharedCode(); // sharing what is playing is turned on in the Spotify step; its code rides in the link by itself

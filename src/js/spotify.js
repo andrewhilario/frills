@@ -48,7 +48,7 @@ export function describe(status, reason = "", retryAfter = 0) {
   return `Spotify answered with an error (${status}).`;
 }
 
-const tidyTrack = (t) => ({
+export const tidyTrack = (t) => ({
   id: String(t?.id ?? ""),
   uri: String(t?.uri ?? ""),
   title: String(t?.name ?? "").slice(0, 160),

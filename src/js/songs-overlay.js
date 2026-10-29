@@ -7,6 +7,8 @@ import { createSongsView } from "./widgets-view.js";
 import { channelFromParams, connectEvents } from "./widget-overlay.js";
 import { fakeLookup, fakeSongSource } from "./fake-alerts.js";
 import { spotifyLayer } from "./songs-spotify.js";
+import { SpotifyForward } from "./spotify-forward.js";
+import { validCode } from "./spotify-bridge.js";
 import { fontsReady, generalFaces } from "./look.js";
 
 const params = new URLSearchParams(location.search);
@@ -34,6 +36,9 @@ const queue = new SongQueue(settings, {
 layer = spotifyLayer({ queue, view });
 layer.apply(settings);
 layer.render();
+// With a Spotify code in the link, Frills keeps the streamer's Spotify login: this page, open in the streaming app, passes each !sr and !next on
+// (the Worker adds the song to the streamer's Spotify queue, if the streamer switched that on in the editor). The editor's own preview does not.
+const forward = !demo && channel && validCode(settings.spotify) ? new SpotifyForward({ code: settings.spotify, channel, settings }) : null;
 setInterval(() => { if (!layer.playing) queue.tick(); }, 1000); // with Spotify playing, the song moves on by itself
 
 if (demo) {
@@ -45,5 +50,5 @@ if (demo) {
 } else if (!channel) {
   say("Add ?channel=yourname to this link.");
 } else {
-  fontsReady(generalFaces(settings), 1000).then(() => connectEvents({ channel, events: [], onChat: (message) => queue.handle(message, channel), say }));
+  fontsReady(generalFaces(settings), 1000).then(() => connectEvents({ channel, events: [], onChat: (message) => { queue.handle(message, channel); forward?.handle(message); }, say }));
 }

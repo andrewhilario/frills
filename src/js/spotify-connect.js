@@ -1,27 +1,37 @@
-// The "Connect Spotify" step of the Song requests editor: log in with Spotify, show the song that is playing on the stream, let chat's !sr
-// songs go into the streamer's own Spotify queue, and try it with a pretend viewer. It is the friendly home of what the private /spotify/ test
-// page does in a technical way; both use the same login and the same post box. The login stays in this browser only; only the song's title,
-// artist, cover and position are passed on (see spotify-bridge.js).
+// The "Connect Spotify" step of the Song requests editor: log in with Spotify, show the song that is playing on the stream, let chat's !sr songs go
+// into the streamer's own Spotify queue, and try it with a pretend viewer.
+//
+// Frills keeps the Spotify login (worker/spotify.mjs), so all of this works with this page closed. The page logs in to Spotify as it always did (the
+// PKCE login, no secret, in spotify.js), then hands the login over once ("Let Frills keep my login", or by itself right after Log in); from then
+// on Frills' Worker asks Spotify what is playing and adds the songs, and the streaming app's overlay passes viewers' !sr and !next on
+// (spotify-forward.js). This page only changes the two switches, shows what happened and disconnects. The login is removed from this browser as
+// soon as Frills has it. Only the song's title, artist, cover and position reach the overlay.
 
 import { REDIRECT_PATH, SpotifyClient } from "./spotify.js";
-import { SpotifyRequests } from "./spotify-requests.js";
-import { Publisher, bridgeIdentity, rememberReturn, startClock } from "./spotify-bridge.js";
+import { SpotifyServer } from "./spotify-server.js";
+import { bridgeIdentity, rememberReturn, watchSpotify } from "./spotify-bridge.js";
 import { buildControl } from "./ui.js";
-import { onScreenWords } from "./songs.js";
+import { SONGS, onScreenWords, parseCommand } from "./songs.js";
 
-export const SHARING = "frills:spotify:sharing"; // "1" while the song playing is shared with the overlay
-export const QUEUE = "frills:spotify:queue"; // "1" while viewers' !sr songs are added to the streamer's Spotify queue
+export const SHARING = "frills:spotify:sharing"; // "1" while Frills keeps this browser's Spotify login: the overlay link then carries the code
+const KEEP = "frills:spotify:keep"; // in this tab, from pressing Log in until the login has been handed to Frills
 const get = (key) => { try { return localStorage.getItem(key); } catch { return null; } };
 const put = (key, value) => { try { localStorage.setItem(key, value); } catch { /* storage can be blocked; the choice lasts until the page closes */ } };
 
 // A Spotify cover is drawn only from Spotify's own picture server.
 const safeCover = (address) => (/^https:\/\/i\.scdn\.co\//.test(address) ? address : "");
 
+const SHARE_ON = "Sharing. The song playing shows on your stream, even with this page closed.";
+const SHARE_OFF = "Not sharing. Your stream shows only the songs viewers ask for.";
+const QUEUE_ON = "On. A viewer's !sr song goes to the end of your Spotify queue, even with this page closed. This needs Spotify Premium, Spotify open on a device, and your song requests overlay open in your streaming app.";
+const QUEUE_OFF = "Off. Songs viewers ask for only go to the list on your stream.";
+
 /**
  * Sets up the step inside `root` (the section, with the ids spx-*). `hear(message)` gives a chat message to the on-screen queue and returns what it
- * did; `refresh()` makes the editor rebuild its link; `channel()` is the streamer's TikTok name. Returns { handle(message), setSettings(settings), loggedIn }.
+ * did; `refresh()` makes the editor rebuild its link. Returns { handle(message), setSettings(settings), loggedIn }. (`handle` is kept for the editor's
+ * sake and does nothing: the overlay passes chat on to Frills, not this page.)
  */
-export function mountSpotify(root, { hear, refresh = () => {}, channel = () => "" } = {}) {
+export function mountSpotify(root, { hear, refresh = () => {} } = {}) {
   const none = { handle() {}, setSettings() {}, loggedIn: () => false };
   const clientId = root?.dataset.client || "";
   if (!root || !clientId) return none; // no Spotify app on this site: the step stays hidden
@@ -29,135 +39,164 @@ export function mountSpotify(root, { hear, refresh = () => {}, channel = () => "
   const $ = (id) => document.getElementById("spx-" + id);
   const client = new SpotifyClient({ clientId, redirectUri: location.origin + REDIRECT_PATH });
   const identity = bridgeIdentity();
+  const server = new SpotifyServer({ code: identity.code, key: identity.key });
   const say = (el, text, bad = false) => { el.textContent = text; el.dataset.state = bad ? "error" : ""; };
 
-  let sharing = get(SHARING) === "1";
-  let queueOn = get(QUEUE) === "1";
-  let ticker = null;
-  let busy = false;
+  let settings = SONGS.defaults;
+  let state = { mode: "loading" }; // off | local | connected | expired | unavailable, as Frills last said
+  let reader = null; // reads what is playing the way the overlay does, to show it here
 
-  // ── what Spotify says is playing, passed to the overlay ────────────────────────────────────────────────────────────────
-  const publisher = new Publisher({
-    code: identity.code,
-    key: identity.key,
-    onError: (status) => say($("share-note"), status === 0 ? "Could not reach Frills to share the song. It will try again." : `Frills could not take the song (error ${status}). It will try again.`, true),
-  });
-  const publish = (now) => {
-    if (!sharing || now.error) return;
-    publisher.send(now.title ? { playing: now.playing, title: now.title, artist: now.artist, cover: now.cover, progressMs: now.progressMs, durationMs: now.durationMs } : { playing: false, title: "", artist: "", cover: "", progressMs: 0, durationMs: 0 });
-  };
-
-  async function readNow() {
-    if (busy) return;
-    busy = true;
-    try {
-      const now = await client.nowPlaying();
-      publish(now);
-      const cover = $("cover");
-      if (now.error) { say($("now-note"), now.error, true); return; }
-      say($("now-note"), "");
-      const art = safeCover(now.cover ?? "");
-      if (art) { cover.src = art; cover.hidden = false; } else cover.hidden = true;
-      if (!now.title) {
-        $("title").textContent = "Nothing is playing";
-        $("artist").textContent = "Start a song in Spotify and it shows up here within a few seconds.";
-      } else {
-        $("title").textContent = now.title;
-        $("artist").textContent = now.artist + (now.playing ? "" : " (paused)");
-      }
-    } finally {
-      busy = false;
+  // ── what is playing, as the overlay sees it ────────────────────────────────────────────────────────────────────────────
+  function paintSong(song) {
+    const art = safeCover(song?.cover ?? "");
+    if (art) { $("cover").src = art; $("cover").hidden = false; } else $("cover").hidden = true;
+    if (!song?.title) {
+      $("title").textContent = "Nothing is playing";
+      $("artist").textContent = state.share === false ? "Sharing is off, so your stream does not show the song." : "Start a song in Spotify and it shows up here within a few seconds.";
+    } else {
+      $("title").textContent = song.title;
+      $("artist").textContent = song.artist + (song.playing ? "" : " (paused)");
     }
   }
 
-  // ── the two switches ───────────────────────────────────────────────────────────────────────────────────────────────────
-  const shareNote = (on) => say($("share-note"), on ? "Sharing. The song playing shows on your stream, as long as this page stays open." : "Not sharing. Your stream shows only the songs viewers ask for.");
-  const share = buildControl({ key: "spShare", type: "toggle", label: "Show what is playing on my stream" }, sharing, (on) => {
-    sharing = on;
-    put(SHARING, on ? "1" : "0");
-    shareNote(on);
-    publisher.sent = null; // send the song that is playing right away
-    refresh(); // the link carries the code only while this is on
-    if (on) readNow();
+  // ── the two switches (kept by Frills, so they hold with this page closed) ────────────────────────────────────────────────
+  const share = buildControl({ key: "spShare", type: "toggle", label: "Show what is playing on my stream" }, true, async (on) => {
+    const done = await server.settings({ share: on });
+    if (!done.ok) { say($("share-note"), done.message, true); share.write(!on); return; }
+    state.share = on;
+    say($("share-note"), on ? SHARE_ON : SHARE_OFF);
   });
-  const queue = buildControl({ key: "spQueue", type: "toggle", label: "Add songs my viewers ask for to my Spotify queue" }, queueOn, (on) => {
-    queueOn = on;
-    requests.real = on;
-    put(QUEUE, on ? "1" : "0");
-    say($("queue-note"), on ? "On. A viewer's !sr song goes to the end of your Spotify queue. This needs Spotify Premium and Spotify open on a device." : "Off. Songs viewers ask for only go to the list on your stream.");
+  const queue = buildControl({ key: "spQueue", type: "toggle", label: "Add songs my viewers ask for to my Spotify queue" }, false, async (on) => {
+    const done = await server.settings({ queue: on });
+    if (!done.ok) { say($("queue-note"), done.message, true); queue.write(!on); return; }
+    state.queue = on;
+    say($("queue-note"), on ? QUEUE_ON : QUEUE_OFF);
   });
   share.row.append($("share-note")); // each switch says what it did right under itself
   queue.row.append($("queue-note"));
   $("switches").append(share.row, queue.row);
 
-  // ── trying it with a pretend viewer ────────────────────────────────────────────────────────────────────────────────────
+  // ── what happened, and trying it with a pretend viewer ─────────────────────────────────────────────────────────────────
   const log = $("log");
-  const line = (state, text) => {
+  const seen = new Set(); // entries Frills wrote down that are already listed
+  const line = (stateName, text) => {
     const li = document.createElement("li");
-    li.dataset.state = state;
+    li.dataset.state = stateName;
     li.textContent = text;
     log.prepend(li);
     while (log.children.length > 20) log.lastElementChild.remove();
   };
-  const requests = new SpotifyRequests(client, { channel: channel(), real: queueOn, onLog: ({ state, text }) => line(state, text) });
+  const entry = (e) => {
+    const id = `${e.at}|${e.text}`;
+    if (seen.has(id)) return;
+    seen.add(id);
+    line(e.state, e.text);
+  };
+  const entries = (list) => { for (const e of [...(list ?? [])].reverse()) entry(e); }; // Frills lists the newest first
+
   const nameBox = buildControl({ key: "spName", type: "text", label: "Viewer name", max: 30 }, "Pretend viewer", () => {}, { id: "spx-try-name" });
   const textBox = buildControl({ key: "spText", type: "text", label: "What the viewer types", max: 120, hint: "For example !sr levitating dua lipa. Type !next to skip, as yourself." }, "", () => {}, { id: "spx-try-text" });
   $("viewer-fields").append(nameBox.row, textBox.row);
-  $("try").addEventListener("submit", (event) => {
+  $("try").addEventListener("submit", async (event) => {
     event.preventDefault();
     const text = $("try-text").value.trim();
     if (!text) return;
     const name = $("try-name").value.trim() || "Pretend viewer";
-    const skipping = ["!next", "!skip"].some((word) => text.toLowerCase().startsWith(word));
-    const message = { id: "", user: "try-" + name.toLowerCase().replace(/[^a-z0-9]+/g, "-"), name, text, mod: false, host: skipping };
+    const command = parseCommand(text, settings);
+    const message = { id: "", user: "try-" + name.toLowerCase().replace(/[^a-z0-9]+/g, "-"), name, text, mod: false, host: command?.kind === "next" };
     const words = onScreenWords(hear(message));
     if (words) line("info", words);
-    handle(message, { practice: true });
     $("try-text").value = "";
+    if (state.mode !== "connected" || !(command?.kind === "request" || command?.kind === "next")) return;
+    const done = command.kind === "next" ? await server.next({ name }) : await server.request({ query: command.query, name });
+    if (done.entry) entry(done.entry);
+    else line(done.ok ? "info" : "error", done.message ?? "Nothing happened.");
   });
 
-  // ── a chat message: the song goes to the streamer's Spotify queue when that is on (a pretend viewer is tried even when it is off) ─────────
-  function handle(message, { practice = false } = {}) {
-    if (!client.loggedIn || !(queueOn || practice)) return null;
-    requests.channel = channel();
-    return requests.handle({ ...message, login: message.login ?? "" });
+  // ── what to show for each state ────────────────────────────────────────────────────────────────────────────────────────
+  function render() {
+    const { mode } = state;
+    const kept = mode === "connected" || mode === "expired";
+    $("login").hidden = !(mode === "off" || mode === "expired");
+    $("login").disabled = false;
+    $("keep").hidden = mode !== "local";
+    $("keep").disabled = false;
+    $("logout").hidden = !(kept || mode === "local");
+    $("on").hidden = mode !== "connected";
+    $("keep-note").hidden = !(mode === "off" || mode === "expired" || mode === "local");
+    if (mode === "off") say($("status"), "Not connected. Spotify asks you to say yes on its own page, and Frills never sees your password.");
+    if (mode === "local") say($("status"), "You are logged in to Spotify in this browser, but Frills is not keeping the login yet.");
+    if (mode === "expired") say($("status"), "Your Spotify login ran out. Press Log in with Spotify again.", true);
+    if (mode === "unavailable") say($("status"), state.message, true);
+    if (mode === "connected") {
+      say($("status"), `Connected to Spotify as ${state.name || "your account"}. Frills keeps your login, so you can close this page.`);
+      share.write(state.share);
+      queue.write(state.queue);
+      say($("share-note"), state.share ? SHARE_ON : SHARE_OFF);
+      say($("queue-note"), state.queue ? QUEUE_ON : QUEUE_OFF);
+      entries(state.log);
+      if (!reader) reader = watchSpotify(identity.code, paintSong);
+    } else {
+      reader?.stop();
+      reader = null;
+    }
+    // the overlay link carries the code while Frills keeps a login for it: the overlay needs it to read the song and to pass requests on
+    const was = get(SHARING) === "1";
+    put(SHARING, kept ? "1" : "0");
+    if (was !== kept) refresh();
   }
 
-  // ── logging in and out ─────────────────────────────────────────────────────────────────────────────────────────────────
-  async function show() {
-    const on = client.loggedIn;
-    $("login").hidden = on;
-    $("logout").hidden = !on;
-    $("on").hidden = !on;
-    ticker?.stop();
-    ticker = null;
-    if (!on) { say($("status"), "Not connected. Spotify asks you to say yes on its own page, and Frills never sees your password."); return; }
-    say($("status"), "Connected to Spotify.");
-    const me = await client.me();
-    if (me.error) say($("status"), me.error, true); else say($("status"), `Connected to Spotify as ${me.name || "your account"}.`);
-    shareNote(sharing);
-    say($("queue-note"), queueOn ? "On. A viewer's !sr song goes to the end of your Spotify queue. This needs Spotify Premium and Spotify open on a device." : "Off. Songs viewers ask for only go to the list on your stream.");
-    await readNow();
-    ticker = startClock(root.dataset.ticker, readNow, 3000);
+  /** What Frills says about this browser's login, as a state to show. */
+  function normalize(answer) {
+    if (!answer.ok) return { mode: "unavailable", message: answer.message };
+    if (!answer.connected) return { mode: client.loggedIn ? "local" : "off" };
+    return { mode: answer.state === "ok" ? "connected" : "expired", name: answer.name, share: answer.share, queue: answer.queue, log: answer.log };
+  }
+
+  async function load() {
+    state = normalize(await server.status());
+    render();
+  }
+
+  // Every few seconds: new lines for the log, and a change of state (the login ran out, or was disconnected somewhere else).
+  setInterval(async () => {
+    if (state.mode !== "connected" && state.mode !== "expired") return;
+    const next = normalize(await server.status());
+    if (next.mode !== state.mode) { state = next; render(); } else if (next.mode === "connected") entries(next.log);
+  }, 5000);
+
+  // ── logging in, handing the login to Frills, and disconnecting ──────────────────────────────────────────────────────────
+  async function keepLogin() {
+    const login = client.tokens;
+    if (!login?.refresh) { client.logout(); await load(); say($("status"), "There is no Spotify login in this browser to give to Frills. Press Log in with Spotify.", true); return; }
+    $("keep").disabled = true;
+    say($("status"), "Giving your login to Frills…");
+    const done = await server.keep({ clientId, refresh: login.refresh, access: login.access, expires: login.expires });
+    if (done.ok) client.logout(); // Frills has it: this browser does not need to
+    else if (done.error === "not_allowed" || done.error === "bad_login") client.logout(); // Spotify will not accept it, so it is no use to anyone
+    await load();
+    if (!done.ok) say($("status"), done.message, true);
   }
 
   $("login").addEventListener("click", async (event) => {
     event.currentTarget.disabled = true;
     rememberReturn("/songs/"); // the callback page brings the person back here
+    try { sessionStorage.setItem(KEEP, "1"); } catch { /* the person presses the button that keeps the login instead */ }
     location.assign(await client.begin());
   });
-  $("logout").addEventListener("click", () => {
+  $("keep").addEventListener("click", keepLogin);
+  $("logout").addEventListener("click", async () => {
+    $("logout").disabled = true;
+    const done = await server.disconnect();
+    if (!done.ok) { $("logout").disabled = false; say($("status"), done.message, true); return; }
     client.logout();
-    sharing = false;
-    put(SHARING, "0");
-    share.write(false);
-    refresh();
-    show();
+    await load();
   });
 
-  // first time connected from here: sharing starts on (the person pressed Log in on the page whose job is showing the song), with the switch to turn it off
-  if (client.loggedIn && get(SHARING) === null) { sharing = true; put(SHARING, "1"); share.write(true); refresh(); }
-  show();
+  // Back from Spotify's page after Log in: the login is in this browser now, and the person already agreed to Frills keeping it, so it is handed over.
+  let justLoggedIn = false;
+  try { justLoggedIn = sessionStorage.getItem(KEEP) === "1"; sessionStorage.removeItem(KEEP); } catch { /* nothing remembered */ }
+  load().then(() => { if (justLoggedIn && state.mode === "local") return keepLogin(); });
 
-  return { handle, setSettings(settings) { requests.settings = settings; }, loggedIn: () => client.loggedIn };
+  return { handle() {}, setSettings(next) { settings = next; }, loggedIn: () => state.mode === "connected" };
 }

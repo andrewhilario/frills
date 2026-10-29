@@ -215,6 +215,11 @@ test("the privacy page says what the database keeps (feedback, uploaded files an
   for (const phrase of ["What Frills keeps on its server", "Feedback you send.", "Images, GIFs and sounds you upload for alerts.", "delete code", "1 MB", "300 KB", "do not store your name or your address", "New Twitch followers", "kept for one day", "The song playing", "Song names in Song requests", "Cloudflare", "private page"]) {
     assert.ok(html.includes(phrase), `the privacy page says "${phrase}"`);
   }
+  // Frills keeps the Spotify login (so the player works with the page closed): the page has to say so, say how it is protected and how it goes away
+  for (const phrase of ["Your Spotify login, if you connect Spotify in Song requests", "encrypted", "never your Spotify password", "Pressing Disconnect deletes all of it at once", "not been used for 14 days is deleted by itself", "spotify.com/account/apps"]) {
+    assert.ok(html.includes(phrase), `the privacy page says "${phrase}"`);
+  }
+  assert.doesNotMatch(html, /Your Spotify login stays in your browser/, "that stopped being true when Frills began keeping the login");
 });
 
 test("the overlays FAQ is its own indexable page with structured data, listed in the sitemap, and linked from the overlays page and the main FAQ", () => {

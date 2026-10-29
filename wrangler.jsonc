@@ -19,5 +19,11 @@
   // name that already has a CNAME. To use another name, change it here and `url` in site.config.json, then build and deploy again.
   "routes": [
     { "pattern": "frills.valwidgets.live", "custom_domain": true }
-  ]
+  ],
+  // Once a day (03:17 UTC) the Worker deletes Spotify logins that have not been used for 14 days (worker/spotify.mjs, `pruneSpotify`).
+  // The Spotify logins Frills keeps are encrypted with a secret that is NOT in this file: set it once with
+  //   npx wrangler secret put SPOTIFY_TOKEN_KEY
+  // and paste 32 random bytes in base64 (make them with: node -e "console.log(require('crypto').randomBytes(32).toString('base64'))").
+  // Until it is set, the Spotify step on /songs/ says it cannot keep a login yet, and nothing else changes.
+  "triggers": { "crons": ["17 3 * * *"] }
 }
