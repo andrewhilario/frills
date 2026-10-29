@@ -90,17 +90,24 @@ test("the Spotify page has the share step, hidden until logged in, and it never 
   assert.equal(await page.evaluate('document.getElementById("sp-link-box").hidden'), true);
 });
 
-test("the Song requests editor puts the Spotify code in the link by itself while sharing is on, shows no box for it, and leaves it out otherwise", { skip }, async () => {
+test("the Song requests editor puts the Spotify code in the link by itself while Frills keeps a login for it, shows no box for it, and leaves it out otherwise", { skip }, async () => {
+  // This server has only files, no Worker: a fetch stub plays the Worker's answer to "is a login kept for this code?"
+  const asWorker = (connected) => `(() => { const real = window.fetch.bind(window); window.fetch = async (input, options) => String(input).includes("/api/spotify/") ? new Response(JSON.stringify(${connected} ? { ok: true, connected: true, state: "ok", name: "T", share: true, queue: false, log: [] } : { ok: true, connected: false }), { status: 200, headers: { "content-type": "application/json" } }) : real(input, options); })()`;
+  const typeChannel = () => page.evaluate(`(() => { const i = document.getElementById("source-channel"); i.value = "pond_cafe"; i.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+  const spotifyParam = async () => new URL(await page.evaluate('document.getElementById("link").value')).searchParams.get("spotify");
   await page.goto(`${base}/songs/`, { settle: 900 });
-  await page.evaluate(`localStorage.setItem("frills:spotify:bridge", ${JSON.stringify(JSON.stringify({ code: CODE, key: KEY }))}); localStorage.setItem("frills:spotify:sharing", "1")`);
+  await page.evaluate(`localStorage.setItem("frills:spotify:bridge", ${JSON.stringify(JSON.stringify({ code: CODE, key: KEY }))})`);
+  const kept = await page.send("Page.addScriptToEvaluateOnNewDocument", { source: asWorker(true) });
   await page.goto(`${base}/songs/`, { settle: 900 });
-  await page.evaluate(`(() => { const i = document.getElementById("source-channel"); i.value = "pond_cafe"; i.dispatchEvent(new Event("input", { bubbles: true })); })()`);
-  assert.equal(new URL(await page.evaluate('document.getElementById("link").value')).searchParams.get("spotify"), CODE, "the code rides in the link");
+  await typeChannel();
+  assert.equal(await spotifyParam(), CODE, "a login is kept: the code rides in the link");
   assert.equal(await page.evaluate('document.getElementById("c-spotify") === null'), true, "and there is no box to type it in");
-  await page.evaluate(`localStorage.setItem("frills:spotify:sharing", "0")`);
+  await page.send("Page.removeScriptToEvaluateOnNewDocument", { identifier: kept.identifier });
+  const none = await page.send("Page.addScriptToEvaluateOnNewDocument", { source: asWorker(false) });
   await page.goto(`${base}/songs/`, { settle: 900 });
-  await page.evaluate(`(() => { const i = document.getElementById("source-channel"); i.value = "pond_cafe"; i.dispatchEvent(new Event("input", { bubbles: true })); })()`);
-  assert.equal(new URL(await page.evaluate('document.getElementById("link").value')).searchParams.has("spotify"), false, "not sharing: no code");
+  await typeChannel();
+  assert.equal(await spotifyParam(), null, "no login kept: no code");
+  await page.send("Page.removeScriptToEvaluateOnNewDocument", { identifier: none.identifier });
 });
 
 test("the Spotify page's clock comes from a worker, and it keeps ticking", { skip }, async () => {
