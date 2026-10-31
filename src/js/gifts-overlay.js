@@ -29,5 +29,6 @@ if (params.get("demo") === "1") {
 } else if (!channel) {
   say("Add ?channel=yourname to this link.");
 } else {
-  fontsReady(generalFaces(settings), 1000).then(() => connectEvents({ channel, events: ["gift"], onAlert: (event) => list.add(event), say }));
+  const fonts = fontsReady(generalFaces(settings), 1000); // the connection starts at once; only drawing waits for the font
+  connectEvents({ channel, events: ["gift"], onAlert: (event) => fonts.then(() => list.add(event)), say });
 }

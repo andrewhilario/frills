@@ -412,7 +412,9 @@ test("the shared relay looks for an account that is not LIVE often at first and 
   const relay = createHelper({ relay: { origins: ["https://site.test"], slots: 3, maxPerIp: 5, trustProxy: false }, factory: async () => ({}) });
   const { offlineWaitMs, offlineGiveUpMs, offlineSlowSteps } = relay.hub.opts;
   assert.equal(offlineWaitMs, 20000, "every 20 seconds at first, when a streamer has just opened the overlay and is about to go LIVE");
-  assert.deepEqual(offlineSlowSteps, [[180000, 60000], [1800000, 180000], [10800000, 600000]], "a minute after 3 minutes, 3 minutes after half an hour, 10 minutes after 3 hours");
+  assert.deepEqual(offlineSlowSteps, [[900000, 30000], [3600000, 60000], [14400000, 180000]], "30 seconds after 15 minutes, a minute after an hour, 3 minutes after 4 hours (a streamer who sets the scene up in TikTok LIVE Studio before going LIVE is found within half a minute)");
+  assert.ok(offlineSlowSteps[0][0] >= 600000, "the quick looks last at least 10 minutes: scene setup before Go LIVE takes a few minutes");
+  assert.ok(offlineSlowSteps[0][1] <= 30000, "and the first slower step is still at most 30 seconds");
   assert.equal(offlineGiveUpMs, 0, "never gives up while a page listens");
   assert.ok(offlineSlowSteps.every(([after, every], i) => every > (offlineSlowSteps[i - 1]?.[1] ?? offlineWaitMs) && after > (offlineSlowSteps[i - 1]?.[0] ?? 0)), "each step is later and slower than the one before");
 });

@@ -54,23 +54,23 @@ if (params.get("demo") === "1") {
 } else if (!channel) {
   say("Add ?channel=yourname to this link.");
 } else {
-  // The first alert should be drawn in the chosen font, so fetch it first (for at most a second).
-  fontsReady(generalFaces(settings), 1000).then(() => {
-    const noFeed = { add() {}, removeById() {}, removeUser() {}, clear() {} }; // chat is not shown here; only alerts
-    let old = false; // the relay we found can only send chat: say so, and keep saying it
-    connectTo([noFeed], platform, channel, (status) => {
-      if (old) return;
-      say(status.state === "connected" || status.state === "stopped" ? "" : statusText(status));
-    }, {
-      relay: relayForPage(),
-      events: PLATFORM_KINDS.tiktok,
-      onAlert: push,
-      onFound: (found) => {
-        if (found && !found.features.includes("alerts")) {
-          old = true;
-          say("The Frills relay needs an update before it can send alerts.");
-        }
-      },
-    });
+  // The connection starts at once: waiting for the font (up to a second) before even asking for the stream made every overlay slower to connect. The first
+  // alert is still drawn in the chosen font, because drawing is what waits for it.
+  const fonts = fontsReady(generalFaces(settings), 1000);
+  const noFeed = { add() {}, removeById() {}, removeUser() {}, clear() {} }; // chat is not shown here; only alerts
+  let old = false; // the relay we found can only send chat: say so, and keep saying it
+  connectTo([noFeed], platform, channel, (status) => {
+    if (old) return;
+    say(status.state === "connected" || status.state === "stopped" ? "" : statusText(status));
+  }, {
+    relay: relayForPage(),
+    events: PLATFORM_KINDS.tiktok,
+    onAlert: (alert) => fonts.then(() => push(alert)),
+    onFound: (found) => {
+      if (found && !found.features.includes("alerts")) {
+        old = true;
+        say("The Frills relay needs an update before it can send alerts.");
+      }
+    },
   });
 }

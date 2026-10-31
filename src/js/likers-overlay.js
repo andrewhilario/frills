@@ -39,5 +39,6 @@ if (demo) {
 } else if (!channel) {
   say("Add ?channel=yourname to this link.");
 } else {
-  fontsReady(generalFaces(settings), 1000).then(() => connectEvents({ channel, events: ["like"], onAlert: (event) => board.add(event), say }));
+  const fonts = fontsReady(generalFaces(settings), 1000); // the connection starts at once; only drawing waits for the font
+  connectEvents({ channel, events: ["like"], onAlert: (event) => fonts.then(() => board.add(event)), say });
 }

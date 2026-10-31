@@ -61,7 +61,11 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
   // signing service, which is asked once, when the LIVE is found), so looking often is cheap. It never gives up while a page is listening: an overlay in
   // OBS has no button to press, so one that was given up on stayed blank until someone reloaded it. A page that opens meanwhile makes it look at once
   // (Room.add).
-  const shared = relay ? { queue: true, idleStopMs: 600000, offlineWaitMs: 20000, offlineGiveUpMs: 0, offlineSlowSteps: [[180000, 60000], [1800000, 180000], [10800000, 600000]], maxRooms: relay.slots ?? 30 } : {};
+  // The steps: streamers who use TikTok LIVE Studio were reported (31 October 2026) as sometimes not connecting. The likeliest cause, not confirmed: a
+  // streamer adds the overlay to the scene, sets the scene up for a few minutes, then presses Go LIVE, and Studio does not reload the overlay when the
+  // LIVE starts. With a look every minute after only 3 minutes, a LIVE was found up to a minute late, and up to 3 minutes late after half an hour. So it
+  // looks every 20 seconds for 15 minutes, every 30 seconds until an hour, every minute until 4 hours, and every 3 minutes after that.
+  const shared = relay ? { queue: true, idleStopMs: 600000, offlineWaitMs: 20000, offlineGiveUpMs: 0, offlineSlowSteps: [[900000, 30000], [3600000, 60000], [14400000, 180000]], maxRooms: relay.slots ?? 30 } : {};
   const signing = new Signing();
   const startedAt = Date.now();
   const hub = new Hub({ factory: make, apiKey, log, onLimited: () => signing.note(), onSigned: () => signing.use(), ...shared, ...tuning });
