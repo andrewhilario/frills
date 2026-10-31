@@ -269,7 +269,7 @@ test("the list of who is connected shows names, LIVE or not, and how long, only 
     const local = JSON.parse((await ask("/health", { Accept: "application/json" })).body);
     assert.deepEqual(local.roster.accounts.map((a) => a.user).sort(), ["mochi_bun", "pond.cafe"]);
     const one = local.roster.accounts.find((a) => a.user === "mochi_bun");
-    assert.deepEqual(Object.keys(one).sort(), ["counts", "followers", "forS", "live", "pages", "state", "user"]);
+    assert.deepEqual(Object.keys(one).sort(), ["counts", "endedS", "followers", "forS", "lastS", "leavesInS", "live", "pages", "state", "user"]);
     assert.equal(one.pages, 1);
     assert.ok(one.forS >= 0);
     assert.deepEqual(local.roster.waiting, []);
@@ -293,7 +293,7 @@ test("the list of who is connected shows names, LIVE or not, and how long, only 
 });
 
 test("the status page draws the table: a link to each LIVE, a status for each, and who is in line", () => {
-  const roster = { accounts: [{ user: "mochi_bun", state: "connected", live: true, pages: 2, followers: 1234, forS: 400, counts: { chat: 5, gift: 1, follow: 2, share: 0 } }], waiting: ["late.comer"] };
+  const roster = { accounts: [{ user: "mochi_bun", state: "connected", live: true, pages: 2, followers: 1234, forS: 400, counts: { chat: 5, gift: 1, follow: 2, share: 0 }, endedS: null, lastS: 3, leavesInS: null }], waiting: ["late.comer"] };
   const page = statusPage(snapshot({ stats: { used: 1, max: 50, waiting: 1 }, startedAt: 0, now: 1000, version: "0.5.1", features: [], signing: new Signing(), estimate: { estimate: 20, measured: false }, roster }));
   assert.match(page, /id="who"/);
   assert.match(page, /tiktok\.com\/@"\+encodeURIComponent\(a\.user\)\+"\/live/, "each name links to their LIVE");

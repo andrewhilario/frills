@@ -21,6 +21,7 @@ class FakeConnection extends EventEmitter {
     super();
     this.script = script;
     this.gone = false;
+    if (script.roomInfo) this.roomInfo = script.roomInfo; // what TikTok says about the room once connected (status 2 is "LIVE")
   }
   async connect() {
     await sleep(5);
@@ -285,6 +286,31 @@ test("the LIVE ending is announced, and the next LIVE is picked up", async () =>
   await page.until(() => page.states().includes("offline"));
   await page.until(() => page.states().filter((s) => s === "connected").length === 2);
   await page.close();
+  await helper.close();
+});
+
+test("the owner's list: a LIVE that ended is no longer LIVE, and a room with no page says when it leaves", async () => {
+  const live = { roomInfo: { data: { status: 2, owner: { follow_info: { follower_count: 500 } } } } };
+  const offline = { failWith: Object.assign(new Error("offline"), { name: "UserOfflineError" }) };
+  const { factory, made } = scripted(live, ...Array(30).fill(offline));
+  await start(factory, { idleStopMs: 400 });
+  const page = listen("pond.pal");
+  await page.until(() => page.states().includes("connected"));
+  const row = () => helper.hub.roster().accounts[0];
+  assert.deepEqual([row().live, row().endedS, row().leavesInS, row().lastS], [true, null, null, null], "LIVE, a page open, nothing seen yet");
+  made[0].conn.emit("chat", chat("m1", "hello pond"));
+  assert.ok(row().lastS <= 1, "a chat line is the last thing seen");
+  made[0].conn.emit("streamEnd");
+  await page.until(() => page.states().includes("offline"));
+  assert.equal(row().live, false, "the flag does not stay on after the LIVE ended");
+  assert.ok(row().endedS >= 0 && row().endedS <= 1, "and the list says how long ago");
+  assert.equal(row().leavesInS, null, "a page is still open, so it is not about to leave");
+  await page.close();
+  await sleep(60);
+  assert.equal(row().pages, 0);
+  assert.ok(row().leavesInS >= 0 && row().leavesInS <= 1, "no page: it says it is about to leave");
+  await sleep(450);
+  assert.equal(helper.hub.roster().accounts.length, 0, "and it is gone from the list once the wait is over");
   await helper.close();
 });
 

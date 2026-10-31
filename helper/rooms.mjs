@@ -49,6 +49,9 @@ export class Room {
     this.followed = 0; // follows seen since then, so a page that joins later is told a current number
     this.likeTimer = 0;
     this.lastLookAt = 0; // when we last asked TikTok whether the account is LIVE (see add)
+    this.liveEndedAt = 0; // when the LIVE we were connected to ended (0: none has, since we started); the owner's list says "ended 20 min ago"
+    this.lastSeenAt = 0; // when a chat line, gift, follow or share last came through, so the list can tell a busy LIVE from a quiet one
+    this.emptySince = Date.now(); // when the last page left (a room with no page is only waiting out idleStopMs)
     this.lastEventAt = 0; // when anything last came from TikTok on the connection we have
     this.silentFor = 0; // how long a silence is put up with before the connection is replaced (grows after a silence that changed nothing)
   }
@@ -56,6 +59,7 @@ export class Room {
   add(client) {
     clearTimeout(this.idleTimer);
     this.clients.add(client);
+    this.emptySince = 0;
     client.send("status", this.status);
     if (this.base > 0 || this.live) client.send("info", this.info());
     if (!this.running) this.start();
@@ -81,12 +85,14 @@ export class Room {
     } catch { /* no details: pages keep the number the streamer typed */ }
     this.base = Number.isFinite(followers) && followers > 0 && followers < 1e10 ? followers : 0;
     this.live = status === 2;
+    if (this.live) this.liveEndedAt = 0;
     this.followed = 0;
     if (this.base > 0 || this.live) this.broadcast("info", this.info());
   }
 
   remove(client) {
     this.clients.delete(client);
+    if (!this.clients.size) this.emptySince = Date.now();
     if (!this.clients.size && !this.stopped) this.idleTimer = setTimeout(() => this.hub.drop(this), this.hub.opts.idleStopMs);
   }
 
@@ -140,12 +146,14 @@ export class Room {
       this.noteEmotes(d, m);
       if (!m || !this.fresh(m.id)) return;
       this.counts.chat += 1;
+      this.lastSeenAt = Date.now();
       this.broadcast("chat", m);
     });
     conn.on("emote", (d) => {
       const m = mapEmoteChat(d);
       if (!m || !this.fresh(m.id)) return;
       this.counts.chat += 1;
+      this.lastSeenAt = Date.now();
       this.broadcast("chat", m);
     });
     conn.on("gift", (d) => {
@@ -191,7 +199,10 @@ export class Room {
   /** An alert event for the pages that asked for it. Its id is kept apart from chat ids, so a gift is both a chat line and an alert. */
   alert(m) {
     if (!m || !this.fresh(m.id && `alert:${m.kind}:${m.id}`)) return;
-    if (m.kind in this.counts) this.counts[m.kind] += 1;
+    if (m.kind in this.counts) {
+      this.counts[m.kind] += 1;
+      this.lastSeenAt = Date.now();
+    }
     if (m.kind === "follow") this.followed += 1;
     this.broadcast("alert", m);
   }
@@ -241,6 +252,12 @@ export class Room {
     const how = await ended;
     clearInterval(watch);
     this.letGo(conn);
+    // The connection is over, so the LIVE we knew about is no longer known to be on. (This flag was only ever set, never cleared: an account whose
+    // LIVE had ended kept saying "LIVE" in the owner's list, and in the details a page that joined later was given.) A reconnect that finds it still on sets it again.
+    if (this.live) {
+      this.live = false;
+      this.liveEndedAt = Date.now();
+    }
     return how;
   }
 
@@ -461,6 +478,7 @@ export class Hub {
    * only: nothing here is written down, and the server never sends it to a page that comes from the internet.
    */
   roster(now = Date.now()) {
+    const secondsSince = (at) => (at ? Math.max(0, Math.round((now - at) / 1000)) : null);
     const accounts = [...this.rooms.values()].map((room) => ({
       user: room.user,
       state: room.status.state,
@@ -469,8 +487,13 @@ export class Hub {
       followers: room.info().followers,
       forS: Math.max(0, Math.round((now - room.since) / 1000)),
       counts: { ...room.counts },
+      endedS: secondsSince(room.liveEndedAt), // how long ago the LIVE ended (null: not since we started watching)
+      lastS: secondsSince(room.lastSeenAt), // how long ago a chat line, gift, follow or share last came through (null: none yet)
+      leavesInS: room.clients.size ? null : Math.max(0, Math.round((room.emptySince + this.opts.idleStopMs - now) / 1000)), // no page open: when it is let go
     }));
-    accounts.sort((a, b) => Number(b.live) - Number(a.live) || b.forS - a.forS);
+    // In use first (LIVE with a page open), then a page waiting for a LIVE, then rooms with no page that are only waiting to be let go.
+    const rank = (a) => (a.pages === 0 ? 2 : a.live ? 0 : 1);
+    accounts.sort((a, b) => rank(a) - rank(b) || b.forS - a.forS);
     return { accounts, waiting: [...this.waiting.values()].map((entry) => entry.user) };
   }
 
