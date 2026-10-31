@@ -1,7 +1,8 @@
 // The editor for the smaller overlays (Last Gifts, Follower Goal): pick a look, set the options, try it, connect a TikTok account, copy
 // one link. Each overlay passes what is its own; the rest is the same for both, and the same way the alerts editor works.
 
-import { LOOKS, LOOK_NAMES, currentLook } from "./widget-settings.js";
+import { currentLook, looksFor } from "./widget-settings.js";
+import { activeSeason } from "./season.js";
 import { buildControl, chips, copyButton } from "./ui.js";
 import { mountSource } from "./source.js";
 import { fontsReady, generalFaces } from "./look.js";
@@ -42,12 +43,15 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
     for (const control of widget.controls) writers[control.key]?.(settings[control.key]);
     lookChips.set(currentLook({ ...settings }));
   }
+  // The season's looks come first while it lasts (Halloween, Christmas), then the usual ones.
+  const looks = looksFor(activeSeason());
   lookChips = chips(
     $("looks"),
-    Object.keys(LOOKS).map((id) => ({ id, name: LOOK_NAMES[id], dot: swatch(LOOKS[id]) })),
+    looks.map((l) => ({ id: l.id, name: l.name, season: l.season, dot: swatch(l.look) })),
     currentLook({ ...settings }),
     (item) => {
-      for (const key of Object.keys(LOOKS[item.id])) if (key in settings) settings[key] = LOOKS[item.id][key];
+      const picked = looks.find((l) => l.id === item.id).look;
+      for (const key of Object.keys(picked)) if (key in settings) settings[key] = picked[key];
       syncControls();
       fontsReady(generalFaces(settings), 600).then(paint);
       refreshLink();

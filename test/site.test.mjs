@@ -135,7 +135,9 @@ test("the overlay stays light, and the site's own numbers are true", () => {
   const overlay = pages.find((p) => p.url === "/overlay/");
   const bytes = gz(overlay.html) + gz(readFileSync(join(dist, assetOf(overlay.html, "css")))) + gz(readFileSync(join(dist, assetOf(overlay.html, "js"))));
   // The budget was 20 KB. Reading TikTok and Twitch together, and saying why the relay turned a page away, cost about 0.7 KB between them (October 2026).
-  assert.ok(bytes <= 21 * 1024, `the overlay is ${(bytes / 1024).toFixed(1)} KB gzipped; the budget is 21 KB`);
+  // The budget is now 21.5 KB (the home page still says 21, which is what it rounds to): the two seasonal decoration packs, Halloween and Christmas, cost 0.2 KB (October 2026).
+  // The seasonal looks themselves are kept out of the overlay (seasonal-looks.js is only loaded by the editors) to spend nothing more.
+  assert.ok(bytes <= 21.5 * 1024, `the overlay is ${(bytes / 1024).toFixed(1)} KB gzipped; the budget is 21.5 KB`);
   const home = pages.find((p) => p.url === "/").html;
   assert.match(home, new RegExp(`data-count="${Math.round(bytes / 1024)}"`), "the KB on the home page matches what was measured");
   assert.match(home, new RegExp(`data-count="${CONTROLS.length}"`), "the settings count matches");

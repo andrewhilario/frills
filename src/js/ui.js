@@ -3,6 +3,7 @@
 
 import { el } from "./feed.js";
 import { initAnnouncement } from "./nav.js";
+import { activeSeason } from "./season.js";
 
 initAnnouncement();
 
@@ -14,6 +15,10 @@ export function chips(host, items, initial, onPick, { dot = false } = {}) {
   const set = (id) => buttons.forEach((b, key) => b.setAttribute("aria-pressed", String(key === id)));
   for (const item of items) {
     const b = el("button", { type: "button", className: "chip" });
+    if (item.season) { // a look or pack of the season: marked, so it reads as the festive one
+      b.classList.add("chip--season");
+      b.dataset.season = item.season;
+    }
     if (dot) {
       const d = el("span", { className: "chip__dot" });
       d.setAttribute("aria-hidden", "true");
@@ -149,7 +154,9 @@ export function buildControl(control, value, onSet, { id = "c-" + control.key } 
     const box = el("div", { className: "chips" });
     box.setAttribute("role", "group");
     box.setAttribute("aria-label", control.label);
-    const group = chips(box, control.options, value, (o) => onSet(o.id));
+    const season = activeSeason();
+    const options = control.options.filter((o) => !o.season || o.season === season || o.id === value); // a seasonal pack only in its season (or when already chosen)
+    const group = chips(box, options, value, (o) => onSet(o.id));
     row.append(el("span", { className: "ctl__label", textContent: control.label }), box);
     write = (v) => group.set(v);
   }

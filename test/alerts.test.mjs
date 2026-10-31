@@ -381,7 +381,7 @@ test("the pictures on a card are their own secret setting: none to begin with, a
   const control = CONTROLS.find((c) => c.key === "deco");
   assert.equal(control.secret, true, "the public editor leaves out what is marked secret");
   assert.deepEqual(CONTROLS.filter((c) => c.secret).map((c) => c.key), ["deco"], "and nothing else is");
-  assert.deepEqual(control.options.map((o) => o.id), ["none", "frog", "frog2", "neko", "hamster", "bunny"]);
+  assert.deepEqual(control.options.map((o) => o.id), ["none", "frog", "frog2", "neko", "hamster", "bunny", "halloween", "christmas"]);
   assert.equal(sanitize({ deco: "frog2" }).deco, "frog2");
   assert.equal(sanitize({ deco: "dragons" }).deco, "none");
   assert.equal(sanitize({ deco: "<img>" }).deco, "none");

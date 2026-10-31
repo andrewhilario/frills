@@ -52,6 +52,7 @@ export const PRESET_NAMES = {
 
 export const LOOK_KEYS = Object.keys(PRESETS.blueberry);
 
+
 export const MOD_ICONS = ["shield", "star", "leaf", "frog", "none"];
 
 // Decorations (a friend peeking over the bubble, a small scene on a corner, sparkles) and the name tag: off to begin with, so a look is exactly what it was until someone turns them on.
@@ -124,9 +125,12 @@ export function sanitize(raw) {
 }
 
 /** A link's query -> raw settings. `look=blueberry` (or any starting look) sets the base; individual settings win over it. */
-export function fromParams(params) {
+/** `more` is a set of extra named looks (the editors pass the seasonal ones: the overlay does not carry them, to stay light). */
+export function fromParams(params, more = null) {
   const raw = {};
-  const look = PRESETS[params.get("look")];
+  const asked = params.get("look");
+  const named = more ? { ...PRESETS, ...more } : PRESETS;
+  const look = Object.prototype.hasOwnProperty.call(named, asked) ? named[asked] : null;
   if (look) Object.assign(raw, look);
   for (const control of CONTROLS) {
     if (!params.has(control.key)) continue;
@@ -160,8 +164,9 @@ export function overlayUrl(base, { channel = "", settings = DEFAULTS, platform =
 }
 
 /** The name of the starting look these settings still match exactly, or null once they've been changed. */
-export function currentPreset(settings) {
-  return Object.keys(PRESETS).find((id) => LOOK_KEYS.every((k) => settings[k] === PRESETS[id][k])) ?? null;
+export function currentPreset(settings, more = null) {
+  const named = more ? { ...PRESETS, ...more } : PRESETS;
+  return Object.keys(named).find((id) => LOOK_KEYS.every((k) => settings[k] === named[id][k])) ?? null;
 }
 
 /** The decoration's size, as the stylesheet's CSS variable. */

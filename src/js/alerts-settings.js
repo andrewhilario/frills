@@ -3,6 +3,7 @@
 
 import { HEX } from "./color.js";
 import { FONTS } from "./settings.js";
+import { SEASONAL_NAMES } from "./seasonal-looks.js";
 import { DECOS } from "./decor.js";
 
 /** An uploaded file is named by 16 random characters (made by the Worker); "" means none. */
@@ -48,6 +49,34 @@ export const LOOKS = {
 };
 export const LOOK_NAMES = { sticker: "Sticker", matcha: "Matcha", night: "Night", bubblegum: "Bubblegum", arcade: "Arcade" };
 export const LOOK_KEYS = Object.keys(LOOKS.sticker);
+
+/**
+ * Seasonal looks for the alert cards (the same moods as the chat's seasonal looks, in the colors and sizes an alert card uses). The editors offer a season's looks
+ * first while it lasts (see season.js); every one is understood all year, so a link that names one, or an overlay saved with one, keeps working.
+ */
+export const SEASONAL_LOOKS = {
+  halloween: {
+    pumpkin: { font: "Baloo 2", size: 40, text: "#fff3e0", accent: "#ff8a1f", pop: "#b6ff5a", bg: "#1c0f06", border: 4, radius: 24, shadow: "hard" },
+    ghost: { font: "Fredoka", size: 40, text: "#2a2350", accent: "#b9a8ff", pop: "#7a4dff", bg: "#f4f0ff", border: 3, radius: 32, shadow: "glow" },
+    witch: { font: "Bricolage Grotesque", size: 38, text: "#f3e8ff", accent: "#7dff4a", pop: "#ff7a1a", bg: "#1b0b33", border: 3, radius: 16, shadow: "glow" },
+    bloodmoon: { font: "Space Grotesk", size: 36, text: "#f4f1f6", accent: "#ff3b4a", pop: "#ffd166", bg: "#08070d", border: 3, radius: 6, shadow: "hard" },
+  },
+  christmas: {
+    candycane: { font: "Baloo 2", size: 40, text: "#ffffff", accent: "#ffffff", pop: "#ffe27a", bg: "#c0152f", border: 4, radius: 26, shadow: "hard" },
+    pine: { font: "Plus Jakarta Sans", size: 36, text: "#fff8e7", accent: "#ffd24a", pop: "#ff6a78", bg: "#0f3d2a", border: 3, radius: 20, shadow: "soft" },
+    snowfall: { font: "Fredoka", size: 40, text: "#ffffff", accent: "#8fd8ff", pop: "#ffd24a", bg: "#0b2540", border: 3, radius: 32, shadow: "glow" },
+    cozy: { font: "Baloo 2", size: 40, text: "#3a1d12", accent: "#c1272d", pop: "#1f7a4d", bg: "#fff4e0", border: 4, radius: 20, shadow: "hard" },
+  },
+};
+/** Every seasonal look by its id, whatever the season. */
+export const SEASON_LOOKS = Object.assign({}, ...Object.values(SEASONAL_LOOKS));
+const ANY_LOOKS = { ...LOOKS, ...SEASON_LOOKS };
+
+/** The starting looks an alert editor offers in a season (null: between seasons): that season's first, then the usual ones. Each is { id, name, look, season? }. */
+export const looksFor = (season) => [
+  ...Object.entries(Object.prototype.hasOwnProperty.call(SEASONAL_LOOKS, season) ? SEASONAL_LOOKS[season] : {}).map(([id, look]) => ({ id, name: SEASONAL_NAMES[id], look, season })),
+  ...Object.keys(LOOKS).map((id) => ({ id, name: LOOK_NAMES[id], look: LOOKS[id] })),
+];
 
 const list = (...pairs) => pairs.map(([id, name]) => ({ id, name }));
 
@@ -238,7 +267,8 @@ export function sanitize(raw) {
 /** A link's query -> raw settings. `look=night` (or any starting look) sets the base; individual settings win over it. */
 export function fromParams(params) {
   const raw = {};
-  if (LOOKS[params.get("look")]) Object.assign(raw, LOOKS[params.get("look")]);
+  const asked = params.get("look");
+  if (Object.prototype.hasOwnProperty.call(ANY_LOOKS, asked)) Object.assign(raw, ANY_LOOKS[asked]);
   for (const control of CONTROLS) {
     if (!params.has(control.key)) continue;
     const value = params.get(control.key);
@@ -270,7 +300,7 @@ export function alertsUrl(base, { channel = "", settings = DEFAULTS, platform = 
 }
 
 /** The name of the starting look these settings still match exactly, or null once they've been changed. */
-export const currentLook = (settings) => Object.keys(LOOKS).find((id) => LOOK_KEYS.every((k) => settings[k] === LOOKS[id][k])) ?? null;
+export const currentLook = (settings) => Object.keys(ANY_LOOKS).find((id) => LOOK_KEYS.every((k) => settings[k] === ANY_LOOKS[id][k])) ?? null;
 
 /** The overlay's look as CSS variables (plain colors, so even an old browser draws them). */
 export function alertVars(s) {

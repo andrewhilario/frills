@@ -1,7 +1,9 @@
 // The editor: pick a look, change anything, connect a channel, copy one link.
 
 import { Feed } from "./feed.js";
-import { CONTROLS, DEFAULTS, PRESETS, PRESET_NAMES, currentPreset, fromParams, overlayUrl, sanitize } from "./settings.js";
+import { CONTROLS, DEFAULTS, currentPreset as presetOf, fromParams as paramsToSettings, overlayUrl, sanitize } from "./settings.js";
+import { SEASON_PRESETS, looksFor } from "./seasonal-looks.js";
+import { activeSeason } from "./season.js";
 import { fontsReady, generalFaces, paintGeneral } from "./look.js";
 import { buildControl, chips, copyButton } from "./ui.js";
 import { mountSource } from "./source.js";
@@ -9,6 +11,9 @@ import { sourcesOf } from "./both.js";
 import { luminance } from "./color.js";
 
 const params = new URLSearchParams(location.search);
+// the usual looks and the seasonal ones: an address may name either, and either may be the look the settings still match
+const fromParams = (p) => paramsToSettings(p, SEASON_PRESETS);
+const currentPreset = (s) => presetOf(s, SEASON_PRESETS);
 const $ = (id) => document.getElementById(id);
 
 // What is remembered in this browser: the settings and the channel. Nothing leaves the page.
@@ -47,12 +52,14 @@ function syncControls() {
   presetChips.set(currentPreset(settings));
 }
 
+// The season's looks come first while it lasts (Halloween, Christmas), then the usual ones. A season's look also turns on its decoration pack.
+const looks = looksFor(activeSeason());
 presetChips = chips(
   $("presets"),
-  Object.keys(PRESETS).map((id) => ({ id, name: PRESET_NAMES[id], dot: swatch(PRESETS[id]) })),
+  looks.map((l) => ({ id: l.id, name: l.name, season: l.season, dot: swatch(l.preset) })),
   currentPreset(settings),
   (item) => {
-    Object.assign(settings, PRESETS[item.id]);
+    Object.assign(settings, looks.find((l) => l.id === item.id).preset);
     syncControls();
     fontsReady(generalFaces(settings), 600).then(paint);
     refreshLink();

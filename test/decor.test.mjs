@@ -11,19 +11,20 @@ import { MATCHA_CONTROLS, MATCHA_DEFAULTS, matchaFromParams, matchaOverlayUrl, s
 
 const control = (key) => CONTROLS.find((c) => c.key === key);
 
-test("the packs: none, Frog pond, Frog pond V2, Neko cafe, Hamster burrow and Bunny cloud (pictures that really exist in the site)", () => {
-  assert.deepEqual(DECO_IDS, ["none", "frog", "frog2", "neko", "hamster", "bunny"]);
-  assert.deepEqual(Object.keys(PACKS), ["frog", "frog2", "neko", "hamster", "bunny"]);
+test("the packs: none, Frog pond, Frog pond V2, Neko cafe, Hamster burrow, Bunny cloud and the two seasonal ones (pictures that really exist in the site)", () => {
+  assert.deepEqual(DECO_IDS, ["none", "frog", "frog2", "neko", "hamster", "bunny", "halloween", "christmas"]);
+  assert.deepEqual(Object.keys(PACKS), ["frog", "frog2", "neko", "hamster", "bunny", "halloween", "christmas"]);
+  assert.deepEqual(DECOS.filter((d) => d.season).map((d) => [d.id, d.season]), [["halloween", "halloween"], ["christmas", "christmas"]], "the seasonal packs say which season they belong to");
   assert.equal(DECOS[0].id, "none");
   const files = join(import.meta.dirname, "..", "public");
-  for (const name of ["frog", "frog2", "neko", "hamster", "bunny"]) {
+  for (const name of ["frog", "frog2", "neko", "hamster", "bunny", "halloween", "christmas"]) {
     for (const piece of [...PACKS[name].peek, ...PACKS[name].corner, ...PACKS[name].spark]) {
       assert.match(piece.src, new RegExp(`^/decor/${name}/[a-z0-9-]+\\.webp$`), "a picture from this site only");
       assert.ok(existsSync(join(files, piece.src)), `${piece.src} is in public/`);
     }
     assert.ok(PACKS[name].corner.length > 0 && PACKS[name].spark.length > 0);
   }
-  for (const name of ["frog2", "neko", "hamster", "bunny"]) {
+  for (const name of ["frog2", "neko", "hamster", "bunny", "halloween", "christmas"]) {
     assert.equal(PACKS[name].peek.length, 2, `${name}: two friends peek over the top`);
     assert.ok(PACKS[name].peek.every((p) => p.ratio > 0.3 && p.ratio < 1), `${name}: the friends on top say how tall they are, so room is left for them`);
     assert.equal(PACKS[name].spark.length, 8, `${name}: eight little pieces`);

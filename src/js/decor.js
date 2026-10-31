@@ -10,6 +10,9 @@ export const DECOS = [
   { id: "neko", name: "Neko cafe" },
   { id: "hamster", name: "Hamster burrow" },
   { id: "bunny", name: "Bunny cloud" },
+  // Seasonal packs: always understood (a saved overlay keeps its pictures), but the editors offer one only while its season lasts (see season.js).
+  { id: "halloween", name: "Halloween", season: "halloween" },
+  { id: "christmas", name: "Christmas", season: "christmas" },
 ];
 export const DECO_IDS = DECOS.map((d) => d.id);
 
@@ -45,6 +48,20 @@ export const PACKS = {
     peek: [{ src: "/decor/bunny/peeker-a.webp", ratio: 0.463 }, { src: "/decor/bunny/peeker-b.webp", ratio: 0.625 }],
     corner: [{ src: "/decor/bunny/corner.webp" }],
     spark: [1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({ src: `/decor/bunny/confetti-${n}.webp` })),
+  },
+  // The seasonal packs: shown in the editors only while their season lasts (see season.js), understood all year. Cut from the owner's ChatGPT sheets
+  // (ASSET-PROMPTS-SEASONAL.md, scripts/cut-seasonal-sheets.mjs).
+  halloween: {
+    // a ghost and a bat peeking over the top, a pumpkin with a little ghost and a candy corn, and eight small Halloween things (bat, candy corn, spider, moon, candy, pumpkin, ghost, star)
+    peek: [{ src: "/decor/halloween/peeker-a.webp", ratio: 0.581 }, { src: "/decor/halloween/peeker-b.webp", ratio: 0.406 }],
+    corner: [{ src: "/decor/halloween/corner.webp" }],
+    spark: [1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({ src: `/decor/halloween/confetti-${n}.webp` })),
+  },
+  christmas: {
+    // a snowman and a reindeer peeking over the top, a tree with presents and a snowman, and eight small Christmas things (snowflake, candy cane, ornament, star, holly, gingerbread man, bell, stocking)
+    peek: [{ src: "/decor/christmas/peeker-a.webp", ratio: 0.7 }, { src: "/decor/christmas/peeker-b.webp", ratio: 0.588 }],
+    corner: [{ src: "/decor/christmas/corner.webp" }],
+    spark: [1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({ src: `/decor/christmas/confetti-${n}.webp` })),
   },
 };
 

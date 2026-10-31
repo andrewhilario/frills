@@ -2,7 +2,8 @@
 
 import { AlertQueue, makeAlert } from "./alerts.js";
 import { createAlertView } from "./alerts-view.js";
-import { CONTROLS, DEFAULTS, KINDS, LOOKS, LOOK_NAMES, PLATFORM_KINDS, SECRET_CARDS, TWITCH_CHAT_KINDS, alertsUrl, currentLook, fromParams, mediaUrl, sanitize } from "./alerts-settings.js";
+import { CONTROLS, DEFAULTS, KINDS, LOOKS, PLATFORM_KINDS, SECRET_CARDS, TWITCH_CHAT_KINDS, alertsUrl, currentLook, fromParams, looksFor, mediaUrl, sanitize } from "./alerts-settings.js";
+import { activeSeason } from "./season.js";
 import { mountMediaPicker } from "./alerts-media.js";
 import { createSounds } from "./sounds.js";
 import { fakeAlert, fakeCrowd } from "./fake-alerts.js";
@@ -96,12 +97,14 @@ function syncControls() {
   lookChips.set(currentLook(settings));
 }
 
+// The season's looks come first while it lasts (Halloween, Christmas), then the usual ones.
+const looks = looksFor(activeSeason());
 lookChips = chips(
   $("looks"),
-  Object.keys(LOOKS).map((id) => ({ id, name: LOOK_NAMES[id], dot: swatch(LOOKS[id]) })),
+  looks.map((l) => ({ id: l.id, name: l.name, season: l.season, dot: swatch(l.look) })),
   currentLook(settings),
   (item) => {
-    Object.assign(settings, LOOKS[item.id]);
+    Object.assign(settings, looks.find((l) => l.id === item.id).look);
     syncControls();
     fontsReady(generalFaces(settings), 600).then(paint);
     refreshLink();

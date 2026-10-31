@@ -71,7 +71,7 @@ test("the alerts pages load under the security policy with no console errors", {
 
 test("editor: each test button shows its alert, a big gift is bigger, and a crowd joins into one", { skip }, async () => {
   const { base } = await withHelper();
-  await page.goto(base + "/alerts/", { settle: 700 });
+  await page.goto(base + "/alerts/?season=none", { settle: 700 }); // (no season: the starting looks are the usual seven whatever day it is)
   await click('[data-test="follow"]');
   await until(async () => (await liveCards()).some((c) => c.kind === "follow"));
   assert.match((await liveCards())[0].text, /just followed!$/);
@@ -90,7 +90,7 @@ test("editor: each test button shows its alert, a big gift is bigger, and a crow
 
 test("editor: changing the words, the look and the position changes the alert and the link", { skip }, async () => {
   const { base } = await withHelper();
-  await page.goto(base + "/alerts/", { settle: 700 });
+  await page.goto(base + "/alerts/?season=none", { settle: 700 }); // (no season: the starting looks are the usual seven whatever day it is)
   await type("#c-followText", "Welcome {name}, you are brilliant!");
   await click('[data-test="follow"]');
   await until(async () => (await liveCards()).some((c) => c.kind === "follow"));
@@ -167,7 +167,7 @@ test("overlay: with one place on screen, the rest wait their turn and the people
 
 test("editor: the counters show what arrived from a connected account, and an older relay is called out", { skip }, async () => {
   const { base, made } = await withHelper();
-  await page.goto(base + "/alerts/", { settle: 700 });
+  await page.goto(base + "/alerts/?season=none", { settle: 700 }); // (no season: the starting looks are the usual seven whatever day it is)
   await type("#source-channel", "pond_cafe");
   await page.evaluate(`[...document.querySelectorAll("#source button")].find((b) => b.textContent.trim() === "Connect").click()`);
   await until(() => made.length === 1);
@@ -393,7 +393,7 @@ test("overlay: on a narrow overlay the words of every card style wrap at the spa
 
 test("editor: Card style is the first Look option, changing it redraws the alert, and the link carries it only when it is not the plain card", { skip }, async () => {
   const { base } = await withHelper();
-  await page.goto(base + "/alerts/", { settle: 700 });
+  await page.goto(base + "/alerts/?season=none", { settle: 700 }); // (no season: the starting looks are the usual seven whatever day it is)
   const label = await page.evaluate(`document.querySelector("#look-controls > *:first-child .ctl__label").textContent.trim()`);
   assert.equal(label, "Card style");
   const names = await page.evaluate(`[...document.querySelectorAll("#look-controls > *:first-child .chip")].map((b) => b.textContent.trim())`);

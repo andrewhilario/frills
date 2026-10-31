@@ -3,9 +3,9 @@
 // link), and writes the link. Pure code, so it is tested without a page.
 
 import { HEX } from "./color.js";
-import { CONTROLS as ALERT_CONTROLS, DEFAULTS as ALERT_DEFAULTS, LOOKS, LOOK_KEYS, MEDIA_ID } from "./alerts-settings.js";
+import { CONTROLS as ALERT_CONTROLS, DEFAULTS as ALERT_DEFAULTS, LOOKS, LOOK_KEYS, MEDIA_ID, SEASON_LOOKS } from "./alerts-settings.js";
 
-export { LOOKS, LOOK_NAMES, alertVars as lookVars, currentLook } from "./alerts-settings.js";
+export { LOOKS, LOOK_NAMES, alertVars as lookVars, currentLook, looksFor } from "./alerts-settings.js";
 
 const LOOK_PICKS = ["accent", "bg", "text", "pop", "font", "size", "letterSpacing", "align", "radius", "border", "shadow"];
 /** The look options every overlay shares (colours, font, size, corners, edge, shadow), taken from the alerts so they can never differ. */
@@ -57,7 +57,9 @@ export function defineWidget({ controls, defaults }) {
   };
   const fromParams = (params) => {
     const raw = {};
-    if (LOOKS[params.get("look")]) Object.assign(raw, Object.fromEntries(LOOK_KEYS.filter((k) => LOOK_PICKS.includes(k)).map((k) => [k, LOOKS[params.get("look")][k]])));
+    const named = { ...LOOKS, ...SEASON_LOOKS }; // a seasonal look is understood all year
+    const asked = params.get("look");
+    if (Object.prototype.hasOwnProperty.call(named, asked)) Object.assign(raw, Object.fromEntries(LOOK_KEYS.filter((k) => LOOK_PICKS.includes(k)).map((k) => [k, named[asked][k]])));
     for (const control of all) {
       if (!params.has(control.key)) continue;
       const value = params.get(control.key);
