@@ -25,7 +25,7 @@ import { ALERT_AT, Signing, capacity, deviceFacts, snapshot, statusPage } from "
 import { SlotAlerts, termuxNotifier } from "./alerts.mjs";
 import { OWNER, ownerGate } from "./owner.mjs";
 
-const VERSION = "0.5.6";
+const VERSION = "0.5.7";
 /** What this program can do, so a page can tell an old one ("chat" only) from one that sends alerts. */
 const FEATURES = ["chat", "alerts", "info", "roles", "status"];
 
@@ -61,7 +61,7 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
   // signing service, which is asked once, when the LIVE is found), so looking often is cheap. It never gives up while a page is listening: an overlay in
   // OBS has no button to press, so one that was given up on stayed blank until someone reloaded it. A page that opens meanwhile makes it look at once
   // (Room.add).
-  // The steps: streamers who use TikTok LIVE Studio were reported (31 October 2026) as sometimes not connecting. The likeliest cause, not confirmed: a
+  // The steps: streamers who use TikTok LIVE Studio were reported as sometimes not connecting. The likeliest cause, not confirmed: a
   // streamer adds the overlay to the scene, sets the scene up for a few minutes, then presses Go LIVE, and Studio does not reload the overlay when the
   // LIVE starts. With a look every minute after only 3 minutes, a LIVE was found up to a minute late, and up to 3 minutes late after half an hour. So it
   // looks every 20 seconds for 15 minutes, every 30 seconds until an hour, every minute until 4 hours, and every 3 minutes after that.

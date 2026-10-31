@@ -239,7 +239,7 @@ cd ~/frills && git pull && (cd helper && npm install)
 tmux new-session -d -s relay "cd ~/frills && set -a && . ~/.frills-relay.env && set +a && RELAY_SLOTS=70 RELAY_ALERT_SPOTS=10 npm run relay"
 ```
 
-Then check it: `tmux attach -t relay` prints a start-up message (leave it again with Ctrl+B, then D). It says `Frills relay 0.5.6 is running` and **`Owner password (...): on`**. If it says `not set` the file was not read, and if it says `NOT USED: it has N characters and needs at least 12` the password is too short. `curl http://127.0.0.1:8765/health` should say `"version":"0.5.6"`.
+Then check it: `tmux attach -t relay` prints a start-up message (leave it again with Ctrl+B, then D). It says `Frills relay 0.5.7 is running` and **`Owner password (...): on`**. If it says `not set` the file was not read, and if it says `NOT USED: it has N characters and needs at least 12` the password is too short. `curl http://127.0.0.1:8765/health` should say `"version":"0.5.7"`.
 
 Without the owner password the same steps work with `tmux new-session -d -s relay "cd ~/frills && RELAY_SLOTS=70 npm run relay"`.
 
