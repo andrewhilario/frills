@@ -112,12 +112,19 @@ export async function launch() {
         await send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile: false });
         await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-motion", value: reducedMotion ? "reduce" : "no-preference" }] });
       },
-      /** Opens a page, waits for it and its fonts, then a little longer. */
-      async goto(url, { settle = 400 } = {}) {
+      /**
+       * Opens a page, waits for it and its fonts, then a little longer. A page that has not finished loading after `timeout` ms ends the test with an error that
+       * names it (a load that never finishes used to wait for ever, and a whole test run with it).
+       */
+      async goto(url, { settle = 400, timeout = 60000 } = {}) {
         problems.length = 0;
         const loaded = once("Page.loadEventFired");
-        await send("Page.navigate", { url });
-        await loaded;
+        let timer;
+        const gaveUp = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`The page did not finish loading in ${timeout / 1000} s: ${url}`)), timeout); });
+        // (the navigate command itself does not come back while the address does not answer, so it is inside the time limit too)
+        const arrived = send("Page.navigate", { url }).then(() => loaded);
+        arrived.catch(() => {}); // if the limit wins, what this does later is not an error
+        try { await Promise.race([arrived, gaveUp]); } finally { clearTimeout(timer); }
         await api.evaluate("document.fonts.ready.then(() => true)");
         await sleep(settle);
       },
