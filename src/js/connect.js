@@ -15,7 +15,7 @@ export const cleanName = (platform, input) => (platform === "tiktok" ? cleanTikT
  * can come from (the helper on this PC, else the site's relay, `relay` being its address); with neither it says so. With `assumeRelay` the relay is
  * used without asking first.
  */
-export function connectTo(feeds, platform, name, onStatus, { relay = "", assumeRelay = false, events = [], onAlert, onInfo, onFound, onFirstMessage } = {}) {
+export function connectTo(feeds, platform, name, onStatus, { relay = "", assumeRelay = false, keepTrying = false, retryMs = LOOK_AGAIN_MS, events = [], onAlert, onInfo, onFound, onFirstMessage } = {}) {
   const list = Array.isArray(feeds) ? feeds : [feeds];
   let sawChat = false;
   const handlers = {
@@ -34,26 +34,51 @@ export function connectTo(feeds, platform, name, onStatus, { relay = "", assumeR
   if (!login) return connectTikTok({ user: name, ...handlers }); // says the name is wrong, at once
   let inner = null;
   let stopped = false;
+  let waiting = false; // nothing answered the last look, and the next one is coming (only with keepTrying)
+  let looks = 0;
+  let timer = 0;
+  let toldNone = false;
   onStatus?.({ state: "connecting", channel: login, platform: "tiktok" });
   // `assumeRelay` (the chat overlay, which needs nothing but chat) skips the question "what answers here?" when the site's relay is known: it saves a round
   // trip through the tunnel before the stream is even asked for. If the relay is down the stream says so, as it does for any lost connection.
-  const looked = assumeRelay && relay ? Promise.resolve({ kind: "relay", base: relay.replace(/\/+$/, ""), features: ["chat"] }) : findTikTokSource(relay);
-  looked.then((found) => {
-    if (stopped) return;
-    onFound?.(found);
-    if (!found) {
-      onStatus?.({ state: "error", channel: login, platform: "tiktok", fatal: true, detail: relay ? "Couldn't reach TikTok chat. The free Frills relay isn't answering right now. Wait a minute and try again." : "TikTok chat needs the Frills helper running on this PC. It isn't answering here." });
-      return;
-    }
-    inner = connectTikTok({ user: name, base: found.base, events, onAlert, onInfo, retryRefused: true, diagnose: explainRefusal, ...handlers }); // (found a moment ago, so a refusal is only busy or full)
-  });
+  const lookFor = () => (assumeRelay && relay ? Promise.resolve({ kind: "relay", base: relay.replace(/\/+$/, ""), features: ["chat"] }) : findTikTokSource(relay));
+  // An overlay in OBS has no Connect button, so a page that opened while the relay was restarting (or the internet was not up yet) must not give up: with
+  // `keepTrying` it says it cannot reach it and looks again by itself, a little later each time (and at once when the network comes back), for as long as it is open.
+  const lookAgainNow = () => { if (waiting && !stopped) { clearTimeout(timer); look(); } };
+  const look = () => {
+    waiting = false;
+    lookFor().then((found) => {
+      if (stopped) return;
+      if (!found && keepTrying) {
+        if (!toldNone) { toldNone = true; onFound?.(found); }
+        onStatus?.({ state: "helper-lost", channel: login, platform: "tiktok", detail: relay ? "Can't reach the free Frills relay right now. This tries again by itself…" : "TikTok chat needs the Frills helper running on this PC. It isn't answering here. Looking again by itself…" });
+        waiting = true;
+        timer = setTimeout(look, retryMs[Math.min(looks, retryMs.length - 1)] * (0.8 + Math.random() * 0.4));
+        looks += 1;
+        return;
+      }
+      onFound?.(found);
+      if (!found) {
+        onStatus?.({ state: "error", channel: login, platform: "tiktok", fatal: true, detail: relay ? "Couldn't reach TikTok chat. The free Frills relay isn't answering right now. Wait a minute and try again." : "TikTok chat needs the Frills helper running on this PC. It isn't answering here." });
+        return;
+      }
+      inner = connectTikTok({ user: name, base: found.base, events, onAlert, onInfo, retryRefused: true, diagnose: explainRefusal, ...handlers }); // (found a moment ago, so a refusal is only busy or full)
+    });
+  };
+  if (keepTrying) globalThis.addEventListener?.("online", lookAgainNow);
+  look();
   return {
     stop() {
       stopped = true;
+      clearTimeout(timer);
+      globalThis.removeEventListener?.("online", lookAgainNow);
       inner?.stop();
     },
   };
 }
+
+/** How long a page that cannot find the relay waits before looking again (milliseconds): quick at first, then every half minute. */
+const LOOK_AGAIN_MS = [2000, 4000, 8000, 15000, 30000];
 
 const who = (s) => (s.platform === "tiktok" ? `@${s.channel}` : `#${s.channel}`);
 

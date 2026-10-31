@@ -328,6 +328,46 @@ test("overlay: when the relay is restarted behind its tunnel, the page comes bac
   }
 });
 
+test("alerts overlay: opened while the relay is down (OBS starting, a restart), it keeps looking by itself and connects once the relay is back, with nobody reloading it", { skip }, async () => {
+  // The page comes from the site (always up); only the relay behind the tunnel is down. Before, an overlay that opened in that moment said "isn't answering" and
+  // never looked again, so it stayed blank until someone reloaded it.
+  let inner = 0;
+  const site = createStatic(dist);
+  const front = http.createServer((req, res) => {
+    if (!req.url.startsWith("/tiktok/")) return site(req, res);
+    if (!inner) { res.writeHead(502, { "content-type": "text/plain" }); res.end("Bad gateway"); return; }
+    const up = http.request({ host: "127.0.0.1", port: inner, path: req.url, method: req.method, headers: req.headers }, (r) => {
+      res.writeHead(r.statusCode, r.headers);
+      r.pipe(res);
+      r.on("close", () => { if (!r.complete) res.destroy(); });
+    });
+    up.on("error", () => { if (!res.headersSent) { res.writeHead(502); res.end(); } else res.destroy(); });
+    res.on("close", () => up.destroy());
+    req.pipe(up);
+  });
+  await new Promise((resolve) => front.listen(0, "127.0.0.1", resolve));
+  const base = `http://127.0.0.1:${front.address().port}`;
+  try {
+    await page.goto(`${base}/overlay/alerts/?channel=pond.pal&platform=tiktok`, { settle: 1500 });
+    const note = () => page.evaluate(`(() => { const n = document.getElementById("note"); return n && !n.hidden ? n.textContent : ""; })()`);
+    assert.match(await note(), /isn't answering here\. Looking again by itself/, "it says what is wrong, and that it is still trying");
+    await sleep(3500); // a few looks go by, each answered 502
+
+    const made = [];
+    const helper = createHelper({ distDir: dist, factory: async (user) => { const conn = new FakeConnection(); made.push({ user, conn }); return conn; }, relay: { origins: [base], slots: 10, trustProxy: false }, idleStopMs: 200, beatMs: 200 });
+    opened.push(helper);
+    inner = await helper.listen(0); // the relay is back
+    await until(() => made.length === 1, 30000).catch(async () => { throw new Error("the overlay never connected to the relay that came back; it says: " + (await note())); });
+    await sleep(200);
+    assert.equal(await note(), "", "the note is gone once it is connected");
+    made[0].conn.emit("follow", { common: { msgId: "f1" }, user: { id: "7", displayId: "ann", nickname: "Ann" } });
+    await page.waitFor(`document.querySelectorAll(".alert").length > 0`, 8000);
+  } finally {
+    front.closeAllConnections?.();
+    front.close();
+  }
+});
+
 test("editor: after the relay restarts, the status line goes back from \"Lost…\" to the real state (it used to stay on \"Connecting…\" while chat flowed)", { skip }, async () => {
   let inner = 0;
   const forward = http.createServer((req, res) => {

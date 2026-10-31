@@ -75,13 +75,13 @@ if (params.get("demo") === "1") {
         const text = noteFor(parts, statusText);
         note.hidden = text === "";
         note.textContent = text;
-      }, { relay: relayForPage(), assumeRelay: true });
+      }, { relay: relayForPage(), assumeRelay: true, keepTrying: true });
     }
   } else {
     const [{ platform, channel }] = sources;
     connectTo([held], platform, channel, (status) => {
       note.hidden = status.state === "connected" || status.state === "stopped";
       note.textContent = statusText(status);
-    }, { relay: relayForPage(), assumeRelay: true });
+    }, { relay: relayForPage(), assumeRelay: true, keepTrying: true });
   }
 }

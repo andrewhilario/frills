@@ -108,10 +108,14 @@ export const relayForPage = () => (document.body.dataset.relay && document.body.
  * First the address the page itself came from (the helper on this PC serves its own pages, and so does a relay in a test), then the
  * shared relay named by the site (`relayBase`, an https address), if there is one.
  */
-export async function findTikTokSource(relayBase = "") {
+export async function findTikTokSource(relayBase = "", { timeoutMs = 8000 } = {}) {
   const ask = async (base) => {
+    // A look that gets no answer at all (a relay half-dead behind a tunnel) is given up after a few seconds: left alone, the browser can wait minutes,
+    // and a page waiting on it would neither connect nor say anything.
+    const stop = new AbortController();
+    const timer = setTimeout(() => stop.abort(), timeoutMs);
     try {
-      const res = await fetch(base + "/tiktok/ping", { cache: "no-store" });
+      const res = await fetch(base + "/tiktok/ping", { cache: "no-store", signal: stop.signal });
       if (!res.ok) return null;
       const body = await res.json();
       if (body?.ok !== true) return null;
@@ -119,7 +123,9 @@ export async function findTikTokSource(relayBase = "") {
       const features = Array.isArray(body.features) ? body.features.map(String) : ["chat"];
       if (body.name === "frills-helper") return { kind: "helper", base, features };
       if (body.name === "frills-relay") return { kind: "relay", base, features };
-    } catch { /* nothing answered there */ }
+    } catch { /* nothing answered there */ } finally {
+      clearTimeout(timer);
+    }
     return null;
   };
   // Both are asked at once (not one after the other, which cost a round trip to the relay on every connect); the page's own address wins when it answers.

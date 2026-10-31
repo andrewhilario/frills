@@ -64,6 +64,7 @@ if (params.get("demo") === "1") {
     say(status.state === "connected" || status.state === "stopped" ? "" : statusText(status));
   }, {
     relay: relayForPage(),
+    keepTrying: true, // an overlay in OBS has no button to press: if the relay is not answering when it opens, it looks again by itself
     events: PLATFORM_KINDS.tiktok,
     onAlert: (alert) => fonts.then(() => push(alert)),
     onFound: (found) => {

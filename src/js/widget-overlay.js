@@ -17,6 +17,7 @@ export function connectEvents({ channel, events, onAlert, onInfo, onChat, say })
     say(status.state === "connected" || status.state === "stopped" ? "" : statusText(status));
   }, {
     relay: relayForPage(),
+    keepTrying: true, // an overlay in OBS has no button to press: if the relay is not answering when it opens, it looks again by itself
     events,
     onAlert,
     onInfo,

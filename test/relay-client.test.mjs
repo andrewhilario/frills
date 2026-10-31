@@ -109,6 +109,73 @@ test("stopping before the search for a source has finished opens nothing, and no
   assert.match(withRelay.at(-1).detail, /relay isn’t answering|relay isn't answering/);
 });
 
+test("a look for the relay that gets no answer at all is given up, not waited on for minutes", { timeout: 4000 }, async (t) => {
+  // a relay half-dead behind a tunnel: the request is accepted and never answered (it only ends when the page aborts it)
+  t.mock.method(globalThis, "fetch", (url, { signal } = {}) => new Promise((resolve, reject) => {
+    signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+  }));
+  const started = Date.now();
+  assert.equal(await findTikTokSource("https://relay.test", { timeoutMs: 60 }), null);
+  assert.ok(Date.now() - started < 1500, "it came back after the time limit");
+});
+
+test("an overlay that opens while the relay is down keeps looking by itself, says so without giving up, and connects when it is back", async (t) => {
+  let up = false;
+  const asked = [];
+  t.mock.method(globalThis, "fetch", async (url) => {
+    asked.push(url);
+    if (!up || url !== "https://relay.test/tiktok/ping") throw new TypeError("fetch failed"); // down: the connection fails
+    return answer({ ok: true, name: "frills-relay", features: ["chat", "alerts"] });
+  });
+  const sources = [];
+  class PretendEventSource {
+    constructor(url) { this.url = url; this.readyState = 1; this.handlers = {}; sources.push(this); }
+    addEventListener(name, fn) { (this.handlers[name] ??= []).push(fn); }
+    close() { this.closed = true; }
+    send(name, data) { (this.handlers[name] ?? []).forEach((fn) => fn({ data: JSON.stringify(data) })); }
+  }
+  stubEventSource(t, PretendEventSource);
+  const status = [];
+  const found = [];
+  const conn = connectTo([], "tiktok", "pond.pal", (s) => status.push(s), { relay: "https://relay.test", keepTrying: true, retryMs: [15, 15, 15], events: ["follow"], onFound: (f) => found.push(f) });
+  await new Promise((r) => setTimeout(r, 120));
+  assert.equal(sources.length, 0, "nothing to open yet");
+  assert.ok(asked.filter((u) => u.endsWith("/tiktok/ping")).length >= 3, "it looked more than once");
+  assert.equal(status.some((s) => s.fatal), false, "it never says it has given up");
+  assert.equal(status.at(-1).state, "helper-lost");
+  assert.match(status.at(-1).detail, /tries again by itself/);
+  assert.deepEqual(found, [null], "the page is told once that nothing was found");
+
+  up = true; // the relay is back
+  await new Promise((r) => setTimeout(r, 120));
+  assert.equal(sources.length, 1, "it opened the stream by itself");
+  assert.match(sources[0].url, /^https:\/\/relay\.test\/tiktok\/stream\?user=pond\.pal&events=follow&page=/);
+  assert.deepEqual(found.map((f) => f && f.kind), [null, "relay"], "and was told what it found");
+  sources[0].send("status", { state: "connected" });
+  assert.equal(status.at(-1).state, "connected");
+  const asking = asked.length;
+  await new Promise((r) => setTimeout(r, 60));
+  assert.equal(asked.length, asking, "it stopped looking once it had found the relay");
+  conn.stop();
+});
+
+test("an overlay that is closed while it is still looking stops looking; one without keepTrying still gives up at once (the editor's Connect button)", async (t) => {
+  const asked = pretendFetch(t, { "/tiktok/ping": "down", "https://relay.test/tiktok/ping": "down" });
+  stubEventSource(t, class { constructor() { throw new Error("no stream should open"); } });
+  const conn = connectTo([], "tiktok", "pond.pal", () => {}, { relay: "https://relay.test", keepTrying: true, retryMs: [10] });
+  await new Promise((r) => setTimeout(r, 60));
+  conn.stop();
+  await new Promise((r) => setTimeout(r, 20));
+  const after = asked.length;
+  await new Promise((r) => setTimeout(r, 80));
+  assert.equal(asked.length, after, "no look after stop()");
+
+  const once = [];
+  connectTo([], "tiktok", "pond.pal", (s) => once.push(s), { relay: "https://relay.test" });
+  await new Promise((r) => setTimeout(r, 60));
+  assert.equal(once.at(-1).fatal, true, "the default is unchanged");
+});
+
 test("the page's own address and the relay are asked at the same time, not one after the other (that cost a round trip on every connect)", { timeout: 4000 }, async (t) => {
   let release;
   const gate = new Promise((resolve) => { release = resolve; });
