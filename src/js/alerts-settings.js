@@ -51,21 +51,21 @@ export const LOOK_NAMES = { sticker: "Sticker", matcha: "Matcha", night: "Night"
 export const LOOK_KEYS = Object.keys(LOOKS.sticker);
 
 /**
- * Seasonal looks for the alert cards (the same moods as the chat's seasonal looks, in the colors and sizes an alert card uses). The editors offer a season's looks
+ * Seasonal looks for the alert cards (the same moods as the chat's seasonal looks, in the colors and sizes an alert card uses, and with the season's pictures). The editors offer a season's looks
  * first while it lasts (see season.js); every one is understood all year, so a link that names one, or an overlay saved with one, keeps working.
  */
 export const SEASONAL_LOOKS = {
   halloween: {
-    pumpkin: { font: "Baloo 2", size: 40, text: "#fff3e0", accent: "#ff8a1f", pop: "#b6ff5a", bg: "#1c0f06", border: 4, radius: 24, shadow: "hard" },
-    ghost: { font: "Fredoka", size: 40, text: "#2a2350", accent: "#b9a8ff", pop: "#7a4dff", bg: "#f4f0ff", border: 3, radius: 32, shadow: "glow" },
-    witch: { font: "Bricolage Grotesque", size: 38, text: "#f3e8ff", accent: "#7dff4a", pop: "#ff7a1a", bg: "#1b0b33", border: 3, radius: 16, shadow: "glow" },
-    bloodmoon: { font: "Space Grotesk", size: 36, text: "#f4f1f6", accent: "#ff3b4a", pop: "#ffd166", bg: "#08070d", border: 3, radius: 6, shadow: "hard" },
+    pumpkin: { font: "Baloo 2", size: 40, text: "#fff3e0", accent: "#ff8a1f", pop: "#b6ff5a", bg: "#1c0f06", border: 4, radius: 24, shadow: "hard", deco: "halloween" },
+    ghost: { font: "Fredoka", size: 40, text: "#2a2350", accent: "#b9a8ff", pop: "#7a4dff", bg: "#f4f0ff", border: 3, radius: 32, shadow: "glow", deco: "halloween" },
+    witch: { font: "Bricolage Grotesque", size: 38, text: "#f3e8ff", accent: "#7dff4a", pop: "#ff7a1a", bg: "#1b0b33", border: 3, radius: 16, shadow: "glow", deco: "halloween" },
+    bloodmoon: { font: "Space Grotesk", size: 36, text: "#f4f1f6", accent: "#ff3b4a", pop: "#ffd166", bg: "#08070d", border: 3, radius: 6, shadow: "hard", deco: "halloween" },
   },
   christmas: {
-    candycane: { font: "Baloo 2", size: 40, text: "#ffffff", accent: "#ffffff", pop: "#ffe27a", bg: "#c0152f", border: 4, radius: 26, shadow: "hard" },
-    pine: { font: "Plus Jakarta Sans", size: 36, text: "#fff8e7", accent: "#ffd24a", pop: "#ff6a78", bg: "#0f3d2a", border: 3, radius: 20, shadow: "soft" },
-    snowfall: { font: "Fredoka", size: 40, text: "#ffffff", accent: "#8fd8ff", pop: "#ffd24a", bg: "#0b2540", border: 3, radius: 32, shadow: "glow" },
-    cozy: { font: "Baloo 2", size: 40, text: "#3a1d12", accent: "#c1272d", pop: "#1f7a4d", bg: "#fff4e0", border: 4, radius: 20, shadow: "hard" },
+    candycane: { font: "Baloo 2", size: 40, text: "#ffffff", accent: "#ffffff", pop: "#ffe27a", bg: "#c0152f", border: 4, radius: 26, shadow: "hard", deco: "christmas" },
+    pine: { font: "Plus Jakarta Sans", size: 36, text: "#fff8e7", accent: "#ffd24a", pop: "#ff6a78", bg: "#0f3d2a", border: 3, radius: 20, shadow: "soft", deco: "christmas" },
+    snowfall: { font: "Fredoka", size: 40, text: "#ffffff", accent: "#8fd8ff", pop: "#ffd24a", bg: "#0b2540", border: 3, radius: 32, shadow: "glow", deco: "christmas" },
+    cozy: { font: "Baloo 2", size: 40, text: "#3a1d12", accent: "#c1272d", pop: "#1f7a4d", bg: "#fff4e0", border: 4, radius: 20, shadow: "hard", deco: "christmas" },
   },
 };
 /** Every seasonal look by its id, whatever the season. */
@@ -84,6 +84,7 @@ const list = (...pairs) => pairs.map(([id, name]) => ({ id, name }));
 export const CARDS = list(["card", "Simple"], ["trading", "Trading card"], ["profile", "Profile card"], ["ticket", "Ticket"], ["polaroid", "Polaroid"], ["stack", "Card stack"], ["note", "Sticky note"], ["capsule", "Capsule"], ["banner", "Banner"], ["bubble", "Bubble"], ["neon", "Neon"], ["text", "Text only"]);
 /** Card styles that work from a link but are not offered in the editor (the Matcha page offers them): a link that names one is believed. */
 export const SECRET_CARDS = ["frogpond"];
+
 
 /** What each placeholder in a text means, for the editor's hint and for filling a template. */
 export const PLACEHOLDERS = ["name", "gift", "count", "diamonds", "total", "others"];
@@ -131,7 +132,7 @@ export const CONTROLS = [
   // look
   { section: "look", ...chipsOf("card", "Card style", CARDS), hint: "The shape of the alert. Your colors, roundness and edge thickness still apply to every one." },
   // `secret`: the public editor does not show it, and strips it from a link or a saved setting; the overlay draws it from a link
-  { section: "look", ...chipsOf("deco", "Pictures on the card", list(["none", "None"], ...DECOS.filter((d) => d.id !== "none").map((d) => [d.id, d.name]))), hint: "Little pictures on any card style: a friend peeking over the top, a scene on a corner, sparkles.", secret: true },
+  { section: "look", ...chipsOf("deco", "Pictures on the card", [{ id: "none", name: "None" }, ...DECOS.filter((d) => d.id !== "none").map((d) => ({ id: d.id, name: d.name, ...(d.season ? { season: d.season } : {}) }))]), hint: "Little pictures on any card style: a friend peeking over the top, a scene on a corner, sparkles.", secret: true },
   { section: "look", key: "accent", type: "color", label: "Accent color" },
   { section: "look", key: "bg", type: "color", label: "Card color" },
   { section: "look", key: "text", type: "color", label: "Text color" },
@@ -323,3 +324,17 @@ export function alertVars(s) {
 }
 
 export { byKey as CONTROL_BY_KEY };
+
+/** The pack ids of the seasons ("halloween", "christmas"). */
+export const SEASONAL_DECO_IDS = DECOS.filter((d) => d.season).map((d) => d.id);
+/**
+ * The pictures choice as the public editors offer it: none, or a season's pack (shown only in its season, or while chosen: see ui.js). The other packs stay private to
+ * the Matcha editor, which keeps using the full control.
+ */
+export const publicDecoControl = (control) => ({
+  ...control,
+  secret: false,
+  label: "Seasonal pictures",
+  options: control.options.filter((o) => o.id === "none" || o.season),
+  hint: "Little pictures from the season you are in (Halloween, Christmas): a friend peeking over the edge, a scene on a corner, sparkles. A seasonal look turns them on; here you can turn them off.",
+});

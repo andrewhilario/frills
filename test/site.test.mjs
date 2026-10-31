@@ -256,6 +256,9 @@ test("the changelog page is listed, linked from the menu and footer, and its cla
   assert.ok(html.includes('href="/overlays/faq/"') && html.includes('href="/privacy/"') && html.includes('href="/twitch/"'));
   assert.match(html, /Text alignment/);
   assert.ok(html.indexOf("14 October 2026") < html.indexOf("13 October 2026") && html.indexOf("13 October 2026") < html.indexOf("8 to 10 October 2026"), "newest first");
+  assert.ok(html.indexOf("31 October 2026") < html.indexOf("28 October 2026") && html.indexOf("28 October 2026") < html.indexOf("26 October 2026"), "the newest entries are on top");
+  // the seasonal looks and the connection work of 31 October are written up, with the dates the seasons run
+  for (const said of ["Halloween looks", "Pumpkin patch", "until 2 November", "1 December", "until 6 January", "Seasonal pictures", "Overlays reconnect by themselves", "20 seconds for 15 minutes"]) assert.ok(html.includes(said), `the changelog says: ${said}`);
 });
 
 test("the update banner sits above the menu where it scrolls away, appears once, and is not on the editor pages whose preview sticks under the top bar", () => {

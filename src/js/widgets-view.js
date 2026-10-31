@@ -7,12 +7,41 @@ import { commandWord } from "./songs.js";
 import { MEDIA_ID, mediaUrl } from "./alerts-settings.js";
 import { fillTemplate } from "./alerts.js";
 import { lookVars } from "./widget-settings.js";
+import { decoPieces, hasDeco, seedOf } from "./decor.js";
 
 const reducedMotion = () => globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
 function applyLook(host, settings) {
   for (const [name, value] of Object.entries(lookVars(settings))) host.style.setProperty(name, value);
   host.dataset.align = settings.align || "left";
+  dress(host, settings.deco);
+}
+
+/**
+ * The pictures of a season on a small overlay (the `deco` setting: a pack from decor.js, "none" for no pictures): a friend peeking over an edge, a scene on a corner and
+ * sparkles. They are our own pictures, never anything a viewer wrote, they sit over the overlay without taking a click, and the overlay leaves room for them (see widgets.css).
+ * Any earlier ones come off first, so this also takes them away or swaps them. An overlay always gets the same pieces, so it does not change when it is drawn again.
+ */
+function dress(host, pack) {
+  host.querySelector(":scope > .widget__deco")?.remove();
+  host.style.removeProperty("--peek-ratio");
+  const pieces = pack && pack !== "none" ? decoPieces(pack, seedOf(host.className + pack)) : null;
+  host.dataset.deco = hasDeco(pieces) ? pack : "none";
+  if (!hasDeco(pieces)) return;
+  const layer = el("span", { className: "widget__deco" });
+  layer.setAttribute("aria-hidden", "true");
+  const piece = (what, className) => {
+    const img = el("img", { className, alt: "", decoding: "async" });
+    img.referrerPolicy = "no-referrer";
+    img.addEventListener("error", () => img.remove(), { once: true }); // a picture that does not load leaves no hole
+    img.src = what.src;
+    layer.append(img);
+  };
+  if (pieces.peek) piece(pieces.peek, "deco__peek");
+  if (pieces.corner) piece(pieces.corner, "deco__corner");
+  pieces.spark.forEach((what, i) => piece(what, `deco__spark deco__spark--${i + 1}`));
+  host.append(layer);
+  if (pieces.peek?.ratio) host.style.setProperty("--peek-ratio", String(pieces.peek.ratio));
 }
 
 /** The Last Gifts list. Returns { apply(settings), render(items), gone(item), clear() }. */

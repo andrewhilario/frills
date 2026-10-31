@@ -349,3 +349,20 @@
 .songs[data-show="queue"][data-empty="true"][data-idle="true"] .songs__idle { display: none; }
 .songs__idleicon { flex: none; display: grid; place-items: center; width: 2em; height: 2em; border-radius: calc(var(--a-radius, 20px) * 0.5); background: var(--a-accent, #fc0); color: var(--a-bg, #fff); font-weight: 800; }
 .songs__idletext { min-width: 0; overflow-wrap: anywhere; }
+
+/* ── The pictures of a season (Halloween, Christmas) ────────────────────────────────────────────────────────────────────────────────────────────────────
+   See decor.js and widgets-view.js. A friend peeking over the bottom edge, a scene on the bottom corner and a few sparkles. They sit over the overlay, never take a
+   click, and the list leaves room for them. The goal bar is a block in the middle, so its friend peeks over the top of it instead. */
+.widget__deco { position: absolute; inset: 0; z-index: 4; pointer-events: none; }
+.widget__deco > * { position: absolute; display: block; height: auto; }
+.widget__deco .deco__peek { right: 4%; bottom: 0; width: 4.6em; }
+.widget__deco .deco__corner { left: 1.5%; bottom: 0; width: 3.6em; }
+.widget__deco .deco__spark--1 { top: 4%; right: 5%; width: 1.1em; }
+.widget__deco .deco__spark--2 { top: 34%; right: 1.5%; width: 0.85em; }
+.widget__deco .deco__spark--3 { bottom: 24%; left: 40%; width: 0.7em; }
+.giftlist[data-deco]:not([data-deco="none"]), .likers[data-deco]:not([data-deco="none"]), .songs[data-deco]:not([data-deco="none"]) { padding-bottom: calc(2% + 3.4em); }
+.goal .widget__deco .deco__peek { right: 4%; bottom: calc(100% - 3px); }
+.goal .widget__deco .deco__corner { left: -1.2em; bottom: -1.5em; width: 3.2em; }
+.goal .widget__deco .deco__spark--1 { top: -0.9em; left: 30%; right: auto; }
+.goal .widget__deco .deco__spark--2 { top: auto; bottom: 20%; right: -1.1em; }
+.goal .widget__deco .deco__spark--3 { bottom: -0.9em; left: 55%; }

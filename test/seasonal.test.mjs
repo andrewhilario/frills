@@ -43,9 +43,10 @@ test("every seasonal chat look sets the look settings, every value is acceptable
 test("every seasonal alert look sets the alert look settings, every value is acceptable, and it can be read", () => {
   for (const [season, looks] of Object.entries(alerts.SEASONAL_LOOKS)) {
     for (const [name, look] of Object.entries(looks)) {
-      assert.deepEqual(Object.keys(look).sort(), [...alerts.LOOK_KEYS].sort(), name);
+      assert.deepEqual(Object.keys(look).sort(), [...alerts.LOOK_KEYS, "deco"].sort(), `${name}: the usual look settings, and its season's pictures`);
       const kept = alerts.sanitize(look);
-      for (const key of alerts.LOOK_KEYS) assert.equal(kept[key], look[key], `${season}/${name}.${key}`);
+      for (const key of [...alerts.LOOK_KEYS, "deco"]) assert.equal(kept[key], look[key], `${season}/${name}.${key}`);
+      assert.equal(look.deco, season, `${name} brings its season's pictures`);
       assert.ok(look.font in FONTS);
       assert.ok(contrast(look.text, look.bg) >= 4.5, `${name}: the words stand out from the card (${contrast(look.text, look.bg).toFixed(1)}:1)`);
     }

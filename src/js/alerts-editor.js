@@ -2,7 +2,7 @@
 
 import { AlertQueue, makeAlert } from "./alerts.js";
 import { createAlertView } from "./alerts-view.js";
-import { CONTROLS, DEFAULTS, KINDS, LOOKS, PLATFORM_KINDS, SECRET_CARDS, TWITCH_CHAT_KINDS, alertsUrl, currentLook, fromParams, looksFor, mediaUrl, sanitize } from "./alerts-settings.js";
+import { CONTROLS, DEFAULTS, KINDS, LOOKS, PLATFORM_KINDS, SECRET_CARDS, SEASONAL_DECO_IDS, TWITCH_CHAT_KINDS, alertsUrl, currentLook, fromParams, looksFor, mediaUrl, publicDecoControl, sanitize } from "./alerts-settings.js";
 import { activeSeason } from "./season.js";
 import { mountMediaPicker } from "./alerts-media.js";
 import { createSounds } from "./sounds.js";
@@ -21,7 +21,8 @@ const $ = (id) => document.getElementById(id);
 // (the public editor never does), and keeping its own saved settings apart from the public one.
 const MATCHA = $("main")?.dataset.mode === "matcha";
 const BASE = MATCHA ? { ...DEFAULTS, ...LOOKS.matcha, deco: "frog2" } : DEFAULTS;
-const CONTROL_LIST = MATCHA ? CONTROLS : CONTROLS.filter((c) => !c.secret);
+// The public editor leaves out what is private to the Matcha editor, except the pictures choice, which it offers only as the season's pack (or none).
+const CONTROL_LIST = MATCHA ? CONTROLS : CONTROLS.filter((c) => !c.secret || c.key === "deco").map((c) => (c.key === "deco" ? publicDecoControl(c) : c));
 
 // What is remembered in this browser: the settings and the account. Nothing leaves the page.
 const STORE = MATCHA ? "frills:alerts:matcha:v1" : "frills:alerts:v1";
@@ -37,7 +38,7 @@ if (MATCHA && SECRET_CARDS.includes(settings.card)) {
 if (!MATCHA) {
   // what only the Matcha editor offers is not shown here, even from an old link or a saved setting
   if (SECRET_CARDS.includes(settings.card)) settings.card = DEFAULTS.card;
-  settings.deco = DEFAULTS.deco;
+  if (!SEASONAL_DECO_IDS.includes(settings.deco)) settings.deco = DEFAULTS.deco; // only a season's pictures can stay
 }
 if (MATCHA) {
   const note = document.createElement("p");

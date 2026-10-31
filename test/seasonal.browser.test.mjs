@@ -118,3 +118,61 @@ test("a seasonal look in an alert editor paints the card, and the usual looks ar
 test("the usual look names are the ones that were always there (a season adds, never replaces)", () => {
   assert.deepEqual(Object.keys(PRESETS).length, usual.length);
 });
+
+// ── the other overlays wear the pictures too, not just the colors ─────────────────────────────────────────────────────────────
+
+const pictures = (selector) => page.evaluate(`(async () => { const imgs = [...document.querySelectorAll(${JSON.stringify(selector + " img")})]; const ok = await Promise.all(imgs.map((i) => i.decode().then(() => i.naturalWidth > 0, () => false))); return JSON.stringify({ count: imgs.length, loaded: ok.filter(Boolean).length, folders: [...new Set(imgs.map((i) => new URL(i.src).pathname.split("/")[2]))] }); })()`).then(JSON.parse);
+
+test("the gifts, goal, likers and songs overlays draw a season's pictures from their link, and accept nothing else", { skip }, async () => {
+  for (const [path, root] of [["gifts", ".giftlist"], ["goal", ".goal"], ["likers", ".likers"], ["songs", ".songs"]]) {
+    await page.goto(`${base}/overlay/${path}/?demo=1&deco=halloween`, { settle: 800 });
+    assert.equal(await page.evaluate(`document.querySelector(${JSON.stringify(root)}).dataset.deco`), "halloween", `${path}: dressed`);
+    assert.deepEqual(await pictures(`${root} .widget__deco`), { count: 5, loaded: 5, folders: ["halloween"] }, `${path}: a friend on the edge, a corner scene and three sparkles, all loaded`);
+    await page.goto(`${base}/overlay/${path}/?demo=1&deco=christmas`, { settle: 800 });
+    assert.deepEqual((await pictures(`${root} .widget__deco`)).folders, ["christmas"], `${path}: Christmas too`);
+    for (const query of ["demo=1", "demo=1&deco=frog2", "demo=1&deco=none", "demo=1&deco=%3Cimg%3E"]) { // the private packs and anything else are not accepted
+      await page.goto(`${base}/overlay/${path}/?${query}`, { settle: 600 });
+      assert.equal(await page.evaluate(`document.querySelectorAll(".widget__deco").length`), 0, `${path}?${query}: no pictures`);
+      assert.equal(await page.evaluate(`document.querySelector(${JSON.stringify(root)}).dataset.deco`), "none");
+    }
+  }
+});
+
+test("the alerts overlay draws the pictures on its cards from its link", { skip }, async () => {
+  await page.goto(`${base}/overlay/alerts/?demo=1&deco=halloween&pace=600`, { settle: 800 });
+  await page.waitFor(`document.querySelector(".alert__deco img")`, { timeout: 15000 });
+  const seen = await pictures(".alert__deco");
+  assert.ok(seen.count >= 5 && seen.count === seen.loaded && seen.folders.length === 1 && seen.folders[0] === "halloween");
+});
+
+test("a small overlay's editor: a seasonal look turns the pictures on and puts them in the link, None takes them off, and out of season only the usual choices show", { skip }, async () => {
+  await open("/gifts/?season=halloween");
+  assert.deepEqual(await chipNames('[aria-label="Seasonal pictures"]'), ["None", "Halloween"], "in season: none, or the season's pack (never the private ones)");
+  assert.equal(await pressed('[aria-label="Seasonal pictures"]'), "None", "off until a seasonal look is chosen");
+  await click("#looks .chip", "Witch's brew");
+  assert.equal(await pressed('[aria-label="Seasonal pictures"]'), "Halloween", "the look brought its pictures");
+  await page.waitFor(`document.querySelectorAll(".widget__deco img").length === 5`, { timeout: 8000 });
+  await page.evaluate(`(() => { const i = document.querySelector("#source-channel"); i.value = "pond.pal"; i.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+  assert.equal(new URL(await page.evaluate(`document.getElementById("link").value`)).searchParams.get("deco"), "halloween");
+  await click('[aria-label="Seasonal pictures"] .chip', "None");
+  await page.waitFor(`document.querySelectorAll(".widget__deco img").length === 0`, { timeout: 8000 });
+  assert.equal(new URL(await page.evaluate(`document.getElementById("link").value`)).searchParams.has("deco"), false, "off: the link carries nothing");
+  await open("/gifts/?season=none");
+  assert.equal(await page.evaluate(`document.querySelector('[aria-label="Seasonal pictures"]') ? JSON.stringify([...document.querySelectorAll('[aria-label="Seasonal pictures"] .chip')].map((c) => c.textContent.trim())) : "[]"`), JSON.stringify(["None"]), "between seasons: just None");
+});
+
+test("the alerts editor: a seasonal look turns its pictures on, and they show on the alert cards", { skip }, async () => {
+  await open("/alerts/?season=christmas");
+  assert.deepEqual(await chipNames('[aria-label="Seasonal pictures"]'), ["None", "Christmas"]);
+  await click("#looks .chip", "Candy cane");
+  assert.equal(await pressed('[aria-label="Seasonal pictures"]'), "Christmas");
+  await page.evaluate(`document.querySelector('[data-test="follow"]').click()`);
+  await page.waitFor(`document.querySelector(".alert__deco img")`, { timeout: 8000 });
+  assert.deepEqual((await pictures(".alert__deco")).folders, ["christmas"]);
+  const link = new URL(await page.evaluate(`(() => { const i = document.querySelector("#source-channel"); i.value = "pond.pal"; i.dispatchEvent(new Event("input", { bubbles: true })); return document.getElementById("link").value; })()`));
+  assert.equal(link.searchParams.get("deco"), "christmas");
+  assert.equal(link.searchParams.get("accent"), "#ffffff");
+  // a private pack in an old link or saved setting is still not accepted by the public editor
+  await open("/alerts/?season=none&deco=frog2");
+  assert.equal(await page.evaluate(`document.querySelectorAll(".alert__deco img").length`), 0);
+});

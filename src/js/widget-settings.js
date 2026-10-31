@@ -3,13 +3,13 @@
 // link), and writes the link. Pure code, so it is tested without a page.
 
 import { HEX } from "./color.js";
-import { CONTROLS as ALERT_CONTROLS, DEFAULTS as ALERT_DEFAULTS, LOOKS, LOOK_KEYS, MEDIA_ID, SEASON_LOOKS } from "./alerts-settings.js";
+import { CONTROLS as ALERT_CONTROLS, DEFAULTS as ALERT_DEFAULTS, LOOKS, LOOK_KEYS, MEDIA_ID, SEASON_LOOKS, publicDecoControl } from "./alerts-settings.js";
 
 export { LOOKS, LOOK_NAMES, alertVars as lookVars, currentLook, looksFor } from "./alerts-settings.js";
 
-const LOOK_PICKS = ["accent", "bg", "text", "pop", "font", "size", "letterSpacing", "align", "radius", "border", "shadow"];
+const LOOK_PICKS = ["accent", "bg", "text", "pop", "font", "size", "letterSpacing", "align", "radius", "border", "shadow", "deco"];
 /** The look options every overlay shares (colours, font, size, corners, edge, shadow), taken from the alerts so they can never differ. */
-export const LOOK_CONTROLS = ALERT_CONTROLS.filter((c) => c.section === "look" && LOOK_PICKS.includes(c.key));
+export const LOOK_CONTROLS = ALERT_CONTROLS.filter((c) => c.section === "look" && LOOK_PICKS.includes(c.key)).map((c) => (c.key === "deco" ? publicDecoControl(c) : c)); // (the pictures: only a season's pack, or none)
 export const LOOK_DEFAULTS = Object.fromEntries(LOOK_PICKS.map((k) => [k, ALERT_DEFAULTS[k]]));
 
 export const range = (key, label, min, max, step, unit, extra = {}) => ({ key, type: "range", label, min, max, step, unit, ...extra });
