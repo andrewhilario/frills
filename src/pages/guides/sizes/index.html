@@ -1,0 +1,54 @@
+<!--
+{
+  "title": "Chat overlay size for vertical TikTok LIVE | Frills",
+  "description": "What size to make your chat overlay source: 1080 by 1920 for a vertical TikTok LIVE, 1920 by 1080 for landscape, and why it should match your scene.",
+  "path": "/guides/sizes/",
+  "css": "page",
+  "js": "page",
+  "bodyClass": "page-guide",
+  "chrome": "nav",
+  "footer": true,
+  "jsonld": ["breadcrumb:Overlay size", "article"]
+}
+-->
+<main id="main">
+  <article class="article shell">
+    <ol class="crumbs" aria-label="Breadcrumb">
+      <li><a href="/">Frills</a></li>
+      <li aria-current="page">Overlay size</li>
+    </ol>
+    <header class="article__head">
+      <h1 class="display">What size should a TikTok LIVE chat overlay be?</h1>
+      <p class="lede">For a vertical TikTok LIVE, make your overlay source 1080 pixels wide and 1920 pixels high, the same as your scene. For a landscape stream on a computer it is 1920 by 1080. Always make the source the same size as your scene, and place the chat inside the see-through page.</p>
+      <p class="article__updated">Updated {{updatedHuman}}</p>
+    </header>
+
+    <div class="article__body">
+      <h2 class="title">The sizes</h2>
+      <ul>
+        <li><strong>Vertical LIVE: 1080 × 1920.</strong> The shape of a phone screen (9 by 16). Use this for a LIVE made for phones.</li>
+        <li><strong>Landscape: 1920 × 1080.</strong> The usual size of a stream on a computer.</li>
+        <li><strong>Square: 1080 × 1080.</strong> For a square scene.</li>
+      </ul>
+      <p>These are the sizes the alerts, last gifts, goal, top likers and song requests editors offer under <strong>Preview as</strong>, so you can see your overlay at the size your streaming app will show it.</p>
+
+      <h2 class="title">Why the source should match your scene</h2>
+      <p>A Frills overlay is a see-through web page that fills the source you give it. The text size you choose is in pixels of that page. If your source is smaller than your scene, the page is drawn in a smaller space and then stretched, and your text looks different from the preview. If the source is the size of your scene, what you see in the editor is what your viewers see.</p>
+
+      <h2 class="title">How to set it</h2>
+      <ol>
+        <li>In the editor for alerts, last gifts, goals, top likers or song requests, set <strong>Preview as</strong> to your scene’s size, then choose the text size. (The chat editor shows a chat box; there the size that matters is the source’s, in your streaming app.)</li>
+        <li>Copy your link. Those editors remind you: for a vertical LIVE use 1080 wide by 1920 high.</li>
+        <li>In your streaming app, add the link as a Browser source and set its width and height to the same numbers. The <a href="/guides/obs/">setup guide</a> shows where in OBS, and the <a href="/guides/live-studio/">TikTok LIVE Studio guide</a> says what we know about Studio.</li>
+      </ol>
+
+      <h2 class="title">Questions</h2>
+      <h3 class="subtitle">What is the size of a TikTok LIVE?</h3>
+      <p>A vertical TikTok LIVE is 1080 pixels wide and 1920 pixels high, which is 9 by 16, the shape of a phone screen.</p>
+      <h3 class="subtitle">Does the overlay cover my game or camera?</h3>
+      <p>No. The page is see-through. Only the chat, the alerts or the list you chose are drawn, where you put them.</p>
+      <h3 class="subtitle">My text looks too small or too big. What now?</h3>
+      <p>Change <strong>Text size</strong> in the editor (for alerts, gifts, goals, likers and song requests, with <strong>Preview as</strong> set to your scene’s size), then copy your link again. Also check that the source in your streaming app is the same size as your scene.</p>
+    </div>
+  </article>
+</main>

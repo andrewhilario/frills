@@ -8,6 +8,9 @@
 - [Frills on TikTok LIVE](https://frills.valwidgets.live/guides/tiktok/): how TikTok chat reaches your overlay
 - [How to add an overlay in OBS](https://frills.valwidgets.live/guides/obs/): add the link as a Browser source
 - [Test it without going LIVE](https://frills.valwidgets.live/guides/test/): practice chat with the name frills_demo
+- [Add an overlay to TikTok LIVE Studio](https://frills.valwidgets.live/guides/live-studio/): what we know, and what to do if it shows tiny
+- [What size should the overlay be?](https://frills.valwidgets.live/guides/sizes/): 1080 by 1920 for a vertical LIVE
+- [Song requests with Spotify](https://frills.valwidgets.live/guides/songs/): !sr in TikTok chat, and the optional Spotify player
 - [Chat not showing?](https://frills.valwidgets.live/guides/not-showing/): the checks, in order
 
 ## Overlays
@@ -18,6 +21,7 @@
 - [Top likers](https://frills.valwidgets.live/likers/): a live ranking of who tapped the most likes
 - [Song requests](https://frills.valwidgets.live/songs/): viewers ask for songs with !sr, with an optional Spotify player
 - [Cute looks and pets](https://frills.valwidgets.live/looks/): cats, frogs, hamsters and bunnies on your chat
+- [Cat chat overlay](https://frills.valwidgets.live/looks/neko-cafe/), [frog](https://frills.valwidgets.live/looks/frog-pond/), [hamster](https://frills.valwidgets.live/looks/hamster-burrow/) and [bunny](https://frills.valwidgets.live/looks/bunny-cloud/) packs
 
 ## Questions and trust
 - [Questions about Frills](https://frills.valwidgets.live/#faq)

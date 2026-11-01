@@ -1,0 +1,80 @@
+<!--
+{
+  "title": "Add a chat overlay to TikTok LIVE Studio | Frills",
+  "description": "How to put a Frills chat overlay in TikTok LIVE Studio as a link source, what to do if it shows tiny or not at all, and what we have not confirmed yet.",
+  "path": "/guides/live-studio/",
+  "css": "page",
+  "js": "page",
+  "bodyClass": "page-guide",
+  "chrome": "nav",
+  "footer": true,
+  "jsonld": ["breadcrumb:TikTok LIVE Studio", "article"]
+}
+-->
+<main id="main">
+  <article class="article shell">
+    <ol class="crumbs" aria-label="Breadcrumb">
+      <li><a href="/">Frills</a></li>
+      <li aria-current="page">TikTok LIVE Studio</li>
+    </ol>
+    <header class="article__head">
+      <h1 class="display">Add a chat overlay to TikTok LIVE Studio</h1>
+      <p class="lede">TikTok LIVE Studio can show a web page on your stream, so a Frills chat overlay can go in it as a link source. We want to be honest: we have not been able to test every version of Studio ourselves, so this page says what we know, what other streamers report, and what to do when the overlay does not show.</p>
+      <p class="article__updated">Updated {{updatedHuman}}</p>
+    </header>
+
+    <div class="article__body">
+      <h2 class="title">The short version</h2>
+      <ol class="steps-list" role="list">
+        <li>
+          <div>
+            <h3 class="subtitle">Get your link</h3>
+            <p>Open the <a href="/editor/">editor</a>, pick a look, type your TikTok @name and copy your link. Not LIVE yet? Type <code>frills_demo</code> to practice with made-up chat.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h3 class="subtitle">Add it as a source in Studio</h3>
+            <p>In LIVE Studio, add a source and choose the link choice (some versions call it Browser or Web page). Paste your link.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h3 class="subtitle">Make it as big as your scene</h3>
+            <p>Stretch the source across the whole scene, then place your chat inside it. The overlay is see-through, so a big source does not cover anything. For a vertical LIVE the scene is 1080 by 1920: see <a href="/guides/sizes/">what size the overlay should be</a>.</p>
+          </div>
+        </li>
+        <li>
+          <div>
+            <h3 class="subtitle">Check it before you go LIVE</h3>
+            <p>The <a href="/guides/test/">test guide</a> shows how to see practice chat in Studio first, so you are not guessing when you are LIVE.</p>
+          </div>
+        </li>
+      </ol>
+
+      <h2 class="title">If the overlay shows tiny, or not at all</h2>
+      <ul>
+        <li><strong>It looks like a dot in a corner.</strong> Some streamers report that Studio opens a link source at zero size. Stretch it by hand across the scene.</li>
+        <li><strong>It will not stretch.</strong> Other streamers report a workaround: show the overlay in OBS, turn on OBS’s Virtual Camera, and add that camera as a source in Studio. We have not tested this ourselves.</li>
+        <li><strong>It is blank.</strong> Real chat only shows while you are LIVE. Use <code>frills_demo</code> to check the source, then read <a href="/guides/not-showing/">chat not showing?</a>, which goes through the causes in order.</li>
+        <li><strong>It disappears during a battle.</strong> We have seen this reported for link sources, and we have not confirmed it. If it happens to you, please tell us.</li>
+      </ul>
+
+      <h2 class="title">What we know, and what we do not</h2>
+      <ul>
+        <li><strong>We know:</strong> a Frills overlay is an ordinary web page, so anything that can show a web page can show it.</li>
+        <li><strong>We have not confirmed:</strong> that every version of Studio opens a link source at the right size, and that sound alerts play in Studio (the <a href="/guides/alerts/">alerts guide</a> says the same).</li>
+      </ul>
+
+      <h2 class="title">Questions</h2>
+      <h3 class="subtitle">Does TikTok LIVE Studio support browser sources?</h3>
+      <p>Other streamers’ guides say Studio has an <strong>Add source</strong> button with a <strong>Link</strong> choice, which some versions call Browser or Web page. We have not confirmed it in every version.</p>
+      <h3 class="subtitle">Why does my overlay look tiny in LIVE Studio?</h3>
+      <p>Some streamers report that Studio opens a link source with a size of zero. Stretch the source by hand across the scene. If it will not resize, try the OBS Virtual Camera workaround above.</p>
+      <h3 class="subtitle">Can I use OBS or Streamlabs instead?</h3>
+      <p>Yes. The overlay works the same in any app that can show a web page. The <a href="/guides/obs/">setup guide</a> shows each step in OBS.</p>
+      <h3 class="subtitle">I use LIVE Studio. How can I help?</h3>
+      <p>Tell us what happened on the <a href="/feedback/">feedback page</a>, and choose TikTok LIVE Studio as your app. It is the only way we learn what each version does.</p>
+    </div>
+  </article>
+</main>

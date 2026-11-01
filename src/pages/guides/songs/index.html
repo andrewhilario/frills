@@ -1,0 +1,64 @@
+<!--
+{
+  "title": "TikTok song requests with Spotify: set it up | Frills",
+  "description": "Let viewers ask for songs in your TikTok LIVE chat with !sr, show the queue on stream, and add Spotify to show the song playing. Free, step by step.",
+  "path": "/guides/songs/",
+  "css": "page",
+  "js": "page",
+  "bodyClass": "page-guide",
+  "chrome": "nav",
+  "footer": true,
+  "jsonld": ["breadcrumb:Song requests", "article"]
+}
+-->
+<main id="main">
+  <article class="article shell">
+    <ol class="crumbs" aria-label="Breadcrumb">
+      <li><a href="/">Frills</a></li>
+      <li aria-current="page">Song requests</li>
+    </ol>
+    <header class="article__head">
+      <h1 class="display">Song requests for TikTok LIVE, with Spotify</h1>
+      <p class="lede">Song requests let your viewers ask for a song in your TikTok LIVE chat by typing <code>!sr</code> and a song name. Frills shows the songs as a queue on your stream, with covers. If you connect Spotify, the song that is playing shows on your stream too, and the songs viewers ask for can go into your own Spotify queue.</p>
+      <p class="article__updated">Updated {{updatedHuman}}</p>
+    </header>
+
+    <div class="article__body">
+      <h2 class="title">How viewers ask</h2>
+      <p>A viewer types <code>!sr</code> and a song name in your LIVE chat, for example <code>!sr levitating dua lipa</code>. Frills looks the song up, finds its cover and adds it to the queue on your stream. You, or a moderator if you allow it, type <code>!next</code> to move to the next song. You choose the command word, how many requests can wait, and how many each person can have waiting.</p>
+
+      <h2 class="title">Set it up without Spotify</h2>
+      <ol>
+        <li>Open the <a href="/songs/">song requests editor</a>, pick a look and press the test buttons to watch requests arrive.</li>
+        <li>Type your TikTok @name.</li>
+        <li>Copy your link into your streaming app as a Browser source. The <a href="/guides/obs/">setup guide</a> shows each step.</li>
+      </ol>
+      <p>That is all: viewers can ask for songs without Spotify, and nobody needs an account.</p>
+
+      <h2 class="title">Add Spotify (optional)</h2>
+      <p>Spotify adds two things: the song that is playing shows on your stream, and the songs viewers ask for can be added to your own Spotify queue.</p>
+      <ol>
+        <li>You need <strong>Spotify Premium</strong> for this, and Spotify has to be open and playing on a phone or a computer.</li>
+        <li>In step 4 of the <a href="/songs/#spotify-step">song requests editor</a>, press <strong>Log in with Spotify</strong>. Frills’ own Spotify app lets in only a short list of people, so most streamers use their own Spotify app: the editor shows three steps (make a free app in Spotify’s developer dashboard, add Frills’ address, paste its Client ID). Frills never asks for your Client secret.</li>
+        <li>Switch on what you want: showing the song that is playing, and adding viewers’ songs to your queue.</li>
+      </ol>
+
+      <h2 class="title">Good to know</h2>
+      <ul>
+        <li>Keep your song requests overlay open in your streaming app: it is what passes your viewers’ <code>!sr</code> and <code>!next</code> on.</li>
+        <li>Frills keeps your Spotify login on its server, encrypted, so the Spotify player works with the editor page closed. <strong>Disconnect</strong> deletes it at once, and it is deleted after 14 days without use. <a href="/privacy/">What Frills keeps</a>.</li>
+        <li>Song requests are built for TikTok LIVE chat, and they are in beta.</li>
+      </ul>
+
+      <h2 class="title">Questions</h2>
+      <h3 class="subtitle">Do my viewers need Spotify?</h3>
+      <p>No. They only type in your chat. Spotify is only for you.</p>
+      <h3 class="subtitle">Do I need Spotify Premium?</h3>
+      <p>Only for the Spotify part. Songs only go into your Spotify queue with Spotify Premium. The list of requests on your stream works without it.</p>
+      <h3 class="subtitle">Is it free?</h3>
+      <p>Yes. It is free and needs no Frills account.</p>
+      <h3 class="subtitle">Why does Spotify say no when I log in?</h3>
+      <p>Frills’ own Spotify app lets in only a short list of people, because Spotify limits apps like it. Use your own Spotify app instead: it is free, takes about three minutes, and the editor shows the steps.</p>
+    </div>
+  </article>
+</main>

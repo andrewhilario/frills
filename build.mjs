@@ -183,7 +183,7 @@ function jsonLd(meta, canonical, faqItems, overlayItems = []) {
     if (kind === "webapp") nodes.push({ "@type": "WebApplication", name: meta.title.replace(/ \| Frills$/, ""), url: canonical, description: meta.description, applicationCategory: "MultimediaApplication", operatingSystem: "Any (runs in a web browser)", isAccessibleForFree: true, offers: { "@type": "Offer", price: "0", priceCurrency: "USD" }, isPartOf: { "@type": "WebSite", name: site.name, url: `${site.url}/` } });
     if (kind === "faq") nodes.push({ "@type": "FAQPage", mainEntity: faqItems.map((i) => ({ "@type": "Question", name: i.q, acceptedAnswer: { "@type": "Answer", text: i.text } })) });
     if (kind === "faq-overlays") nodes.push({ "@type": "FAQPage", mainEntity: overlayItems.map((i) => ({ "@type": "Question", name: i.q, acceptedAnswer: { "@type": "Answer", text: i.text } })) });
-    if (kind.startsWith("breadcrumb:")) nodes.push({ "@type": "BreadcrumbList", itemListElement: [{ "@type": "ListItem", position: 1, name: site.name, item: `${site.url}/` }, { "@type": "ListItem", position: 2, name: kind.slice(11), item: canonical }] });
+    if (kind.startsWith("breadcrumb:")) nodes.push({ "@type": "BreadcrumbList", itemListElement: [{ name: site.name, item: `${site.url}/` }, ...(meta.parent ? [{ name: meta.parent.name, item: `${site.url}${meta.parent.path}` }] : []), { name: kind.slice(11), item: canonical }].map((x, i) => ({ "@type": "ListItem", position: i + 1, ...x })) });
   }
   return nodes.map((n) => `<script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org", ...n }).replace(/</g, "\\u003c")}</script>`).join("\n");
 }

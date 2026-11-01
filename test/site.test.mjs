@@ -8,7 +8,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 import { join, relative } from "node:path";
 import { site } from "../src/site.mjs";
-import { CONTROLS, PRESETS } from "../src/js/settings.js";
+import { CONTROLS, DECOS, PRESETS } from "../src/js/settings.js";
 
 const dist = join(import.meta.dirname, "..", "dist");
 if (!existsSync(join(dist, "index.html"))) throw new Error("dist/ is empty. Run `npm run build` first (`npm test` does that for you).");
@@ -26,7 +26,7 @@ const assetOf = (html, kind) => (new RegExp(`${kind === "css" ? 'href="(/assets/
 
 test("the pages we expect are all there", () => {
   const urls = pages.map((p) => p.url).sort();
-  assert.deepEqual(urls, ["/", "/404.html", "/admin/", "/alerts/", "/changelog/", "/check/", "/editor/", "/feedback/", "/gifts/", "/goal/", "/guides/alerts/", "/guides/both/", "/guides/not-showing/", "/guides/obs/", "/guides/setup/", "/guides/test/", "/guides/tiktok/", "/likers/", "/looks/", "/matcha/", "/matcha/alerts/", "/overlay/", "/overlay/alerts/", "/overlay/gifts/", "/overlay/goal/", "/overlay/likers/", "/overlay/songs/", "/overlays/", "/overlays/faq/", "/privacy/", "/songs/", "/spotify/", "/spotify/callback/", "/start/", "/twitch/", "/twitch/callback/"]);
+  assert.deepEqual(urls, ["/","/404.html","/admin/","/alerts/","/changelog/","/check/","/editor/","/feedback/","/gifts/","/goal/","/guides/alerts/","/guides/both/","/guides/live-studio/","/guides/not-showing/","/guides/obs/","/guides/setup/","/guides/sizes/","/guides/songs/","/guides/test/","/guides/tiktok/","/likers/","/looks/","/looks/bunny-cloud/","/looks/frog-pond/","/looks/hamster-burrow/","/looks/neko-cafe/","/matcha/","/matcha/alerts/","/overlay/","/overlay/alerts/","/overlay/gifts/","/overlay/goal/","/overlay/likers/","/overlay/songs/","/overlays/","/overlays/faq/","/privacy/","/songs/","/spotify/","/spotify/callback/","/start/","/twitch/","/twitch/callback/"]);
 });
 
 test("every indexable page has its own title and description, a canonical address, share tags and one h1", () => {
@@ -393,4 +393,45 @@ test("the gifts, goal and likers pages have real text (how to add them, and ques
     assert.ok([...html.matchAll(/<h3>[^<]*\?<\/h3>/g)].length >= 3, `${url}: at least three questions as headings`);
   }
   for (const { url, html } of indexable.filter((p) => /class="foot/.test(p.html))) for (const link of ["/alerts/", "/gifts/", "/goal/", "/likers/", "/songs/"]) assert.match(html, new RegExp(`<a href="${link}">`), `${url}: footer links to ${link}`);
+});
+
+test("each look-pack page has a live practice chat that really names its look and its pictures, an editor link with the same two, questions as headings, and links to the other packs", () => {
+  const packs = ["neko-cafe", "frog-pond", "hamster-burrow", "bunny-cloud"];
+  const ids = new Set(DECOS.map((d) => d[0] ?? d.id));
+  for (const slug of packs) {
+    const url = `/looks/${slug}/`;
+    const { html } = pages.find((p) => p.url === url);
+    const frame = /<iframe class="pack__frame" src="\/overlay\/\?demo=1&amp;look=(\w+)&amp;deco=(\w+)&amp;/.exec(html);
+    assert.ok(frame, `${url}: a practice chat`);
+    assert.ok(frame[1] in PRESETS, `${url}: look "${frame[1]}" exists`);
+    assert.ok(ids.has(frame[2]), `${url}: pictures "${frame[2]}" exist`);
+    assert.ok(html.includes(`href="/editor/?look=${frame[1]}&amp;deco=${frame[2]}"`), `${url}: the editor link carries the same look and pictures`);
+    assert.match(textOf(html), /Decorations on the bubbles/, `${url}: it names the real editor setting`);
+    assert.ok([...html.matchAll(/<h3 class="subtitle">[^<]*\?<\/h3>/g)].length >= 3, `${url}: three questions as headings`);
+    for (const other of packs.filter((s) => s !== slug)) assert.ok(html.includes(`href="/looks/${other}/"`), `${url} links to ${other}`);
+    const crumbs = ldOf(html).find((n) => n["@type"] === "BreadcrumbList").itemListElement.map((i) => i.name);
+    assert.deepEqual([crumbs[0], crumbs[1], crumbs.length], ["Frills", "Looks", 3], `${url}: a three-step breadcrumb in the structured data`);
+    assert.ok(textOf(html).split(/\s+/).length >= 380, `${url}: real text`);
+    assert.match(pages.find((p) => p.url === "/looks/").html, new RegExp(`href="${url}"`), "the looks page links to it");
+  }
+});
+
+test("the new guides (TikTok LIVE Studio, song requests, overlay size) answer their question in the first words, are honest about what is not confirmed, and are linked from the footer", () => {
+  const live = pages.find((p) => p.url === "/guides/live-studio/").html;
+  assert.match(textOf(live), /we have not been able to test every version of Studio ourselves/i);
+  assert.match(textOf(live), /Some streamers report/);
+  assert.match(textOf(live), /We have not confirmed/);
+  const songs = pages.find((p) => p.url === "/guides/songs/").html;
+  assert.match(textOf(songs), /Spotify Premium/);
+  assert.match(textOf(songs), /Frills never asks for your Client secret/);
+  assert.match(songs, /href="\/songs\/#spotify-step"/, "it links to the Spotify step");
+  const sizes = pages.find((p) => p.url === "/guides/sizes/").html;
+  assert.match(textOf(sizes.split("<main")[1]).slice(0, 600), /1080 pixels wide and 1920 pixels high/);
+  assert.match(sizes, /<strong>Square: 1080 × 1080\.<\/strong>/);
+  for (const url of ["/guides/live-studio/", "/guides/songs/", "/guides/sizes/"]) {
+    const { html } = pages.find((p) => p.url === url);
+    assert.ok([...html.matchAll(/<h3 class="subtitle">[^<]*\?<\/h3>/g)].length >= 3, `${url}: questions as headings`);
+    assert.match(html, /<p class="article__updated">Updated \d{1,2} [A-Z][a-z]+ 20\d\d<\/p>/);
+    for (const { html: other } of indexable.filter((p) => /class="foot/.test(p.html))) assert.match(other, new RegExp(`<a href="${url}">`), `the footer links to ${url}`);
+  }
 });
