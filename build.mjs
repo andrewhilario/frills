@@ -170,11 +170,16 @@ const shared = {
   looksGrid,
 };
 
+const ORG = { "@type": "Organization", name: site.name, url: `${site.url}/`, logo: `${site.url}/apple-touch-icon.png` };
+const FEATURES = ["Chat overlay for TikTok LIVE and Twitch, with cute looks and little pets", "Alerts for follows, gifts and shares", "Last gifts list", "Goal bar for followers, gifts or likes", "Top likers ranking", "Song requests with a queue, and a Spotify player", "Seasonal looks and pictures", "Practice mode with made-up chat", "Free, no account"];
+
 function jsonLd(meta, canonical, faqItems, overlayItems = []) {
   const nodes = [];
   for (const kind of meta.jsonld ?? []) {
-    if (kind === "website") nodes.push({ "@type": "WebSite", name: site.name, url: `${site.url}/`, description: site.description });
-    if (kind === "software") nodes.push({ "@type": "SoftwareApplication", name: site.name, url: `${site.url}/`, description: site.description, applicationCategory: "MultimediaApplication", operatingSystem: "Any (runs in a web browser)", offers: { "@type": "Offer", price: "0", priceCurrency: "USD" } });
+    if (kind === "website") nodes.push({ "@type": "WebSite", name: site.name, url: `${site.url}/`, description: site.description, publisher: ORG });
+    if (kind === "organization") nodes.push(ORG); // (no sameAs yet: it is added when Frills has public profiles to point to)
+    if (kind === "article") nodes.push({ "@type": "Article", headline: meta.headline ?? meta.title.replace(/ \| Frills$/, ""), description: meta.description, mainEntityOfPage: canonical, ...(meta.published && { datePublished: meta.published }), dateModified: meta.updated ?? meta.published, author: ORG, publisher: ORG, image: `${site.url}/og.png` });
+    if (kind === "software") nodes.push({ "@type": "SoftwareApplication", name: site.name, url: `${site.url}/`, description: site.description, applicationCategory: "MultimediaApplication", operatingSystem: "Any (runs in a web browser)", featureList: FEATURES, screenshot: `${site.url}/og.png`, publisher: ORG, offers: { "@type": "Offer", price: "0", priceCurrency: "USD" } });
     if (kind === "webapp") nodes.push({ "@type": "WebApplication", name: meta.title.replace(/ \| Frills$/, ""), url: canonical, description: meta.description, applicationCategory: "MultimediaApplication", operatingSystem: "Any (runs in a web browser)", isAccessibleForFree: true, offers: { "@type": "Offer", price: "0", priceCurrency: "USD" }, isPartOf: { "@type": "WebSite", name: site.name, url: `${site.url}/` } });
     if (kind === "faq") nodes.push({ "@type": "FAQPage", mainEntity: faqItems.map((i) => ({ "@type": "Question", name: i.q, acceptedAnswer: { "@type": "Answer", text: i.text } })) });
     if (kind === "faq-overlays") nodes.push({ "@type": "FAQPage", mainEntity: overlayItems.map((i) => ({ "@type": "Question", name: i.q, acceptedAnswer: { "@type": "Answer", text: i.text } })) });
@@ -196,6 +201,8 @@ function renderPage(page, stats) {
     title: meta.title,
     description: meta.description ?? site.description,
     canonical,
+    updated: meta.updated ?? "",
+    updatedHuman: meta.updated ? new Date(meta.updated + "T00:00:00Z").toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }) : "",
     ogImage: `${site.url}/og.png`,
     robots: meta.noindex ? '\n<meta name="robots" content="noindex, nofollow">' : "",
     css: assets.css[meta.css],
@@ -211,8 +218,8 @@ function renderPage(page, stats) {
     navTest: meta.navTest ? ' aria-current="page"' : "",
     navFeedback: meta.navFeedback ? ' aria-current="page"' : "",
     navOverlays: meta.navOverlays ? ' aria-current="page"' : "",
-    overlaysFaqItems: overlayItems.map((i) => `        <details><summary>${esc(i.q)}</summary><div class="faq__answer"><p>${i.a}</p></div></details>`).join("\n"),
-    faqItems: faqItems.map((i) => `        <details><summary>${esc(i.q)}</summary><div class="faq__answer"><p>${i.a}</p></div></details>`).join("\n"),
+    overlaysFaqItems: overlayItems.map((i) => `        <details><summary><h3 class="faq__q">${esc(i.q)}</h3></summary><div class="faq__answer"><p>${i.a}</p></div></details>`).join("\n"),
+    faqItems: faqItems.map((i) => `        <details><summary><h3 class="faq__q">${esc(i.q)}</h3></summary><div class="faq__answer"><p>${i.a}</p></div></details>`).join("\n"),
   };
   const where = relative(root, page.file);
   const content = render(page.body, vars, partials, where);
@@ -245,7 +252,7 @@ for (const page of pages) writePage(page, renderPage(page, stats));
 const listed = pages.filter((p) => !p.meta.noindex && p.meta.listed !== false).sort((a, b) => a.meta.path.localeCompare(b.meta.path));
 writeFileSync(
   join(dist, "sitemap.xml"),
-  `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${listed.map((p) => `  <url><loc>${site.url}${p.meta.path}</loc><lastmod>${p.mtime.toISOString().slice(0, 10)}</lastmod></url>`).join("\n")}\n</urlset>\n`,
+  `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${listed.map((p) => `  <url><loc>${site.url}${p.meta.path}</loc>${p.meta.updated ? `<lastmod>${p.meta.updated}</lastmod>` : ""}</url>`).join("\n")}\n</urlset>\n`,
 );
 writeFileSync(
   join(dist, "robots.txt"),
