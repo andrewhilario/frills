@@ -136,7 +136,8 @@ test("the overlay stays light, and the site's own numbers are true", () => {
   const bytes = gz(overlay.html) + gz(readFileSync(join(dist, assetOf(overlay.html, "css")))) + gz(readFileSync(join(dist, assetOf(overlay.html, "js"))));
   // The budget was 20 KB. Reading TikTok and Twitch together, and saying why the relay turned a page away, cost about 0.7 KB between them (October 2026).
   // The budget is now 21.5 KB (the home page still says 21, which is what it rounds to): the two seasonal decoration packs, Halloween and Christmas, cost 0.2 KB (October 2026).
-  // The seasonal looks themselves are kept out of the overlay (seasonal-looks.js is only loaded by the editors) to spend nothing more.
+  // The seasonal looks themselves are kept out of the overlay (seasonal-looks.js is only loaded by the editors) to spend nothing more. The twelve extra fonts (fonts.css) cost
+  // another 0.4 KB: only their declarations are in the overlay, the font files load only when a look uses one. It is now right at the cap: the next addition must make room.
   assert.ok(bytes <= 21.5 * 1024, `the overlay is ${(bytes / 1024).toFixed(1)} KB gzipped; the budget is 21.5 KB`);
   const home = pages.find((p) => p.url === "/").html;
   assert.match(home, new RegExp(`data-count="${Math.round(bytes / 1024)}"`), "the KB on the home page matches what was measured");
@@ -258,7 +259,7 @@ test("the changelog page is listed, linked from the menu and footer, and its cla
   assert.ok(html.indexOf("14 October 2026") < html.indexOf("13 October 2026") && html.indexOf("13 October 2026") < html.indexOf("8 to 10 October 2026"), "newest first");
   assert.ok(html.indexOf("31 October 2026") < html.indexOf("28 October 2026") && html.indexOf("28 October 2026") < html.indexOf("26 October 2026"), "the newest entries are on top");
   // the seasonal looks and the connection work of 31 October are written up, with the dates the seasons run
-  for (const said of ["Halloween looks", "Pumpkin patch", "until 2 November", "1 December", "until 6 January", "Seasonal pictures", "Overlays reconnect by themselves", "20 seconds for 15 minutes"]) assert.ok(html.includes(said), `the changelog says: ${said}`);
+  for (const said of ["Halloween looks", "Pumpkin patch", "until 2 November", "1 December", "until 6 January", "Seasonal pictures", "Overlays reconnect by themselves", "20 seconds for 15 minutes", "Twelve new fonts", "Six new designs for the song playing"]) assert.ok(html.includes(said), `the changelog says: ${said}`);
 });
 
 test("the update banner sits above the menu where it scrolls away, appears once, and is not on the editor pages whose preview sticks under the top bar", () => {

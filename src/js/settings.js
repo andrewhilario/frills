@@ -15,6 +15,19 @@ export const FONTS = {
   "Space Grotesk": '"Space Grotesk", system-ui, sans-serif',
   "JetBrains Mono": '"JetBrains Mono", ui-monospace, monospace',
   "Press Start 2P": '"Press Start 2P", ui-monospace, monospace',
+  // more faces, added 31 October 2026 (the clean ones, the loud ones, the handwriting ones and the techy ones; Latin letters only, see fonts.css)
+  "Poppins": '"Poppins", system-ui, sans-serif',
+  "Montserrat": '"Montserrat", system-ui, sans-serif',
+  "Nunito": '"Nunito", system-ui, sans-serif',
+  "Quicksand": '"Quicksand", system-ui, sans-serif',
+  "Lilita One": '"Lilita One", system-ui, sans-serif',
+  "Bangers": '"Bangers", Impact, system-ui, sans-serif',
+  "Permanent Marker": '"Permanent Marker", "Comic Sans MS", cursive',
+  "Pacifico": '"Pacifico", cursive',
+  "Dancing Script": '"Dancing Script", cursive',
+  "Caveat": '"Caveat", cursive',
+  "Orbitron": '"Orbitron", system-ui, sans-serif',
+  "Silkscreen": '"Silkscreen", ui-monospace, monospace',
 };
 
 // How a message arrives: the CSS animation, and the curve it runs on.
