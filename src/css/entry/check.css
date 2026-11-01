@@ -1,0 +1,30 @@
+/* The browser check page: plain, large, high-contrast, and plain colors only, because it has to work in the very browsers it is checking
+   (a browser source in a streaming app can ship an older engine than your own). */
+html, body { margin: 0; background: #14141b; color: #f4f1f6; }
+body { font: 18px/1.45 "Segoe UI", system-ui, Arial, sans-serif; }
+.check { max-width: 1100px; margin: 0 auto; padding: 18px 24px 28px; }
+.check h1 { margin: 0 0 4px; font-size: 30px; line-height: 1.15; }
+.check__lead { margin: 0 0 14px; color: #c9c3d6; }
+.check__list { margin: 0; padding: 0; list-style: none; }
+.check__list li { display: flex; gap: 12px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid #2a2a38; }
+.check__mark { flex: none; width: 1.5em; font-weight: 800; text-align: center; }
+.check__list strong { flex: none; min-width: 15.5em; }
+.check__detail { color: #c9c3d6; overflow-wrap: anywhere; }
+.is-wait .check__mark { color: #9a93ab; }
+.is-ok .check__mark { color: #7be08a; }
+.is-warn .check__mark { color: #ffd166; }
+.is-bad .check__mark { color: #ff6b6b; }
+.is-bad strong { color: #ff9a9a; }
+.check__sum { margin: 14px 0; padding: 10px 14px; border-radius: 8px; background: #20202c; font-size: 20px; font-weight: 700; }
+.check__sum[data-state="ok"] { background: #17341f; color: #b6f3c0; }
+.check__sum[data-state="warn"] { background: #3a3014; color: #ffe39a; }
+.check__sum[data-state="bad"] { background: #3d1a1a; color: #ffb8b8; }
+.check__frames { display: flex; flex-wrap: wrap; gap: 16px; }
+.check__frame { margin: 0; }
+.check__frame figcaption { margin-bottom: 4px; color: #c9c3d6; font-size: 15px; }
+.check__frame iframe { display: block; border: 1px solid #3a3a4c; background: #4a4a5c; }
+.check__how { margin: 16px 0 0; color: #9a93ab; font-size: 15px; }
+.check code { padding: 1px 5px; border-radius: 4px; background: #2a2a38; color: #f4f1f6; font: 14px Consolas, monospace; }
+/* A box that animates for a moment: the check waits for its animation to finish, which tells whether this browser plays animations at all. */
+.check__probe { position: absolute; left: -99px; top: 0; width: 4px; height: 4px; animation: check-probe 200ms linear 1; }
+@keyframes check-probe { from { opacity: 0.2; } to { opacity: 1; } }

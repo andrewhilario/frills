@@ -1,0 +1,28 @@
+<!--
+{
+  "title": "Frills browser check",
+  "path": "/check/",
+  "css": "check",
+  "js": "check",
+  "layout": "bare",
+  "noindex": true,
+  "listed": false
+}
+-->
+<main class="check" id="check">
+  <h1>Frills browser check</h1>
+  <p class="check__lead" id="lead">Checking this browser for about 20 seconds. Nothing is changed or saved.</p>
+  <ol class="check__list" id="list"></ol>
+  <p class="check__sum" id="sum" role="status"></p>
+  <div class="check__frames">
+    <figure class="check__frame">
+      <figcaption>Drawing test: the overlay with made-up messages</figcaption>
+      <iframe id="f-demo" title="The Frills overlay drawing made-up messages" width="560" height="170" scrolling="no"></iframe>
+    </figure>
+    <figure class="check__frame" id="fig-own" hidden>
+      <figcaption>Your link, as your streaming app would load it</figcaption>
+      <iframe id="f-own" title="The Frills overlay with your link" width="560" height="170" scrolling="no"></iframe>
+    </figure>
+  </div>
+  <p class="check__how">To test your own account too, add <code>&amp;channel=yourTikTokName&amp;platform=tiktok</code> to the end of this link. To test your exact overlay, paste your overlay link’s part after the <code>?</code> here. Add this page as a Browser source in your streaming app, the same way as your overlay, and take a screenshot of what it says.</p>
+</main>
