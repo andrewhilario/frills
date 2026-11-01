@@ -1,0 +1,26 @@
+# Frills
+
+> Frills is a free web tool that shows your TikTok LIVE or Twitch chat as cute speech bubbles on your stream. Pick a look, copy one link and paste it into OBS, Streamlabs or another streaming app. No account, nothing to install.
+
+## Start here
+- [Quick start](https://frills.valwidgets.live/start/): answer six questions and get your links
+- [Chat overlay editor](https://frills.valwidgets.live/editor/): pick a look and change every color, font and corner
+- [Frills on TikTok LIVE](https://frills.valwidgets.live/guides/tiktok/): how TikTok chat reaches your overlay
+- [How to add an overlay in OBS](https://frills.valwidgets.live/guides/obs/): add the link as a Browser source
+- [Test it without going LIVE](https://frills.valwidgets.live/guides/test/): practice chat with the name frills_demo
+- [Chat not showing?](https://frills.valwidgets.live/guides/not-showing/): the checks, in order
+
+## Overlays
+- [All the overlays](https://frills.valwidgets.live/overlays/)
+- [Alerts](https://frills.valwidgets.live/alerts/): follows, gifts and shares as cards on your stream
+- [Last gifts](https://frills.valwidgets.live/gifts/): the newest TikTok gifts as a list
+- [Goal](https://frills.valwidgets.live/goal/): a bar for followers, gift diamonds or likes
+- [Top likers](https://frills.valwidgets.live/likers/): a live ranking of who tapped the most likes
+- [Song requests](https://frills.valwidgets.live/songs/): viewers ask for songs with !sr, with an optional Spotify player
+- [Cute looks and pets](https://frills.valwidgets.live/looks/): cats, frogs, hamsters and bunnies on your chat
+
+## Questions and trust
+- [Questions about Frills](https://frills.valwidgets.live/#faq)
+- [Overlays questions](https://frills.valwidgets.live/overlays/faq/)
+- [Privacy: what Frills keeps and what it does not](https://frills.valwidgets.live/privacy/)
+- [Changelog](https://frills.valwidgets.live/changelog/)

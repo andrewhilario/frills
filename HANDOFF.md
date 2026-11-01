@@ -70,6 +70,10 @@ Audit and research done: a Hallmark audit of the site (2026-10-11) found 0 criti
 - **A pretend-viewer box as the tester** (the `/spotify/` step 4) was judged "not interactive enough" by the owner, and "for the SR it doesn't work" is still unexplained. Likeliest cause, now fixed in the uncommitted change: the page stopped sharing whenever its tab was in the background, so the overlay went empty after 90 seconds.
 - **Spotify search from the relay or a server** was avoided on purpose: the login must stay in the owner's browser; only title, artist, cover and position go through the post box. **Reversed on 28 October 2026 on the owner's decision (so the Spotify player works with the page closed):** the Worker now keeps the login encrypted (`worker/spotify.mjs`, table `spotify_logins`, secret `SPOTIFY_TOKEN_KEY`, daily clean-up after 14 days). One-time setup before it works: set the secret (`npx wrangler secret put SPOTIFY_TOKEN_KEY`, 32 random bytes in base64) and run the new `spotify_logins` part of `worker/schema.sql` in D1. Until both are done the Spotify step says Frills cannot keep logins yet.
 
+## Page dates (added 1 November 2026)
+
+Each page's front matter carries `"published"` and `"updated"` dates. They feed the sitemap's `<lastmod>`, the "Updated" line on the guides and the Article structured data, and the build never invents one. After you change a page or a partial it uses, **commit, then run `node scripts/page-dates.mjs` and commit again** (it reads git, so it needs the full history). A page with no `"updated"` gets no `<lastmod>`.
+
 ## 6. Specific next steps
 
 1. **Settle the uncommitted work.** Ask the owner whether the other editor's changes (layouts `compact`, `macos`, `shell`, `discord`, cover `none`, the `glass` redesign) should stay. If not, restore them with `git diff` as the guide. Then `node build.mjs`, `node --test --test-concurrency=2 "test/**/*.test.mjs"`, commit the minimum fix (files in section 2), and push only when the owner says "push it". Say plainly in the commit message what each part is.

@@ -51,7 +51,9 @@ export async function launch() {
   const close = async () => {
     chrome.kill();
     await sleep(300);
-    try { rmSync(profile, { recursive: true, force: true }); } catch { /* Windows can hold the folder a moment; it is only a temp folder */ }
+    // Chrome's helper processes hold the folder for a moment after it is killed, and a profile left behind is 100 to 250 MB: the disk filled up with them (November 2026).
+    // So the removal tries again for a few seconds instead of giving up on the first refusal.
+    try { rmSync(profile, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 }); } catch { /* still held: it is only a temp folder */ }
   };
   try {
     let target;

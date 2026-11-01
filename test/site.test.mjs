@@ -320,3 +320,77 @@ test("the Quick start page is there, is found from the home page and the footer,
   assert.ok(read("start/index.html").includes("/guides/setup/"), "and it points to the clips");
   assert.ok(pages.every((p) => !p.html.includes("Quick start") || p.html.includes('href="/start/"') || p.url === "/start/"), "any page that names it links to it");
 });
+
+// ── search and AI-assistant basics (the SEO and GEO audit of 1 November 2026, SEO-GEO-AUDIT-2026-11-01.md) ──────────────────────────────────────────────────────────
+const titleOf = (html) => (/<title>([^<]*)<\/title>/.exec(html) ?? [])[1];
+const ldOf = (html) => [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].map((m) => JSON.parse(m[1].replace(/\\u003c/g, "<")));
+
+test("every indexable page has a title that Google shows whole (25 to 60 characters)", () => {
+  for (const { url, html } of indexable) {
+    if (url === "/404.html") continue;
+    const title = titleOf(html);
+    assert.ok(title.length >= 25 && title.length <= 60, `${url}: "${title}" is ${title.length} characters`);
+  }
+});
+
+test("the sitemap gives each page the day it really changed, which each page also states, and no date is in the future or made up", () => {
+  const sitemap = read("sitemap.xml");
+  const entries = [...sitemap.matchAll(/<url><loc>([^<]+)<\/loc>(?:<lastmod>([^<]*)<\/lastmod>)?<\/url>/g)];
+  assert.ok(entries.length >= 15);
+  const today = new Date().toISOString().slice(0, 10);
+  const dates = new Set();
+  for (const [, loc, lastmod] of entries) {
+    assert.match(lastmod ?? "", /^\d{4}-\d{2}-\d{2}$/, `${loc} has a date`);
+    assert.ok(lastmod <= today, `${loc}: ${lastmod} is in the future`);
+    dates.add(lastmod);
+    const page = pages.find((p) => site.url + p.url === loc);
+    const modified = ldOf(page.html).find((n) => n["@type"] === "Article")?.dateModified;
+    if (modified) assert.equal(modified, lastmod, `${loc}: the Article date and the sitemap date agree`);
+  }
+  assert.ok(dates.size >= 5, "the dates differ from page to page, so they say something");
+});
+
+test("a guide says when it was updated, in words and in its structured data", () => {
+  const guides = indexable.filter((p) => p.url.startsWith("/guides/") || p.url === "/looks/");
+  assert.ok(guides.length >= 7);
+  for (const { url, html } of guides) {
+    assert.match(html, /<p class="article__updated">Updated \d{1,2} [A-Z][a-z]+ 20\d\d<\/p>/, `${url}: a visible Updated line`);
+    const article = ldOf(html).find((n) => n["@type"] === "Article");
+    assert.ok(article, `${url}: Article data`);
+    assert.match(article.dateModified, /^\d{4}-\d{2}-\d{2}$/);
+    assert.ok(article.headline.length >= 10 && article.author?.name === "Frills" && article.publisher?.logo, `${url}: a headline, an author and a publisher with a logo`);
+  }
+});
+
+test("the questions in the FAQs are headings, so search engines and AI assistants read them as questions", () => {
+  for (const url of ["/", "/overlays/faq/"]) {
+    const html = pages.find((p) => p.url === url).html;
+    const summaries = [...html.matchAll(/<summary>([\s\S]*?)<\/summary>/g)].map((m) => m[1]);
+    assert.ok(summaries.length >= 8, `${url} has its questions`);
+    for (const s of summaries) assert.match(s, /^<h3 class="faq__q">[^<]+<\/h3>$/, `${url}: ${s.slice(0, 50)}`);
+  }
+});
+
+test("the home page says in its first words what Frills is, and its structured data names the publisher and the features", () => {
+  const home = pages.find((p) => p.url === "/").html;
+  assert.match(textOf(home.split("<main")[1]).slice(0, 700), /Free TikTok LIVE and Twitch chat overlays/, "the h1 says what it is");
+  assert.match(home, /<p class="lede">Frills is a free web tool that shows your TikTok LIVE or Twitch chat as cute speech bubbles on your stream\./, "an answer in one sentence");
+  const nodes = ldOf(home);
+  const app = nodes.find((n) => n["@type"] === "SoftwareApplication");
+  assert.ok(app.featureList.length >= 6 && app.publisher.name === "Frills" && app.screenshot.endsWith("/og.png"));
+  assert.equal(app.offers.price, "0");
+  assert.ok(nodes.find((n) => n["@type"] === "WebSite").publisher.logo.endsWith("/apple-touch-icon.png"));
+  assert.ok(existsSync(join(dist, "apple-touch-icon.png")), "the logo exists");
+  for (const heading of [...home.matchAll(/<h2 class="(?:title|display)" id="[a-z-]+">([^<]*)<\/h2>/g)].map((m) => m[1])) assert.ok(heading.length >= 12, `a home heading says something: "${heading}"`);
+});
+
+test("the gifts, goal and likers pages have real text (how to add them, and questions with answers), and every page's footer links to every overlay page", () => {
+  for (const url of ["/gifts/", "/goal/", "/likers/"]) {
+    const { html } = pages.find((p) => p.url === url);
+    const words = textOf(html).split(/\s+/).length;
+    assert.ok(words >= 420, `${url} has ${words} words`);
+    assert.match(html, /<h3>Add it to your streaming app<\/h3>/);
+    assert.ok([...html.matchAll(/<h3>[^<]*\?<\/h3>/g)].length >= 3, `${url}: at least three questions as headings`);
+  }
+  for (const { url, html } of indexable.filter((p) => /class="foot/.test(p.html))) for (const link of ["/alerts/", "/gifts/", "/goal/", "/likers/", "/songs/"]) assert.match(html, new RegExp(`<a href="${link}">`), `${url}: footer links to ${link}`);
+});
