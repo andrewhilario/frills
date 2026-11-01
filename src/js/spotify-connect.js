@@ -7,7 +7,7 @@
 // (spotify-forward.js). This page only changes the two switches, shows what happened and disconnects. The login is removed from this browser as
 // soon as Frills has it. Only the song's title, artist, cover and position reach the overlay.
 
-import { REDIRECT_PATH, SpotifyClient } from "./spotify.js";
+import { CLIENT_ID_FORMAT, REDIRECT_PATH, SpotifyClient, ownClientId, saveOwnClientId } from "./spotify.js";
 import { SpotifyServer } from "./spotify-server.js";
 import { bridgeIdentity, rememberReturn, watchSpotify } from "./spotify-bridge.js";
 import { buildControl } from "./ui.js";
@@ -33,14 +33,43 @@ const QUEUE_OFF = "Off. Songs viewers ask for only go to the list on your stream
  */
 export function mountSpotify(root, { hear, refresh = () => {} } = {}) {
   const none = { handle() {}, setSettings() {}, loggedIn: () => false };
-  const clientId = root?.dataset.client || "";
-  if (!root || !clientId) return none; // no Spotify app on this site: the step stays hidden
+  const siteId = root?.dataset.client || "";
+  if (!root || !siteId) return none; // no Spotify app on this site: the step stays hidden
+  let clientId = ownClientId() || siteId; // the streamer's own Spotify app when they made one (the panel below), else Frills' own, which lets in only a few people
   root.hidden = false;
   const $ = (id) => document.getElementById("spx-" + id);
-  const client = new SpotifyClient({ clientId, redirectUri: location.origin + REDIRECT_PATH });
+  const redirect = location.origin + REDIRECT_PATH;
+  let client = new SpotifyClient({ clientId, redirectUri: redirect });
   const identity = bridgeIdentity();
   const server = new SpotifyServer({ code: identity.code, key: identity.key });
   const say = (el, text, bad = false) => { el.textContent = text; el.dataset.state = bad ? "error" : ""; };
+
+  // ── the streamer's own Spotify app: free, with them as its only user, so there is no list to be on ──────────────────────────────────────────────
+  function paintOwn() {
+    const own = ownClientId();
+    $("own-redirect").textContent = redirect;
+    $("own-id").value = own;
+    $("own-back").hidden = !own;
+    say($("own-status"), own ? `Using your own Spotify app (${own.slice(0, 6)}…). It applies the next time you log in.` : "Using Frills' Spotify app, which lets in only a short list of people.");
+  }
+  function useOwn(id) {
+    saveOwnClientId(id);
+    clientId = ownClientId() || siteId;
+    client.logout(); // a login made with the other app is no use to this one
+    client = new SpotifyClient({ clientId, redirectUri: redirect });
+    paintOwn();
+    return load();
+  }
+  $("own-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const id = $("own-id").value.trim();
+    if (!CLIENT_ID_FORMAT.test(id)) { say($("own-status"), "That does not look like a Client ID. It is 32 letters and numbers, and it is on the app's Settings page in the Spotify dashboard.", true); $("own-id").focus(); return; }
+    useOwn(id);
+  });
+  $("own-back").addEventListener("click", () => useOwn(""));
+  $("own-copy").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(redirect); $("own-copy").textContent = "Copied"; } catch { $("own-copy").textContent = "Select it and copy"; }
+  });
 
   let settings = SONGS.defaults;
   let state = { mode: "loading" }; // off | local | connected | expired | unavailable, as Frills last said
@@ -176,6 +205,7 @@ export function mountSpotify(root, { hear, refresh = () => {} } = {}) {
     else if (done.error === "not_allowed" || done.error === "bad_login") client.logout(); // Spotify will not accept it, so it is no use to anyone
     await load();
     if (!done.ok) say($("status"), done.message, true);
+    if (done.error === "not_allowed") $("own").open = true; // Spotify turned this person away: show them the way that has no list
   }
 
   $("login").addEventListener("click", async (event) => {
@@ -196,6 +226,7 @@ export function mountSpotify(root, { hear, refresh = () => {} } = {}) {
   // Back from Spotify's page after Log in: the login is in this browser now, and the person already agreed to Frills keeping it, so it is handed over.
   let justLoggedIn = false;
   try { justLoggedIn = sessionStorage.getItem(KEEP) === "1"; sessionStorage.removeItem(KEEP); } catch { /* nothing remembered */ }
+  paintOwn();
   load().then(() => { if (justLoggedIn && state.mode === "local") return keepLogin(); });
 
   return { handle() {}, setSettings(next) { settings = next; }, loggedIn: () => state.mode === "connected" };

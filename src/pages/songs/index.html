@@ -72,6 +72,7 @@
         <h2 class="step-card__title" id="s4">Connect Spotify <span class="spx__optional">(optional)</span></h2>
       </div>
       <p class="ctl__hint">Show the song that is playing on your Spotify on your stream, and let viewers add songs to your Spotify queue with <code>!sr</code>. Once it is connected you can close this page. You do not need this for the song list: viewers can ask for songs without it.</p>
+      <p class="ctl__hint spx__limit"><strong>Frills’ own Spotify app lets in only a short list of people,</strong> because Spotify limits apps like it. If Spotify says no, or you are not on the list, <strong>use your own Spotify app</strong> (just under the buttons): it is free and takes about three minutes.</p>
       <p class="spx__status" id="spx-status" role="status"></p>
       <div class="spx__row">
         <button class="btn" type="button" id="spx-login">Log in with Spotify</button>
@@ -79,6 +80,25 @@
         <button class="btn btn--soft" type="button" id="spx-logout" hidden>Disconnect</button>
       </div>
       <p class="ctl__hint spx__note" id="spx-keep-note" hidden>When you log in, Frills keeps your Spotify login on its server, encrypted, so the Spotify player works with this page closed. <strong>Disconnect</strong> deletes it at once, and it is deleted after 14 days without use.</p>
+      <details class="spx__own" id="spx-own">
+        <summary>Use your own Spotify app (free, no list)</summary>
+        <p class="ctl__hint">Spotify lets Frills’ own app in for only a few people. So everyone else makes a free Spotify app of their own, in about three minutes, and gives Frills its Client ID. You are then the only person that app has to let in. It needs Spotify Premium.</p>
+        <ol class="spx__steps">
+          <li>Open the <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">Spotify developer dashboard</a> and log in with your Spotify account.</li>
+          <li>Press <strong>Create app</strong>. Any name and description will do. Under <strong>Redirect URIs</strong> add exactly this address: <span class="spx__addr"><code id="spx-own-redirect"></code><button class="btn btn--soft" type="button" id="spx-own-copy">Copy</button></span> Then tick <strong>Web API</strong>, accept the terms and save.</li>
+          <li>Open the new app’s <strong>Settings</strong>, copy its <strong>Client ID</strong> and paste it here. You do not need the Client secret, and Frills never asks for it.</li>
+        </ol>
+        <form class="spx__ownform" id="spx-own-form" autocomplete="off" novalidate>
+          <label class="spx__label" for="spx-own-id">Your Client ID</label>
+          <input type="text" id="spx-own-id" maxlength="40" spellcheck="false" autocomplete="off">
+          <div class="spx__row">
+            <button class="btn" type="submit">Use my app</button>
+            <button class="btn btn--soft" type="button" id="spx-own-back" hidden>Go back to Frills’ app</button>
+          </div>
+          <p class="ctl__hint spx__note" id="spx-own-status" role="status"></p>
+        </form>
+        <p class="ctl__hint">Then press <strong>Log in with Spotify</strong> above. If you were already connected, press <strong>Disconnect</strong> first.</p>
+      </details>
       <div id="spx-on" hidden>
         <div class="spx__now">
           <img class="spx__cover" id="spx-cover" alt="" width="64" height="64" hidden>
@@ -103,7 +123,7 @@
         <summary>Having trouble?</summary>
         <ul>
           <li>Songs only go to your Spotify queue with <strong>Spotify Premium</strong>, and Spotify has to be open and playing on a phone or computer (it does not have to be this computer).</li>
-          <li>While Frills is in testing, Spotify lets only a short list of people log in. If Spotify says you are not registered, tell us on the <a href="/feedback/">feedback page</a>. Spotify allows only a few people, so we can add you only if there is room.</li>
+          <li>Frills’ own Spotify app lets in only a short list of people. If Spotify says no, use your own Spotify app: open <strong>Use your own Spotify app</strong> above and follow its three steps.</li>
           <li>Your Spotify password is never seen by Frills. Frills keeps your Spotify login on its server, encrypted, and uses it only to read what is playing, and (when you have switched that on) to add songs to your queue and skip. <strong>Disconnect</strong> deletes it at once, and it is deleted after 14 days without use. You can also remove Frills at spotify.com/account/apps. Only the song’s name, artist, cover and position reach your overlay.</li>
           <li>If the song on your stream stops updating, check that Spotify is playing and that your song requests overlay is open in your streaming app. If this step says your login ran out, log in again.</li>
         </ul>

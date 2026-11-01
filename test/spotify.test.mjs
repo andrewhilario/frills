@@ -3,7 +3,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { SCOPES, SpotifyClient, REDIRECT_PATH, authorizeUrl, b64url, challengeOf, describe, makeVerifier } from "../src/js/spotify.js";
+import { CLIENT_ID_FORMAT, SCOPES, SpotifyClient, REDIRECT_PATH, authorizeUrl, b64url, challengeOf, describe, makeVerifier, ownClientId, saveOwnClientId } from "../src/js/spotify.js";
 
 const REDIRECT = "https://frills.example" + REDIRECT_PATH;
 const memory = () => { const data = new Map(); return { getItem: (k) => data.get(k) ?? null, setItem: (k, v) => data.set(k, String(v)), removeItem: (k) => data.delete(k), data }; };
@@ -157,7 +157,7 @@ test("adding to the queue: only a real song address, and every way Spotify can s
   assert.match((await noDevice.client.addToQueue(uri)).error, /Open Spotify on your phone or computer/);
   const premium = rig(() => reply(403, { error: { status: 403, message: "Player command failed: Premium required", reason: "PREMIUM_REQUIRED" } }));
   login(premium.client);
-  assert.match((await premium.client.addToQueue(uri)).error, /Premium.*allowlist/);
+  assert.match((await premium.client.addToQueue(uri)).error, /short list[\s\S]*your own Spotify app[\s\S]*Premium/);
   const busy = rig(() => reply(429, {}, { "retry-after": "7" }));
   login(busy.client);
   assert.match((await busy.client.addToQueue(uri)).error, /7 seconds/);
@@ -259,4 +259,36 @@ test("!next skips for the streamer (their own account or TikTok's host flag) and
   const entry = await failing.requests.handle(say("!next", { id: "6", host: true }));
   assert.deepEqual([entry.state, /no device/.test(entry.text)], ["error", true]);
   assert.equal(lines.length, 5);
+});
+
+test("a streamer's own Spotify app: only a real Client ID is kept, it can be forgotten, and Frills' own app is what is used when there is none", () => {
+  const own = "0123456789abcdef0123456789ABCDEF";
+  const storage = memory();
+  assert.equal(ownClientId(storage), "", "none to begin with");
+  assert.equal(saveOwnClientId("not an id", storage), "", "something that is not a Client ID is refused");
+  assert.equal(saveOwnClientId("0123456789abcdef0123456789abcdeg", storage), "", "32 characters, but not all letters and numbers of a Client ID");
+  assert.equal(saveOwnClientId("<script>alert(1)</script>", storage), "");
+  assert.equal(ownClientId(storage), "", "nothing was kept for any of them");
+  assert.equal(saveOwnClientId("  " + own + "  ", storage), own, "spaces round a paste are dropped");
+  assert.equal(ownClientId(storage), own);
+  assert.ok(CLIENT_ID_FORMAT.test(own));
+  assert.equal(saveOwnClientId("", storage), "", "an empty one forgets it");
+  assert.equal(ownClientId(storage), "");
+  assert.equal(ownClientId({ getItem() { throw new Error("storage is blocked"); } }), "", "blocked storage is the same as none");
+});
+
+test("logging in with the streamer's own Spotify app: the login asks for it, and the way back finishes with the same one, never a secret", async () => {
+  const own = "0123456789abcdef0123456789abcdef";
+  const storage = memory();
+  const calls = [];
+  const fetchImpl = async (url, init = {}) => { calls.push({ url: String(url), body: String(init.body ?? "") }); return reply(200, { access_token: "ACCESS", refresh_token: "REFRESH", expires_in: 3600, scope: "a" }); };
+  const first = new SpotifyClient({ clientId: own, redirectUri: REDIRECT, storage, fetchImpl });
+  const to = new URL(await first.begin());
+  assert.equal(to.searchParams.get("client_id"), own, "Spotify is asked to log the person in to their own app");
+  // the page Spotify sends the person back to knows only Frills' own app, but finishes with the one that started the login
+  const back = new SpotifyClient({ clientId: "f".repeat(32), redirectUri: REDIRECT, storage, fetchImpl });
+  assert.deepEqual(await back.finish("?code=THECODE&state=" + to.searchParams.get("state")), { ok: true });
+  const body = new URLSearchParams(calls[0].body);
+  assert.equal(body.get("client_id"), own);
+  assert.equal(body.has("client_secret"), false, "no secret is asked for or sent");
 });

@@ -61,6 +61,14 @@
 .spx__log li { padding: var(--space-xs) var(--space-sm); border-radius: var(--radius-sm); background: var(--color-paper-2); font-size: var(--text-sm); overflow-wrap: anywhere; }
 .spx__log li[data-state="ok"] { background: var(--color-mint-tint); }
 .spx__log li[data-state="error"] { background: var(--color-accent-3-tint); color: var(--color-error); }
+.spx__own { font-size: var(--text-sm); }
+.spx__own summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
+.spx__steps { margin: 0 0 var(--space-sm); padding-left: 1.4em; display: grid; gap: var(--space-xs); }
+.spx__steps code { overflow-wrap: anywhere; }
+.spx__addr { display: flex; flex-wrap: wrap; gap: var(--space-xs); align-items: center; margin: var(--space-2xs) 0; }
+.spx__ownform { display: grid; gap: var(--space-xs); justify-items: start; margin-bottom: var(--space-xs); }
+.spx__ownform input { width: min(100%, 24rem); }
+.spx__label { font-weight: 600; }
 .spx__help { font-size: var(--text-sm); }
 .spx__help summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
 .spx__help ul { margin: var(--space-xs) 0 0; padding-left: 1.2em; display: grid; gap: var(--space-xs); }

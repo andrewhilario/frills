@@ -243,14 +243,57 @@ test("song requests: back from Spotify's page after Log in, the login is handed 
   assert.equal(await page.evaluate('localStorage.getItem("frills:spotify:tokens")'), null);
 });
 
-test("song requests: Frills refusing a login (not on the app's allowlist) is said in words, and the useless login is dropped", { skip }, async () => {
-  await open("/songs/", { server: null, login: true, loginReply: { status: 403, body: { ok: false, error: "not_allowed", message: "Spotify said no. This Spotify account has to be on the app's allowlist in the Spotify dashboard." } } });
+test("song requests: Frills refusing a login (not on Frills' short list) is said in words, the useless login is dropped, and the way with no list is opened", { skip }, async () => {
+  await open("/songs/", { server: null, login: true, loginReply: { status: 403, body: { ok: false, error: "not_allowed", message: "Spotify said no. Frills' own Spotify app lets in only a short list of people: if you are not on it, use your own Spotify app instead." } } });
+  assert.equal(await page.evaluate('document.getElementById("spx-own").open'), false, "closed until it is needed");
   await page.waitFor(`!document.getElementById("spx-keep").hidden`);
   await page.evaluate('document.getElementById("spx-keep").click()');
   await page.waitFor(`document.getElementById("spx-status").dataset.state === "error"`);
-  assert.match(await text("spx-status"), /allowlist/);
+  assert.match(await text("spx-status"), /short list/);
   assert.equal(await page.evaluate('localStorage.getItem("frills:spotify:tokens")'), null, "Spotify will not accept it, so it is gone");
   assert.equal(await shown("login", "keep", "on"), "true,false,false");
+  assert.equal(await page.evaluate('document.getElementById("spx-own").open'), true, "the person is shown where to use their own Spotify app");
+});
+
+const OWN = "0123456789abcdef0123456789abcdef";
+const useOwnApp = (id) => page.evaluate(`(() => { document.getElementById("spx-own-id").value = ${JSON.stringify(id)}; document.getElementById("spx-own-form").requestSubmit(); })()`);
+
+test("song requests: use your own Spotify app: the steps and the address to add are there, a wrong Client ID is refused in words, and a real one is kept", { skip }, async () => {
+  await open("/songs/", { server: null });
+  const panel = await page.evaluate('document.getElementById("spx-own").textContent.replace(/\\s+/g, " ")');
+  assert.match(panel, /Create app/);
+  assert.match(panel, /Client ID/);
+  assert.match(panel, /never asks for it/, "no secret is asked for");
+  assert.equal(await text("spx-own-redirect"), base + "/spotify/callback/", "the address to register is this site's, exactly");
+  assert.match(await text("spx-own-status"), /Frills' Spotify app, which lets in only a short list/);
+  assert.equal(await shown("own-back"), "false");
+  await useOwnApp("not a client id");
+  assert.equal(await page.evaluate('document.getElementById("spx-own-status").dataset.state'), "error");
+  assert.match(await text("spx-own-status"), /does not look like a Client ID/);
+  assert.equal(await page.evaluate('localStorage.getItem("frills:spotify:app")'), null, "nothing was kept");
+  await useOwnApp(OWN);
+  await page.waitFor(`document.getElementById("spx-own-status").textContent.includes("your own Spotify app")`);
+  assert.equal(await page.evaluate('localStorage.getItem("frills:spotify:app")'), OWN);
+  assert.equal(await shown("own-back"), "true");
+  await open("/songs/", { server: null }, { fresh: false });
+  assert.match(await text("spx-own-status"), new RegExp("your own Spotify app \\(" + OWN.slice(0, 6)), "still there after the page is opened again");
+  assert.equal(await page.evaluate('document.getElementById("spx-own-id").value'), OWN);
+  await page.evaluate('document.getElementById("spx-own-back").click()');
+  await page.waitFor(`document.getElementById("spx-own-status").textContent.includes("Frills' Spotify app")`);
+  assert.equal(await page.evaluate('localStorage.getItem("frills:spotify:app")'), null, "going back forgets it");
+  assert.deepEqual(problems(), []);
+});
+
+test("song requests: with the streamer's own Spotify app, the login Frills keeps is theirs: its Client ID goes to the Worker, so the refresh uses it", { skip }, async () => {
+  await open("/songs/", { server: null, login: true });
+  await page.evaluate(`localStorage.setItem("frills:spotify:app", "${OWN}")`);
+  await open("/songs/", { server: null, login: true }, { fresh: false });
+  await page.waitFor(`!document.getElementById("spx-keep").hidden`);
+  await page.evaluate('document.getElementById("spx-keep").click()');
+  await page.waitFor(`(window.__calls || []).some((c) => c.url.endsWith("/login") && c.method === "POST")`);
+  const sent = JSON.parse((await worker("login")).find((c) => c.method === "POST").body);
+  assert.equal(sent.clientId, OWN, "Frills keeps the login for the streamer's own app");
+  assert.equal(JSON.stringify(sent).includes("secret"), false, "and never a secret");
 });
 
 test("song requests: a login that ran out asks to log in again, and keeps the code in the link", { skip }, async () => {

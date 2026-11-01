@@ -2,7 +2,9 @@
 // page), the playback calls we need (what is playing, search, add to the queue), and plain-words explanations of what Spotify says when it
 // refuses. The fetch, the storage and the clock are given in, so it is tested without Spotify.
 //
-// Spotify's rules (checked October 2026): an app in development mode works for at most five allowlisted people and its owner needs Premium;
+// Spotify's rules (checked October 2026): an app in development mode works for at most five allowlisted people and its owner needs Premium, so Frills' own
+// app can only let in a few people. Everyone else makes a free Spotify app of their own and gives Frills its Client ID (a public id, never the secret, which PKCE does
+// not need): that app has the streamer as its only user, so there is no list to be on (saveOwnClientId below);
 // adding to the queue needs Premium and a device that is open and active; the redirect address must be https (or 127.0.0.1) and match
 // exactly what is registered in the Spotify dashboard.
 
@@ -12,7 +14,21 @@ export const API_URL = "https://api.spotify.com/v1";
 export const SCOPES = ["user-read-currently-playing", "user-read-playback-state", "user-modify-playback-state"];
 export const REDIRECT_PATH = "/spotify/callback/";
 
-const KEYS = { session: "frills:spotify:session", tokens: "frills:spotify:tokens" };
+const KEYS = { session: "frills:spotify:session", tokens: "frills:spotify:tokens", app: "frills:spotify:app" };
+
+/** What a Spotify Client ID looks like: 32 letters and numbers. */
+export const CLIENT_ID_FORMAT = /^[0-9a-f]{32}$/i;
+/** The Client ID of the Spotify app this streamer made for themselves, or "" (then Frills' own app is used). */
+export function ownClientId(storage = globalThis.localStorage) {
+  try { const id = storage.getItem(KEYS.app) ?? ""; return CLIENT_ID_FORMAT.test(id) ? id : ""; } catch { return ""; }
+}
+/** Keeps (or, with "", forgets) the streamer's own Client ID. Returns what was kept: "" when it did not look like a Client ID. */
+export function saveOwnClientId(value, storage = globalThis.localStorage) {
+  const id = String(value ?? "").trim();
+  if (id && !CLIENT_ID_FORMAT.test(id)) return "";
+  try { if (id) storage.setItem(KEYS.app, id); else storage.removeItem(KEYS.app); } catch { /* storage can be blocked: the choice lasts until the page closes */ }
+  return id;
+}
 
 /** Bytes -> the URL-safe base64 that PKCE uses (no +, no /, no =). */
 export const b64url = (bytes) => btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
@@ -40,7 +56,7 @@ export function authorizeUrl({ clientId, redirectUri, challenge, state, scopes =
 /** What Spotify said, in words a streamer can act on. `reason` is Spotify's own code when it gives one. */
 export function describe(status, reason = "", retryAfter = 0) {
   if (status === 401) return "Your Spotify login ran out. Press Log in with Spotify again.";
-  if (status === 403) return "Spotify said no. Adding to the queue needs Premium, and this Spotify account has to be on the app's allowlist in the Spotify dashboard.";
+  if (status === 403) return "Spotify said no. Frills' own Spotify app lets in only a short list of people: if you are not on it, use your own Spotify app instead (the steps are on the Song requests page, under the Log in button). Adding to the queue also needs Premium.";
   if (status === 404 && /NO_ACTIVE_DEVICE/i.test(reason)) return "Spotify has no device to play on. Open Spotify on your phone or computer and start any song, then try again.";
   if (status === 404) return "Spotify could not find that. If you were adding to the queue, open Spotify on a device and start any song first.";
   if (status === 429) return `Spotify asks us to slow down${retryAfter ? `. Try again in ${retryAfter} seconds` : ""}.`;
@@ -79,7 +95,7 @@ export class SpotifyClient {
   async begin(random) {
     const verifier = makeVerifier(random);
     const state = makeVerifier(random).slice(0, 24);
-    this.write(KEYS.session, { verifier, state, at: this.now() });
+    this.write(KEYS.session, { verifier, state, at: this.now(), clientId: this.clientId }); // the app is kept too: the page Spotify sends the person back to finishes with the same one
     return authorizeUrl({ clientId: this.clientId, redirectUri: this.redirectUri, challenge: await challengeOf(verifier), state });
   }
 
@@ -92,7 +108,7 @@ export class SpotifyClient {
     if (!session || !params.get("code")) return { error: "This page needs to be opened by Spotify after you log in. Go back and press Log in with Spotify." };
     if (params.get("state") !== session.state) return { error: "The login did not match the one that was started, so it was stopped for safety. Try again." };
     if (this.now() - session.at > 15 * 60 * 1000) return { error: "That login took too long. Try again." };
-    const body = new URLSearchParams({ grant_type: "authorization_code", code: params.get("code"), redirect_uri: this.redirectUri, client_id: this.clientId, code_verifier: session.verifier });
+    const body = new URLSearchParams({ grant_type: "authorization_code", code: params.get("code"), redirect_uri: this.redirectUri, client_id: session.clientId || this.clientId, code_verifier: session.verifier });
     const res = await this.fetch(TOKEN_URL, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.access_token) return { error: `Spotify would not give a login (${data.error_description ?? data.error ?? res.status}). Check that the redirect address in the Spotify dashboard is exactly ${this.redirectUri}` };

@@ -121,9 +121,10 @@ test("the security headers are in place", () => {
   assert.match(headers, /\/fonts\/\*\n  Cache-Control: public, max-age=31536000, immutable/);
 });
 
+// (developer.spotify.com is a link a person presses to make their own Spotify app; the page sends nothing to it)
 test("the only outside addresses are Twitch, the site itself, Tally and the standards", () => {
   const relayHost = site.relayUrl ? new URL(site.relayUrl).host : "no-relay.invalid";
-  const allowed = [new RegExp(`^${relayHost.replace(/\./g, "\\.")}$`), /^static-cdn\.jtvnw\.net$/, /^irc-ws\.chat\.twitch\.tv$/, /^eventsub\.wss\.twitch\.tv$/, /^api\.twitch\.tv$/, /^id\.twitch\.tv$/, /^accounts\.spotify\.com$/, /^api\.spotify\.com$/, /^i\.scdn\.co$/, new RegExp(`^${new URL(site.url).host.replace(/\./g, "\\.")}$`), new RegExp(`^${new URL(site.tally.url).host.replace(/\./g, "\\.")}$`), /^schema\.org$/, /^www\.w3\.org$/, /^www\.sitemaps\.org$/];
+  const allowed = [new RegExp(`^${relayHost.replace(/\./g, "\\.")}$`), /^static-cdn\.jtvnw\.net$/, /^irc-ws\.chat\.twitch\.tv$/, /^eventsub\.wss\.twitch\.tv$/, /^api\.twitch\.tv$/, /^id\.twitch\.tv$/, /^accounts\.spotify\.com$/, /^api\.spotify\.com$/, /^developer\.spotify\.com$/, /^i\.scdn\.co$/, new RegExp(`^${new URL(site.url).host.replace(/\./g, "\\.")}$`), new RegExp(`^${new URL(site.tally.url).host.replace(/\./g, "\\.")}$`), /^schema\.org$/, /^www\.w3\.org$/, /^www\.sitemaps\.org$/];
   for (const file of files.filter((f) => /\.(html|js|css|xml|txt)$/.test(f) && !f.startsWith("fonts/licenses/"))) {
     for (const m of read(file).matchAll(/(?:https?|wss?):\/\/([a-z0-9.-]+)/gi)) {
       assert.ok(allowed.some((re) => re.test(m[1])), `${file} talks to ${m[1]}`);
@@ -259,7 +260,7 @@ test("the changelog page is listed, linked from the menu and footer, and its cla
   assert.ok(html.indexOf("14 October 2026") < html.indexOf("13 October 2026") && html.indexOf("13 October 2026") < html.indexOf("8 to 10 October 2026"), "newest first");
   assert.ok(html.indexOf("31 October 2026") < html.indexOf("28 October 2026") && html.indexOf("28 October 2026") < html.indexOf("26 October 2026"), "the newest entries are on top");
   // the seasonal looks and the connection work of 31 October are written up, with the dates the seasons run
-  for (const said of ["Halloween looks", "Pumpkin patch", "until 2 November", "1 December", "until 6 January", "Seasonal pictures", "Overlays reconnect by themselves", "20 seconds for 15 minutes", "Twelve new fonts", "Six new designs for the song playing"]) assert.ok(html.includes(said), `the changelog says: ${said}`);
+  for (const said of ["Halloween looks", "Pumpkin patch", "until 2 November", "1 December", "until 6 January", "Seasonal pictures", "Overlays reconnect by themselves", "20 seconds for 15 minutes", "Twelve new fonts", "Six new designs for the song playing", "Use your own Spotify app"]) assert.ok(html.includes(said), `the changelog says: ${said}`);
 });
 
 test("the update banner sits above the menu where it scrolls away, appears once, and is not on the editor pages whose preview sticks under the top bar", () => {
