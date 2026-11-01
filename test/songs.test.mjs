@@ -255,10 +255,10 @@ test("a song asked for before is answered from the edge's memory, and nothing fo
 
 test("layouts: the song playing can be a card, a strip, a stack or a disc, and an overlay can show only the song or only the queue", async () => {
   const { SONG_LAYOUTS, SONG_SHOWS } = await import("../src/js/songs.js");
-  assert.deepEqual(SONG_LAYOUTS.map((l) => l[0]), ["card", "compact", "strip", "stack", "disc", "glass", "equalizer", "capsule", "poster", "boxy", "minimal", "macos", "shell", "discord"]);
+  assert.deepEqual(SONG_LAYOUTS.map((l) => l[0]), ["card", "compact", "strip", "stack", "disc", "glass", "equalizer", "capsule", "poster", "boxy", "minimal", "macos", "shell", "discord", "cassette", "turntable", "handheld", "kawaii", "polaroid", "neon"]);
   assert.deepEqual(SONG_SHOWS.map((l) => l[0]), ["both", "now", "queue"]);
   assert.deepEqual([SONGS.defaults.layout, SONGS.defaults.show], ["card", "both"], "what it was before: a card, and both");
-  for (const layout of ["card", "compact", "strip", "stack", "disc", "glass", "equalizer", "capsule", "poster", "boxy", "minimal", "macos", "shell", "discord"]) assert.equal(SONGS.sanitize({ layout }).layout, layout);
+  for (const layout of ["card", "compact", "strip", "stack", "disc", "glass", "equalizer", "capsule", "poster", "boxy", "minimal", "macos", "shell", "discord", "cassette", "turntable", "handheld", "kawaii", "polaroid", "neon"]) assert.equal(SONGS.sanitize({ layout }).layout, layout);
   assert.deepEqual([SONGS.defaults.progress, SONGS.defaults.scrollTitle], [true, true]);
   assert.equal(SONGS.sanitize({ layout: "<script>" }).layout, "card", "anything else falls back");
   assert.equal(SONGS.sanitize({ show: "now" }).show, "now");

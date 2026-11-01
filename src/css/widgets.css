@@ -366,3 +366,98 @@
 .goal .widget__deco .deco__spark--1 { top: -0.9em; left: 30%; right: auto; }
 .goal .widget__deco .deco__spark--2 { top: auto; bottom: 20%; right: -1.1em; }
 .goal .widget__deco .deco__spark--3 { bottom: -0.9em; left: 55%; }
+
+/* ── More ways the song playing can look: designs with their own artwork, drawn here in CSS ─────────────────────────────────────────────────────────────
+   cassette, turntable, handheld, kawaii (cat ears), polaroid, neon. The card carries every part (cover, words, progress, the four bars), and these use them as
+   pieces of the picture: the bars become the reels of a tape or floating notes, a pseudo-element is the tonearm or the buttons. */
+@keyframes song-note { 0% { transform: translateY(0.4em) scale(0.7); opacity: 0; } 25% { opacity: 1; } 100% { transform: translateY(-1.5em) scale(1.05); opacity: 0; } }
+@keyframes song-arm { from { transform: rotate(16deg); } to { transform: rotate(-26deg); } }
+@keyframes song-flicker { 0%, 18%, 22%, 62%, 66%, 100% { opacity: 1; } 20%, 64% { opacity: 0.55; } }
+
+/* cassette: a tape in its case. The label has the cover as a sticker and the words; two reels turn behind a little window. */
+.songs[data-layout="cassette"] .song--now { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 0.6em; width: min(100%, 17em); box-sizing: border-box; padding: 0.95em 1em 3.4em; font-size: 1em;
+  background: linear-gradient(var(--a-bg, #fff), var(--a-bg, #fff)) 0.55em 0.55em / calc(100% - 1.1em) calc(100% - 4em) no-repeat, var(--a-accent, #fc0); border: 0.14em solid rgba(0, 0, 0, 0.55); border-radius: 0.7em; box-shadow: 0 0.35em 0 rgba(0, 0, 0, 0.28); }
+.songs[data-layout="cassette"] .song--now::before { content: ""; position: absolute; left: 24%; right: 24%; bottom: 0.6em; height: 2.3em; border-radius: 1.2em; background: #24242c; border: 0.13em solid rgba(0, 0, 0, 0.65); box-shadow: inset 0 0.15em 0.3em rgba(0, 0, 0, 0.6); }
+.songs[data-layout="cassette"] .song--now::after { content: ""; position: absolute; inset: 0.28em; pointer-events: none; background: radial-gradient(circle at 0.18em 0.18em, #2b2b33 0 0.15em, transparent 0.17em), radial-gradient(circle at calc(100% - 0.18em) 0.18em, #2b2b33 0 0.15em, transparent 0.17em), radial-gradient(circle at 0.18em calc(100% - 0.18em), #2b2b33 0 0.15em, transparent 0.17em), radial-gradient(circle at calc(100% - 0.18em) calc(100% - 0.18em), #2b2b33 0 0.15em, transparent 0.17em); }
+.songs[data-layout="cassette"] .song--now .song__bars { display: flex; position: absolute; left: calc(24% + 0.5em); right: calc(24% + 0.5em); bottom: 0.78em; height: 1.95em; align-items: center; justify-content: space-between; }
+.songs[data-layout="cassette"] .song--now .song__bars i { width: 1.45em; height: 1.45em; border-radius: 50%; background: radial-gradient(circle, #24242c 0 0.2em, transparent 0.22em), repeating-conic-gradient(#f2eddf 0 24deg, #3b3b45 24deg 60deg); border: 0.16em solid #f2eddf; box-sizing: border-box; animation: song-spin 2.6s linear infinite; transform: none; }
+.songs[data-layout="cassette"] .song--now .song__bars i:nth-child(n+3) { display: none; }
+.songs[data-layout="cassette"] .song--now .song__art { width: 3.2em; height: 3.2em; border-radius: 0.2em; transform: rotate(-4deg); box-shadow: 0 0 0 0.14em #fff, 0 0.15em 0.35em rgba(0, 0, 0, 0.35); }
+.songs[data-layout="cassette"] .song--now .song__text { position: relative; z-index: 1; }
+.songs[data-layout="cassette"] .song--now .song__title { font-size: 1.05em; }
+.songs[data-layout="cassette"] .song:not(.song--now) { border-radius: 0.3em; border-left-width: 0.7em; }
+@media (prefers-reduced-motion: reduce) { .songs[data-layout="cassette"] .song--now .song__bars i { animation: none; } }
+
+/* turntable: a record player. The cover is the record's label, the record turns, and the tonearm swings onto it when a song starts. */
+.songs[data-layout="turntable"] .song--now { position: relative; display: flex; align-items: center; gap: 1em; width: min(100%, 16.5em); box-sizing: border-box; padding: 0.75em 1em 0.75em 0.75em; font-size: 1em; background: var(--a-accent, #fc0); border: 0.14em solid rgba(0, 0, 0, 0.5); border-radius: 0.55em; box-shadow: 0 0.35em 0 rgba(0, 0, 0, 0.28); }
+.songs[data-layout="turntable"] .song--now .song__art { width: 5.6em; height: 5.6em; border-radius: 50%; background: #14141a; box-shadow: 0 0 0 0.22em rgba(0, 0, 0, 0.3), 0 0 0 0.32em #d9dae2; overflow: hidden; animation: song-spin 5.5s linear infinite; }
+.songs[data-layout="turntable"] .song--now .song__img { left: 27%; top: 27%; width: 46%; height: 46%; border-radius: 50%; }
+.songs[data-layout="turntable"] .song--now .song__art::before { content: ""; position: absolute; inset: 0; border-radius: 50%; background: conic-gradient(from 30deg, rgba(255, 255, 255, 0.16), transparent 22%, rgba(255, 255, 255, 0.12) 50%, transparent 72%, rgba(255, 255, 255, 0.16)), repeating-radial-gradient(circle, transparent 0 0.1em, rgba(255, 255, 255, 0.07) 0.1em 0.14em); pointer-events: none; }
+.songs[data-layout="turntable"] .song--now .song__art::after { content: ""; position: absolute; left: 50%; top: 50%; width: 0.5em; height: 0.5em; margin: -0.25em 0 0 -0.25em; border-radius: 50%; background: #e7e8ee; box-shadow: 0 0 0 0.12em #14141a; }
+.songs[data-layout="turntable"] .song--now::after { content: ""; position: absolute; left: 3.7em; top: 0.9em; width: 3.7em; height: 0.2em; border-radius: 0.1em; background: linear-gradient(90deg, #f4f4f8, #b9bac6); box-shadow: 0 0.05em 0.15em rgba(0, 0, 0, 0.45); transform-origin: calc(100% - 0.2em) 50%; transform: rotate(-26deg); animation: song-arm 1400ms cubic-bezier(0.3, 0.9, 0.3, 1) both; }
+.songs[data-layout="turntable"] .song--now::before { content: ""; position: absolute; left: 7.25em; top: 0.62em; width: 0.8em; height: 0.8em; border-radius: 50%; background: radial-gradient(circle, #6b6c7a 0 0.14em, #d4d5de 0.16em); box-shadow: 0 0.06em 0.15em rgba(0, 0, 0, 0.45); z-index: 2; }
+.songs[data-layout="turntable"] .song--now .song__text { padding-left: 0.5em; position: relative; z-index: 1; }
+.songs[data-layout="turntable"] .song:not(.song--now) .song__art { border-radius: 50%; }
+@media (prefers-reduced-motion: reduce) { .songs[data-layout="turntable"] .song--now .song__art, .songs[data-layout="turntable"] .song--now::after { animation: none; } }
+
+/* handheld: a little game console. The screen is a green LCD in pixel letters with the cover in one color; a pad and two buttons below. */
+.songs[data-layout="handheld"] .song--now { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 0.7em; width: min(100%, 17em); box-sizing: border-box; padding: 1.15em 1.1em 4.1em; font: 400 0.78em/1.5 "Press Start 2P", ui-monospace, monospace; letter-spacing: 0; color: #0f380f;
+  background: linear-gradient(#9bbc0f, #9bbc0f) 0.7em 0.7em / calc(100% - 1.4em) calc(100% - 4.6em) no-repeat, #d3d5c6; border: 0.2em solid #8c8f7c; border-radius: 0.7em 0.7em 2.8em 0.7em; box-shadow: 0 0.4em 0 #8c8f7c, inset 0 0 0 0.12em #e9ebde; }
+.songs[data-layout="handheld"] .song--now::before { content: ""; position: absolute; left: 1.1em; bottom: 0.7em; width: 2.9em; height: 2.9em; background: linear-gradient(#35382d, #35382d) center / 100% 33% no-repeat, linear-gradient(#35382d, #35382d) center / 33% 100% no-repeat; filter: drop-shadow(0 0.1em 0 rgba(0, 0, 0, 0.3)); }
+.songs[data-layout="handheld"] .song--now::after { content: ""; position: absolute; right: 1em; bottom: 0.8em; width: 4.6em; height: 2.7em; background: radial-gradient(circle at 28% 68%, #a8325f 0 0.85em, transparent 0.9em), radial-gradient(circle at 76% 34%, #a8325f 0 0.85em, transparent 0.9em); filter: drop-shadow(0 0.1em 0 rgba(0, 0, 0, 0.3)); }
+.songs[data-layout="handheld"] .song--now .song__art { width: 3.6em; height: 3.6em; border-radius: 0; background: #9bbc0f; border: 0.14em solid #0f380f; }
+.songs[data-layout="handheld"] .song--now .song__img { mix-blend-mode: multiply; filter: grayscale(1) contrast(1.5) brightness(1.15); image-rendering: pixelated; }
+.songs[data-layout="handheld"] .song--now .song__label { color: #306230; font-size: 0.8em; }
+.songs[data-layout="handheld"] .song--now .song__title { font-size: 1em; }
+.songs[data-layout="handheld"] .song--now .song__artist, .songs[data-layout="handheld"] .song--now .song__by { color: #306230; opacity: 1; font-size: 0.7em; }
+.songs[data-layout="handheld"] .song--now .song__progress { height: 0.5em; border-radius: 0; background: #8bac0f; border: 0.1em solid #0f380f; }
+.songs[data-layout="handheld"] .song--now .song__progress i { background: #0f380f; border-radius: 0; }
+.songs[data-layout="handheld"] .song:not(.song--now) { font: 400 0.7em/1.5 "Press Start 2P", ui-monospace, monospace; color: #0f380f; background: #9bbc0f; border: 0.18em solid #0f380f; border-radius: 0; box-shadow: 0.2em 0.2em 0 #306230; }
+
+/* kawaii: a round cover with cat ears, in a soft pill, with little notes floating up */
+.songs[data-layout="kawaii"] .song--now { position: relative; display: flex; align-items: center; gap: 0.75em; margin-top: 1.1em; padding: 0.7em 1.5em 0.7em 0.7em; font-size: 1.05em; background: var(--a-bg, #fff); border: 0.18em solid var(--a-accent, #fc0); border-radius: 2.4em; box-shadow: 0 0.28em 0 var(--a-accent, #fc0); }
+.songs[data-layout="kawaii"] .song--now::before, .songs[data-layout="kawaii"] .song--now::after { content: ""; position: absolute; top: -1em; width: 1.5em; height: 1.4em; background: var(--a-accent, #fc0); clip-path: polygon(0 100%, 46% 0, 100% 100%); }
+.songs[data-layout="kawaii"] .song--now::before { left: 0.45em; transform: rotate(-12deg); }
+.songs[data-layout="kawaii"] .song--now::after { left: 3.05em; transform: rotate(12deg) scaleX(-1); }
+.songs[data-layout="kawaii"] .song--now .song__art { width: 4em; height: 4em; border-radius: 50%; border: 0.2em solid var(--a-accent, #fc0); box-sizing: border-box; box-shadow: 0 0 0 0.16em var(--a-bg, #fff); z-index: 1; }
+.songs[data-layout="kawaii"] .song--now .song__title { font-weight: 800; }
+.songs[data-layout="kawaii"] .song--now .song__by::before { content: "\2661\00a0"; color: var(--a-pop, #f48); }
+.songs[data-layout="kawaii"] .song--now .song__bars { display: block; position: absolute; right: 1em; top: 0; width: 3em; height: 100%; pointer-events: none; }
+.songs[data-layout="kawaii"] .song--now .song__bars i { position: absolute; top: 0.3em; display: block; width: auto; height: auto; background: none; font-style: normal; font-size: 0.9em; line-height: 1; color: var(--a-pop, #f48); opacity: 0; animation: song-note 2800ms ease-out infinite; transform: none; }
+.songs[data-layout="kawaii"] .song--now .song__bars i::before { content: "\266a"; }
+.songs[data-layout="kawaii"] .song--now .song__bars i:nth-child(2) { right: 0.2em; left: auto; animation-delay: -900ms; }
+.songs[data-layout="kawaii"] .song--now .song__bars i:nth-child(2)::before { content: "\266b"; }
+.songs[data-layout="kawaii"] .song--now .song__bars i:nth-child(3) { right: 1.5em; left: auto; animation-delay: -1800ms; }
+.songs[data-layout="kawaii"] .song--now .song__bars i:nth-child(4) { right: 2.4em; left: auto; animation-delay: -2300ms; }
+.songs[data-layout="kawaii"] .song--now .song__bars i:nth-child(4)::before { content: "\2661"; }
+.songs[data-layout="kawaii"] .song:not(.song--now) { border-radius: 2em; }
+@media (prefers-reduced-motion: reduce) { .songs[data-layout="kawaii"] .song--now .song__bars i { animation: none; opacity: 0.8; } }
+
+/* polaroid: a photo of the cover on paper, a piece of tape on top, the words written underneath */
+.songs[data-layout="polaroid"] .song--now { position: relative; flex-direction: column; align-items: stretch; gap: 0.5em; width: 10em; box-sizing: border-box; margin: 0.9em 0 0.5em 0.5em; padding: 0.6em 0.6em 0.8em; font-size: 1em; background: #fffdf4; color: #3b3326; border: 0; border-radius: 0.15em; box-shadow: 0 0.5em 1.1em rgba(0, 0, 0, 0.45), 0 0.05em 0.2em rgba(0, 0, 0, 0.3); transform: rotate(-3deg); }
+.songs[data-layout="polaroid"] .song--now::before { content: ""; position: absolute; left: 50%; top: -0.75em; width: 4.2em; height: 1.4em; margin-left: -2.1em; background: rgba(255, 226, 120, 0.8); box-shadow: 0 0.05em 0.12em rgba(0, 0, 0, 0.25); transform: rotate(2.5deg); }
+.songs[data-layout="polaroid"] .song--now .song__art { width: 100%; height: 8.6em; border-radius: 0.1em; box-shadow: inset 0 0 0 0.1em rgba(0, 0, 0, 0.1); }
+.songs[data-layout="polaroid"] .song--now .song__text { align-items: center; text-align: center; }
+.songs[data-layout="polaroid"] .song--now .song__title, .songs[data-layout="polaroid"] .song--now .song__artist, .songs[data-layout="polaroid"] .song--now .song__by { max-width: 100%; text-align: center; }
+.songs[data-layout="polaroid"] .song--now .song__label { color: #b3402f; }
+.songs[data-layout="polaroid"] .song--now .song__title { font-size: 1.1em; }
+.songs[data-layout="polaroid"] .song--now .song__progress { width: 100%; background: rgba(60, 50, 38, 0.18); }
+.songs[data-layout="polaroid"] .song--now .song__progress i { background: #b3402f; }
+.songs[data-layout="polaroid"] .song:not(.song--now) { background: #fffdf4; color: #3b3326; border: 0; border-radius: 0.15em; box-shadow: 0 0.2em 0.5em rgba(0, 0, 0, 0.35); transform: rotate(0.8deg); }
+.songs[data-layout="polaroid"] .song:not(.song--now):nth-child(even) { transform: rotate(-0.9deg); }
+
+/* neon: a glowing sign with a little grid horizon */
+.songs[data-layout="neon"] .song--now { position: relative; overflow: hidden; padding: 0.75em 1.3em 0.75em 0.75em; font-size: 1.1em; background: #0b0a15; color: #fff; border: 0.13em solid var(--a-accent, #fc0); border-radius: 0.45em; box-shadow: 0 0 0.5em var(--a-accent, #fc0), 0 0 1.5em var(--a-accent, #fc0), inset 0 0 0.7em var(--a-accent, #fc0); }
+.songs[data-layout="neon"] .song--now::before { content: ""; position: absolute; left: -10%; right: -10%; bottom: 0; height: 52%; background: repeating-linear-gradient(90deg, transparent 0 1em, var(--a-accent, #fc0) 1em calc(1em + 1px)), repeating-linear-gradient(0deg, transparent 0 0.55em, var(--a-accent, #fc0) 0.55em calc(0.55em + 1px)); opacity: 0.3; transform: perspective(7em) rotateX(58deg); transform-origin: 50% 100%; pointer-events: none; }
+.songs[data-layout="neon"] .song--now > * { position: relative; }
+.songs[data-layout="neon"] .song--now .song__art { width: 3.7em; height: 3.7em; border-radius: 0.3em; border: 0.12em solid var(--a-accent, #fc0); box-shadow: 0 0 0.7em var(--a-accent, #fc0); }
+.songs[data-layout="neon"] .song--now .song__title { color: #fff; font-weight: 800; text-shadow: 0 0 0.12em #fff, 0 0 0.45em var(--a-accent, #fc0), 0 0 1em var(--a-accent, #fc0); animation: song-flicker 7s linear infinite; }
+.songs[data-layout="neon"] .song--now .song__artist { color: #fff; opacity: 0.9; text-shadow: 0 0 0.5em var(--a-accent, #fc0); }
+.songs[data-layout="neon"] .song--now .song__label { color: var(--a-pop, #f48); text-shadow: 0 0 0.5em var(--a-pop, #f48); }
+.songs[data-layout="neon"] .song--now .song__by { color: #fff; opacity: 0.7; }
+.songs[data-layout="neon"] .song--now .song__progress { background: rgba(255, 255, 255, 0.15); }
+.songs[data-layout="neon"] .song--now .song__progress i { background: var(--a-pop, #f48); box-shadow: 0 0 0.6em var(--a-pop, #f48); }
+.songs[data-layout="neon"] .song:not(.song--now) { background: #0b0a15; color: #fff; border: 0.1em solid var(--a-accent, #fc0); border-radius: 0.4em; box-shadow: 0 0 0.45em var(--a-accent, #fc0), inset 0 0 0.4em var(--a-accent, #fc0); }
+@media (prefers-reduced-motion: reduce) { .songs[data-layout="neon"] .song--now .song__title { animation: none; } }
+/* the neon glow of the words would be cut to a box by the words' own clipping, so the words get room for it */
+.songs[data-layout="neon"] .song--now .song__title, .songs[data-layout="neon"] .song--now .song__artist { padding: 0.25em 0.4em; margin: -0.25em -0.4em; }

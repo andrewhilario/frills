@@ -20,6 +20,12 @@ export const SONG_LAYOUTS = [
   ["macos", "macOS: a desktop window with buttons"],
   ["shell", "Shell: a retro terminal window"],
   ["discord", "Discord: rich presence card"],
+  ["cassette", "Cassette: a tape with turning reels"],
+  ["turntable", "Turntable: a record player with a tonearm"],
+  ["handheld", "Handheld: a little game console screen"],
+  ["kawaii", "Cat ears: a cute pill with floating notes"],
+  ["polaroid", "Polaroid: a photo with the words under it"],
+  ["neon", "Neon: a glowing sign"],
 ];
 export const SONG_COVERS = [["auto", "The layout\u2019s own"], ["square", "Square"], ["round", "Round"], ["vinyl", "Vinyl: round and spinning"], ["none", "None: hide the cover"]];
 export const SONG_SHOWS = [["both", "The song playing and the queue"], ["now", "Only the song playing"], ["queue", "Only the queue"]];
