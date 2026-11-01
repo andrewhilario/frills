@@ -3,6 +3,8 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { SONGS, SongQueue, commandWord, loadSongs, makeLookup, parseCommand, saveSongs, songsKey } from "../src/js/songs.js";
 import { handleSongs, shape } from "../worker/songs.mjs";
 
@@ -267,6 +269,23 @@ test("layouts: the song playing can be a card, a strip, a stack or a disc, and a
   const params = new URL(link).searchParams;
   assert.deepEqual([params.get("layout"), params.get("show")], ["disc", "now"]);
   assert.equal(new URL(SONGS.url("https://x.example/o/")).searchParams.has("layout"), false, "the defaults are not written into the link");
+});
+
+test("the pictures the six song designs are drawn from are in the site, each one a real webp, with none left over and none missing", () => {
+  const root = join(import.meta.dirname, "..");
+  const css = readFileSync(join(root, "src", "css", "widgets.css"), "utf8");
+  const asked = [...new Set([...css.matchAll(/url\("(\/decor\/songs\/[a-z]+\/[a-z0-9-]+\.webp)"\)/g)].map((m) => m[1]))].sort();
+  assert.ok(asked.length >= 30, "the designs ask for their pictures");
+  for (const url of asked) {
+    const file = join(root, "public", url);
+    assert.ok(existsSync(file), `${url} is in public/`);
+    const bytes = readFileSync(file);
+    assert.equal(bytes.subarray(0, 4).toString("latin1") + bytes.subarray(8, 12).toString("latin1"), "RIFFWEBP", `${url} is a webp picture`);
+    assert.ok(statSync(file).size < 90 * 1024, `${url} is ${Math.round(statSync(file).size / 1024)} KB: small enough to load when a design uses it`);
+  }
+  const shipped = readdirSync(join(root, "public", "decor", "songs"), { recursive: true }).filter((f) => f.endsWith(".webp")).map((f) => "/decor/songs/" + f.replace(/\\/g, "/")).sort();
+  assert.deepEqual(shipped, asked, "every picture in the folder is used by a design, and the other way round (scripts/cut-song-sheets.mjs cuts the same ones)");
+  for (const design of ["cassette", "turntable", "handheld", "catears", "polaroid", "neon"]) assert.ok(asked.some((u) => u.startsWith(`/decor/songs/${design}/`)), `${design} has pictures`);
 });
 
 test("the practice catalog finds each practice song by its own words, not by a word they share", async () => {
