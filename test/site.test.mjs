@@ -8,7 +8,8 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { gzipSync } from "node:zlib";
 import { join, relative } from "node:path";
 import { site } from "../src/site.mjs";
-import { CONTROLS, DECOS, PRESETS } from "../src/js/settings.js";
+import { CONTROLS, PRESETS } from "../src/js/settings.js";
+import { DECO_IDS } from "../src/js/decor.js";
 
 const dist = join(import.meta.dirname, "..", "dist");
 if (!existsSync(join(dist, "index.html"))) throw new Error("dist/ is empty. Run `npm run build` first (`npm test` does that for you).");
@@ -397,7 +398,7 @@ test("the gifts, goal and likers pages have real text (how to add them, and ques
 
 test("each look-pack page has a live practice chat that really names its look and its pictures, an editor link with the same two, questions as headings, and links to the other packs", () => {
   const packs = ["neko-cafe", "frog-pond", "hamster-burrow", "bunny-cloud"];
-  const ids = new Set(DECOS.map((d) => d[0] ?? d.id));
+  const ids = new Set(DECO_IDS);
   for (const slug of packs) {
     const url = `/looks/${slug}/`;
     const { html } = pages.find((p) => p.url === url);
