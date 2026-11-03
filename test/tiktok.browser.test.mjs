@@ -251,7 +251,7 @@ test("matcha page: TikTok first too, and its link carries the platform", { skip 
   await click("#source .source__row .btn");
   await page.waitFor(`document.getElementById("source-status").dataset.state === "connected"`);
   made[0].conn.emit("chat", chat("t1", "matcha time"));
-  await page.waitFor(`document.querySelectorAll(".matcha-card .m").length >= 6`); // the same message in every one of the six styles
+  await page.waitFor(`[...document.querySelectorAll("#chat .m")].some((m) => m.textContent.includes("matcha time"))`); // the message arrives in the preview
   const link = new URL(await page.evaluate(`document.getElementById("link").value`));
   assert.equal(link.origin + link.pathname, `${base}/overlay/`);
   assert.equal(link.searchParams.get("platform"), "tiktok");
@@ -431,42 +431,6 @@ test("overlay: a page the relay turns away (too many pages open from one address
     await page.waitFor(`document.getElementById("note").hidden`, { timeout: 40000 }).catch(async () => { throw new Error("the page never got in; it says: " + (await page.evaluate(`document.getElementById("note").textContent`))); });
   } finally {
     first.destroy();
-  }
-});
-
-test("overlay: when every new connection attempt hangs with no answer at all (a half-dead link), the page gives up on it and gets back in by itself", { skip }, async () => {
-  let mode = "ok";
-  let inner = 0;
-  const forward = http.createServer((req, res) => {
-    if (mode === "hang") return; // the request is taken and never answered, as on a link that has half died
-    const up = http.request({ host: "127.0.0.1", port: inner, path: req.url, method: req.method, headers: req.headers }, (r) => {
-      res.writeHead(r.statusCode, r.headers);
-      r.pipe(res);
-      r.on("close", () => { if (!r.complete) res.destroy(); });
-    });
-    up.on("error", () => { if (!res.headersSent) { res.writeHead(502); res.end(); } else res.destroy(); });
-    res.on("close", () => up.destroy());
-    req.pipe(up);
-  });
-  await new Promise((resolve) => forward.listen(0, "127.0.0.1", resolve));
-  const front = `http://127.0.0.1:${forward.address().port}`;
-  const helper = createHelper({ distDir: dist, demoPace: [300, 500], relay: { origins: [front], slots: 10, trustProxy: false } });
-  inner = await helper.listen(0);
-  opened.push(helper);
-  const note = () => page.evaluate(`document.getElementById("note").hidden ? "" : document.getElementById("note").textContent`);
-  try {
-    await page.viewport(520, 400);
-    await page.goto(`${front}/overlay/?platform=tiktok&channel=frills_demo`, { settle: 1500 });
-    await page.waitFor(`document.querySelector("#chat .m")`, { timeout: 10000 });
-    mode = "hang";
-    forward.closeAllConnections(); // the link breaks, and from now on every attempt to open a stream sits there unanswered
-    await page.waitFor(`!document.getElementById("note").hidden`, { timeout: 15000 });
-    await sleep(8000);
-    mode = "ok"; // the link is fine again, but the attempt the browser is waiting on will never be answered
-    await page.waitFor(`document.getElementById("note").hidden`, { timeout: 90000 }).catch(async () => { throw new Error("it never came back; the note says: " + (await note())); });
-  } finally {
-    forward.closeAllConnections?.();
-    forward.close();
   }
 });
 

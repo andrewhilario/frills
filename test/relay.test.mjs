@@ -136,7 +136,8 @@ test("when every spot is taken the next accounts wait in line, are told their pl
 });
 
 test("two pages for the same waiting account share one place, and a page that reloads in time keeps its turn", async () => {
-  await start({ relay: { slots: 1 } });
+  // (a longer grace than the other tests: nothing here waits for it to run out, and 80 ms was not always enough for a reload on a busy computer)
+  await start({ relay: { slots: 1 }, queueGraceMs: 1500 });
   const a = listen("acct.a");
   await a.until(() => a.states().includes("connected"));
   const c1 = listen("acct.c");

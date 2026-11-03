@@ -2,7 +2,7 @@
 // No packages. Set CHROME_PATH if yours is somewhere unusual.
 
 import { spawn } from "node:child_process";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -19,6 +19,10 @@ const CANDIDATES = [
 ].filter(Boolean);
 
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// scripts/test.mjs sets FRILLS_TEST_SETTLE (a fraction, 0.5 by default there) to shorten the wait after a page has loaded: most tests wait for the very thing
+// they need anyway. The scripts that take pictures never set it, so they wait as long as they ask.
+const SETTLE_SCALE = Number(process.env.FRILLS_TEST_SETTLE) > 0 ? Number(process.env.FRILLS_TEST_SETTLE) : 1;
 
 /**
  * Waits until a server just started answers (any answer will do), for at most `ms`. The tests that start scripts/serve.mjs used to sleep a fixed
@@ -37,6 +41,24 @@ export async function waitForServer(url, ms = 20000) {
   }
 }
 
+/**
+ * Runs `work(item, page)` for every item on several browsers at once (each its own headless Chrome, all closed at the end). A sweep that visits
+ * a hundred pages one after another was the slowest test there was, and the visits don't depend on each other.
+ */
+export async function inParallel(items, work, { pages = 4 } = {}) {
+  const queue = [...items];
+  const opened = [];
+  try {
+    await Promise.all(Array.from({ length: Math.min(pages, queue.length) }, async () => {
+      const page = await launch();
+      opened.push(page);
+      while (queue.length) await work(queue.shift(), page);
+    }));
+  } finally {
+    await Promise.all(opened.map((p) => p.close()));
+  }
+}
+
 export function findChrome() {
   const found = CANDIDATES.find((p) => existsSync(p));
   if (!found) throw new Error("No Chrome or Edge found. Set CHROME_PATH to its executable.");
@@ -45,9 +67,8 @@ export function findChrome() {
 
 /** Starts a headless browser. Returns the page's controls, and close() when you're done. */
 export async function launch() {
-  const port = 9700 + Math.floor(Math.random() * 200);
   const profile = mkdtempSync(join(tmpdir(), "frills-chrome-"));
-  const chrome = spawn(findChrome(), ["--headless=new", `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`, "--no-first-run", "--hide-scrollbars", "--force-device-scale-factor=1", "--force-color-profile=srgb", "--disable-background-timer-throttling", "--disable-renderer-backgrounding", "about:blank"], { stdio: "ignore" });
+  const chrome = spawn(findChrome(), ["--headless=new", "--remote-debugging-port=0", `--user-data-dir=${profile}`, "--no-first-run", "--hide-scrollbars", "--force-device-scale-factor=1", "--force-color-profile=srgb", "--disable-background-timer-throttling", "--disable-renderer-backgrounding", "about:blank"], { stdio: "ignore" });
   const close = async () => {
     chrome.kill();
     await sleep(300);
@@ -56,8 +77,14 @@ export async function launch() {
     try { rmSync(profile, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 }); } catch { /* still held: it is only a temp folder */ }
   };
   try {
+    // The browser picks a free port itself and writes it into its profile folder. A port picked at random by us collided now and then once
+    // several browsers ran at once, and a test then drove somebody else's browser.
+    let port = 0;
+    for (let i = 0; i < 150 && !port; i++) {
+      try { port = Number(readFileSync(join(profile, "DevToolsActivePort"), "utf8").split("\n")[0]); } catch { await sleep(100); }
+    }
     let target;
-    for (let i = 0; i < 100 && !target; i++) {
+    for (let i = 0; i < 100 && port && !target; i++) {
       try { target = (await (await fetch(`http://127.0.0.1:${port}/json/list`)).json()).find((t) => t.type === "page"); } catch { /* not up yet */ }
       if (!target) await sleep(100);
     }
@@ -128,7 +155,7 @@ export async function launch() {
         arrived.catch(() => {}); // if the limit wins, what this does later is not an error
         try { await Promise.race([arrived, gaveUp]); } finally { clearTimeout(timer); }
         await api.evaluate("document.fonts.ready.then(() => true)");
-        await sleep(settle);
+        await sleep(settle * SETTLE_SCALE);
       },
       async waitFor(expression, { timeout = 8000 } = {}) {
         const start = Date.now();

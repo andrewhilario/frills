@@ -68,7 +68,7 @@ test("chat: the decorations never stick out past the page's edges, whatever the 
   for (const deco of ["frog", "frog2", "neko", "hamster", "bunny"]) {
     for (const side of ["left", "right"]) {
       for (const align of ["left", "center", "right"]) {
-        const out = await look(`/overlay/?demo=1&look=matcha&deco=${deco}&decoSide=${side}&tag=pill&pace=400`, align, `document.querySelectorAll("#chat .m .deco__corner").length >= 3`, `() => {
+        const out = await look(`/overlay/?demo=1&look=matcha&deco=${deco}&decoSide=${side}&tag=pill&pace=300`, align, `document.querySelectorAll("#chat .m .deco__corner").length >= 3`, `() => {
           const w = document.documentElement.clientWidth;
           let past = 0;
           for (const e of document.querySelectorAll("#chat .m [class*='deco']")) { const b = e.getBoundingClientRect(); if (b.width < 1) continue; past = Math.max(past, -b.left, b.right - w); }

@@ -15,8 +15,9 @@
     "tiktok": "node build.mjs && node helper/server.mjs",
     "relay": "node helper/server.mjs --relay",
     "tiktok:setup": "cd helper && npm install --ignore-scripts --no-audit --no-fund",
-    "test": "node build.mjs && node --test \"test/**/*.test.mjs\"",
-    "deploy": "node build.mjs && npx wrangler deploy"
+    "test": "node scripts/test.mjs",
+    "deploy": "node build.mjs && npx wrangler deploy",
+    "test:quick": "node scripts/test.mjs --quick"
   },
   "devDependencies": {
     "esbuild": "^0.28.2"
