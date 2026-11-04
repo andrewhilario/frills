@@ -37,42 +37,79 @@ const still = "demo=1&pace=10000&start=45&fromLive=0&target=100&step=0"; // a ba
 const open = (query) => page.goto(`${base}/overlay/goal/?${still}&${query}`, { settle: 600 });
 const css = (selector, property, pseudo = null) => page.evaluate(`getComputedStyle(document.querySelector(${JSON.stringify(selector)}), ${JSON.stringify(pseudo)}).getPropertyValue(${JSON.stringify(property)})`);
 
-test("goal designs: each one is drawn its own way on the overlay, and an unknown one is the classic bar", { skip }, async () => {
-  await open("barStyle=bar");
+const rect = (selector) => page.evaluate(`(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return { left: Math.round(r.left), right: Math.round(r.right), top: Math.round(r.top), bottom: Math.round(r.bottom) }; })()`);
+const near = (a, b, within = 1) => Math.abs(a - b) <= within;
+
+test("goal designs: each one is drawn its own way, as one piece (the words and the bar together, lined up), and an unknown one is the classic bar", { skip }, async () => {
+  await open("barStyle=bar&showPercent=1");
   assert.equal(await page.evaluate(`document.querySelector(".goal").dataset.style`), "bar");
-  const classicHeight = await css(".goal__track", "height");
   assert.equal(await css(".goal__track", "mask-image"), "none");
+  assert.equal(await css(".goal", "border-top-width"), "0px", "the classic goal is two boxes, not one card");
   const percent = Number(await page.evaluate(`document.querySelector(".goal").style.getPropertyValue("--p")`));
   assert.ok(percent >= 45 && percent <= 55, `the bar is at about 45 % (${percent})`);
 
-  await open("barStyle=candy");
-  assert.equal(await css(".goal__fill", "animation-name"), "goal-stripes", "candy stripes move");
-  assert.notEqual(await css(".goal__track", "height"), classicHeight, "and the bar is thicker");
+  // candy stripes: the words sit on the bar itself
+  await open("barStyle=candy&showPercent=1");
+  assert.equal(await css(".goal__fill", "animation-name"), "goal-stripes", "the stripes move");
+  const candy = { head: await rect(".goal__head"), track: await rect(".goal__track") };
+  assert.ok(candy.head.left >= candy.track.left && candy.head.right <= candy.track.right && candy.head.top >= candy.track.top && candy.head.bottom <= candy.track.bottom, `the words are on the bar: ${JSON.stringify(candy)}`);
+  assert.equal(await css(".goal__head", "background-color"), "rgba(0, 0, 0, 0)", "with no box of their own");
 
+  // the card designs: one card around the words and the bar, the words with no box of their own, and the words and the bar the same width
+  for (const design of ["blocks", "hearts", "stars", "neon"]) {
+    await open(`barStyle=${design}&showPercent=1`);
+    assert.notEqual(await css(".goal", "border-top-width"), "0px", `${design}: one card around everything`);
+    assert.equal(await css(".goal__head", "background-color"), "rgba(0, 0, 0, 0)", `${design}: the words have no box of their own`);
+    assert.equal(await css(".goal__head", "border-top-width"), "0px");
+    const head = await rect(".goal__head");
+    const track = await rect(".goal__track");
+    const card = await rect(".goal");
+    assert.ok(near(head.left, track.left) && near(head.right, track.right), `${design}: the words and the bar line up (${JSON.stringify([head, track])})`);
+    assert.ok(track.left > card.left && track.right < card.right && head.top > card.top && track.bottom < card.bottom, `${design}: both are inside the card`);
+  }
   await open("barStyle=blocks");
-  assert.equal(await css(".goal__track", "content", "::after") !== "none", true, "blocks: the gaps between the blocks are drawn over the fill");
-
+  assert.notEqual(await css(".goal__track", "content", "::after"), "none", "blocks: the gaps between the blocks are drawn over the fill");
   for (const shape of ["hearts", "stars"]) {
     await open(`barStyle=${shape}`);
     assert.match(await css(".goal__track", "mask-image"), /svg/, `${shape}: the track is cut to little shapes`);
-    assert.equal(await css(".goal__track", "border-top-width"), "0px");
   }
-
   await open("barStyle=neon");
-  assert.notEqual(await css(".goal__track", "box-shadow"), "none", "neon glows");
+  assert.notEqual(await css(".goal", "box-shadow"), "none", "neon glows, card and all");
 
-  await open("barStyle=ring");
+  // the ring: a card with the ring, the percent in the middle of it, and the name and the count beside it
+  await open("barStyle=ring&showPercent=1");
   assert.equal(await css(".goal__track", "border-radius"), "50%", "the ring is a circle");
   assert.equal(await css(".goal__track", "width"), await css(".goal__track", "height"));
   assert.match(await css(".goal__track", "background-image"), /conic-gradient/);
   assert.equal(await css(".goal__fill", "display"), "none");
-  const inside = await page.evaluate(`(() => { const ring = document.querySelector(".goal__track").getBoundingClientRect(); const n = document.querySelector(".goal__numbers").getBoundingClientRect(); return [Math.round(n.left + n.width / 2 - (ring.left + ring.width / 2)), Math.round(n.top + n.height / 2 - (ring.top + ring.height / 2))]; })()`);
-  assert.deepEqual(inside, [0, 0], "the numbers are in the middle of the ring");
-  assert.doesNotMatch(await page.evaluate(`document.querySelector(".goal__numbers").textContent`), /followers|diamonds|likes/, "the ring shows no unit");
+  const ring = await rect(".goal__track");
+  const pct = await rect(".goal__pct");
+  assert.ok(near(pct.left + pct.right, ring.left + ring.right, 2) && near(pct.top + pct.bottom, ring.top + ring.bottom, 2), "the percent is in the middle of the ring");
+  assert.match(await page.evaluate(`document.querySelector(".goal__pct").textContent`), /^\d+%$/);
+  const label = await rect(".goal__label");
+  const numbers = await rect(".goal__numbers");
+  assert.ok(label.left >= ring.right && numbers.left >= ring.right, "the name and the count are beside the ring");
+  assert.ok(label.top >= ring.top && numbers.bottom <= ring.bottom, "and level with it");
+  assert.doesNotMatch(await page.evaluate(`document.querySelector(".goal__numbers").textContent`), /%/, "the percent is not said twice");
 
   await open("barStyle=%3Cscript%3E");
   assert.equal(await page.evaluate(`document.querySelector(".goal").dataset.style`), "bar");
   assert.deepEqual(page.problems, [], page.problems.join(" | "));
+});
+
+test("goal designs: the small ones (hearts, stars, ring) sit where the alignment says, left, center or right", { skip }, async () => {
+  const width = Number(await page.evaluate("innerWidth"));
+  for (const design of ["hearts", "stars", "ring"]) {
+    await open(`barStyle=${design}&align=left`);
+    let box = await rect(".goal");
+    assert.ok(near(box.left, width * 0.04, 2), `${design} left: starts at the left margin (${box.left})`);
+    await open(`barStyle=${design}&align=center`);
+    box = await rect(".goal");
+    assert.ok(near(box.left + box.right, width, 3), `${design} center: in the middle (${JSON.stringify(box)})`);
+    await open(`barStyle=${design}&align=right`);
+    box = await rect(".goal");
+    assert.ok(near(box.right, width * 0.96, 2), `${design} right: ends at the right margin (${box.right})`);
+  }
 });
 
 test("goal designs: the editor offers them as choices, the preview changes at once, and the link carries the design and the sound", { skip }, async () => {

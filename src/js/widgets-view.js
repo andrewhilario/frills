@@ -128,12 +128,13 @@ export function createGoalView(host) {
   const label = el("span", { className: "goal__label" });
   const numbers = el("span", { className: "goal__numbers" });
   const track = el("div", { className: "goal__track" });
+  const pct = el("span", { className: "goal__pct" }); // (only the ring design shows it: inside the ring)
   const fill = el("div", { className: "goal__fill" });
   const cheer = el("p", { className: "goal__cheer", hidden: true });
   const fx = el("span", { className: "alert__fx goal__fx" });
   fx.setAttribute("aria-hidden", "true");
   track.append(fill);
-  root.append(el("div", { className: "goal__head" }, label, numbers), track, cheer, fx);
+  root.append(el("div", { className: "goal__head" }, label, numbers), track, pct, cheer, fx);
   let settings = null;
   let last = null;
 
@@ -141,11 +142,11 @@ export function createGoalView(host) {
     if (!settings || !last) return;
     const type = GOAL_TYPES[settings.type] ?? GOAL_TYPES.follow;
     label.textContent = settings.label || type.label;
-    const ring = settings.barStyle === "ring"; // (the numbers sit inside a small circle: no unit, and the percent on its own line)
     const parts = [];
-    if (settings.showNumbers) parts.push(`${last.value.toLocaleString("en-US")} / ${last.goal.toLocaleString("en-US")}${type.unit && !ring ? " " + type.unit : ""}`);
-    if (settings.showPercent) parts.push(`${last.percent}%`);
-    numbers.textContent = parts.join(ring ? "\n" : "  ·  ");
+    if (settings.showNumbers) parts.push(`${last.value.toLocaleString("en-US")} / ${last.goal.toLocaleString("en-US")}${type.unit ? " " + type.unit : ""}`);
+    if (settings.showPercent && settings.barStyle !== "ring") parts.push(`${last.percent}%`); // (the ring shows the percent inside itself)
+    numbers.textContent = parts.join("  ·  ");
+    pct.textContent = settings.showPercent ? `${last.percent}%` : "";
     fill.style.width = last.percent + "%";
     root.style.setProperty("--p", String(last.percent)); // (the ring design is drawn from this)
     root.dataset.full = String(last.percent >= 100);
