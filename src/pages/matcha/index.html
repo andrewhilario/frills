@@ -5,54 +5,97 @@
   "path": "/matcha/",
   "css": "matcha",
   "js": "matcha",
-  "bodyClass": "page-matcha",
+  "bodyClass": "page-editor page-matcha",
   "chrome": "appbar",
   "footer": false,
   "noindex": true,
   "listed": false
 }
 -->
-<main class="shell" id="main">
-  <div class="matcha-head">
-    <h1 class="display">Matcha chat styles</h1>
-    <p class="lede">Six looks for the chat box, on made-up messages or on {{matchaLede}}. Pick a palette, a mod icon, little pictures to go with the bubbles (a frog pond, a cat cafe) and a background, change anything you like under More options, then use the style you like best and copy its link.</p>
-  </div>
-
-  <div class="matcha-tools">
-    <div class="matcha-tools__row"><span class="label">Palette</span><div class="chips" id="palettes" role="group" aria-label="Palette"></div></div>
-    <div class="matcha-tools__row"><span class="label">Mod icon</span><div class="chips" id="icons" role="group" aria-label="Moderator icon"></div></div>
-    <div class="matcha-tools__row"><span class="label">Pictures</span><div class="chips" id="decos" role="group" aria-label="Pictures on the bubbles"></div></div>
-    <div class="matcha-tools__row"><span class="label">Behind it</span><div class="chips" id="backs" role="group" aria-label="Background"></div></div>
-    <details class="more matcha-more">
-      <summary>More options</summary>
-      <div class="stack" id="more-controls"></div>
-      <p class="matcha-more__foot"><button class="btn btn--soft btn--sm" type="button" id="more-reset">Reset these options</button></p>
-    </details>
-    {{>source-checklist}}
-    <div id="source"></div>
-  </div>
-
-  <div class="matcha-grid" id="matcha-grid"></div>
-
-  <section class="matcha-alerts" aria-labelledby="alerts-title">
-    <h2 class="subtitle" id="alerts-title">Frog pond alerts</h2>
-    <p>Follows, gifts and shares pop up on a card with a frog peeking over the top and a lily pad with a lotus on the corner, in the same matcha colors. Below are made-up examples; use the same TikTok name as above.</p>
-    <div class="matcha-card__stage matcha-alerts__stage" id="alerts-stage"></div>
-    <div class="matcha-link__row">
-      <input type="text" id="alerts-link" readonly placeholder="Appears once you type a name" spellcheck="false" autocomplete="off" aria-label="Your alerts link">
-      <button class="btn" type="button" id="copy-alerts-link" disabled>Copy alerts link</button>
+<main class="workspace" id="main" data-mode="matcha">
+  <section class="preview" id="preview" data-back="dark" data-view="chat" aria-label="Live preview of your matcha chat">
+    <div class="preview__bar">
+      <div class="preview__tabs" role="group" aria-label="What to preview">
+        <button class="chip" type="button" id="view-chat" aria-pressed="true">Chat</button>
+        <button class="chip" type="button" id="view-alerts" aria-pressed="false">Frog pond alerts</button>
+      </div>
+      <div id="preview-width"></div>
+      <label class="visually-hidden" for="backdrop">What sits behind the preview</label>
+      <select id="backdrop">
+        <option value="dark">Dark game</option>
+        <option value="bright">Bright game</option>
+        <option value="busy">Busy scene</option>
+        <option value="checker">See-through</option>
+      </select>
     </div>
-    <p class="linkfield__hint" id="alerts-hint" role="status"></p>
-    <p class="matcha-alerts__edit"><a class="btn btn--soft btn--sm" id="alerts-edit" href="/matcha/alerts/">Matcha alerts editor</a> A private editor for these alerts: change the card style, the colors, the words, the sounds and where the alert sits.</p>
+    <div class="chatstage" id="stage" aria-hidden="true"><div class="chatbox" id="chat"></div></div>
+    <div class="matcha-alerts__stage" id="alerts-stage" aria-hidden="true"></div>
   </section>
 
-  <section class="matcha-link" aria-labelledby="link-title">
-    <h2 class="subtitle" id="link-title">Your link</h2>
-    <p>Paste it into a Browser source in your streaming app. The style you picked has a dark outline around its card.</p>
-    <div class="matcha-link__row">
-      <input type="text" id="link" readonly placeholder="Appears once you type a name" spellcheck="false" autocomplete="off" aria-label="Your link">
-      <button class="btn" type="button" id="copy-link" disabled>Copy link</button>
-    </div>
-    <p class="linkfield__hint" id="link-hint" role="status"></p>
-  </section>
+  <div class="panel">
+    <noscript><p class="note">Frills needs JavaScript to draw your chat. Turn it on for this page and reload.</p></noscript>
+    <header class="panel__intro">
+      <h1 class="panel__title">Matcha chat styles</h1>
+      <p class="panel__lede">Six matcha-green looks for your chat, on made-up messages or on {{matchaLede}}. Pick one, change anything you like and copy its link.</p>
+    </header>
+
+    <section class="step-card" aria-labelledby="s1">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">1</span>
+        <h2 class="step-card__title" id="s1">Pick a style</h2>
+      </div>
+      <div class="stack">
+        <div class="ctl ctl--wide"><span class="ctl__label">Style</span><div class="chips" id="styles" role="group" aria-label="Chat style"></div><small class="ctl__hint" id="style-note"></small></div>
+        <div class="ctl ctl--wide"><span class="ctl__label">Palette</span><div class="chips" id="palettes" role="group" aria-label="Palette"></div></div>
+        <div class="ctl ctl--wide"><span class="ctl__label">Mod icon</span><div class="chips" id="icons" role="group" aria-label="Moderator icon"></div></div>
+        <div class="ctl ctl--wide"><span class="ctl__label">Pictures</span><div class="chips" id="decos" role="group" aria-label="Pictures on the bubbles"></div><small class="ctl__hint">Little pictures that sit on the bubbles: a frog pond, a cat cafe and more.</small></div>
+      </div>
+      <details class="more matcha-more">
+        <summary>More options</summary>
+        <div class="stack" id="more-controls"></div>
+        <p class="matcha-more__foot"><button class="btn btn--soft btn--sm" type="button" id="more-reset">Reset these options</button></p>
+      </details>
+    </section>
+
+    <section class="step-card" aria-labelledby="s2">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">2</span>
+        <h2 class="step-card__title" id="s2">Connect your chat</h2>
+      </div>
+      {{>source-checklist}}
+      <div id="source"></div>
+    </section>
+
+    <section class="step-card" aria-labelledby="s3">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">3</span>
+        <h2 class="step-card__title" id="s3">Add it to your stream</h2>
+      </div>
+      <div class="linkfield">
+        <label class="ctl__label" for="link">Your link</label>
+        <input type="text" id="link" readonly placeholder="Appears once you type a name" spellcheck="false" autocomplete="off">
+        <div class="linkfield__actions">
+          <button class="btn" type="button" id="copy-link" disabled>Copy link</button>
+        </div>
+        <p class="linkfield__hint" id="link-hint" role="status"></p>
+      </div>
+    </section>
+
+    <section class="step-card" aria-labelledby="alerts-title">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">4</span>
+        <h2 class="step-card__title" id="alerts-title">Frog pond alerts</h2>
+      </div>
+      <p class="matcha-alerts__text">Follows, gifts and shares pop up on a card with a frog peeking over the top and a lily pad with a lotus on the corner, in the same matcha colors. Press “Frog pond alerts” above the preview to see them on made-up examples. Use the same TikTok name as in step 2.</p>
+      <div class="linkfield">
+        <label class="ctl__label" for="alerts-link">Your alerts link</label>
+        <input type="text" id="alerts-link" readonly placeholder="Appears once you type a name" spellcheck="false" autocomplete="off">
+        <div class="linkfield__actions">
+          <button class="btn" type="button" id="copy-alerts-link" disabled>Copy alerts link</button>
+        </div>
+        <p class="linkfield__hint" id="alerts-hint" role="status"></p>
+      </div>
+      <p class="matcha-alerts__edit"><a class="btn btn--soft btn--sm" id="alerts-edit" href="/matcha/alerts/">Matcha alerts editor</a> A private editor for these alerts: change the card style, the colors, the words, the sounds and where the alert sits.</p>
+    </section>
+  </div>
 </main>

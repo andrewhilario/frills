@@ -147,14 +147,14 @@ test("the chat editor: the decoration settings appear when a pack is picked and 
   await page.waitFor(`document.querySelectorAll("#chat .m .deco").length === 0`);
 });
 
-test("the matcha page has a Pictures choice up front: Frog pond puts the frog on a lily pad on the cards, and it stays in step with More options", { skip }, async () => {
+test("the matcha page has a Pictures choice up front: Frog pond puts the frog on a lily pad on the bubbles, and it stays in step with More options", { skip }, async () => {
   await page.viewport(1280, 900);
   await page.goto(`${base}/matcha/`, { settle: 900 });
   const pressed = () => page.evaluate(`[...document.querySelectorAll("#decos .chip")].filter((b) => b.getAttribute("aria-pressed") === "true").map((b) => b.textContent.trim())`);
   assert.deepEqual(await pressed(), ["None"]);
   assert.equal(await page.evaluate(`document.querySelectorAll(".chatbox .deco").length`), 0);
   await page.evaluate(`[...document.querySelectorAll("#decos .chip")].find((b) => b.textContent.trim() === "Frog pond").click()`);
-  await page.waitFor(`document.querySelectorAll(".chatbox .deco img.deco__corner").length >= 6`, { timeout: 15000 });
+  await page.waitFor(`new Set([...document.querySelectorAll(".chatbox .deco img.deco__corner")].map((i) => i.src)).size >= 2`, { timeout: 25000 });
   const seen = await page.evaluate(`[...new Set([...document.querySelectorAll(".chatbox .deco img.deco__corner")].map((i) => i.src.split("/").pop()))].sort()`);
   assert.deepEqual(seen, ["corner-lily.webp", "corner-pond.webp"], "the frog on its lily pad and the lotus both turn up");
   const rows = await page.evaluate(`[...document.querySelectorAll("#more-controls > *")].filter((r) => r.style.display !== "none").map((r) => r.querySelector(".ctl__label")?.textContent.trim())`);

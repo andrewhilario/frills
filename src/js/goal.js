@@ -2,7 +2,19 @@
 // is counted comes from what the relay sends. For followers the bar can start from the account's real follower count, which the relay
 // reads from TikTok when it connects; the number typed in the editor is used when it cannot.
 
-import { defineWidget, number, selectOf, text, toggle } from "./widget-settings.js";
+import { SOUNDS } from "./alerts-settings.js";
+import { chipsOf, defineWidget, number, selectOf, text, toggle } from "./widget-settings.js";
+
+/** The designs of the bar. Each one is drawn by widgets.css from `data-style` on the goal. */
+export const GOAL_STYLES = [
+  { id: "bar", name: "Classic" },
+  { id: "candy", name: "Candy stripes" },
+  { id: "blocks", name: "Blocks" },
+  { id: "hearts", name: "Hearts" },
+  { id: "stars", name: "Stars" },
+  { id: "neon", name: "Neon glow" },
+  { id: "ring", name: "Ring" },
+];
 
 /** What a goal can count. `kind` is the relay event it listens for; `small` and `big` are what the editor's test buttons add. */
 export const GOAL_TYPES = {
@@ -21,9 +33,10 @@ export function goalAmount(type, event) {
 }
 
 export const GOAL = defineWidget({
-  defaults: { type: "follow", label: "", start: 0, fromLive: true, target: 100, step: 25, showNumbers: true, showPercent: false, celebrate: true, celebrateText: "Goal reached! Thank you!", keep: false },
+  defaults: { type: "follow", barStyle: "bar", label: "", start: 0, fromLive: true, target: 100, step: 25, showNumbers: true, showPercent: false, celebrate: true, celebrateSound: "none", celebrateText: "Goal reached! Thank you!", keep: false },
   controls: [
     { section: "goal", ...selectOf("type", "What the goal counts", Object.entries(GOAL_TYPES).map(([id, t]) => [id, t.name]), "Followers count each new follow. Gifts count diamonds, the way TikTok measures them. Likes count taps.") },
+    { section: "goal", ...chipsOf("barStyle", "Bar design", GOAL_STYLES.map((s) => [s.id, s.name])) },
     { section: "goal", ...text("label", "Label", 40, "Leave it empty to use the name of the goal type.") },
     { section: "goal", ...number("start", "Starts at", 0, 100000000, { hint: "The bar starts from this and adds what it sees." }) },
     { section: "goal", ...toggle("fromLive", "Followers: start from the account's real count", "Read from TikTok when the overlay connects, so you do not have to type it. If it cannot be read, the number above is used.") },
@@ -32,6 +45,7 @@ export const GOAL = defineWidget({
     { section: "goal", ...toggle("showNumbers", "Show the numbers (37 / 50)") },
     { section: "goal", ...toggle("showPercent", "Show the percent") },
     { section: "goal", ...toggle("celebrate", "Celebrate when the goal is reached") },
+    { section: "goal", ...selectOf("celebrateSound", "Celebration sound", SOUNDS.map(({ id, name }) => [id, name]), "Played when the goal is reached, together with the celebration. No sound keeps it quiet. A streaming app may need to be allowed to play sound.") },
     { section: "goal", ...text("celebrateText", "Celebration words", 60) },
     { section: "goal", ...toggle("keep", "Remember the count if the page reloads", "Kept only in this browser or streaming app. Off starts again each time the page loads.") },
   ],

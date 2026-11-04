@@ -1,4 +1,5 @@
-// The matcha page: six styles side by side, a palette, a mod icon and "More options" to pick, and the link for the style you choose.
+// The matcha page, laid out like the editor: one live preview that stays put, and beside it a style, a palette, a mod icon, pictures and "More options" to pick,
+// where chat comes from, and the links (the chat, and the frog pond alerts, which have a second preview behind a tab).
 
 import { Feed, ICONS, el } from "./feed.js";
 import { MATCHA_CONTROLS, MATCHA_DEFAULTS, MATCHA_PALETTES, MATCHA_STYLES, currentPalette, matchaFromParams, matchaOverlayUrl, paletteColors, sanitizeMatcha } from "./matcha.js";
@@ -22,45 +23,46 @@ const saved = load();
 const fromLink = Object.fromEntries(Object.entries(matchaFromParams(params)).filter(([, value]) => value !== null && value !== undefined && !Number.isNaN(value)));
 let settings = sanitizeMatcha({ ...saved?.settings, ...fromLink });
 
-// The frog pond alerts: the alerts page's Matcha look wearing the frog pond pictures (a setting that only the Matcha editor offers).
+const preview = $("preview");
+const stage = $("stage");
+const feed = new Feed($("chat"));
+
+// The frog pond alerts: the alerts page's Matcha look wearing the frog pond pictures (a setting that only the Matcha editor offers). The practice page is
+// only loaded when its tab is first opened, and it is 1080 wide by 560 high: it is shrunk to the room the preview has.
 const ALERT_FROG = { ...ALERT_DEFAULTS, ...ALERT_LOOKS.matcha, deco: "frog2" };
 const alertsStage = $("alerts-stage");
-const alertsFrame = el("iframe", { className: "matcha-alerts__frame", title: "Frog pond alerts on made-up follows, gifts and shares", loading: "lazy", tabIndex: -1 });
-alertsFrame.setAttribute("aria-hidden", "true");
-alertsFrame.src = alertsUrl("/overlay/alerts/", { settings: ALERT_FROG }) + "&demo=1&pace=2400&maxShown=1&vpos=middle&hpos=center";
-alertsStage.append(alertsFrame);
-/** The practice alerts page is 1080 wide; shrink it to the room there is. */
+let alertsFrame = null;
 const fitAlerts = () => {
-  const k = Math.max(0.1, alertsStage.clientWidth / 1080);
-  alertsFrame.style.transform = `scale(${k.toFixed(4)})`;
-  alertsStage.style.height = Math.round(560 * k) + "px";
+  if (!alertsFrame) return;
+  const w = alertsStage.clientWidth;
+  const h = alertsStage.clientHeight;
+  const k = Math.max(0.1, Math.min(w / 1080, h / 560));
+  alertsFrame.style.transform = `translate(${Math.round((w - 1080 * k) / 2)}px, ${Math.round((h - 560 * k) / 2)}px) scale(${k.toFixed(4)})`;
 };
 new ResizeObserver(fitAlerts).observe(alertsStage);
-fitAlerts();
+function showView(view) {
+  preview.dataset.view = view;
+  $("view-chat").setAttribute("aria-pressed", String(view === "chat"));
+  $("view-alerts").setAttribute("aria-pressed", String(view === "alerts"));
+  if (view === "alerts" && !alertsFrame) {
+    alertsFrame = el("iframe", { className: "matcha-alerts__frame", title: "Frog pond alerts on made-up follows, gifts and shares", tabIndex: -1 });
+    alertsFrame.setAttribute("aria-hidden", "true");
+    alertsFrame.src = alertsUrl("/overlay/alerts/", { settings: ALERT_FROG }) + "&demo=1&pace=2400&maxShown=1&vpos=middle&hpos=center";
+    alertsStage.append(alertsFrame);
+  }
+  fitAlerts();
+}
+$("view-chat").addEventListener("click", () => showView("chat"));
+$("view-alerts").addEventListener("click", () => showView("alerts"));
 
-const grid = $("matcha-grid");
-const cards = MATCHA_STYLES.map((style, index) => {
-  const stage = el("div", { className: "chatstage" });
-  const chat = el("div", { className: "chatbox" });
-  stage.append(chat);
-  const pick = el("button", { type: "button", className: "btn btn--soft btn--sm", textContent: "Use this style" });
-  pick.addEventListener("click", () => {
-    settings.style = style.id;
-    refresh();
-  });
-  const card = el(
-    "article",
-    { className: "matcha-card" },
-    el("div", { className: "matcha-card__head" }, el("h2", { className: "subtitle", textContent: `${index + 1} · ${style.name}` }), el("p", { textContent: style.note })),
-    el("div", { className: "matcha-card__stage", id: `stage-${style.id}` }, stage),
-    el("div", { className: "matcha-card__foot" }, pick),
-  );
-  grid.append(card);
-  return { style, stage, card, feed: new Feed(chat), back: card.querySelector(".matcha-card__stage") };
+// The six styles: one row of choices, and a line about the one picked.
+const styleChips = chips($("styles"), MATCHA_STYLES.map((s) => ({ id: s.id, name: s.name })), settings.style, (item) => {
+  settings.style = item.id;
+  refresh();
 });
 
 function paintAll() {
-  for (const c of cards) c.feed.configure(paintMatcha(c.stage, { ...settings, style: c.style.id }));
+  feed.configure(paintMatcha(stage, settings));
 }
 
 function save() {
@@ -69,13 +71,14 @@ function save() {
 
 function refresh() {
   paintAll();
-  for (const c of cards) c.card.dataset.picked = String(c.style.id === settings.style);
+  styleChips.set(settings.style);
+  $("style-note").textContent = MATCHA_STYLES.find((s) => s.id === settings.style)?.note ?? "";
   const both = source.platform === "both";
   const names = both ? source.cleanChannels() : null; // in "both" the link needs each of the two accounts
   const channel = source.cleanChannel();
   const ready = both ? Boolean(names.tiktok && names.twitch) : Boolean(channel);
   const on = both && settings.source !== "none"; // one chat reading TikTok and Twitch: a small icon before each name
-  for (const c of cards) c.feed.configure({ markPlatform: on });
+  feed.configure({ markPlatform: on });
   link.value = ready ? matchaOverlayUrl(`${location.origin}/overlay/`, { channel, settings, platform: source.platform, both: names }) : "";
   copyBtn.disabled = !ready;
   const alertName = both ? names.tiktok : channel; // alerts come from one account: in "Both" it is the TikTok one
@@ -87,7 +90,7 @@ function refresh() {
   save();
 }
 
-// ── The quick choices: palette, mod icon, what sits behind the chat ───────────────────────────────────────────────────────
+// ── The quick choices: palette, mod icon, pictures, and the preview's backdrop and width ───────────────────────────────────────────────────────
 const paletteChips = chips(
   $("palettes"),
   Object.entries(MATCHA_PALETTES).map(([id, p]) => ({ id, name: p.name, dot: p.matcha })),
@@ -117,12 +120,9 @@ const decoChips = chips(
     refresh();
   },
 );
-chips(
-  $("backs"),
-  [{ id: "dark", name: "Dark game" }, { id: "bright", name: "Bright game" }, { id: "busy", name: "Busy scene" }],
-  "dark",
-  (item) => { cards.forEach((c) => { c.back.dataset.back = item.id; }); $("alerts-stage").dataset.back = item.id; },
-);
+$("backdrop").addEventListener("change", (event) => { preview.dataset.back = event.target.value; });
+const width = buildControl({ key: "previewW", type: "range", label: "Width", min: 280, max: 720, step: 10, unit: " px" }, 440, (value) => $("chat").style.setProperty("--preview-w", value + "px"), { id: "c-previewW" });
+$("preview-width").append(width.row);
 
 // ── More options: built from the same kind of list the editor uses ────────────────────────────────────────────────────────
 const writers = {};
@@ -169,7 +169,7 @@ const named = params.has("tiktok") || params.has("twitch") ? sourcesOf(params) :
 const wanted = named.length === 2 ? "both" : named.length === 1 ? named[0].platform : params.get("platform");
 const channelFromLink = named.length ? named[0].channel : params.get("channel") ?? "";
 const source = mountSource($("source"), {
-  feeds: cards.map((c) => c.feed),
+  feeds: [feed],
   pace: () => [900, 1900],
   channel: channelFromLink || saved?.channel || "",
   twitch: named.length === 2 ? named[1].channel : saved?.twitch ?? "",

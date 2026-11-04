@@ -6,6 +6,7 @@ import { GOAL, GOAL_TYPES, GoalState, goalAmount, loadGoal, saveGoal } from "./g
 import { createGoalView } from "./widgets-view.js";
 import { channelFromParams, connectEvents } from "./widget-overlay.js";
 import { fontsReady, generalFaces } from "./look.js";
+import { createSounds } from "./sounds.js";
 
 const params = new URLSearchParams(location.search);
 const settings = GOAL.sanitize(GOAL.fromParams(params));
@@ -17,6 +18,7 @@ const say = (text) => { note.hidden = !text; note.textContent = text; };
 const channel = channelFromParams(params);
 const demo = params.get("demo") === "1";
 
+const sounds = createSounds();
 const view = createGoalView(document.getElementById("goal"));
 view.apply(settings);
 const remembered = settings.keep && channel ? loadGoal(globalThis.localStorage, channel, settings.type) : null;
@@ -28,7 +30,10 @@ const state = new GoalState(settings, {
     if (settings.keep && channel) saveGoal(globalThis.localStorage, channel, state);
   },
   onReach: async () => {
-    if (settings.celebrate) await view.celebrate(settings.celebrateText);
+    if (settings.celebrate) {
+      sounds.play(settings.celebrateSound, { volume: 70, tier: 3 }); // ("No sound" is not a sound, so it plays nothing)
+      await view.celebrate(settings.celebrateText);
+    }
     state.raise();
   },
 });

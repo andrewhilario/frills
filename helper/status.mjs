@@ -38,7 +38,7 @@ export class Signing {
 }
 
 /** Everything the page and the alerts need. `device` (processor, memory) is added only for someone on the device itself. */
-export function snapshot({ stats, startedAt, now, version, features, signing, estimate, streams = null, alertAt = ALERT_AT, device = null, roster = null, ownerLogin = false, keyed = null }) {
+export function snapshot({ stats, startedAt, now, version, features, signing, estimate, streams = null, alertAt = ALERT_AT, device = null, roster = null, ownerLogin = false, keyed = null, actions = null }) {
   const free = Math.max(0, stats.max - stats.used);
   return {
     ok: true, name: "frills-relay", version, features, slots: stats,
@@ -51,6 +51,7 @@ export function snapshot({ stats, startedAt, now, version, features, signing, es
     ...(device ? { device } : {}),
     ...(roster ? { roster } : {}), // the names: only for the owner (on the device, or with the owner's password), like `device`
     ...(ownerLogin ? { ownerLogin: true } : {}), // says only that an owner password exists, so the page can offer the box for it
+    ...(actions ? { actions } : {}), // what the owner may do from the page (only when the owner's password was sent and is right)
   };
 }
 
@@ -115,6 +116,8 @@ td a{font-weight:700;color:var(--ink)}.pill{display:inline-block;padding:2px 10p
 <section class="card who dev" id="who"><h2>Who is connected</h2><span class="note" id="whonote"></span>
 <div class="wrap"><table id="whotable"><thead><tr><th>Account</th><th>Status</th><th>Pages</th><th>Followers</th><th>Here for</th><th>Last minute</th></tr></thead><tbody id="whobody"></tbody></table></div>
 <p class="note" id="waitnote"></p><button id="ownout" type="button" hidden>Hide the names again</button></section>
+<section class="card own" id="ctl" hidden><b>Restart</b> <span class="note">Stops the relay and starts it again. Everyone's chat reconnects by itself in a few seconds.</span>
+<div class="ownrow"><button id="restart" type="button">Restart the relay</button></div><p class="note" id="ctlmsg" role="status"></p></section>
 </main>
 <script>
 const $=(id)=>document.getElementById(id);let last="ok",first=true;
@@ -156,6 +159,12 @@ function draw(s){
   const c=s.capacity;$("cap").textContent="About "+c.estimate+" accounts";$("capnote").textContent=(c.measured?"A guess from what this device uses now.":"A first guess; it improves once a few accounts are open.")+" Your internet and TikTok's free signing usually run out before the device does."+(c.estimate>s.slots.max*1.5?" You set "+s.slots.max+" spots, so there may be room to raise it.":"");
   const b=$("banner");b.dataset.on=String(low);b.textContent=s.slots.waiting>0?"People are waiting in line. Only "+free+" spots left.":free===0?"The relay is full.":"Only "+free+" spots left.";
   $("own").hidden=!s.ownerLogin;$("ownout").hidden=!(s.roster&&OWNER);
+  $("ctl").hidden=!(s.actions&&OWNER);
+  if(s.actions){
+    if(restarting&&s.uptimeS<restarting){restarting=0;$("restart").disabled=!s.actions.restart;$("ctlmsg").textContent="Back, and restarted just now."}
+    else if(!restarting&&!s.actions.restart){$("restart").disabled=true;$("ctlmsg").textContent="This relay cannot restart itself, because nothing would start it again. Start it with npm run relay (the guide has the steps)."}
+    lastUp=s.uptimeS;
+  }
   if(s.roster){drawWho(s.roster)}else{$("who").dataset.on="false"}
   if(s.device){$("dev").dataset.on="true";const d=s.device;$("devtext").textContent=d.cores+" processor cores. Memory: "+d.memoryFreeMB+" MB free of "+d.memoryTotalMB+" MB. The relay itself uses "+d.relayMemoryMB+" MB and about "+d.relayCpuPercent+"% of one core. Node "+d.node+"."}
   if(low&&last==="ok"&&!first){beep();try{if(Notification.permission==="granted")new Notification("Frills relay",{body:b.textContent})}catch{}}
@@ -169,6 +178,17 @@ async function tick(){try{
 $("ownsave").addEventListener("click",()=>{const v=$("ownkey").value.trim();if(!v)return;keep(v);$("ownkey").value="";$("ownmsg").textContent="";tick()});
 $("ownkey").addEventListener("keydown",(e)=>{if(e.key==="Enter")$("ownsave").click()});
 $("ownout").addEventListener("click",()=>{keep("");tick()});
+let restarting=0,lastUp=0;
+$("restart").addEventListener("click",async()=>{
+  if(!OWNER||!confirm("Restart the relay now? Everyone's chat reconnects by itself in a few seconds."))return;
+  $("restart").disabled=true;$("ctlmsg").textContent="Asking the relay to restart...";
+  try{
+    const r=await fetch("/owner/restart",{method:"POST",headers:{authorization:"Bearer "+OWNER},cache:"no-store"});
+    const j=await r.json().catch(()=>({}));
+    if(r.ok){restarting=lastUp||1;$("ctlmsg").textContent="Restarting. This page finds the relay again by itself."}
+    else{$("ctlmsg").textContent=({not_supervised:"It cannot restart itself, because nothing would start it again. Start it with npm run relay (the guide has the steps).",too_soon:"It was started or restarted a moment ago. Wait half a minute.",locked:"Too many wrong tries. Wait ten minutes.",wrong_key:"That is not the right password.",key_needed:"Enter the password first.",no_owner_password:"The relay has no owner password set."})[j.error]||"The relay said no ("+r.status+").";$("restart").disabled=false}
+  }catch{$("ctlmsg").textContent="Cannot reach the relay right now.";$("restart").disabled=false}
+});
 draw(${JSON.stringify(s).replace(/</g, "\\u003c")});setInterval(tick,5000);if(OWNER)tick();
 </script></body></html>`;
 }

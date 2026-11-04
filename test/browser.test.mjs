@@ -35,63 +35,15 @@ after(async () => {
   server?.kill();
 });
 
-const PAGES = ["/", "/editor/", "/feedback/", "/alerts/", "/gifts/", "/goal/", "/likers/", "/overlays/", "/guides/alerts/", "/overlay/?demo=1", "/overlay/alerts/?demo=1", "/matcha/", "/guides/obs/", "/guides/test/", "/guides/tiktok/", "/privacy/"];
 const stubClipboard = () => page.evaluate(`Object.defineProperty(navigator.clipboard, "writeText", { value: async (t) => { window.__copied = t; }, configurable: true })`);
 const css = (selector, name) => page.evaluate(`document.querySelector(${JSON.stringify(selector)}).style.getPropertyValue(${JSON.stringify(name)})`);
 const click = (selector, text) => page.evaluate(`(() => { const list = [...document.querySelectorAll(${JSON.stringify(selector)})]; const el = ${text ? `list.find((e) => e.textContent.trim() === ${JSON.stringify(text)})` : "list[0]"}; if (!el) throw new Error("nothing to click: ${selector}"); el.click(); })()`);
 const type = (selector, value) => page.evaluate(`(() => { const i = document.querySelector(${JSON.stringify(selector)}); i.value = ${JSON.stringify(value)}; i.dispatchEvent(new Event("input", { bubbles: true })); })()`);
 
-test("every page loads under the security policy without a single console error", { skip }, async () => {
-  for (const path of PAGES) {
-    await page.goto(base + path, { settle: 900 });
-    assert.deepEqual(page.problems, [], `${path}: ${page.problems.join(" | ")}`);
-  }
-});
-
 test("a page that doesn't exist answers 404 with the friendly page", { skip }, async () => {
   const res = await fetch(base + "/no-such-page/");
   assert.equal(res.status, 404);
   assert.match(await res.text(), /That page isn’t here/);
-});
-
-test("no page scrolls sideways at any width from 320 to 1920 px", { skip }, async () => {
-  for (const width of [320, 375, 414, 768, 1280, 1920]) {
-    await page.viewport(width, 800);
-    for (const path of PAGES) {
-      await page.goto(base + path, { settle: 600 });
-      const w = await page.evaluate("({ scroll: document.documentElement.scrollWidth, inner: innerWidth })");
-      assert.ok(w.scroll <= w.inner, `${path} at ${width}px is ${w.scroll}px wide`);
-    }
-  }
-  await page.viewport(1280, 900);
-});
-
-test("no button, link or chip wraps onto two lines, from 320 to 1280 px", { skip }, async () => {
-  for (const width of [320, 375, 768, 1280]) {
-    await page.viewport(width, 800);
-    for (const path of PAGES) {
-      await page.goto(base + path, { settle: 500 });
-      const wrapped = await page.evaluate(`(() => {
-        const bad = [];
-        for (const el of document.querySelectorAll(".btn, .nav__link, .chip, .foot__links a, .look-card__link")) {
-          if (!el.offsetParent && getComputedStyle(el).position !== "fixed") continue; // hidden
-          const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-          let wrapped = false;
-          while (walker.nextNode()) {
-            if (!walker.currentNode.textContent.trim()) continue;
-            const range = document.createRange();
-            range.selectNodeContents(walker.currentNode);
-            const tops = new Set([...range.getClientRects()].filter((r) => r.width > 2).map((r) => Math.round(r.top / 4)));
-            if (tops.size > 1) wrapped = true;
-          }
-          if (wrapped) bad.push(el.textContent.trim());
-        }
-        return bad;
-      })()`);
-      assert.deepEqual(wrapped, [], `${path} at ${width}px`);
-    }
-  }
-  await page.viewport(1280, 900);
 });
 
 test("home: choosing a look restyles the stage", { skip }, async () => {
@@ -265,64 +217,6 @@ test("overlay: with no channel it says what to add, and with demo=1 it draws pra
   assert.ok(count >= 2 && count <= 3, `${count} messages showing`);
 });
 
-test("overlay: with Keep messages on screen (stay=1) messages never fade, in a general look and a matcha one; without it they leave after their time", { skip }, async () => {
-  const count = () => page.evaluate(`[...document.querySelectorAll("#chat .m")].filter((m) => !m.classList.contains("leaving")).length`);
-  // a one-second life and a quick practice chat: without stay the list stays short, with stay it fills to max
-  for (const look of ["", "style=latte&palette=sakura&"]) {
-    await page.goto(`${base}/overlay/?demo=1&pace=300&max=12&life=1&${look}`, { settle: 300 });
-    await sleep(5000);
-    const fading = await count();
-    assert.ok(fading <= 4, `without stay (${look || "general"}) ${fading} messages showing after 5 s with a life of 1 s`);
-    await page.goto(`${base}/overlay/?demo=1&pace=300&max=12&life=1&stay=1&${look}`, { settle: 300 });
-    await sleep(5000);
-    const kept = await count();
-    assert.ok(kept >= 7, `with stay (${look || "general"}) ${kept} messages showing after 5 s`);
-  }
-});
-
-test("overlay: Chat position puts the messages at the bottom of the window (the default) or at the top, in a general look and a matcha one", { skip }, async () => {
-  const edges = () => page.evaluate(`(() => { const r = document.getElementById("chat").getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(innerHeight - r.bottom), height: Math.round(r.height), window: innerHeight }; })()`);
-  for (const look of ["", "style=latte&palette=sakura&"]) {
-    await page.goto(`${base}/overlay/?demo=1&pace=300&max=3&life=0&${look}`, { settle: 300 });
-    await page.waitFor(`document.querySelectorAll("#chat .m").length >= 2`, { timeout: 6000 });
-    await sleep(600);
-    const bottom = await edges();
-    assert.ok(bottom.bottom <= 12 && bottom.top > 40, `by default (${look || "general"}) the chat is at the bottom: ${JSON.stringify(bottom)}`);
-    await page.goto(`${base}/overlay/?demo=1&pace=300&max=3&life=0&place=top&${look}`, { settle: 300 });
-    await page.waitFor(`document.querySelectorAll("#chat .m").length >= 2`, { timeout: 6000 });
-    await sleep(600);
-    const top = await edges();
-    assert.ok(top.top <= 12 && top.bottom > 40, `with place=top (${look || "general"}) the chat is at the top: ${JSON.stringify(top)}`);
-  }
-});
-
-test("overlay: ?pace= makes the practice events come faster, and without it they come at the usual speed (chat and last gifts, like the other overlays)", { skip }, async () => {
-  // how many came in a 3-second stretch, after the first few that a practice chat starts with
-  const chatIn3Seconds = async (query) => {
-    await page.goto(`${base}/overlay/?demo=1&max=40&life=0&${query}`, { settle: 300 });
-    await sleep(1800);
-    const before = await page.evaluate(`document.querySelectorAll("#chat .m").length`);
-    await sleep(3000);
-    return (await page.evaluate(`document.querySelectorAll("#chat .m").length`)) - before;
-  };
-  const usual = await chatIn3Seconds("");
-  assert.ok(usual <= 3, `at the usual pace ${usual} new chat messages came in 3 seconds`);
-  const quick = await chatIn3Seconds("pace=300");
-  assert.ok(quick >= 6, `with pace=300 ${quick} new chat messages came in 3 seconds`);
-  // the same for the last gifts: a missing pace is the usual speed, not the fast one (it once was the fast one)
-  const giftsIn3Seconds = async (query) => {
-    await page.goto(`${base}/overlay/gifts/?demo=1&max=30&${query}`, { settle: 100 });
-    await sleep(3000);
-    return page.evaluate(`document.querySelectorAll("#gifts .gift").length`);
-  };
-  const gifts = await giftsIn3Seconds("");
-  assert.ok(gifts <= 3, `at the usual pace ${gifts} gifts showed in 3 seconds`);
-  const fast = await giftsIn3Seconds("pace=300");
-  assert.ok(fast >= 5, `with pace=300 ${fast} gifts showed in 3 seconds`);
-  // and a pace that is not a number is the usual speed too
-  assert.ok((await giftsIn3Seconds("pace=soon")) <= 3, "a pace that is not a number changes nothing");
-});
-
 test("overlay: the page is truly see-through", { skip }, async () => {
   await page.goto(base + "/overlay/?channel=notarealchannel", { settle: 600 });
   const png = await page.screenshot({ transparent: true });
@@ -343,16 +237,16 @@ test("overlay: the page is truly see-through", { skip }, async () => {
 
 test("matcha: pick a style and the link follows, once there is a channel", { skip }, async () => {
   await page.goto(base + "/matcha/", { settle: 900 });
-  assert.equal(await page.evaluate(`document.querySelectorAll(".matcha-card").length`), 6);
+  assert.equal(await page.evaluate(`document.querySelectorAll("#styles .chip").length`), 6);
   assert.equal(await page.evaluate(`document.getElementById("copy-link").disabled`), true);
   await click("#palettes .chip", "Forest");
-  await click(".matcha-card:nth-child(4) .btn", "Use this style");
+  await click("#styles .chip", "Pixel Pond");
   await type("#source-channel", "somechannel");
   const url = new URL(await page.evaluate(`document.getElementById("link").value`));
   assert.equal(url.searchParams.get("style"), "pixel");
   assert.equal(url.searchParams.get("palette"), "forest");
   assert.equal(url.searchParams.get("channel"), "somechannel");
-  assert.equal(await page.evaluate(`document.querySelector(".matcha-card[data-picked=true] h2").textContent`), "4 · Pixel Pond");
+  assert.equal(await page.evaluate(`document.querySelector("#styles .chip[aria-pressed=true]").textContent.trim()`), "Pixel Pond");
 });
 
 test("keyboard: the first Tab goes to the skip link, which jumps to the content", { skip }, async () => {

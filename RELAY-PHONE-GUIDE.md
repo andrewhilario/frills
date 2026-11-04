@@ -297,6 +297,16 @@ tmux kill-session -t relay; tmux new-session -d -s relay "cd ~/frills && RELAY_S
 
 Then open the public status page, type the password in the "Owner?" box and press the button. The page remembers it only until you close that tab, and sends it in a header (never in the address). Ten wrong tries in ten minutes lock that visitor out for ten minutes. Without `RELAY_OWNER_KEY` nothing changes: the public page shows only numbers. From 0.5.6 `update-relay.sh` reads `~/.frills-relay.env`, so the owner login stays on after an update (older versions of the script did not carry it).
 
+### Restarting the relay from the status page, without touching the phone (relay 0.5.8)
+
+Once you are signed in with the owner password (see above) the public status page shows a **Restart** card with a **Restart the relay** button. It stops the relay and starts it again in about two seconds; every page's chat reconnects by itself a few seconds later (the pages wait 2 to 4 seconds before they try again).
+
+- **It needs something to start the relay again.** `npm run relay` now does that by itself (it runs a small keeper, `helper/keep.mjs`, which also starts the relay again if it ever crashes), so your usual start line and `update-relay.sh` need no change. On the DigitalOcean server `systemd` does it (`Restart=always`). If you start the relay some other way (`node helper/server.mjs --relay` by hand) the button says it cannot restart, and the start-up message says `Restart from the status page: off`.
+- **It does not update the relay.** A restart runs the same code again. After a new release you still run `update-relay.sh` once (and `git pull` on the server). From 0.5.8 on, that is the only time you need to touch the phone.
+- **The very first time** (this release itself) has to be started by hand, because the running relay does not have the button yet. After `update-relay.sh` the start-up message should say `Restart from the status page: on`.
+- It needs the owner password, never answers a page on another site, and ignores a second request within 30 seconds (and any in the first 15 seconds after a start).
+- A relay that stops again straight away is started again after a longer and longer wait (up to 30 seconds), and prints `[keeper]` lines you can read with `tmux attach -t relay`.
+
 ## When the signing service is busy at night (relay 0.5.6)
 
 TikTok's own pages do not limit the relay. What limits it is the **signing service** (Euler Stream) the connector asks once for every connection. Without a key of your own, the relay is in the service's anonymous tier, where every relay and every streamer who has no key share a small allowance per internet address, and the service says "busy" when it runs out. That is most likely why it gets worst in the Philippine night (midnight to about 4 am, which is 4 pm to 8 pm UTC): that is when a lot of streamers go LIVE at once. This is what we know and what we do not:
