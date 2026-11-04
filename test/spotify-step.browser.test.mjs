@@ -245,11 +245,11 @@ test("song requests: back from Spotify's page after Log in, the login is handed 
 
 test("song requests: Frills refusing a login (not on Frills' short list) is said in words, the useless login is dropped, and the way with no list is opened", { skip }, async () => {
   await open("/songs/", { server: null, login: true, loginReply: { status: 403, body: { ok: false, error: "not_allowed", message: "Spotify said no. Frills' own Spotify app lets in only a short list of people: if you are not on it, use your own Spotify app instead." } } });
-  assert.equal(await page.evaluate('document.getElementById("spx-own").open'), false, "closed until it is needed");
+  assert.equal(await page.evaluate('document.getElementById("spx-own").open'), true, "the steps are open to follow while nothing is connected");
   await page.waitFor(`!document.getElementById("spx-keep").hidden`);
   await page.evaluate('document.getElementById("spx-keep").click()');
   await page.waitFor(`document.getElementById("spx-status").dataset.state === "error"`);
-  assert.match(await text("spx-status"), /short list/);
+  assert.match(await text("spx-status"), /short list of people[\s\S]*make your own Spotify app/, "with Frills' app: it is the short list, and the way round it");
   assert.equal(await page.evaluate('localStorage.getItem("frills:spotify:tokens")'), null, "Spotify will not accept it, so it is gone");
   assert.equal(await shown("login", "keep", "on"), "true,false,false");
   assert.equal(await page.evaluate('document.getElementById("spx-own").open'), true, "the person is shown where to use their own Spotify app");
@@ -345,4 +345,50 @@ test("the Spotify test page shows the song's title and time while it plays (the 
   assert.equal(await text("sp-time"), "0:10 / 3:45");
   await sleep(300);
   assert.deepEqual(problems(), [], problems().join(" | "));
+});
+
+test("song requests: the own-app steps are nine numbered steps with the one most people miss (User management), the hand-done ones can be ticked and are remembered, and the count follows", { skip }, async () => {
+  await open("/songs/", { server: null });
+  assert.deepEqual(await page.evaluate(`[...document.querySelectorAll("#spotify-step [data-step]")].map((li) => li.dataset.step)`), ["1", "2", "3", "4", "5", "6", "7", "8", "9"]);
+  const six = await page.evaluate(`document.querySelector('[data-step="6"]').textContent.replace(/\\s+/g, " ")`);
+  assert.match(six, /User management[\s\S]*exact email of your Spotify account/);
+  assert.match(await page.evaluate('document.getElementById("spotify-step").textContent.replace(/\\s+/g, " ")'), /You need Spotify Premium/);
+  assert.match(await text("spx-progress"), /0 of 9 done/);
+  await page.evaluate(`document.querySelector('[data-done="1"]').click(); document.querySelector('[data-done="2"]').click()`);
+  assert.match(await text("spx-progress"), /2 of 9 done/);
+  assert.equal(await page.evaluate(`document.querySelector('[data-step="1"]').dataset.finished`), "true");
+  await open("/songs/", { server: null }, { fresh: false });
+  assert.match(await text("spx-progress"), /2 of 9 done/, "remembered after the page is opened again");
+  assert.equal(await page.evaluate(`document.querySelector('[data-done="1"]').checked`), true);
+  await useOwnApp(OWN);
+  await page.waitFor(`document.getElementById("spx-progress").textContent.includes("3 of 9 done")`);
+  assert.equal(await page.evaluate(`document.querySelector('[data-step="7"]').dataset.finished`), "true", "step 7 ticks itself once a Client ID is kept");
+  assert.deepEqual(problems(), []);
+});
+
+test("song requests: when Spotify refuses a login made with the streamer's OWN app, it names the two things to check (not Frills' list), flags step 6 and opens the help", { skip }, async () => {
+  await open("/songs/", { server: null, login: true, loginReply: { status: 403, body: { ok: false, error: "not_allowed", message: "Spotify said no." } } });
+  await page.evaluate(`localStorage.setItem("frills:spotify:app", ${JSON.stringify(OWN)}); localStorage.setItem("frills:spotify:steps", JSON.stringify(["1", "2", "3", "4", "5", "6"]))`);
+  await page.goto(`${base}/songs/`, { settle: 500 });
+  await page.waitFor(`!document.getElementById("spx-keep").hidden`);
+  await page.evaluate('document.getElementById("spx-keep").click()');
+  await page.waitFor(`document.getElementById("spx-status").dataset.state === "error"`);
+  const said = await text("spx-status");
+  assert.match(said, /your own Spotify app[\s\S]*Step 6[\s\S]*exact email[\s\S]*Premium/);
+  assert.doesNotMatch(said, /short list/, "the person is not told about Frills' list when they already use their own app");
+  assert.equal(await page.evaluate(`document.querySelector('[data-step="6"]').dataset.flag`), "check", "step 6 is marked");
+  assert.equal(await page.evaluate(`document.querySelector('[data-done="6"]').checked`), false, "and un-ticked, so it is done again");
+  assert.equal(await page.evaluate('document.getElementById("spx-help").open'), true);
+  assert.equal(await page.evaluate('localStorage.getItem("frills:spotify:tokens")'), null, "the refused login is gone");
+});
+
+test("song requests: the page Spotify sends the person back to says what to check when the login did not work, shows the address to register and leads back to Song requests", { skip }, async () => {
+  await open("/privacy/", { server: null });
+  await page.evaluate(`sessionStorage.setItem("frills:spotify:return", "/songs/")`);
+  await page.goto(`${base}/spotify/callback/?error=server_error`, { settle: 600 });
+  assert.match(await text("sp-status"), /Spotify stopped the login/);
+  assert.equal(await page.evaluate('!document.getElementById("sp-help").hidden'), true);
+  assert.equal(await text("sp-redirect"), base + "/spotify/callback/");
+  assert.equal(await page.evaluate('document.getElementById("sp-back").getAttribute("href")'), "/songs/");
+  assert.match(await text("sp-help"), /User management[\s\S]*Premium/);
 });

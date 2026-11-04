@@ -84,7 +84,8 @@ test("the overlays FAQ keeps its promises: Twitch support as it is, uploads desc
   assert.doesNotMatch(answer("Which overlays are there?"), /coming soon/i, "song requests are in beta now, nothing in that list is only planned");
   const songs = answer("How do song requests and the Spotify player work?");
   assert.match(songs, /Spotify Premium/);
-  assert.match(songs, /short list of people log in/, "the Spotify login limit is said plainly");
+  assert.match(songs, /short list of people/, "the Spotify login limit is said plainly");
+  assert.match(songs, /own free Spotify app[\s\S]*Premium[\s\S]*User management/, "and so is the way round it, with the two things that go wrong");
   assert.ok(songs.includes('href="/privacy/"'));
 });
 

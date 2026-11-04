@@ -53,10 +53,18 @@ export function authorizeUrl({ clientId, redirectUri, challenge, state, scopes =
   return url.toString();
 }
 
+/**
+ * Spotify turned a login away (a 403 when Frills asked who it is). The person is told which app it was, because the fix differs: with Frills' own app they are not
+ * on its short list (make their own app), with their own app it is one of two things in their dashboard (their name and email under User management, or Premium).
+ */
+export const DENIED_OWN = "Spotify turned your account away from your own Spotify app. Check these two things, then press Log in with Spotify again. Step 6: your name and the exact email of your Spotify account must be in your app's Settings, User management list. And the Spotify account that made the app must have Premium.";
+export const DENIED_FRILLS = "Spotify said no, because Frills' own Spotify app lets in only a short list of people and you are not on it. That is normal: make your own Spotify app with the steps below (it is free, and it needs Spotify Premium).";
+
 /** What Spotify said, in words a streamer can act on. `reason` is Spotify's own code when it gives one. */
 export function describe(status, reason = "", retryAfter = 0) {
   if (status === 401) return "Your Spotify login ran out. Press Log in with Spotify again.";
-  if (status === 403) return "Spotify said no. Frills' own Spotify app lets in only a short list of people: if you are not on it, use your own Spotify app instead (the steps are on the Song requests page, under the Log in button). Adding to the queue also needs Premium.";
+  if (status === 403 && /premium/i.test(reason)) return "Spotify says this needs Premium. Adding songs to a queue only works with Spotify Premium, and so does an app like this one: the Spotify account that made the Spotify app needs Premium too.";
+  if (status === 403) return "Spotify said no. Check two things. The Spotify account that made your Spotify app must have Premium. And in the Spotify dashboard, your app's Settings, User management list must have your name and the exact email of your Spotify account. The steps are on the Song requests page.";
   if (status === 404 && /NO_ACTIVE_DEVICE/i.test(reason)) return "Spotify has no device to play on. Open Spotify on your phone or computer and start any song, then try again.";
   if (status === 404) return "Spotify could not find that. If you were adding to the queue, open Spotify on a device and start any song first.";
   if (status === 429) return `Spotify asks us to slow down${retryAfter ? `. Try again in ${retryAfter} seconds` : ""}.`;

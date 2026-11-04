@@ -39,10 +39,18 @@
 
       <h2 class="title">Add Spotify (optional)</h2>
       <p>Spotify adds two things: the song that is playing shows on your stream, and the songs viewers ask for can be added to your own Spotify queue.</p>
+      <p><strong>You need Spotify Premium</strong> on the Spotify account you log in with. Spotify only lets Premium accounts add songs to a queue, and it only lets an app like this one work for a Premium account, so a free Spotify account will not work, even with your own app. Spotify also has to be open and playing on a phone or a computer.</p>
+      <p>Frills’ own Spotify app lets in only a short list of people, so you make your own Spotify app, once. It is free and takes about five minutes. The <a href="/songs/#spotify-step">song requests editor</a> shows the same nine steps with a tick for each:</p>
       <ol>
-        <li>You need <strong>Spotify Premium</strong> for this, and Spotify has to be open and playing on a phone or a computer.</li>
-        <li>In step 4 of the <a href="/songs/#spotify-step">song requests editor</a>, press <strong>Log in with Spotify</strong>. Frills’ own Spotify app lets in only a short list of people, so most streamers use their own Spotify app: the editor shows three steps (make a free app in Spotify’s developer dashboard, add Frills’ address, paste its Client ID). Frills never asks for your Client secret.</li>
-        <li>Switch on what you want: showing the song that is playing, and adding viewers’ songs to your queue.</li>
+        <li>Open the <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener">Spotify developer dashboard</a> and log in with your Premium Spotify account. Accept Spotify’s terms if it asks.</li>
+        <li>Press <strong>Create app</strong>.</li>
+        <li>Give it any name and description, for example <em>Frills</em> and <em>Song requests</em>, and leave the website empty.</li>
+        <li>In <strong>Redirect URIs</strong>, paste the address the editor shows (copy it with its button) and press <strong>Add</strong>. It must appear in the list under the box.</li>
+        <li>Tick <strong>Web API</strong>, agree to the terms and press <strong>Save</strong>.</li>
+        <li><strong>Add yourself as a user.</strong> On your app’s page press <strong>Settings</strong>, open the <strong>User management</strong> tab, press <strong>Add new user</strong>, and type your name and the exact email of your Spotify account. Spotify only lets the people on this list use an app that is still being tested, so add yourself even though it is your own app. This is the step most people miss.</li>
+        <li>In <strong>Settings</strong>, under <strong>Basic information</strong>, copy the <strong>Client ID</strong> (Frills never asks for your Client secret), paste it into the editor and press <strong>Use my app</strong>.</li>
+        <li>Press <strong>Log in with Spotify</strong>.</li>
+        <li>On Spotify’s page press <strong>Agree</strong>. The editor then says it is connected to Spotify as you. Switch on what you want: showing the song that is playing, and adding viewers’ songs to your queue.</li>
       </ol>
 
       <h2 class="title">Good to know</h2>
@@ -56,11 +64,11 @@
       <h3 class="subtitle">Do my viewers need Spotify?</h3>
       <p>No. They only type in your chat. Spotify is only for you.</p>
       <h3 class="subtitle">Do I need Spotify Premium?</h3>
-      <p>Only for the Spotify part. Songs only go into your Spotify queue with Spotify Premium. The list of requests on your stream works without it.</p>
+      <p>Only for the Spotify part, and then yes: Spotify only lets Premium accounts add songs to a queue, and an app like this one (including your own Spotify app) only works while the Spotify account that made it has Premium. The list of requests on your stream works without Spotify at all.</p>
       <h3 class="subtitle">Is it free?</h3>
       <p>Yes. It is free and needs no Frills account.</p>
       <h3 class="subtitle">Why does Spotify say no when I log in?</h3>
-      <p>Frills’ own Spotify app lets in only a short list of people, because Spotify limits apps like it. Use your own Spotify app instead: it is free, takes about three minutes, and the editor shows the steps.</p>
+      <p>If you use Frills’ own Spotify app, it lets in only a short list of people, so make your own Spotify app (the nine steps above). If you already did and it still says no, it is almost always one of two things: your name and the exact email of your Spotify account are not in your app’s <strong>Settings</strong>, <strong>User management</strong> list (step 6), or the Spotify account that made the app does not have Premium. Fix it and log in again.</p>
     </div>
   </article>
 </main>

@@ -61,15 +61,34 @@
 .spx__log li { padding: var(--space-xs) var(--space-sm); border-radius: var(--radius-sm); background: var(--color-paper-2); font-size: var(--text-sm); overflow-wrap: anywhere; }
 .spx__log li[data-state="ok"] { background: var(--color-mint-tint); }
 .spx__log li[data-state="error"] { background: var(--color-accent-3-tint); color: var(--color-error); }
+/* The steps for making an own Spotify app: nine numbered cards, each with what to do, what you should see, and (for the ones done by hand) a tick. */
+.spx__need { display: grid; gap: var(--space-2xs); padding: var(--space-sm) var(--space-md); border-radius: var(--radius-sm); background: var(--color-accent-tint); font-size: var(--text-sm); }
+.spx__need p { margin: 0; }
+.spx__need ul { margin: 0; padding-left: 1.2em; display: grid; gap: var(--space-xs); }
 .spx__own { font-size: var(--text-sm); }
-.spx__own summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
-.spx__steps { margin: 0 0 var(--space-sm); padding-left: 1.4em; display: grid; gap: var(--space-xs); }
+.spx__own summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-xs); }
+.spx__progress { font-weight: 500; color: var(--color-ink-2); }
+.spx__steps { margin: 0 0 var(--space-sm); padding: 0; list-style: none; display: grid; gap: var(--space-sm); }
+.spx__steps li { position: relative; display: grid; gap: var(--space-xs); padding: var(--space-sm) var(--space-md) var(--space-sm) 3.4rem; border: 2px solid var(--color-rule-2); border-radius: var(--radius-sm); background: var(--color-paper); }
+.spx__steps li::before { content: attr(data-step); position: absolute; left: var(--space-sm); top: var(--space-sm); display: grid; place-items: center; width: 2rem; height: 2rem; border: 2px solid var(--color-ink); border-radius: 50%; font-weight: 800; background: var(--color-accent); }
+.spx__steps li[data-finished="true"] { border-color: var(--color-success); background: var(--color-mint-tint); }
+.spx__steps li[data-finished="true"]::before { content: "\2713"; background: var(--color-success); border-color: var(--color-success); color: #fff; }
+.spx__steps li[data-flag="check"] { border-color: var(--color-error); background: var(--color-accent-3-tint); }
+.spx__steps li[data-flag="check"]::after { content: "Check this step"; justify-self: start; padding: 0 var(--space-xs); border-radius: 99px; background: var(--color-error); color: #fff; font-size: var(--text-xs); font-weight: 700; }
+.spx__steps li.spx__key:not([data-finished="true"]) { border-color: var(--color-ink); }
+.spx__steps p { margin: 0; overflow-wrap: anywhere; }
 .spx__steps code { overflow-wrap: anywhere; }
+.spx__seen { color: var(--color-ink-2); }
+.spx__done { display: flex; align-items: center; gap: var(--space-xs); min-height: 44px; font-weight: 600; cursor: pointer; }
+.spx__done input { width: 1.25rem; height: 1.25rem; }
+.spx__steps--connect { margin-top: var(--space-xs); }
 .spx__addr { display: flex; flex-wrap: wrap; gap: var(--space-xs); align-items: center; margin: var(--space-2xs) 0; }
 .spx__ownform { display: grid; gap: var(--space-xs); justify-items: start; margin-bottom: var(--space-xs); }
 .spx__ownform input { width: min(100%, 24rem); }
 .spx__label { font-weight: 600; }
 .spx__help { font-size: var(--text-sm); }
-.spx__help summary { cursor: pointer; font-weight: 600; min-height: 44px; display: flex; align-items: center; }
-.spx__help ul { margin: var(--space-xs) 0 0; padding-left: 1.2em; display: grid; gap: var(--space-xs); }
+.spx__help summary { cursor: pointer; font-weight: 700; min-height: 44px; display: flex; align-items: center; }
+.spx__faq { display: grid; gap: var(--space-2xs); margin: var(--space-xs) 0; }
+.spx__faq dt { margin-top: var(--space-xs); font-weight: 700; }
+.spx__faq dd { margin: 0; padding-left: var(--space-sm); border-left: 3px solid var(--color-accent); }
 .spx #spx-on:not([hidden]) { display: grid; gap: var(--space-sm); }

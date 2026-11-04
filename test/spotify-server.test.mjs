@@ -144,7 +144,7 @@ test("a login Spotify refuses is not kept: not on the app's allowlist, or not a 
   assert.equal(refused.status, 403);
   const answer = await refused.json();
   assert.equal(answer.error, "not_allowed");
-  assert.match(answer.message, /short list/);
+  assert.match(answer.message, /Premium[\s\S]*User management/, "the words name the two usual reasons");
   assert.equal(row(env), undefined, "nothing was kept");
   const bad = await login(env, fakeSpotify({ meStatus: 401, refreshStatus: 400 }), { access: "", expires: 0 });
   assert.equal(bad.status, 400);

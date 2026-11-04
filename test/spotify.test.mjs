@@ -3,7 +3,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { CLIENT_ID_FORMAT, SCOPES, SpotifyClient, REDIRECT_PATH, authorizeUrl, b64url, challengeOf, describe, makeVerifier, ownClientId, saveOwnClientId } from "../src/js/spotify.js";
+import { DENIED_FRILLS, DENIED_OWN, CLIENT_ID_FORMAT, SCOPES, SpotifyClient, REDIRECT_PATH, authorizeUrl, b64url, challengeOf, describe, makeVerifier, ownClientId, saveOwnClientId } from "../src/js/spotify.js";
 
 const REDIRECT = "https://frills.example" + REDIRECT_PATH;
 const memory = () => { const data = new Map(); return { getItem: (k) => data.get(k) ?? null, setItem: (k, v) => data.set(k, String(v)), removeItem: (k) => data.delete(k), data }; };
@@ -157,11 +157,15 @@ test("adding to the queue: only a real song address, and every way Spotify can s
   assert.match((await noDevice.client.addToQueue(uri)).error, /Open Spotify on your phone or computer/);
   const premium = rig(() => reply(403, { error: { status: 403, message: "Player command failed: Premium required", reason: "PREMIUM_REQUIRED" } }));
   login(premium.client);
-  assert.match((await premium.client.addToQueue(uri)).error, /short list[\s\S]*your own Spotify app[\s\S]*Premium/);
+  assert.match((await premium.client.addToQueue(uri)).error, /needs Premium[\s\S]*made the Spotify app needs Premium too/);
   const busy = rig(() => reply(429, {}, { "retry-after": "7" }));
   login(busy.client);
   assert.match((await busy.client.addToQueue(uri)).error, /7 seconds/);
   assert.match(describe(503), /problem on its side/);
+  // a 403 with no reason is the two usual things to check; "denied" says which app it was, because the fix differs
+  assert.match(describe(403), /Premium[\s\S]*User management[\s\S]*exact email/);
+  assert.match(DENIED_OWN, /Step 6[\s\S]*exact email[\s\S]*Premium/);
+  assert.match(DENIED_FRILLS, /short list of people[\s\S]*make your own Spotify app/);
 });
 
 test("logging out forgets everything, and storage that is blocked never breaks anything", async () => {

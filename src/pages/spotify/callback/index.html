@@ -19,7 +19,17 @@
       <p class="lede" id="sp-status" role="status">Finishing the login…</p>
     </header>
     <div class="article__body">
-      <p><a class="btn btn--soft" href="/spotify/">Back to the test page</a></p>
+      <div id="sp-help" hidden>
+        <h2 class="subtitle">What to check</h2>
+        <ol>
+          <li><strong>The redirect address.</strong> In your Spotify app’s settings it must be exactly <code id="sp-redirect"></code>. Press Add, then Save.</li>
+          <li><strong>The Client ID.</strong> It must be the one from your app’s Settings page (not the Client secret).</li>
+          <li><strong>Your name and email under Settings → User management</strong> in the Spotify dashboard, with the exact email of your Spotify account.</li>
+          <li><strong>Spotify Premium</strong> on the account that made the Spotify app.</li>
+        </ol>
+        <p>Fix what is wrong, then press <strong>Log in with Spotify</strong> again.</p>
+      </div>
+      <p><a class="btn btn--soft" id="sp-back" href="/spotify/">Back to the test page</a></p>
     </div>
   </article>
 </main>

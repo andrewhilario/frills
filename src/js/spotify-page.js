@@ -21,7 +21,14 @@ const safeCover = (address) => (/^https:\/\/i\.scdn\.co\//.test(address) ? addre
 async function callback() {
   if (!clientId) return say(status, "This site has no Spotify app set up yet.", true);
   const result = await client.finish(location.search);
-  if (result.error) return say(status, result.error, true);
+  if (result.error) {
+    say(status, result.error, true);
+    $("sp-redirect").textContent = location.origin + REDIRECT_PATH;
+    $("sp-help").hidden = false;
+    $("sp-back").href = takeReturn(); // back to the page the person pressed Log in on
+    $("sp-back").textContent = "Go back and try again";
+    return;
+  }
   say(status, "Connected. Taking you back…");
   history.replaceState(null, "", REDIRECT_PATH); // the code in the address is used once and is not kept
   setTimeout(() => location.replace(takeReturn()), 600); // back to the page the person pressed Log in on

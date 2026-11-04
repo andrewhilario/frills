@@ -7,7 +7,7 @@
 // (spotify-forward.js). This page only changes the two switches, shows what happened and disconnects. The login is removed from this browser as
 // soon as Frills has it. Only the song's title, artist, cover and position reach the overlay.
 
-import { CLIENT_ID_FORMAT, REDIRECT_PATH, SpotifyClient, ownClientId, saveOwnClientId } from "./spotify.js";
+import { CLIENT_ID_FORMAT, DENIED_FRILLS, DENIED_OWN, REDIRECT_PATH, SpotifyClient, ownClientId, saveOwnClientId } from "./spotify.js";
 import { SpotifyServer } from "./spotify-server.js";
 import { bridgeIdentity, rememberReturn, watchSpotify } from "./spotify-bridge.js";
 import { buildControl } from "./ui.js";
@@ -15,6 +15,7 @@ import { SONGS, onScreenWords, parseCommand } from "./songs.js";
 
 export const SHARING = "frills:spotify:sharing"; // "1" while Frills keeps this browser's Spotify login: the overlay link then carries the code
 const KEEP = "frills:spotify:keep"; // in this tab, from pressing Log in until the login has been handed to Frills
+const STEPS = "frills:spotify:steps"; // the steps of making an own Spotify app that the person ticked as done (a list of step numbers)
 const get = (key) => { try { return localStorage.getItem(key); } catch { return null; } };
 const put = (key, value) => { try { localStorage.setItem(key, value); } catch { /* storage can be blocked; the choice lasts until the page closes */ } };
 
@@ -44,13 +45,54 @@ export function mountSpotify(root, { hear, refresh = () => {} } = {}) {
   const server = new SpotifyServer({ code: identity.code, key: identity.key });
   const say = (el, text, bad = false) => { el.textContent = text; el.dataset.state = bad ? "error" : ""; };
 
+  // ── the nine steps: the ones to do by hand can be ticked off (kept in this browser), the others tick themselves ─────────────────────────────────
+  const ticked = () => { try { return new Set(JSON.parse(get(STEPS) ?? "[]").map(String)); } catch { return new Set(); } };
+  const boxes = [...root.querySelectorAll("[data-done]")];
+  for (const box of boxes) {
+    box.addEventListener("change", () => {
+      const now = ticked();
+      box.checked ? now.add(box.dataset.done) : now.delete(box.dataset.done);
+      put(STEPS, JSON.stringify([...now]));
+      if (box.dataset.done === "6") $("steps").querySelector('[data-step="6"]').removeAttribute("data-flag");
+      paintSteps();
+    });
+  }
+  /** Ticks and the count: step 7 is done once a Client ID is kept, 8 once logged in, 9 once connected. */
+  function paintSteps() {
+    const by = ticked();
+    if (ownClientId()) by.add("7");
+    const finished = new Set(by);
+    if (state.mode === "local" || state.mode === "connected" || state.mode === "expired") finished.add("8");
+    if (state.mode === "connected") finished.add("9");
+    for (const box of boxes) box.checked = by.has(box.dataset.done);
+    for (const li of root.querySelectorAll("[data-step]")) li.dataset.finished = String(finished.has(li.dataset.step));
+    $("progress").textContent = state.mode === "connected" ? "(all done)" : `(${finished.size} of 9 done)`;
+  }
+  /** Spotify turned the login away: say which app it was, point at the step to check, and open what is needed. */
+  function denied() {
+    const own = Boolean(ownClientId());
+    say($("status"), own ? DENIED_OWN : DENIED_FRILLS, true);
+    $("own").open = true;
+    $("help").open = true;
+    if (own) { // the step that fixes it, marked, and un-ticked so it can be done again
+      const li = $("steps").querySelector('[data-step="6"]');
+      li.dataset.flag = "check";
+      const now = ticked();
+      now.delete("6");
+      put(STEPS, JSON.stringify([...now]));
+      paintSteps();
+      li.scrollIntoView?.({ block: "center", behavior: "smooth" });
+    }
+  }
+
   // ── the streamer's own Spotify app: free, with them as its only user, so there is no list to be on ──────────────────────────────────────────────
   function paintOwn() {
     const own = ownClientId();
     $("own-redirect").textContent = redirect;
     $("own-id").value = own;
     $("own-back").hidden = !own;
-    say($("own-status"), own ? `Using your own Spotify app (${own.slice(0, 6)}…). It applies the next time you log in.` : "Using Frills' Spotify app, which lets in only a short list of people.");
+    say($("own-status"), own ? `Using your own Spotify app (${own.slice(0, 6)}…). Now do step 6 if you have not, then step 8.` : "Using Frills' Spotify app, which lets in only a short list of people.");
+    paintSteps();
   }
   function useOwn(id) {
     saveOwnClientId(id);
@@ -157,6 +199,7 @@ export function mountSpotify(root, { hear, refresh = () => {} } = {}) {
     if (mode === "local") say($("status"), "You are logged in to Spotify in this browser, but Frills is not keeping the login yet.");
     if (mode === "expired") say($("status"), "Your Spotify login ran out. Press Log in with Spotify again.", true);
     if (mode === "unavailable") say($("status"), state.message, true);
+    paintSteps();
     if (mode === "connected") {
       say($("status"), `Connected to Spotify as ${state.name || "your account"}. Frills keeps your login, so you can close this page.`);
       share.write(state.share);
@@ -204,8 +247,8 @@ export function mountSpotify(root, { hear, refresh = () => {} } = {}) {
     if (done.ok) client.logout(); // Frills has it: this browser does not need to
     else if (done.error === "not_allowed" || done.error === "bad_login") client.logout(); // Spotify will not accept it, so it is no use to anyone
     await load();
-    if (!done.ok) say($("status"), done.message, true);
-    if (done.error === "not_allowed") $("own").open = true; // Spotify turned this person away: show them the way that has no list
+    if (done.error === "not_allowed") denied(); // Spotify turned this person away: say which app it was, and show what to check
+    else if (!done.ok) say($("status"), done.message, true);
   }
 
   $("login").addEventListener("click", async (event) => {
@@ -227,7 +270,10 @@ export function mountSpotify(root, { hear, refresh = () => {} } = {}) {
   let justLoggedIn = false;
   try { justLoggedIn = sessionStorage.getItem(KEEP) === "1"; sessionStorage.removeItem(KEEP); } catch { /* nothing remembered */ }
   paintOwn();
-  load().then(() => { if (justLoggedIn && state.mode === "local") return keepLogin(); });
+  load().then(() => {
+    if (state.mode !== "connected" && state.mode !== "expired") $("own").open = true; // not connected yet: the steps are open to follow
+    if (justLoggedIn && state.mode === "local") return keepLogin();
+  });
 
   return { handle() {}, setSettings(next) { settings = next; }, loggedIn: () => state.mode === "connected" };
 }
