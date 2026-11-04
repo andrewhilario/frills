@@ -141,16 +141,18 @@ export function createGoalView(host) {
     if (!settings || !last) return;
     const type = GOAL_TYPES[settings.type] ?? GOAL_TYPES.follow;
     label.textContent = settings.label || type.label;
+    const ring = settings.barStyle === "ring"; // (the numbers sit inside a small circle: no unit, and the percent on its own line)
     const parts = [];
-    if (settings.showNumbers) parts.push(`${last.value.toLocaleString("en-US")} / ${last.goal.toLocaleString("en-US")}${type.unit ? " " + type.unit : ""}`);
+    if (settings.showNumbers) parts.push(`${last.value.toLocaleString("en-US")} / ${last.goal.toLocaleString("en-US")}${type.unit && !ring ? " " + type.unit : ""}`);
     if (settings.showPercent) parts.push(`${last.percent}%`);
-    numbers.textContent = parts.join("  ·  ");
+    numbers.textContent = parts.join(ring ? "\n" : "  ·  ");
     fill.style.width = last.percent + "%";
+    root.style.setProperty("--p", String(last.percent)); // (the ring design is drawn from this)
     root.dataset.full = String(last.percent >= 100);
   };
 
   return {
-    apply(next) { settings = next; applyLook(root, next); show(); },
+    apply(next) { settings = next; applyLook(root, next); root.dataset.style = next.barStyle || "bar"; show(); },
     update(snapshot) { last = snapshot; show(); },
     /** Confetti and the words, for a few seconds. Resolves when it is over. */
     celebrate(words, ms = 6000) {

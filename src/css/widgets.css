@@ -54,6 +54,40 @@
 @keyframes goal-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
 .goal__fx { top: 50%; z-index: 2; }
 
+/* The goal's other designs: the same pieces (the label and numbers, the track and its fill) drawn another way. `data-style` on .goal says which one;
+   without it, or with "bar", nothing here applies. Plain properties only, with the -webkit- masks, because OBS's browser can be old. */
+.goal[data-style="candy"] .goal__track { height: 2.3em; border-width: calc(var(--a-border, 2px) + 1px); }
+.goal[data-style="candy"] .goal__fill { background-color: var(--a-accent, #fc0); background-image: linear-gradient(-45deg, rgba(255, 255, 255, 0.3) 25%, rgba(255, 255, 255, 0) 25%, rgba(255, 255, 255, 0) 50%, rgba(255, 255, 255, 0.3) 50%, rgba(255, 255, 255, 0.3) 75%, rgba(255, 255, 255, 0) 75%); background-size: 1.6em 1.6em; box-shadow: inset 0 0.5em 0 rgba(255, 255, 255, 0.25); animation: goal-stripes 1.1s linear infinite; }
+.goal[data-style="candy"][data-full="true"] .goal__fill { background-color: var(--a-pop, #f48); }
+@keyframes goal-stripes { from { background-position: 0 0; } to { background-position: 1.6em 0; } }
+
+.goal[data-style="blocks"] .goal__track { position: relative; height: 1.9em; border-radius: calc(var(--a-radius, 20px) / 3); }
+.goal[data-style="blocks"] .goal__track::after { content: ""; position: absolute; top: 0; right: 0; bottom: 0; left: 0; background: repeating-linear-gradient(90deg, rgba(0, 0, 0, 0) 0, rgba(0, 0, 0, 0) calc(5% - 0.22em), var(--a-bg, #fff) calc(5% - 0.22em), var(--a-bg, #fff) 5%); }
+
+/* Hearts and stars: the track is cut to a row of little shapes, so the fill shows through only inside them. */
+.goal[data-style="hearts"] .goal__track, .goal[data-style="stars"] .goal__track { height: 2.4em; border: 0; border-radius: 0; box-shadow: none; -webkit-mask-size: 2.4em 2.4em; mask-size: 2.4em 2.4em; -webkit-mask-repeat: repeat; mask-repeat: repeat; -webkit-mask-repeat: space; mask-repeat: space; }
+.goal[data-style="hearts"] .goal__track { -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z'/%3E%3C/svg%3E"); mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z'/%3E%3C/svg%3E"); }
+.goal[data-style="stars"] .goal__track { -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z'/%3E%3C/svg%3E"); mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z'/%3E%3C/svg%3E"); }
+
+.goal[data-style="neon"] .goal__head, .goal[data-style="neon"] .goal__cheer { color: #fff; background: rgba(8, 8, 22, 0.66); text-shadow: 0 0 0.5em var(--a-accent, #fc0); box-shadow: 0 0 0.6em var(--a-accent, #fc0), inset 0 0 0.5em rgba(255, 255, 255, 0.1); }
+.goal[data-style="neon"] .goal__track { background: rgba(8, 8, 22, 0.66); box-shadow: 0 0 0.7em var(--a-accent, #fc0), inset 0 0 0.6em rgba(0, 0, 0, 0.6); }
+.goal[data-style="neon"] .goal__fill { background-image: linear-gradient(rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0) 65%); background-color: var(--a-accent, #fc0); }
+.goal[data-style="neon"][data-full="true"] .goal__fill { background-color: var(--a-pop, #f48); }
+
+/* Ring: a circle that fills clockwise, the numbers in the middle and the label under it. It sits where the alignment says (left, center or right). */
+.goal[data-style="ring"] { right: auto; display: grid; justify-items: center; row-gap: 0.5em; width: max-content; max-width: 92%; }
+.goal[data-style="ring"][data-align="center"] { left: 50%; transform: translate(-50%, -50%); }
+.goal[data-style="ring"][data-align="right"] { left: auto; right: 4%; }
+.goal[data-style="ring"] .goal__head { display: contents; }
+.goal[data-style="ring"] .goal__track { grid-area: 1 / 1; justify-self: center; width: 6.5em; height: 6.5em; border: 0; border-radius: 50%; box-shadow: none; background: conic-gradient(var(--a-accent, #fc0) calc(var(--p, 0) * 1%), var(--a-bg, #fff) 0); -webkit-mask-image: radial-gradient(farthest-side, rgba(0, 0, 0, 0) calc(100% - 1em), #000 calc(100% - 1em)); mask-image: radial-gradient(farthest-side, rgba(0, 0, 0, 0) calc(100% - 1em), #000 calc(100% - 1em)); }
+.goal[data-style="ring"][data-full="true"] .goal__track { background: conic-gradient(var(--a-pop, #f48) 100%, var(--a-bg, #fff) 0); }
+.goal[data-style="ring"] .goal__fill { display: none; }
+.goal[data-style="ring"] .goal__numbers { grid-area: 1 / 1; align-self: center; justify-self: center; display: grid; place-items: center; width: 4.7em; height: 4.7em; box-sizing: border-box; padding: 0.3em; border-radius: 50%; font-size: 0.75em; line-height: 1.2; text-align: center; white-space: pre-line; font-weight: 800; color: var(--a-text, #222); background: var(--a-bg, #fff); }
+.goal[data-style="ring"] .goal__numbers:empty { display: none; }
+.goal[data-style="ring"] .goal__label { grid-area: 2 / 1; justify-self: center; padding: 0.2em 0.9em; font-weight: 800; color: var(--a-text, #222); background: var(--a-bg, #fff); border: var(--a-border, 2px) solid var(--a-accent, #fc0); border-radius: var(--a-radius, 20px); }
+.goal[data-style="ring"] .goal__cheer { grid-column: 1; }
+@media (prefers-reduced-motion: reduce) { .goal[data-style="candy"] .goal__fill { animation: none; } }
+
 /* ── Top Likers ─────────────────────────────────────────────────────────────────────────────────────────────────────── */
 .likers { position: absolute; inset: 0; padding: 2%; overflow: hidden; pointer-events: none; font-family: var(--a-font, sans-serif); font-size: var(--a-size, 24px); letter-spacing: var(--a-letter, 0px); }
 .likers__title { display: block; width: fit-content; margin: 0 0 0.5em; padding: 0.2em 0.8em; font-weight: 800; color: var(--a-text, #222); background: var(--a-bg, #fff); border: var(--a-border, 2px) solid var(--a-accent, #fc0); border-radius: var(--a-radius, 20px); }
