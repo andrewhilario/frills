@@ -25,7 +25,7 @@ import { ALERT_AT, Signing, capacity, deviceFacts, snapshot, statusPage } from "
 import { SlotAlerts, termuxNotifier } from "./alerts.mjs";
 import { OWNER, ownerGate } from "./owner.mjs";
 
-const VERSION = "0.5.7";
+const VERSION = "0.5.8";
 /** What this program can do, so a page can tell an old one ("chat" only) from one that sends alerts. */
 const FEATURES = ["chat", "alerts", "info", "roles", "status"];
 
@@ -83,11 +83,11 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
   const sampler = setInterval(sample, 10000);
   sampler.unref?.();
   const gate = ownerGate(relay?.ownerKey); // the owner's password, to see the names from anywhere
-  const numbers = (local) => {
+  const numbers = (local, owned = false) => {
     const stats = hub.stats();
     const estimate = capacity({ freeMem: os.freemem(), rss: process.memoryUsage().rss, baseRss, rooms: stats.used, cpuFraction });
     const streams = relay ? { open: openCount(), limit: maxPerIp, turnedAway: away.total, replaced: away.replaced, lastTurnedAwayS: away.lastAt ? Math.round((Date.now() - away.lastAt) / 1000) : null } : null;
-    return snapshot({ stats, startedAt, now: Date.now(), version: VERSION, features: FEATURES, signing, estimate, streams, keyed: Boolean(apiKey), alertAt: relay?.alertAt ?? ALERT_AT, device: local ? deviceFacts(cpuFraction) : null, roster: local ? hub.roster() : null, ownerLogin: gate.enabled && !local });
+    return snapshot({ stats, startedAt, now: Date.now(), version: VERSION, features: FEATURES, signing, estimate, streams, keyed: Boolean(apiKey), alertAt: relay?.alertAt ?? ALERT_AT, device: local ? deviceFacts(cpuFraction) : null, roster: local ? hub.roster() : null, ownerLogin: gate.enabled && !local, actions: owned ? { restart: Boolean(relay?.restart) } : null });
   };
   const nothing = (req, res) => {
     res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
@@ -117,6 +117,11 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
     res.writeHead(status, { "Content-Type": "text/plain; charset=utf-8", ...headers });
     res.end(body);
   };
+  const json = (res, status, body) => {
+    res.writeHead(status, { "Content-Type": "application/json", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
+    res.end(JSON.stringify(body));
+  };
+  let restartAt = 0; // when the owner last asked for a restart
 
   const server = http.createServer((req, res) => {
     let cors = {};
@@ -142,7 +147,24 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
     // The device's details and the names of who is connected: for someone on the device itself, or anyone who sends the owner's password.
     // Everyone else gets only the numbers.
     const onDevice = !req.headers["cf-connecting-ip"] && !req.headers["x-forwarded-for"];
+    // Restarting the relay from the status page. It takes the owner's password in a header, like everything else of the owner's: a page on another site cannot send
+    // that header without asking the relay's permission first, and the relay never gives it (it sends no CORS headers for this address).
+    if (relay && url.pathname === "/owner/restart") {
+      if (req.method !== "POST") return text(res, 405, "Use POST.", { Allow: "POST" });
+      if (!gate.enabled) return json(res, 403, { ok: false, error: "no_owner_password" });
+      const who = gate.check(req.headers.authorization, visitor(req));
+      if (who === "locked") return json(res, 429, { ok: false, error: "locked" });
+      if (who !== "ok") return json(res, 401, { ok: false, error: who === "wrong" ? "wrong_key" : "key_needed" });
+      if (!relay.restart) return json(res, 409, { ok: false, error: "not_supervised" }); // nothing would start it again, so it stays up
+      const now = Date.now();
+      if (now - startedAt < (relay.minUptimeMs ?? 15000) || now - restartAt < (relay.restartGapMs ?? 30000)) return json(res, 429, { ok: false, error: "too_soon" });
+      restartAt = now;
+      log("a restart was asked for from the status page");
+      res.on("finish", () => setTimeout(relay.restart, 250));
+      return json(res, 200, { ok: true, restarting: true });
+    }
     let owner = onDevice;
+    let proven = false; // the owner's password was sent and is right (being on the device is enough to see the names, not to restart it)
     if (relay && url.pathname === "/health" && !wantsPage) {
       const asked = gate.check(req.headers.authorization, visitor(req));
       if (asked === "wrong" || asked === "locked") {
@@ -150,13 +172,14 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
         return res.end(JSON.stringify({ ok: false, error: asked === "wrong" ? "wrong_key" : "locked" }));
       }
       owner = owner || asked === "ok";
+      proven = asked === "ok";
     }
     if (wantsPage) {
       res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; connect-src 'self'" });
       res.end(statusPage(numbers(onDevice))); // a page load can't carry the password: the page asks again with it
     } else if (url.pathname === "/tiktok/ping" || (relay && url.pathname === "/health")) {
       res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", ...cors });
-      res.end(JSON.stringify(relay && url.pathname === "/health" ? numbers(owner) : relay ? { ok: true, name: "frills-relay", version: VERSION, features: FEATURES, slots: hub.stats() } : { ok: true, name: "frills-helper", version: VERSION, features: FEATURES }));
+      res.end(JSON.stringify(relay && url.pathname === "/health" ? numbers(owner, proven) : relay ? { ok: true, name: "frills-relay", version: VERSION, features: FEATURES, slots: hub.stats() } : { ok: true, name: "frills-helper", version: VERSION, features: FEATURES }));
     } else if (url.pathname === "/tiktok/stream") {
       stream(req, res, url, cors);
     } else {
@@ -288,6 +311,8 @@ async function mainRelay() {
   const slots = numberOr(process.env.RELAY_SLOTS, 30);
   const alertAt = Number.isFinite(Number(process.env.RELAY_ALERT_SPOTS)) && process.env.RELAY_ALERT_SPOTS !== undefined && process.env.RELAY_ALERT_SPOTS !== "" ? Math.max(0, Number(process.env.RELAY_ALERT_SPOTS)) : 10;
   const ownerKey = process.env.RELAY_OWNER_KEY;
+  // Something starts the relay again when it stops: the keeper that `npm run relay` runs (it sets RELAY_SUPERVISED), or systemd (it sets INVOCATION_ID).
+  const supervised = Boolean(process.env.RELAY_SUPERVISED || process.env.INVOCATION_ID);
   const relay = { origins, slots, alertAt, ownerKey, maxPerIp: numberOr(process.env.RELAY_PER_IP, 60), maxAccountsPerIp: numberOr(process.env.RELAY_ACCOUNTS_PER_IP, 12), trustProxy: process.env.RELAY_TRUST_PROXY !== "0" };
   const port = numberOr(process.argv.find((a) => a.startsWith("--port="))?.slice(7) ?? process.env.PORT, 8765);
   const bind = process.env.RELAY_BIND ?? "127.0.0.1"; // behind a tunnel nothing else may reach it
@@ -300,6 +325,7 @@ async function mainRelay() {
   }
   import("tiktok-live-connector").catch(() => {}); // warm it up now: the first account to connect should not wait for the library to load
   console.log(`\nFrills relay ${VERSION} is running on ${bind}:${port}.\n  Spots: ${slots}. Allowed website addresses: ${origins.join(", ")}.\n  Status page: http://${bind}:${port}/health (open it in a browser)\n  Warns you when ${alertAt} spots or fewer are left${process.env.RELAY_ALERTS === "0" ? " (alerts are off)" : ""}.\n  Owner password (to see who is connected from your PC): ${ownerState(ownerKey)}.\n  Signing service key (EULER_API_KEY): ${process.env.EULER_API_KEY?.trim() ? "set, so the limits are your own" : "NOT set: the limits are shared with everyone, and TikTok will often be busy at night"}.\n  Pages one internet address may keep open: ${relay.maxPerIp} (RELAY_PER_IP), for at most ${relay.maxAccountsPerIp} different accounts (RELAY_ACCOUNTS_PER_IP).\n`);
+  console.log(`  Restart from the status page: ${ownerKey && ownerKey.length >= OWNER.minKey ? (supervised ? "on" : "off (start the relay with npm run relay, or under systemd, so that something starts it again)") : "off (it needs the owner password)"}`);
   if (process.env.RELAY_ALERTS !== "0") {
     const alerts = new SlotAlerts({ stats: () => helper.hub.stats(), signing: helper.signing, alertAt, notify: termuxNotifier({ log: say }), log: say });
     alerts.start();
@@ -308,11 +334,15 @@ async function mainRelay() {
     const s = helper.hub.stats();
     say(`spots ${s.used}/${s.max}, ${s.waiting} waiting`);
   }, 5 * 60000).unref();
+  let stopping = false;
   const stop = async () => {
+    if (stopping) return;
+    stopping = true;
     console.log("Stopping…");
     await helper.close();
     process.exit(0);
   };
+  if (supervised) relay.restart = stop; // asked for from the owner's status page: it stops and is started again. Without a keeper it would just stay stopped.
   process.on("SIGINT", stop);
   process.on("SIGTERM", stop);
 }

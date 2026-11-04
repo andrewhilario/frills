@@ -13,7 +13,7 @@
     "dev": "node scripts/dev.mjs",
     "serve": "node scripts/serve.mjs",
     "tiktok": "node build.mjs && node helper/server.mjs",
-    "relay": "node helper/server.mjs --relay",
+    "relay": "node helper/keep.mjs",
     "tiktok:setup": "cd helper && npm install --ignore-scripts --no-audit --no-fund",
     "test": "node scripts/test.mjs",
     "deploy": "node build.mjs && npx wrangler deploy",
