@@ -111,13 +111,13 @@ td a{font-weight:700;color:var(--ink)}.pill{display:inline-block;padding:2px 10p
 <section class="alarm"><label>Warn me when <input type="number" id="at" min="0" max="500" value="${esc(s.alertAt)}"> or fewer spots are left <button id="allow" type="button">Turn on notifications</button></label>
 <p class="note" id="allownote">The warning also shows here as a red bar, and plays a short sound. Keep this page open to get it. Your phone can warn you by itself too (Termux notification), see the guide.</p></section>
 <section class="card dev" id="dev"><b>This device</b><span id="devtext"></span></section>
-<section class="card own" id="own" hidden><b>Owner?</b> <span class="note">Enter the relay password to see who is connected. It stays in this tab only.</span>
-<div class="ownrow"><input type="password" id="ownkey" autocomplete="current-password" spellcheck="false" aria-label="Relay password"> <button id="ownsave" type="button">Show who is connected</button></div><p class="note" id="ownmsg" role="status"></p></section>
+<section class="card own" id="own" hidden><b>Owner?</b> <span class="note">Enter the relay password to see who is connected and to restart the relay. It stays in this tab only.</span>
+<div class="ownrow"><input type="password" id="ownkey" autocomplete="current-password" spellcheck="false" aria-label="Relay password"> <button id="ownsave" type="button">Sign in</button></div><p class="note" id="ownmsg" role="status"></p></section>
+<section class="card own" id="ctl" hidden><b>Restart</b> <span class="note">Stops the relay and starts it again. Everyone's chat reconnects by itself in a few seconds.</span>
+<div class="ownrow"><button id="restart" type="button">Restart the relay</button></div><p class="note" id="ctlmsg" role="status"></p></section>
 <section class="card who dev" id="who"><h2>Who is connected</h2><span class="note" id="whonote"></span>
 <div class="wrap"><table id="whotable"><thead><tr><th>Account</th><th>Status</th><th>Pages</th><th>Followers</th><th>Here for</th><th>Last minute</th></tr></thead><tbody id="whobody"></tbody></table></div>
 <p class="note" id="waitnote"></p><button id="ownout" type="button" hidden>Hide the names again</button></section>
-<section class="card own" id="ctl" hidden><b>Restart</b> <span class="note">Stops the relay and starts it again. Everyone's chat reconnects by itself in a few seconds.</span>
-<div class="ownrow"><button id="restart" type="button">Restart the relay</button></div><p class="note" id="ctlmsg" role="status"></p></section>
 </main>
 <script>
 const $=(id)=>document.getElementById(id);let last="ok",first=true;
@@ -159,10 +159,17 @@ function draw(s){
   const c=s.capacity;$("cap").textContent="About "+c.estimate+" accounts";$("capnote").textContent=(c.measured?"A guess from what this device uses now.":"A first guess; it improves once a few accounts are open.")+" Your internet and TikTok's free signing usually run out before the device does."+(c.estimate>s.slots.max*1.5?" You set "+s.slots.max+" spots, so there may be room to raise it.":"");
   const b=$("banner");b.dataset.on=String(low);b.textContent=s.slots.waiting>0?"People are waiting in line. Only "+free+" spots left.":free===0?"The relay is full.":"Only "+free+" spots left.";
   $("own").hidden=!s.ownerLogin;$("ownout").hidden=!(s.roster&&OWNER);
-  $("ctl").hidden=!(s.actions&&OWNER);
-  if(s.actions){
-    if(restarting&&s.uptimeS<restarting){restarting=0;$("restart").disabled=!s.actions.restart;$("ctlmsg").textContent="Back, and restarted just now."}
-    else if(!restarting&&!s.actions.restart){$("restart").disabled=true;$("ctlmsg").textContent="This relay cannot restart itself, because nothing would start it again. Start it with npm run relay (the guide has the steps)."}
+  $("ctl").hidden=!(s.actions||s.device); // the owner (signed in) or someone on the device itself: the card says what is missing when it cannot be used
+  // the card's own lines (what is missing, or that it cannot restart) are put up and taken down here; what a press of the button said is left alone
+  const ownLine=(key,text)=>{if(cardNote!==key){cardNote=key;$("ctlmsg").textContent=text}};
+  if(!s.actions){
+    if(!restarting){$("restart").disabled=true;ownLine(s.ownerLogin?"in":"none",s.ownerLogin?"Sign in with the owner password above to restart the relay.":"This relay has no owner password, so it cannot be restarted from this page. Set RELAY_OWNER_KEY (12 or more characters) and start the relay again.")}
+  }else{
+    if(restarting&&s.uptimeS<restarting){restarting=0;cardNote="";$("restart").disabled=!s.actions.restart;$("ctlmsg").textContent="Back, and restarted just now."}
+    else if(!restarting){
+      $("restart").disabled=!s.actions.restart;
+      if(s.actions.restart){if(cardNote){cardNote="";$("ctlmsg").textContent=""}}else ownLine("alone","This relay cannot restart itself, because nothing would start it again. Start it with npm run relay (the guide has the steps).");
+    }
     lastUp=s.uptimeS;
   }
   if(s.roster){drawWho(s.roster)}else{$("who").dataset.on="false"}
@@ -171,14 +178,14 @@ function draw(s){
   last=low?"low":"ok";first=false;document.title="Frills relay: "+free+" spots free";
 }
 async function tick(){try{
-  const r=await fetch(location.pathname,{headers:{accept:"application/json",...(OWNER?{authorization:"Bearer "+OWNER}:{})},cache:"no-store"});
+  const r=await fetch("/health",{headers:{accept:"application/json",...(OWNER?{authorization:"Bearer "+OWNER}:{})},cache:"no-store"});
   if(r.status===401){keep("");$("ownmsg").textContent="That is not the right password.";return tick()}
   if(r.status===429){keep("");$("ownmsg").textContent="Too many wrong tries. Wait ten minutes and try again.";return}
   draw(await r.json())}catch{$("state").textContent="Cannot reach the relay right now."}}
 $("ownsave").addEventListener("click",()=>{const v=$("ownkey").value.trim();if(!v)return;keep(v);$("ownkey").value="";$("ownmsg").textContent="";tick()});
 $("ownkey").addEventListener("keydown",(e)=>{if(e.key==="Enter")$("ownsave").click()});
 $("ownout").addEventListener("click",()=>{keep("");tick()});
-let restarting=0,lastUp=0;
+let restarting=0,lastUp=0,cardNote="";
 $("restart").addEventListener("click",async()=>{
   if(!OWNER||!confirm("Restart the relay now? Everyone's chat reconnects by itself in a few seconds."))return;
   $("restart").disabled=true;$("ctlmsg").textContent="Asking the relay to restart...";

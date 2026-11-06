@@ -30,19 +30,19 @@ class FakeConnection extends EventEmitter {
   async connect() {}
   disconnect() { this.emit("disconnected"); }
 }
-async function start({ restart }) {
+async function start({ restart, ownerKey = KEY }) {
   const calls = { restart: 0 };
   const helper = createHelper({
-    relay: { origins: ["https://frills.example"], slots: 2, maxPerIp: 20, trustProxy: false, ownerKey: KEY, restart: restart ? () => { calls.restart++; } : null, minUptimeMs: 0 },
+    relay: { origins: ["https://frills.example"], slots: 2, maxPerIp: 20, trustProxy: false, ownerKey, restart: restart ? () => { calls.restart++; } : null, minUptimeMs: 0 },
     factory: async () => new FakeConnection(),
   });
   helpers.push(helper);
   return { base: `http://127.0.0.1:${await helper.listen(0)}`, calls };
 }
-const signIn = async (base) => {
-  await page.goto(`${base}/health`, { settle: 300 });
+const signIn = async (base, path = "/health") => {
+  await page.goto(`${base}${path}`, { settle: 300 });
   await page.evaluate("sessionStorage.clear()");
-  await page.goto(`${base}/health`, { settle: 300 });
+  await page.goto(`${base}${path}`, { settle: 300 });
   await page.waitFor(`!document.getElementById("own").hidden`);
   assert.equal(await page.evaluate(`document.getElementById("ctl").hidden`), true, "no Restart card before the password");
   await page.evaluate(`(() => { document.getElementById("ownkey").value = ${JSON.stringify(KEY)}; document.getElementById("ownsave").click(); })()`);
@@ -69,4 +69,40 @@ test("status page: on a relay that nothing would start again the button is off a
   assert.equal(await page.evaluate(`document.getElementById("restart").disabled`), true);
   assert.match(await page.evaluate(`document.getElementById("ctlmsg").textContent`), /cannot restart itself/);
   assert.equal(calls.restart, 0);
+});
+
+test("status page: opened at the relay's plain address (not /health) it works too: the sign in, and then the Restart card", { skip }, async () => {
+  const { base, calls } = await start({ restart: true });
+  await signIn(base, "/"); // (the page used to ask for its numbers at the address it was opened at, and "/" is not where they are)
+  assert.equal(await page.evaluate(`document.getElementById("restart").disabled`), false);
+  await page.evaluate(`window.confirm = () => true; document.getElementById("restart").click()`);
+  for (let i = 0; i < 30 && calls.restart === 0; i++) await sleep(100);
+  assert.equal(calls.restart, 1);
+});
+
+test("status page: on the device itself the password box and the Restart card are there too, the card says to sign in first and works after, and a relay with no owner password says why it cannot restart", { skip }, async () => {
+  await page.send("Network.setExtraHTTPHeaders", { headers: {} }); // no tunnel header: this visit is on the device itself
+  try {
+    const { base, calls } = await start({ restart: true });
+    await page.goto(`${base}/health`, { settle: 300 });
+    await page.evaluate("sessionStorage.clear()");
+    await page.goto(`${base}/health`, { settle: 300 });
+    assert.equal(await page.evaluate(`document.getElementById("own").hidden`), false, "the password box is offered on the device too");
+    assert.equal(await page.evaluate(`document.getElementById("ctl").hidden`), false, "and so is the card");
+    assert.equal(await page.evaluate(`document.getElementById("restart").disabled`), true);
+    assert.match(await page.evaluate(`document.getElementById("ctlmsg").textContent`), /Sign in with the owner password/);
+    await page.evaluate(`(() => { document.getElementById("ownkey").value = ${JSON.stringify(KEY)}; document.getElementById("ownsave").click(); })()`);
+    await page.waitFor(`!document.getElementById("restart").disabled`);
+    await page.evaluate(`window.confirm = () => true; document.getElementById("restart").click()`);
+    for (let i = 0; i < 30 && calls.restart === 0; i++) await sleep(100);
+    assert.equal(calls.restart, 1);
+
+    const bare = await start({ restart: true, ownerKey: "" });
+    await page.goto(`${bare.base}/health`, { settle: 300 });
+    assert.equal(await page.evaluate(`document.getElementById("ctl").hidden`), false);
+    assert.equal(await page.evaluate(`document.getElementById("restart").disabled`), true);
+    assert.match(await page.evaluate(`document.getElementById("ctlmsg").textContent`), /no owner password[\s\S]*RELAY_OWNER_KEY/);
+  } finally {
+    await page.send("Network.setExtraHTTPHeaders", { headers: { "cf-connecting-ip": "203.0.113.7" } });
+  }
 });
