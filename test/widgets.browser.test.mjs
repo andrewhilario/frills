@@ -40,6 +40,8 @@ const person = (id, name) => ({ id, displayId: name.toLowerCase().replace(/\W/g,
 const gift = (id, name, giftName, diamondCount, count = 1) => ({ common: { msgId: id }, user: person(id, name), gift: { name: giftName, type: 2, diamondCount }, repeatCount: count });
 const follow = (id, name) => ({ common: { msgId: id }, user: person(id, name) });
 const text = (selector) => page.evaluate(`document.querySelector(${JSON.stringify(selector)})?.textContent.trim() ?? null`);
+// the goal's numbers now also say how many are left ("8 / 10  ·  2 to go"); the older tests below are about the count itself
+const count = async () => (await text(".goal__numbers")).replace(/\s+·\s+[\d,]+ to go$/, "");
 const click = (selector) => page.evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
 const type = (selector, value) => page.evaluate(`(() => { const i = document.querySelector(${JSON.stringify(selector)}); i.value = ${JSON.stringify(value)}; i.dispatchEvent(new Event("input", { bubbles: true })); })()`);
 const rows = () => page.evaluate(`[...document.querySelectorAll(".gift:not(.gift--out)")].map((g) => g.querySelector(".gift__words").textContent)`);
@@ -95,15 +97,15 @@ test("overlay: followers move the goal bar, reaching it celebrates, and the next
   await until(() => made.length === 1);
   await sleep(150);
   assert.equal(await text(".goal__label"), "Road to 10");
-  assert.equal(await text(".goal__numbers"), "8 / 10");
+  assert.equal(await count(), "8 / 10");
   made[0].emit("follow", follow("f1", "Ann"));
-  await until(async () => (await text(".goal__numbers")) === "9 / 10");
+  await until(async () => (await count()) === "9 / 10");
   assert.equal(await page.evaluate(`document.querySelector(".goal__fill").style.width`), "90%");
   made[0].emit("follow", follow("f2", "Ben"));
   await until(async () => (await text(".goal__cheer")) === "Yay");
   assert.equal(await page.evaluate(`document.querySelector(".goal").dataset.full`), "true");
   assert.ok(await page.evaluate(`document.querySelectorAll(".goal__fx i").length > 0`), "confetti");
-  await until(async () => (await text(".goal__numbers")) === "10 / 15", 9000);
+  await until(async () => (await count()) === "10 / 15", 9000);
 });
 
 test("overlay: with remember turned on, the count survives a reload", { skip }, async () => {
@@ -116,9 +118,9 @@ test("overlay: with remember turned on, the count survives a reload", { skip }, 
   await sleep(150);
   made[0].emit("follow", follow("f1", "Ann"));
   made[0].emit("follow", follow("f2", "Ben"));
-  await until(async () => (await text(".goal__numbers")) === "2 / 100");
+  await until(async () => (await count()) === "2 / 100");
   await page.goto(url, { settle: 800 });
-  assert.equal(await text(".goal__numbers"), "2 / 100", "remembered");
+  assert.equal(await count(), "2 / 100", "remembered");
 });
 
 test("editor: the follower goal talks about follows, not chat, and a follow counts as reading", { skip }, async () => {
@@ -134,11 +136,11 @@ test("editor: the follower goal talks about follows, not chat, and a follow coun
 test("overlay: the goal starts from the account's real follower count, and a gift goal counts diamonds", { skip }, async () => {
   const { base, made } = await withHelper({ followers: 5000 });
   await page.goto(`${base}/overlay/goal/?channel=pond_cafe&platform=tiktok&start=0&target=100&step=25`, { settle: 800 });
-  await until(async () => (await text(".goal__numbers")) === "5,000 / 5,025");
+  await until(async () => (await count()) === "5,000 / 5,025");
   assert.equal(await text(".goal__label"), "Follower goal", "no label typed: the type's name");
   await until(() => made.length === 1);
   made[0].emit("follow", follow("f1", "Ann"));
-  await until(async () => (await text(".goal__numbers")) === "5,001 / 5,025");
+  await until(async () => (await count()) === "5,001 / 5,025");
 
   await page.goto(`${base}/overlay/goal/?channel=pond_two&platform=tiktok&type=gift&target=1000&step=0`, { settle: 800 });
   await until(() => made.length >= 2);
@@ -146,7 +148,7 @@ test("overlay: the goal starts from the account's real follower count, and a gif
   assert.equal(await text(".goal__label"), "Gift goal");
   made[made.length - 1].emit("gift", gift("g1", "Ann", "Panda", 100, 3));
   made[made.length - 1].emit("follow", follow("f9", "Ben")); // not counted by a gift goal
-  await until(async () => (await text(".goal__numbers")) === "300 / 1,000 diamonds");
+  await until(async () => (await count()) === "300 / 1,000 diamonds");
 });
 
 test("editor: when TikTok says the room is LIVE it reads at once, even if nobody says or does anything", { skip }, async () => {
@@ -179,13 +181,13 @@ test("editor: the goal test buttons move the bar, reaching celebrates, and the g
   await page.goto(base + "/goal/", { settle: 800 });
   await type("#c-target", "20");
   await type("#c-start", "5");
-  assert.equal(await text(".goal__numbers"), "5 / 20");
+  assert.equal(await count(), "5 / 20");
   await click('[data-test="ten"]');
-  await until(async () => (await text(".goal__numbers")) === "15 / 20");
+  await until(async () => (await count()) === "15 / 20");
   await click('[data-test="reach"]');
   await until(async () => (await text(".goal__cheer")) !== "", 3000);
   await click('[data-test="reset"]');
-  await until(async () => /^5 \/ \d+$/.test(await text(".goal__numbers")), 9000);
+  await until(async () => /^5 \/ \d+$/.test(await count()), 9000);
 });
 
 test("overlays page: the live and beta ones link to their editors, and the coming ones are listed without links", { skip }, async () => {

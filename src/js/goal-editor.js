@@ -4,6 +4,7 @@ import { GOAL, GOAL_TYPES, GoalState, goalAmount } from "./goal.js";
 import { createGoalView } from "./widgets-view.js";
 import { startWidgetEditor } from "./widget-editor.js";
 import { createSounds } from "./sounds.js";
+import { practiceName } from "./fake-alerts.js";
 
 const sounds = createSounds();
 
@@ -30,6 +31,7 @@ startWidgetEditor({
     labelTests(type);
     const view = createGoalView(host);
     const state = new GoalState(settings, {
+      onGain: (gain) => view.gain(gain),
       onChange: (snapshot) => view.update(snapshot),
       onReach: async () => {
         if (state.settings.celebrate) {
@@ -49,13 +51,13 @@ startWidgetEditor({
         state.setSettings(next);
         if (moved) { labelTests(type); ctx.restart(); } // it now waits for a different kind of event
       },
-      onEvent: (event) => { const n = goalAmount(type, event); if (n) state.add(n); },
+      onEvent: (event) => { const n = goalAmount(type, event); if (n) state.add(n, event.name); },
       onInfo: (info) => { if (info.followers && type === "follow" && state.settings.fromLive) state.setLive(info.followers); },
       // (the button is the click that lets the browser play sound)
       tests: {
-        one: async () => { await sounds.unlock(); state.add(GOAL_TYPES[type].small); },
-        ten: async () => { await sounds.unlock(); state.add(GOAL_TYPES[type].big); },
-        reach: async () => { await sounds.unlock(); state.add(Math.max(1, state.goal - state.value)); },
+        one: async () => { await sounds.unlock(); state.add(GOAL_TYPES[type].small, practiceName()); },
+        ten: async () => { await sounds.unlock(); state.add(GOAL_TYPES[type].big, practiceName()); },
+        reach: async () => { await sounds.unlock(); state.add(Math.max(1, state.goal - state.value), practiceName()); },
         reset: () => state.reset(),
       },
     };

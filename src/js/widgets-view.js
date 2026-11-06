@@ -2,7 +2,7 @@
 // Everything somebody else wrote (a name, a gift) goes in with textContent and text nodes, never as HTML.
 
 import { el } from "./feed.js";
-import { GOAL_TYPES } from "./goal.js";
+import { GOAL_TYPES, MOMENTS } from "./goal.js";
 import { commandWord } from "./songs.js";
 import { MEDIA_ID, mediaUrl } from "./alerts-settings.js";
 import { fillTemplate } from "./alerts.js";
@@ -130,23 +130,31 @@ export function createGoalView(host) {
   const track = el("div", { className: "goal__track" });
   const pct = el("span", { className: "goal__pct" }); // (only the ring design shows it: inside the ring)
   const fill = el("div", { className: "goal__fill" });
+  const reward = el("p", { className: "goal__reward", hidden: true }); // what you get at the goal, under the bar
   const cheer = el("p", { className: "goal__cheer", hidden: true });
   const fx = el("span", { className: "alert__fx goal__fx" });
-  fx.setAttribute("aria-hidden", "true");
+  const gains = el("div", { className: "goal__gains" }); // the "+1 name" bubbles that rise from the bar
+  const moment = el("p", { className: "goal__moment", hidden: true }); // "Halfway there!"
+  for (const layer of [fx, gains, moment]) layer.setAttribute("aria-hidden", "true");
   track.append(fill);
-  root.append(el("div", { className: "goal__head" }, label, numbers), track, pct, cheer, fx);
+  root.append(el("div", { className: "goal__head" }, label, numbers), track, pct, reward, cheer, fx, gains, moment);
   let settings = null;
   let last = null;
+  let momentTimer = 0;
 
   const show = () => {
     if (!settings || !last) return;
     const type = GOAL_TYPES[settings.type] ?? GOAL_TYPES.follow;
     label.textContent = settings.label || type.label;
+    const ring = settings.barStyle === "ring";
     const parts = [];
     if (settings.showNumbers) parts.push(`${last.value.toLocaleString("en-US")} / ${last.goal.toLocaleString("en-US")}${type.unit ? " " + type.unit : ""}`);
-    if (settings.showPercent && settings.barStyle !== "ring") parts.push(`${last.percent}%`); // (the ring shows the percent inside itself)
+    if (settings.showPercent && !ring) parts.push(`${last.percent}%`); // (the ring shows the percent inside itself)
+    if (settings.toGo && !ring && last.goal > last.value) parts.push(`${(last.goal - last.value).toLocaleString("en-US")} to go`);
     numbers.textContent = parts.join("  ·  ");
     pct.textContent = settings.showPercent ? `${last.percent}%` : "";
+    reward.hidden = !settings.reward;
+    reward.replaceChildren(...(settings.reward ? [el("b", { textContent: "At the goal: " }), document.createTextNode(settings.reward)] : []));
     fill.style.width = last.percent + "%";
     root.style.setProperty("--p", String(last.percent)); // (the ring design is drawn from this)
     root.dataset.full = String(last.percent >= 100);
@@ -155,6 +163,29 @@ export function createGoalView(host) {
   return {
     apply(next) { settings = next; applyLook(root, next); root.dataset.style = next.barStyle || "bar"; show(); },
     update(snapshot) { last = snapshot; show(); },
+    /**
+     * Something was added: a "+1 name" bubble rises from the end of the bar (at most three at once), and a moment passed on the way (a quarter, half, three
+     * quarters) is cheered for a few seconds. Each is switched on or off in the editor.
+     */
+    gain({ name = "", amount = 1, milestones = [] } = {}) {
+      if (settings?.thanks) {
+        const bubble = el("span", { className: "goal__gain", textContent: `+${Number(amount).toLocaleString("en-US")} ${name}`.trim() });
+        bubble.style.left = Math.max(14, Math.min(86, last?.percent ?? 0)) + "%"; // (it keeps the place it was made at while the bar moves on)
+        gains.append(bubble);
+        while (gains.children.length > 3) gains.firstElementChild.remove();
+        setTimeout(() => bubble.remove(), 2200);
+      }
+      const passed = milestones.at(-1);
+      if (settings?.milestones && passed && MOMENTS[passed]) {
+        moment.textContent = MOMENTS[passed];
+        moment.hidden = false;
+        moment.classList.remove("goal__moment--on");
+        void moment.offsetWidth; // (so the same cheer can play again)
+        moment.classList.add("goal__moment--on");
+        clearTimeout(momentTimer);
+        momentTimer = setTimeout(() => { moment.hidden = true; moment.classList.remove("goal__moment--on"); }, 3000);
+      }
+    },
     /** Confetti and the words, for a few seconds. Resolves when it is over. */
     celebrate(words, ms = 6000) {
       cheer.textContent = words;

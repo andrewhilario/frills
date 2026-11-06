@@ -7,6 +7,7 @@ import { createGoalView } from "./widgets-view.js";
 import { channelFromParams, connectEvents } from "./widget-overlay.js";
 import { fontsReady, generalFaces } from "./look.js";
 import { createSounds } from "./sounds.js";
+import { practiceName } from "./fake-alerts.js";
 
 const params = new URLSearchParams(location.search);
 const settings = GOAL.sanitize(GOAL.fromParams(params));
@@ -25,6 +26,7 @@ const remembered = settings.keep && channel ? loadGoal(globalThis.localStorage, 
 const state = new GoalState(settings, {
   gained: remembered?.gained ?? 0,
   target: remembered?.goal,
+  onGain: (gain) => view.gain(gain),
   onChange: (snapshot) => {
     view.update(snapshot);
     if (settings.keep && channel) saveGoal(globalThis.localStorage, channel, state);
@@ -42,7 +44,7 @@ view.update(state.snapshot);
 if (demo) {
   fontsReady(generalFaces(settings), 1000).then(() => {
     const type = GOAL_TYPES[settings.type] ?? GOAL_TYPES.follow;
-    const send = () => { state.add(Math.max(1, Math.round(type.small * (1 + Math.random() * 2)))); setTimeout(send, demoPace ? demoPace * (0.6 + Math.random() * 0.8) : 1800 + Math.random() * 2500); };
+    const send = () => { state.add(Math.max(1, Math.round(type.small * (1 + Math.random() * 2))), practiceName()); setTimeout(send, demoPace ? demoPace * (0.6 + Math.random() * 0.8) : 1800 + Math.random() * 2500); };
     send();
   });
 } else if (!channel) {
@@ -52,7 +54,7 @@ if (demo) {
   connectEvents({
     channel,
     events: [GOAL_TYPES[settings.type].kind],
-    onAlert: (event) => fonts.then(() => { const n = goalAmount(settings.type, event); if (n) state.add(n); }),
+    onAlert: (event) => fonts.then(() => { const n = goalAmount(settings.type, event); if (n) state.add(n, event.name); }),
     // The account's real follower count: the bar starts from it instead of from the number typed in the editor.
     onInfo: (info) => { if (info.followers && settings.type === "follow" && settings.fromLive) fonts.then(() => state.setLive(info.followers)); },
     say,

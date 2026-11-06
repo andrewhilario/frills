@@ -54,6 +54,22 @@
 @keyframes goal-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
 .goal__fx { top: 50%; z-index: 2; }
 
+/* What makes a goal worth watching (all designs): what you get at the goal, the "+1 name" bubbles rising from the end of the bar, and the cheer at a quarter, half and
+   three quarters. Only movement and fading are animated, so it stays smooth. */
+.goal__reward { margin: 0.45em auto 0; width: fit-content; max-width: 100%; padding: 0.1em 0.85em; box-sizing: border-box; text-align: center; font-size: 0.78em; font-weight: 700; color: var(--a-text, #222); background: var(--a-bg, #fff); border: var(--a-border, 2px) solid var(--a-accent, #fc0); border-radius: var(--a-radius, 20px); }
+.goal__reward b { color: var(--a-pop, #f48); }
+.goal__reward[hidden], .goal__moment[hidden] { display: none; }
+.goal[data-align="left"] .goal__reward { margin-left: 0; }
+.goal[data-align="right"] .goal__reward { margin-right: 0; }
+.goal__gains { position: absolute; left: 0; right: 0; bottom: 100%; height: 0; pointer-events: none; }
+.goal__gain { position: absolute; bottom: 0.3em; left: 50%; max-width: 12em; padding: 0.05em 0.7em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.8em; font-weight: 800; color: var(--a-text, #222); background: var(--a-bg, #fff); border: var(--a-border, 2px) solid var(--a-accent, #fc0); border-radius: 99px; opacity: 0; animation: goal-gain 2s ease-out forwards; }
+@keyframes goal-gain { 0% { opacity: 0; transform: translate(-50%, 0.7em) scale(0.8); } 14% { opacity: 1; transform: translate(-50%, -0.15em) scale(1.1); } 28% { transform: translate(-50%, -0.35em) scale(1); } 100% { opacity: 0; transform: translate(-50%, -2.4em) scale(1); } }
+.goal__moment { position: absolute; left: 50%; bottom: calc(100% + 2.2em); margin: 0; padding: 0.1em 0.9em; white-space: nowrap; font-weight: 900; color: #fff; background: var(--a-pop, #f48); border: var(--a-border, 2px) solid var(--a-bg, #fff); border-radius: 99px; pointer-events: none; transform: translateX(-50%); }
+.goal__moment--on { animation: goal-moment 3s ease-out forwards; }
+@keyframes goal-moment { 0% { opacity: 0; transform: translate(-50%, 0.6em) scale(0.6); } 10% { opacity: 1; transform: translate(-50%, 0) scale(1.15); } 18% { transform: translate(-50%, 0) scale(1); } 85% { opacity: 1; transform: translate(-50%, 0) scale(1); } 100% { opacity: 0; transform: translate(-50%, -0.5em) scale(1); } }
+@keyframes goal-fade { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .goal__gain, .goal__moment--on { animation-name: goal-fade; transform: translateX(-50%); opacity: 1; } .goal__gain { animation-duration: 2s; } }
+
 /* The goal's other designs. Each one makes the whole goal one piece (the words and the bar together in one card, or the words on the bar), not just another bar:
    `data-style` on .goal says which. The classic bar is the plain rules above and none of this applies to it. Plain properties only, with the -webkit- masks,
    because OBS's browser can be old. The empty part of a bar is a neutral grey that shows on a light card and a dark one alike. */
@@ -98,7 +114,7 @@
 .goal[data-style="ring"] .goal__pct { display: block; grid-area: 1 / 1 / span 2 / 2; place-self: center; font-size: 0.9em; font-weight: 800; color: var(--a-text, #222); }
 .goal[data-style="ring"] .goal__label { grid-area: 1 / 2; align-self: end; font-weight: 800; color: var(--a-text, #222); }
 .goal[data-style="ring"] .goal__numbers { grid-area: 2 / 2; align-self: start; font-size: 0.85em; color: var(--a-text, #222); }
-.goal[data-style="ring"] .goal__cheer { grid-column: 1 / -1; }
+.goal[data-style="ring"] .goal__cheer, .goal[data-style="ring"] .goal__reward { grid-column: 1 / -1; }
 
 /* The small ones (hearts, stars, ring) sit where the alignment says. */
 .goal[data-style="hearts"][data-align="center"], .goal[data-style="stars"][data-align="center"], .goal[data-style="ring"][data-align="center"] { left: 50%; transform: translate(-50%, -50%); }

@@ -32,8 +32,16 @@ export function goalAmount(type, event) {
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
+/** The moments on the way that get a cheer, as a percent of the goal, and what the cheer says. */
+export const MOMENTS = { 25: "A quarter of the way!", 50: "Halfway there!", 75: "Almost there!" };
+
+/** Which of those moments a change from `before` to `after` percent passed (none going backwards, none that were already behind). */
+export function crossed(before, after) {
+  return Object.keys(MOMENTS).map(Number).filter((m) => before < m && after >= m);
+}
+
 export const GOAL = defineWidget({
-  defaults: { type: "follow", barStyle: "bar", label: "", start: 0, fromLive: true, target: 100, step: 25, showNumbers: true, showPercent: false, celebrate: true, celebrateSound: "none", celebrateText: "Goal reached! Thank you!", keep: false },
+  defaults: { type: "follow", barStyle: "bar", label: "", start: 0, fromLive: true, target: 100, step: 25, showNumbers: true, showPercent: false, toGo: true, reward: "", thanks: true, milestones: true, celebrate: true, celebrateSound: "none", celebrateText: "Goal reached! Thank you!", keep: false },
   controls: [
     { section: "goal", ...selectOf("type", "What the goal counts", Object.entries(GOAL_TYPES).map(([id, t]) => [id, t.name]), "Followers count each new follow. Gifts count diamonds, the way TikTok measures them. Likes count taps.") },
     { section: "goal", ...chipsOf("barStyle", "Bar design", GOAL_STYLES.map((s) => [s.id, s.name])) },
@@ -44,6 +52,10 @@ export const GOAL = defineWidget({
     { section: "goal", ...number("step", "When the goal is reached, raise it by", 0, 1000000, { hint: "The next goal is this many more, and it repeats every time you reach one. 0 stops at the goal and the bar stays full." }) },
     { section: "goal", ...toggle("showNumbers", "Show the numbers (37 / 50)") },
     { section: "goal", ...toggle("showPercent", "Show the percent") },
+    { section: "goal", ...toggle("toGo", "Show how many are left (53 to go)") },
+    { section: "goal", ...text("reward", "What you get at the goal", 60, "For example: Karaoke night! It stays under the bar, so viewers know what they are helping to win. Leave it empty for none.") },
+    { section: "goal", ...toggle("thanks", "Thank each person (+1 and their name)", "A little bubble with the name rises from the bar for every follow, gift or like.") },
+    { section: "goal", ...toggle("milestones", "Cheer at 25%, 50% and 75%") },
     { section: "goal", ...toggle("celebrate", "Celebrate when the goal is reached") },
     { section: "goal", ...selectOf("celebrateSound", "Celebration sound", SOUNDS.map(({ id, name }) => [id, name]), "Played when the goal is reached, together with the celebration. No sound keeps it quiet. A streaming app may need to be allowed to play sound.") },
     { section: "goal", ...text("celebrateText", "Celebration words", 60) },
@@ -51,9 +63,12 @@ export const GOAL = defineWidget({
   ],
 });
 
-/** The count and the goal. `onChange(state)` after each change, `onReach(state)` each time a goal is reached. */
+/**
+ * The count and the goal. `onChange(state)` after each change, `onReach(state)` each time a goal is reached, and `onGain({ name, amount, milestones })` for each
+ * thing that was added (who gave it, how much, and which cheering moments it passed on the way).
+ */
 export class GoalState {
-  constructor(settings, { gained = 0, target, onChange, onReach } = {}) {
+  constructor(settings, { gained = 0, target, onChange, onReach, onGain } = {}) {
     this.settings = settings;
     this.liveStart = null; // the account's real count, when the relay told us (see setLive)
     this.seenType = settings.type;
@@ -61,6 +76,7 @@ export class GoalState {
     this.goal = target ?? settings.target;
     this.onChange = onChange ?? (() => {});
     this.onReach = onReach ?? (() => {});
+    this.onGain = onGain ?? (() => {});
     this.seenTarget = settings.target; // (the editor changes one settings object in place, so the goal it had is remembered here)
     this.catchUp(); // a count restored past its goal does not celebrate again, and is not left stuck on it
   }
@@ -92,11 +108,13 @@ export class GoalState {
     this.onChange(this.snapshot);
   }
 
-  /** `n` more of what is counted (one follower, the diamonds of a gift, a number of likes). */
-  add(n = 1) {
+  /** `n` more of what is counted (one follower, the diamonds of a gift, a number of likes), from `who` when it is known. */
+  add(n = 1, who = "") {
+    const before = this.percent;
     this.gained += n;
     this.check();
     this.onChange(this.snapshot);
+    this.onGain({ name: who, amount: n, milestones: crossed(before, Math.min(99, this.percent)) }); // (reaching the goal itself is the celebration, not a moment)
   }
 
   follow(n = 1) { this.add(n); }

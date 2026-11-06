@@ -1,6 +1,7 @@
 // Practice alerts: made-up follows, gifts of every size and shares, so alerts can be designed and tried without anybody being live.
 // The same shape the relay sends (and acceptAlert checks), so they go through exactly the same engine and drawing.
 
+export const practiceName = () => NAMES[Math.floor(Math.random() * NAMES.length)]; // a made-up name, for the practice events
 const NAMES = ["Pond Pal", "Mochi Bun", "frogfan 🐸", "Mattcha", "Little Lily", "Croaker", "Nori Neko", "Sunny Side", "Bubbletea", "Kero-chan"];
 const GIFTS = [["Rose", 1, "#ff5f86"], ["Finger Heart", 5, "#ffb347"], ["Heart", 20, "#ff4d6d"], ["Panda", 100, "#6c7a89"], ["Galaxy", 1000, "#7b61ff"], ["Lion", 29999, "#e8a33d"]];
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
