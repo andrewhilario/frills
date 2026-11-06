@@ -60,7 +60,7 @@ export function acceptMessage(raw) {
     mod: raw.mod === true,
     gift: raw.gift === true,
     gifter: raw.gifter === true,
-    avatar: isAvatarUrl(raw.avatar) ? raw.avatar : "",
+    avatar: pic(raw.avatar),
     login: String(raw.login ?? "").slice(0, 40),
     host: raw.host === true,
     emotes: [],
@@ -71,6 +71,7 @@ export function acceptMessage(raw) {
 
 const ALERT_KINDS = ["follow", "gift", "share", "like"];
 const num = (value, max) => Math.max(0, Math.min(max, Math.round(Number(value) || 0)));
+const pic = (value) => (isAvatarUrl(value) ? value : ""); // an address a picture may be loaded from, or ""
 
 /** One alert from the helper or relay -> the plain object the alerts draw, with every field checked. Null if there is nothing to draw. */
 export function acceptAlert(raw) {
@@ -82,7 +83,8 @@ export function acceptAlert(raw) {
     id: String(raw.id ?? "").slice(0, 80),
     user: String(raw.user ?? "").slice(0, 80),
     name,
-    avatar: isAvatarUrl(raw.avatar) ? raw.avatar : "",
+    avatar: pic(raw.avatar),
+    hd: pic(raw.avatarHd), // the big picture (the relay sends it as avatarHd), for the alert cards that draw it large
   };
   if (raw.kind === "like") {
     alert.count = Math.max(1, num(raw.count, 100000));
@@ -91,7 +93,7 @@ export function acceptAlert(raw) {
   if (raw.kind === "gift") {
     Object.assign(alert, {
       gift: String(raw.gift ?? "").replace(/[\u0000-\u001f\u007f]+/g, " ").trim().slice(0, 40) || "a gift",
-      picture: isAvatarUrl(raw.picture) ? raw.picture : "",
+      picture: pic(raw.picture),
       diamonds: num(raw.diamonds, 1000000),
       count: Math.max(1, num(raw.count, 9999)),
     });

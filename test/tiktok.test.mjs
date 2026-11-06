@@ -3,12 +3,12 @@
 
 import test, { mock } from "node:test";
 import assert from "node:assert/strict";
-import { acceptMessage, cleanTikTokUser, connectTikTok, explainRefusal, isAvatarUrl } from "../src/js/tiktok.js";
+import { acceptAlert, acceptMessage, cleanTikTokUser, connectTikTok, explainRefusal, isAvatarUrl } from "../src/js/tiktok.js";
 import { cleanName, statusText } from "../src/js/connect.js";
 import { overlayUrl } from "../src/js/settings.js";
 import { matchaOverlayUrl } from "../src/js/matcha.js";
 import { classify } from "../helper/rooms.mjs";
-import { avatarUrl, mapChat, mapDelete, mapGift } from "../helper/map.mjs";
+import { avatarHdUrl, avatarUrl, mapChat, mapDelete, mapFollow, mapGift } from "../helper/map.mjs";
 
 test("a TikTok name is letters, numbers, underscores and dots, with or without an @ or a link around it", () => {
   assert.equal(cleanTikTokUser("  @Some_Name.9 "), "some_name.9");
@@ -641,4 +641,23 @@ test("explainRefusal reads the relay's own words, adds nothing of its own when a
   assert.match(await explainRefusal("https://r.test/s", async () => { throw new TypeError("Failed to fetch"); }), /^Can't reach the free Frills relay right now\./);
   assert.equal(await explainRefusal("https://r.test/s", "not a function"), "Can't reach the free Frills relay right now. Check your internet. Trying again…", "nothing usable to ask with is the same as no answer");
   assert.ok(signals.length === 8 && signals.every((s) => s.aborted), "whatever answered, the request is let go afterwards (a stream that opened must not stay open)");
+});
+
+test("alerts carry the big picture too: the medium one, else the large one, only from TikTok's own picture servers, and chat keeps just the small one", () => {
+  const SMALL = "https://p16-sign.tiktokcdn.com/obj/small~tplv-100x100.webp";
+  const MEDIUM = "https://p16-sign.tiktokcdn.com/obj/medium~tplv-720x720.webp";
+  const LARGE = "https://p16-sign.tiktokcdn.com/obj/large~tplv-1080x1080.webp";
+  const user = (over = {}) => ({ id: "1", uniqueId: "pond.pal", nickname: "Pond Pal", avatarThumb: { urlList: [SMALL] }, avatarMedium: { urlList: [MEDIUM] }, avatarLarge: { urlList: [LARGE] }, ...over });
+  assert.equal(avatarUrl(user()), SMALL, "the small picture is still what a chat bubble gets");
+  assert.equal(avatarHdUrl(user()), MEDIUM, "the medium one: sharp enough, and a lot lighter than the large one");
+  assert.equal(avatarHdUrl(user({ avatarMedium: undefined })), LARGE, "the large one when there is no medium one");
+  assert.equal(avatarHdUrl(user({ avatarMedium: { urlList: ["https://evil.example/m.webp"] }, avatarLarge: undefined })), "", "an address that is not TikTok's is never used");
+  assert.equal(avatarHdUrl({ avatarThumb: { urlList: [SMALL] } }), "", "nothing when TikTok sent only the small one");
+  const follow = mapFollow({ common: { msgId: "f1" }, user: user() });
+  assert.deepEqual([follow.avatar, follow.avatarHd], [SMALL, MEDIUM]);
+  assert.equal("avatarHd" in mapFollow({ common: { msgId: "f2" }, user: { id: "2", uniqueId: "x", nickname: "X", avatarThumb: { urlList: [SMALL] } } }), false, "no key when there is no big picture");
+  assert.equal("avatarHd" in mapChat({ common: { msgId: "c1" }, user: user(), content: "hi" }), false, "chat does not carry it");
+  const accepted = acceptAlert({ kind: "follow", name: "Pond Pal", avatar: SMALL, avatarHd: MEDIUM });
+  assert.deepEqual([accepted.avatar, accepted.hd], [SMALL, MEDIUM], "the page keeps the big picture as hd");
+  assert.equal(acceptAlert({ kind: "follow", name: "Pond Pal", avatar: SMALL, avatarHd: "https://evil.example/x.webp" }).hd, "", "the page drops one it may not load");
 });

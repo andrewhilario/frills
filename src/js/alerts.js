@@ -77,6 +77,7 @@ export function makeAlert(event, config) {
     tier,
     name: event.name,
     avatar: event.avatar ?? "",
+    ...(event.hd ? { hd: event.hd } : {}), // (the big picture)
     picture: kind === "gift" ? event.picture ?? "" : "",
     gift: event.gift,
     resub: Boolean(event.resub),

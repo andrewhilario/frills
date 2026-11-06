@@ -45,10 +45,13 @@ export function createAlertView(host) {
   function avatar(item) {
     const node = el("span", { className: "alert__av", textContent: [...(item.name || "?")][0].toUpperCase() });
     node.setAttribute("aria-hidden", "true");
-    if (item.avatar) {
-      const img = el("img", { className: "alert__img", src: item.avatar, alt: "", referrerPolicy: "no-referrer" });
+    // The big picture when TikTok sent one (a trading, profile or polaroid card draws it large, where the 100 px one is blurry), the small one if that cannot be loaded.
+    const sources = [item.hd, item.avatar].filter(Boolean);
+    if (sources.length) {
+      let tried = 0;
+      const img = el("img", { className: "alert__img", src: sources[0], alt: "", referrerPolicy: "no-referrer" });
       img.addEventListener("load", () => node.classList.add("alert__av--pic"));
-      img.addEventListener("error", () => img.remove());
+      img.addEventListener("error", () => { if (++tried < sources.length) img.src = sources[tried]; else img.remove(); });
       node.append(img);
     }
     return node;

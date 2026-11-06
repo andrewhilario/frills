@@ -20,6 +20,17 @@ export function avatarUrl(user) {
 }
 
 /**
+ * The big picture of a chatter, or "": TikTok lists three sizes (the small one is only about 100 px wide, the medium one 720, the large one 1080). An alert card
+ * draws the picture large, where the small one looks blurry, so alerts carry this one too. The medium one is enough (and a lot lighter than the large one).
+ */
+export function avatarHdUrl(user) {
+  for (const image of [user?.avatarMedium, user?.avatarLarge, user?.avatarLarger]) {
+    for (const address of Array.isArray(image?.urlList) ? image.urlList : []) if (isAvatarUrl(address)) return address;
+  }
+  return "";
+}
+
+/**
  * The pictures of TikTok emotes in a chat message: [{ at, url }], where `at` is the place in the text the picture goes (TikTok sends the
  * words without the emotes and says where each one belongs). Only addresses a page may load are kept, at most 8, in order.
  */
@@ -123,11 +134,13 @@ const person = (d) => {
   const u = d?.user;
   if (!u) return null;
   const handle = clean(u.displayId ?? u.uniqueId, 40);
+  const hd = avatarHdUrl(u);
   return {
     id: clean(d.common?.msgId ?? d.msgId, 60),
     user: clean(u.idStr || u.id || u.userId || handle, 40),
     name: clean(u.nickname, 40) || handle || "viewer",
     avatar: avatarUrl(u),
+    ...(hd ? { avatarHd: hd } : {}), // (only when TikTok sent one: an older relay, or a chatter with no big picture, sends just the small one)
   };
 };
 
