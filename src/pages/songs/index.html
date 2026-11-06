@@ -159,6 +159,7 @@
         <div class="stack" id="spx-switches"></div>
         <p class="ctl__hint spx__note" id="spx-share-note" role="status"></p>
         <p class="ctl__hint spx__note" id="spx-queue-note" role="status"></p>
+        <p class="spx__note spx__overlay" id="spx-overlay-note" role="status"></p>
         <p class="ctl__hint">You can close this page now: Frills reads Spotify for you. Keep your song requests overlay open in your streaming app, because it is what passes your viewers’ <code>!sr</code> and <code>!next</code> on.</p>
       </div>
       <form class="spx__try" id="spx-try" autocomplete="off">
@@ -177,7 +178,7 @@
           <dt>Frills says “Spotify said no” after you log in</dt>
           <dd>Two usual reasons. <strong>Step 6:</strong> your name and the exact email of your Spotify account must be in the app’s <strong>Settings</strong> → <strong>User management</strong> list. <strong>Premium:</strong> the Spotify account that made the app must have Premium. Fix it, then press <strong>Log in with Spotify</strong> again.</dd>
           <dt>It says connected, but viewers’ songs do not reach the queue</dt>
-          <dd>Spotify has to be open and playing on a phone or computer (it does not have to be this computer). The switch <strong>Add songs my viewers ask for to my Spotify queue</strong> must be on, and your song requests overlay has to be open in your streaming app.</dd>
+          <dd>Check these four things. (1) The switch <strong>Add songs my viewers ask for to my Spotify queue</strong> is on. (2) The line under the switches says your song requests overlay is open: if it says Frills cannot see it, the overlay is not open in your streaming app, or its link was copied before you connected Spotify (copy it again in step 5 and replace the old one). (3) Spotify is open and playing on a phone or computer (it does not have to be this computer). (4) Try it in <strong>Try it as a viewer</strong> below: its answer says what Spotify said.</dd>
           <dt>It worked, and then it stopped</dt>
           <dd>The most common reason is that the Premium on the account that made the app ended: Spotify turns such apps off. Renew it, then log in again. If only the song stopped updating, check that Spotify is playing and that your song requests overlay is open.</dd>
         </dl>
@@ -197,6 +198,7 @@
           <button class="btn" type="button" id="copy-link" disabled>Copy link</button>
         </div>
         <p class="linkfield__hint" id="link-hint" role="status"></p>
+        <p class="ctl__hint spx__relink">Connected Spotify? Its connection is inside this link. If you copied your link <strong>before</strong> you connected Spotify, copy it again and paste it into your streaming app in place of the old one: the old link cannot pass viewers’ <code>!sr</code> to Spotify.</p>
       </div>
     </section>
 

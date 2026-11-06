@@ -24,7 +24,7 @@ import { CODE, KEY, clean, json, sameOrigin, sha256 } from "./box.mjs";
 
 /** How old the stored song may be before the next read of the post box asks Spotify again. */
 export const REFRESH_MS = 2500;
-const LIMITS = { bytes: 4096, rows: 200, keepDays: 14, minGapMs: 2000, perHour: 200, recentMs: 10 * 60 * 1000, logLines: 12, usedEveryMs: 3600 * 1000 };
+const LIMITS = { bytes: 4096, rows: 200, keepDays: 14, minGapMs: 2000, perHour: 200, recentMs: 10 * 60 * 1000, logLines: 12, usedEveryMs: 3600 * 1000, helloGapMs: 20000 };
 const CLIENT_ID = /^[A-Za-z0-9]{16,64}$/;
 const TOKEN = /^[A-Za-z0-9._~+/=-]{16,1500}$/;
 const TRACK = /^spotify:track:[A-Za-z0-9]{22}$/;
@@ -72,6 +72,10 @@ async function open(env, code, text) {
 
 const grab = (env, code) => env.DB.prepare("SELECT * FROM spotify_logins WHERE code = ?").bind(code).first();
 const list = (text) => { try { const value = JSON.parse(text); return Array.isArray(value) ? value : []; } catch { return []; } };
+// The song requests overlay says hello now and then (see hello below). When it last did is kept as one marker among the log's lines, { kind: "overlay", at },
+// so the table needs no new column: the lines the streamer reads leave it out, and a new line never pushes it off the end.
+const lines = (text) => list(text).filter((e) => e?.kind !== "overlay");
+const marker = (text) => list(text).find((e) => e?.kind === "overlay") ?? null;
 
 /**
  * A login good for the next minute: the kept access token, or a new one from Spotify (the new refresh token Spotify may give is kept too).
@@ -174,7 +178,9 @@ async function readJson(request) {
 /** Writes down what happened (for the streamer to read in the editor), and what was queued, and counts it against the hour's limit. */
 async function record(env, row, now, { state, text, recent = null, acted = false }) {
   const entry = { at: now, state, text: clean(text, 220) };
-  const log = [entry, ...list(row.log)].slice(0, LIMITS.logLines);
+  const seen = marker(row.log);
+  const log = [entry, ...lines(row.log)].slice(0, LIMITS.logLines);
+  if (seen) log.push(seen);
   const sameHour = now - row.hour_start < 3600 * 1000;
   const count = (sameHour ? row.hour_count : 0) + (acted ? 1 : 0);
   await env.DB.prepare("UPDATE spotify_logins SET log = ?, recent = ?, last_act = ?, hour_start = ?, hour_count = ?, used_at = ? WHERE code = ?")
@@ -238,7 +244,22 @@ async function status({ env, code, now, keyHash }) {
   const row = await grab(env, code);
   if (!row) return json(200, { ok: true, connected: false, now });
   if (row.key_hash !== keyHash) return json(403, { ok: false, error: "wrong_key" });
-  return json(200, { ok: true, connected: true, state: row.state, name: row.name, share: row.share === 1, queue: row.queue === 1, log: list(row.log), now });
+  const seen = marker(row.log);
+  return json(200, { ok: true, connected: true, state: row.state, name: row.name, share: row.share === 1, queue: row.queue === 1, log: lines(row.log), overlayAt: seen ? Number(seen.at) || 0 : 0, now });
+}
+
+/**
+ * The song requests overlay, open in the streaming app with this code in its link, says hello when it starts and then every minute. Nothing is asked of
+ * Spotify: it only writes down when the overlay was last seen, so the editor can say whether viewers' !sr has anything to reach Spotify through.
+ */
+async function hello({ env, code, now }) {
+  const row = await grab(env, code);
+  if (!row) return json(404, { ok: false, error: "not_connected" });
+  const seen = marker(row.log);
+  if (seen && now - Number(seen.at) < LIMITS.helloGapMs) return json(200, { ok: true, now }); // (not written again so soon: a link cannot make the database busy)
+  const log = [...lines(row.log), { kind: "overlay", at: now, state: "info", text: "Your song requests overlay is open." }];
+  await env.DB.prepare("UPDATE spotify_logins SET log = ?, used_at = ? WHERE code = ?").bind(JSON.stringify(log), now, code).run(); // (an open overlay is use: the login is kept)
+  return json(200, { ok: true, now });
 }
 
 async function settings({ env, code, request, keyHash }) {
@@ -306,12 +327,12 @@ async function skipSong({ env, code, now, fetchImpl, request, keyHash }) {
   return json(200, { ok: true, skipped: true, entry: await record(env, row, now, { state: "ok", text: `${who} used !next: skipped to the next song.`, acted: true }) });
 }
 
-/** /api/spotify/<code>/<login | status | settings | request | next>. */
+/** /api/spotify/<code>/<login | status | settings | request | next | hello>. */
 export async function handleSpotify(request, env, { now = Date.now(), fetchImpl = globalThis.fetch?.bind(globalThis) } = {}) {
   const parts = new URL(request.url).pathname.split("/").filter(Boolean);
   const code = parts[2] ?? "";
   const action = parts[3] ?? "";
-  if (parts.length !== 4 || !CODE.test(code) || !["login", "status", "settings", "request", "next"].includes(action)) return json(404, { ok: false, error: "not_found" });
+  if (parts.length !== 4 || !CODE.test(code) || !["login", "status", "settings", "request", "next", "hello"].includes(action)) return json(404, { ok: false, error: "not_found" });
   if (!(await ready(env))) return json(503, { ok: false, error: "not_ready" });
   const reads = request.method === "GET" && action === "status";
   if (!reads && !sameOrigin(request)) return json(403, { ok: false, error: "wrong_origin" });
@@ -325,6 +346,7 @@ export async function handleSpotify(request, env, { now = Date.now(), fetchImpl 
     if (route === "PUT settings") return await settings(answer);
     if (route === "POST request") return await addSong(answer);
     if (route === "POST next") return await skipSong(answer);
+    if (route === "POST hello") return await hello(answer);
     return json(405, { ok: false, error: "method" });
   } catch {
     return json(503, { ok: false, error: "not_ready" });

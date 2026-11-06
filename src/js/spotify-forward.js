@@ -27,6 +27,9 @@ export class SpotifyForward {
     return this.fetch(`${BASE}${this.code}/${action}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }).then(() => true, () => false);
   }
 
+  /** Says the overlay is open (the editor shows it). Resolves to whether Frills heard. */
+  hello() { return this.post("hello", {}); }
+
   /** One chat message ({ id, user, name, text, mod, host, login }). Resolves to "sent" or, when it was not passed on, why not. */
   async handle(message) {
     const command = parseCommand(message?.text, this.settings);

@@ -58,7 +58,8 @@ after(async () => {
   await page?.close();
   for (const h of opened) await h.close();
 });
-const sent = () => page.evaluate("window.__sent");
+const sent = () => page.evaluate('window.__sent.filter((c) => !c.url.endsWith("/hello"))'); // what it passed on (the hellos are looked at on their own)
+const hellos = () => page.evaluate('window.__sent.filter((c) => c.url.endsWith("/hello"))');
 
 async function overlay(query) {
   const { base, made } = await withHelper();
@@ -85,6 +86,14 @@ test("with a Spotify code in the link, the overlay passes a viewer's !sr and the
   assert.equal(await page.evaluate('document.getElementById("note").hidden'), true);
 });
 
+test("with a Spotify code in the link, the overlay says hello when it opens, with no key, so the editor can tell the streamer it is open", { skip }, async () => {
+  await overlay(`channel=pond_cafe&platform=tiktok&spotify=${CODE}`);
+  await until(async () => (await hellos()).length >= 1);
+  const [hi] = await hellos();
+  assert.deepEqual([hi.method, hi.url, hi.body], ["POST", `/api/spotify/${CODE}/hello`, {}]);
+  assert.ok(!("x-key" in hi.headers), "only the code, never the key");
+});
+
 test("a viewer's !next is not passed on, nor is chat that is not a command", { skip }, async () => {
   const conn = await overlay(`channel=pond_cafe&platform=tiktok&spotify=${CODE}`);
   conn.emit("chat", tiktok("m1", "!next", "pal"));
@@ -100,6 +109,8 @@ test("with no Spotify code in the link, or in practice mode, nothing is passed o
   conn.emit("chat", tiktok("m1", "!sr levitating"));
   await sleep(500);
   assert.deepEqual(await sent(), []);
+  assert.deepEqual(await hellos(), [], "an overlay with no Spotify code has nobody to say hello to");
   await page.goto(`${(await withHelper()).base}/overlay/songs/?demo=1&spotify=${CODE}&pace=300`, { settle: 1500 });
   assert.deepEqual((await sent()).filter((c) => c.method === "POST"), [], "the practice requests are made up on the page and never reach Spotify");
+  assert.deepEqual(await hellos(), [], "and the practice does not say hello either");
 });

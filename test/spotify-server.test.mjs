@@ -417,3 +417,34 @@ test("the Worker routes /api/spotify/ to this, and answers 503 on a Worker with 
   const bare = await worker.fetch(new Request(`${SITE}/api/spotify/${CODE}/status`, { headers: { "x-key": KEY } }), { DB: env.DB }, { waitUntil() {} });
   assert.equal(bare.status, 503);
 });
+
+test("the song requests overlay says hello: Frills writes down when, the status tells the editor, the lines the streamer reads leave it out, and Spotify is not asked anything", async () => {
+  const { env, spotify } = await connected({ queue: true });
+  const status = async (now) => body(await call(env, spotify, "GET", "status", { now }));
+  assert.equal((await status(T0 + 500)).overlayAt, 0, "not seen yet");
+  const hi = await call(env, spotify, "POST", "hello", { key: "", body: {}, now: T0 + 1000 });
+  assert.equal(hi.status, 200);
+  assert.equal(spotify.calls.length, 0, "Spotify was not asked anything");
+  const seen = await status(T0 + 5000);
+  assert.deepEqual([seen.overlayAt, seen.now], [T0 + 1000, T0 + 5000]);
+  assert.ok(seen.log.every((line) => line.kind !== "overlay"), "the marker is not one of the lines the streamer reads");
+  // a hello soon after another is not written again, a later one is
+  await call(env, spotify, "POST", "hello", { key: "", body: {}, now: T0 + 10000 });
+  assert.equal((await status(T0 + 11000)).overlayAt, T0 + 1000);
+  await call(env, spotify, "POST", "hello", { key: "", body: {}, now: T0 + 30000 });
+  assert.equal((await status(T0 + 31000)).overlayAt, T0 + 30000);
+  // another site cannot say it, and a code with no login gets nothing written
+  assert.equal((await call(env, spotify, "POST", "hello", { key: "", body: {}, origin: "https://evil.example" })).status, 403);
+  const none = await call(fresh(), fakeSpotify(), "POST", "hello", { key: "", body: {} });
+  assert.deepEqual([none.status, (await none.json()).error], [404, "not_connected"]);
+});
+
+test("a long run of what happened never pushes the overlay's marker off the end, and the lines stay within the limit", async () => {
+  const { env, spotify } = await connected({ queue: true });
+  await call(env, spotify, "POST", "hello", { key: "", body: {}, now: T0 + 1000 });
+  for (let i = 0; i < 16; i++) await ask(env, spotify, "song number " + i, { options: { now: T0 + 5000 + i * 3000 } });
+  const s = await body(await call(env, spotify, "GET", "status", { now: T0 + 100000 }));
+  assert.equal(s.overlayAt, T0 + 1000, "still known");
+  assert.ok(s.log.length > 0 && s.log.length <= 12, `${s.log.length} lines`);
+  assert.ok(s.log.every((line) => line.kind !== "overlay"));
+});

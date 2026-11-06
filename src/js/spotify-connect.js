@@ -26,6 +26,7 @@ const SHARE_ON = "Sharing. The song playing shows on your stream, even with this
 const SHARE_OFF = "Not sharing. Your stream shows only the songs viewers ask for.";
 const QUEUE_ON = "On. A viewer's !sr song goes to the end of your Spotify queue, even with this page closed. This needs Spotify Premium, Spotify open on a device, and your song requests overlay open in your streaming app.";
 const QUEUE_OFF = "Off. Songs viewers ask for only go to the list on your stream.";
+const SEEN_FRESH_MS = 150000; // the overlay says hello every minute: not heard for two and a half is "not open"
 
 /**
  * Sets up the step inside `root` (the section, with the ids spx-*). `hear(message)` gives a chat message to the on-screen queue and returns what it
@@ -142,6 +143,7 @@ export function mountSpotify(root, { hear, refresh = () => {} } = {}) {
     if (!done.ok) { say($("queue-note"), done.message, true); queue.write(!on); return; }
     state.queue = on;
     say($("queue-note"), on ? QUEUE_ON : QUEUE_OFF);
+    paintOverlay();
   });
   share.row.append($("share-note")); // each switch says what it did right under itself
   queue.row.append($("queue-note"));
@@ -207,10 +209,12 @@ export function mountSpotify(root, { hear, refresh = () => {} } = {}) {
       say($("share-note"), state.share ? SHARE_ON : SHARE_OFF);
       say($("queue-note"), state.queue ? QUEUE_ON : QUEUE_OFF);
       entries(state.log);
+      paintOverlay();
       if (!reader) reader = watchSpotify(identity.code, paintSong);
     } else {
       reader?.stop();
       reader = null;
+      paintOverlay();
     }
     // the overlay link carries the code while Frills keeps a login for it: the overlay needs it to read the song and to pass requests on
     const was = get(SHARING) === "1";
@@ -222,7 +226,21 @@ export function mountSpotify(root, { hear, refresh = () => {} } = {}) {
   function normalize(answer) {
     if (!answer.ok) return { mode: "unavailable", message: answer.message };
     if (!answer.connected) return { mode: client.loggedIn ? "local" : "off" };
-    return { mode: answer.state === "ok" ? "connected" : "expired", name: answer.name, share: answer.share, queue: answer.queue, log: answer.log };
+    return { mode: answer.state === "ok" ? "connected" : "expired", name: answer.name, share: answer.share, queue: answer.queue, log: answer.log, overlayAt: answer.overlayAt, now: answer.now };
+  }
+
+  /** Is the song requests overlay open with Spotify in its link? Frills notes when it last said hello; this says it in words, and what to check when it is not. */
+  function paintOverlay() {
+    const note = $("overlay-note");
+    if (state.mode !== "connected") { note.textContent = ""; return; }
+    const age = state.overlayAt && state.now ? state.now - state.overlayAt : Infinity;
+    if (age < SEEN_FRESH_MS) {
+      note.dataset.state = "ok";
+      note.textContent = state.queue ? "Your song requests overlay is open in your streaming app. Viewers’ !sr can reach your Spotify queue." : "Your song requests overlay is open in your streaming app. Switch on adding to your Spotify queue (above) to let viewers’ !sr reach it.";
+    } else {
+      note.dataset.state = "error";
+      note.textContent = "Frills cannot see your song requests overlay with Spotify in its link, so viewers’ !sr cannot reach your Spotify. Check: (1) the overlay is open in your streaming app and visible there (if it has been open for a long time, refresh the browser source once); (2) its link was copied after you connected Spotify: copy your link again in step 5 and paste it into the app in place of the old one.";
+    }
   }
 
   async function load() {
@@ -234,7 +252,12 @@ export function mountSpotify(root, { hear, refresh = () => {} } = {}) {
   setInterval(async () => {
     if (state.mode !== "connected" && state.mode !== "expired") return;
     const next = normalize(await server.status());
-    if (next.mode !== state.mode) { state = next; render(); } else if (next.mode === "connected") entries(next.log);
+    if (next.mode !== state.mode) { state = next; render(); } else if (next.mode === "connected") {
+      state.overlayAt = next.overlayAt;
+      state.now = next.now;
+      entries(next.log);
+      paintOverlay();
+    }
   }, 5000);
 
   // ── logging in, handing the login to Frills, and disconnecting ──────────────────────────────────────────────────────────

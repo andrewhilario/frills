@@ -53,6 +53,8 @@
 .spx__title { margin: 0; font-weight: 800; overflow-wrap: anywhere; }
 .spx__artist, .spx__note { margin: 0; font-size: var(--text-sm); color: var(--color-ink-2); overflow-wrap: anywhere; }
 .spx__note:empty { display: none; }
+.spx__note[data-state="ok"] { color: var(--color-success); font-weight: 600; }
+.spx__relink { margin-top: var(--space-xs); }
 .spx__try { display: grid; gap: var(--space-sm); margin-top: var(--space-sm); padding-top: var(--space-sm); border-top: 2px solid var(--color-rule); }
 .spx__try .btn { justify-self: start; }
 .spx__sub { margin: 0; font-size: var(--text-md); }

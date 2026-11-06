@@ -57,7 +57,7 @@ const stub = ({ server = null, login = false, session = null, loginReply = null,
     window.__calls.push({ method, url, body: options.body ? String(options.body) : "" });
     const s = window.__server;
     const action = url.includes("/api/spotify/") ? url.split("/").pop() : "";
-    if (action === "status") return json(window.__statusReply ?? (s.connected ? { ok: true, connected: true, state: s.state, name: s.name, share: s.share, queue: s.queue, log: s.log } : { ok: true, connected: false }), window.__statusReply ? 503 : 200);
+    if (action === "status") return json(window.__statusReply ?? (s.connected ? { ok: true, connected: true, state: s.state, name: s.name, share: s.share, queue: s.queue, log: s.log, overlayAt: s.overlayAt ?? 0, now: Date.now() } : { ok: true, connected: false }), window.__statusReply ? 503 : 200);
     if (action === "login") {
       if (method === "DELETE") { window.__server = { connected: false }; return json({ ok: true }); }
       if (window.__loginReply) return json(window.__loginReply.body, window.__loginReply.status);
@@ -391,4 +391,22 @@ test("song requests: the page Spotify sends the person back to says what to chec
   assert.equal(await text("sp-redirect"), base + "/spotify/callback/");
   assert.equal(await page.evaluate('document.getElementById("sp-back").getAttribute("href")'), "/songs/");
   assert.match(await text("sp-help"), /User management[\s\S]*Premium/);
+});
+
+test("song requests: the step says whether the song requests overlay is open with Spotify in its link, and what to check when Frills cannot see it", { skip }, async () => {
+  await open("/songs/", { server: { queue: true, overlayAt: Date.now() - 20000 } });
+  await connected();
+  assert.equal(await page.evaluate('document.getElementById("spx-overlay-note").dataset.state'), "ok");
+  assert.match(await text("spx-overlay-note"), /overlay is open[\s\S]*!sr can reach your Spotify queue/);
+
+  await open("/songs/", { server: { queue: true, overlayAt: 0 } });
+  await connected();
+  assert.equal(await page.evaluate('document.getElementById("spx-overlay-note").dataset.state'), "error");
+  assert.match(await text("spx-overlay-note"), /cannot see your song requests overlay[\s\S]*copied after you connected Spotify[\s\S]*copy your link again/);
+
+  await open("/songs/", { server: { queue: false, overlayAt: Date.now() - 20000 } });
+  await connected();
+  assert.match(await text("spx-overlay-note"), /overlay is open[\s\S]*Switch on adding to your Spotify queue/, "open, but the switch is off: it says so");
+  assert.match(await page.evaluate('document.querySelector(".spx__relink").textContent'), /copied your link[\s\S]*before[\s\S]*connected Spotify[\s\S]*copy it again/, "the link step says to copy it again");
+  assert.deepEqual(problems(), []);
 });

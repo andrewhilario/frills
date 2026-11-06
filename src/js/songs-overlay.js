@@ -40,6 +40,8 @@ layer.render();
 // (the Worker adds the song to the streamer's Spotify queue, if the streamer switched that on in the editor). The editor's own preview does not.
 const forward = !demo && channel && validCode(settings.spotify) ? new SpotifyForward({ code: settings.spotify, channel, settings }) : null;
 setInterval(() => { if (!layer.playing) queue.tick(); }, 1000); // with Spotify playing, the song moves on by itself
+// Tell Frills this overlay is open (now, and every minute), so the editor can show the streamer that viewers' requests have a way to reach Spotify.
+if (forward) { forward.hello(); setInterval(() => forward.hello(), 60000); }
 
 if (demo) {
   fontsReady(generalFaces(settings), 1000).then(() => {
