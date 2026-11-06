@@ -1,4 +1,7 @@
 // The nav: it gains a hairline and a soft shadow once the page has moved, and below the wide breakpoint its links live in a sheet.
+// (Every page with the nav also counts its visit, anonymously: see stats.js.)
+
+import "./stats.js";
 
 export function initAnnouncement() {
   const banner = document.getElementById("site-announcement");

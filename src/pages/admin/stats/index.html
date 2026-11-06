@@ -1,0 +1,50 @@
+<!--
+{
+  "title": "Stats | Frills admin",
+  "description": "The private stats page for Frills and valwidgets.live: visits, links copied, overlays opened and the Frills Plus check.",
+  "path": "/admin/stats/",
+  "css": "admin",
+  "js": "adminStats",
+  "bodyClass": "page-admin",
+  "chrome": "none",
+  "footer": false,
+  "noindex": true,
+  "listed": false
+}
+-->
+<main class="admin stats" id="main">
+  <header class="admin__bar">
+    <h1 class="admin__title">Stats</h1>
+    <div class="admin__bar-actions" id="bar-actions" hidden>
+      <a class="btn btn--soft btn--sm" href="/admin/">Feedback and files</a>
+      <button class="btn btn--soft btn--sm" type="button" id="refresh">Refresh</button>
+      <button class="btn btn--outline btn--sm" type="button" id="logout">Log out</button>
+    </div>
+  </header>
+
+  <noscript><p class="admin__note">The stats page needs JavaScript. Turn it on for this page and reload.</p></noscript>
+
+  <section class="admin__login" id="login" aria-labelledby="login-title">
+    <h2 class="admin__h" id="login-title">Log in</h2>
+    <form id="login-form" class="admin__form">
+      <label class="admin__label" for="key">Admin password</label>
+      <input type="password" id="key" name="key" autocomplete="current-password" spellcheck="false" required>
+      <button class="btn" type="submit" id="login-go">Open the stats</button>
+      <p class="admin__status" id="login-status" role="status"></p>
+    </form>
+    <p class="admin__note">The same password as the admin page (the <code>ADMIN_KEY</code> secret). It stays in this tab only and is forgotten when you close it.</p>
+  </section>
+
+  <div id="dash" hidden>
+    <p class="admin__note admin__note--warn" id="setup" hidden></p>
+    <p class="admin__note" id="status" role="status"></p>
+    <section class="stats__plus" id="plus" aria-labelledby="plus-title" hidden>
+      <h2 class="admin__h" id="plus-title">Is Frills Plus worth building yet?</h2>
+      <p class="admin__note">Three numbers, each against a starting point of mine (not a rule: they are in <code>worker/stats-report.mjs</code>). Watch them for a few weeks before deciding.</p>
+      <ul class="stats__score" id="score"></ul>
+    </section>
+    <section class="stats__site" id="frills" aria-labelledby="frills-title"></section>
+    <section class="stats__site" id="valwidgets" aria-labelledby="valwidgets-title"></section>
+    <p class="admin__note">Counts are anonymous: no cookies, no addresses, no names. Cloudflare keeps them for three months. Overlays opened on a real account are counted as different ones by a scrambled, one-way code of the account (it cannot be turned back into a name). Practice overlays and the editors' previews are counted apart.</p>
+  </div>
+</main>

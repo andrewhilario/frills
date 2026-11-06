@@ -3,6 +3,7 @@
 
 import { el } from "./feed.js";
 import { initAnnouncement } from "./nav.js";
+import { countCopy } from "./stats.js";
 import { activeSeason } from "./season.js";
 
 initAnnouncement();
@@ -90,6 +91,7 @@ export function copyButton(button, getText, { label = "Copy link", done = "Copie
     button.dataset.state = ok ? "copied" : "failed";
     text.innerHTML = ok ? `${CHECK}${done}` : failed;
     if (ok) {
+      countCopy(); // (an anonymous count: which editor the link was copied from)
       // A keyboard "click" has no pointer position, so the star bursts from the button itself.
       const box = button.getBoundingClientRect();
       starBurst(event.clientX || box.left + box.width / 2, event.clientY || box.top + box.height / 2);

@@ -7,6 +7,7 @@
 
 import { KINDS } from "./feedback.mjs";
 import { MEDIA } from "./media.mjs";
+import { report } from "./stats-report.mjs";
 
 export const ADMIN = { minKey: 12, maxWrong: 10, windowMs: 10 * 60 * 1000, pageSize: 40, maxPage: 100 };
 export const STATUSES = ["new", "done"];
@@ -126,7 +127,7 @@ async function removeMedia(id, env) {
 }
 
 /** Routes everything under /api/admin/. Returns a Response, or null when the address is not under it. */
-export async function handleAdmin(request, env, { now = Date.now() } = {}) {
+export async function handleAdmin(request, env, { now = Date.now(), fetchImpl } = {}) {
   const url = new URL(request.url);
   if (url.pathname !== "/api/admin" && !url.pathname.startsWith("/api/admin/")) return null;
   const denied = await authorize(request, env, now);
@@ -136,6 +137,7 @@ export async function handleAdmin(request, env, { now = Date.now() } = {}) {
   const [, , , area, rest, ...more] = url.pathname.split("/");
   try {
     if (more.length === 0 && area === "summary" && !rest) return method === "GET" ? await summary(env) : json(405, { ok: false, error: "method" }, { allow: "GET" });
+    if (more.length === 0 && area === "stats" && !rest) return method === "GET" ? json(200, await report(env, { now, fetchImpl })) : json(405, { ok: false, error: "method" }, { allow: "GET" });
     if (more.length === 0 && area === "feedback") {
       if (!rest) return method === "GET" ? await listFeedback(url, env) : json(405, { ok: false, error: "method" }, { allow: "GET" });
       const id = Number(rest);

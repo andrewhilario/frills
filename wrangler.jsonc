@@ -2,7 +2,7 @@
   "name": "frills",
   "compatibility_date": "2026-10-01",
   // The site is static files in dist/, built by `npm run build`. Requests for static assets are free and unlimited on Cloudflare's
-  // free plan, and they never reach the Worker: only /api/* does (run_worker_first). The Worker (worker/) takes the feedback form's
+  // free plan, and they never reach the Worker: only /api/* and the overlay pages do (run_worker_first; the Worker counts an overlay opening, then serves the page). The Worker (worker/) takes the feedback form's
   // messages and saves them in a D1 database (the binding DB, below; its table is in worker/schema.sql).
   "main": "worker/index.mjs",
   "d1_databases": [
@@ -12,8 +12,17 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "404-page",
-    "run_worker_first": ["/api/*"]
+    "run_worker_first": ["/api/*", "/overlay", "/overlay/*"]
   },
+  // Anonymous counts (src/js/stats-events.js, worker/stats.mjs) go to this Workers Analytics Engine dataset; Cloudflare keeps them for three months. The account has to have
+  // switched Analytics Engine on once (valwidgets.live's counter already needed that). Without the binding the counter checks each event and drops it (it answers
+  // `x-counted: no`). Three secrets, set once in the dashboard (Workers & Pages, frills, Settings, Variables and Secrets), never in this file:
+  //   STATS_SALT      any long random text: scrambles each overlay's account into a one-way code, so "different overlays this week" can be counted (without it that is not counted)
+  //   CF_ACCOUNT_ID   your account id (dashboard, Workers & Pages overview)
+  //   CF_API_TOKEN    a token with the one permission Account > Account Analytics > Read: lets the private page /admin/stats/ read the counts of both sites
+  "analytics_engine_datasets": [
+    { "binding": "EVENTS", "dataset": "frills_events" }
+  ],
   // The address. A Custom Domain makes Cloudflare create the DNS record and the certificate itself (valwidgets.live has to be an
   // active zone on the account that deploys), so do not add a record for this name by hand: a Custom Domain can't be created on a
   // name that already has a CNAME. To use another name, change it here and `url` in site.config.json, then build and deploy again.
