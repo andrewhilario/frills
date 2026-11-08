@@ -924,6 +924,44 @@
   font-weight: 600;
 }
 
+/* the chat-reply controls only show when the editor was opened with ?chatbot=1 (see actions-editor.js) */
+body[data-chatbot="off"] .action-chat-toggle,
+body[data-chatbot="off"] #chat-hint,
+body[data-chatbot="off"] .action-cmd-row__replywrap {
+  display: none;
+}
+
+.action-chat-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 4px;
+  font-weight: 700;
+}
+
+.action-cmd-row__replywrap {
+  flex: 1 1 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.action-cmd-row__reply {
+  flex: 1;
+  height: 38px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px dashed var(--line, #cbd5e1);
+}
+
+.action-cmd-row__count {
+  min-width: 52px;
+  text-align: right;
+  font-size: 0.8em;
+  color: var(--text-soft, #64748b);
+}
+
 .actions-prefix-group {
   margin-top: 14px;
 }

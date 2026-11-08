@@ -6,6 +6,7 @@ import {
   decodeCommands,
   readCommands,
   cleanTrigger,
+  cleanReply,
   commandProblems,
   matchCommand,
   createCooldownTracker,
@@ -175,4 +176,27 @@ test("triggers are kept without spaces, and commands that can never pop up are f
     { kind: "duplicate", trigger: "mouse", index: 1, first: 0 },
     { kind: "empty", index: 2 },
   ]);
+});
+
+test("chat replies and the on/off choice go into the link, and the starting commands and old links have none", () => {
+  const mine = { ...defaultActionsConfig(), chat: true, commands: [{ trigger: "mouse", title: "Mouse", text: "card", icon: "x", reply: "I use a Viper V3 Pro" }] };
+  const back = readCommands(encodeCommands(mine));
+  assert.equal(back.state, "ok");
+  assert.equal(back.config.chat, true);
+  assert.equal(back.config.commands[0].reply, "I use a Viper V3 Pro");
+
+  const start = defaultActionsConfig();
+  assert.equal(start.chat, false, "chat replies are off until the streamer turns them on");
+  assert.ok(start.commands.every((c) => c.reply === ""), "the sample gear can never be posted to a real chat");
+
+  const old = readCommands(linkOf({ a: [{ t: "mouse", h: "Mouse", d: "x", i: "" }] }));
+  assert.equal(old.config.chat, false);
+  assert.equal(old.config.commands[0].reply, "");
+});
+
+test("cleanReply makes one line of at most 150 characters", () => {
+  assert.equal(cleanReply("  Viper   V3\nPro\t800 DPI "), "Viper V3 Pro 800 DPI");
+  assert.equal(cleanReply(null), "");
+  assert.equal(Array.from(cleanReply("a".repeat(400))).length, 150);
+  assert.equal(Array.from(cleanReply("🎯".repeat(200))).length, 150, "counted in characters, not in bytes");
 });

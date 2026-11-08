@@ -13,6 +13,8 @@ import {
   encodeCommands,
   readCommands,
   cleanTrigger,
+  cleanReply,
+  MAX_REPLY,
   commandProblems,
   matchCommand,
   createCooldownTracker,
@@ -28,6 +30,20 @@ const STORE_KEY = "frills.actions";
 
 export function initActionsEditor() {
   const params = new URLSearchParams(location.search);
+
+  // The chat-reply controls are hidden unless switched on, so putting this live changes nothing for anyone else. Open the editor with
+  // ?chatbot=1 once (it is remembered in this browser); ?chatbot=0 hides them again.
+  const chatbotOn = (() => {
+    const asked = params.get("chatbot");
+    try {
+      if (asked === "1") localStorage.setItem("frills.chatbot", "1");
+      if (asked === "0") localStorage.removeItem("frills.chatbot");
+      return localStorage.getItem("frills.chatbot") === "1";
+    } catch {
+      return asked === "1"; // storage blocked: the link alone decides
+    }
+  })();
+  document.body.dataset.chatbot = chatbotOn ? "on" : "off";
 
   // Load saved state or URL parameters
   const loadSaved = () => {
@@ -356,10 +372,45 @@ export function initActionsEditor() {
         save();
       });
 
-      row.append(iconInput, triggerWrap, titleInput, textInput, testBtn, delBtn);
+      // The reply the bot posts in TikTok chat. Empty means it posts nothing for this command (the card still shows).
+      const replyWrap = document.createElement("div");
+      replyWrap.className = "action-cmd-row__replywrap";
+      const replyInput = document.createElement("input");
+      replyInput.type = "text";
+      replyInput.className = "action-cmd-row__reply";
+      replyInput.value = cmd.reply || "";
+      replyInput.maxLength = MAX_REPLY;
+      replyInput.placeholder = "Chat reply: what the bot says in your TikTok chat (empty = no chat reply)";
+      replyInput.spellcheck = false;
+      const replyCount = document.createElement("span");
+      replyCount.className = "action-cmd-row__count";
+      const countReply = () => {
+        replyCount.textContent = `${Array.from(replyInput.value).length}/${MAX_REPLY}`;
+      };
+      countReply();
+      replyInput.addEventListener("input", (e) => {
+        cmd.reply = e.target.value;
+        countReply();
+        refreshLink();
+        save();
+      });
+      replyWrap.append(replyInput, replyCount);
+
+      row.append(iconInput, triggerWrap, titleInput, textInput, testBtn, delBtn, replyWrap);
       commandsContainer.append(row);
     });
     renderWarnings();
+  }
+
+  // Post the replies in the streamer's TikTok chat. The bot that posts is not connected yet, so for now this only saves the choice in the link.
+  const chatToggle = $("chat-on");
+  if (chatToggle) {
+    chatToggle.checked = Boolean(config.chat);
+    chatToggle.addEventListener("change", () => {
+      config.chat = chatToggle.checked;
+      refreshLink();
+      save();
+    });
   }
 
   $("add-cmd-btn").addEventListener("click", () => {
@@ -368,6 +419,7 @@ export function initActionsEditor() {
       title: "New Command",
       text: "Details about this command",
       icon: "✨",
+      reply: "",
     });
     renderCommands();
     renderQuickTests();
@@ -380,6 +432,7 @@ export function initActionsEditor() {
     config = defaultActionsConfig();
     cooldown = createCooldownTracker(config.cooldown);
     view.apply(config);
+    if (chatToggle) chatToggle.checked = Boolean(config.chat);
     renderCommands();
     renderQuickTests();
     refreshLink();
@@ -430,7 +483,13 @@ export function initActionsEditor() {
 
     cooldown.record(match.trigger);
     view.trigger(match);
-    simFeedback.textContent = `Triggered ${config.prefix || ""}${match.trigger}! (Playing chime & showing card)`;
+    const said = chatbotOn ? cleanReply(match.reply) : "";
+    const chatLine = said
+      ? config.chat
+        ? ` In your TikTok chat the bot would say: "${said}"`
+        : " (It has a chat reply: turn on chat replies above to post it in chat.)"
+      : "";
+    simFeedback.textContent = `Triggered ${config.prefix || ""}${match.trigger}! (Playing chime & showing card)${chatLine}`;
     simFeedback.dataset.state = "success";
   }
 

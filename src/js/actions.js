@@ -7,6 +7,8 @@ export const DEFAULT_DURATION = 6;
 export const DEFAULT_COOLDOWN = 10;
 export const DEFAULT_SOUND = "chime";
 export const DEFAULT_POSITION = "bottom-right";
+/** The most a chat reply can be. TikTok comments are about 150 characters (not confirmed for LIVE chat), so a reply is cut there. */
+export const MAX_REPLY = 150;
 
 export const DEFAULT_COMMANDS = [
   { trigger: "mouse", title: "Mouse & Pad", text: "Logitech G Pro X Superlight 2 (800 DPI, Artisan Zero Soft)", icon: "🖱️" },
@@ -32,7 +34,9 @@ export function defaultActionsConfig() {
     cooldown: DEFAULT_COOLDOWN,
     sound: DEFAULT_SOUND,
     position: DEFAULT_POSITION,
-    commands: DEFAULT_COMMANDS.map((c) => ({ ...c })),
+    chat: false, // post the replies in the streamer's TikTok chat. Off until they turn it on
+    // The starting commands show sample gear on the card. They have no chat reply, so sample text can never be posted to a real chat.
+    commands: DEFAULT_COMMANDS.map((c) => ({ reply: "", ...c })),
   };
 }
 
@@ -49,6 +53,12 @@ function numberOr(value, fallback) {
  */
 export function cleanTrigger(raw) {
   return String(raw ?? "").toLowerCase().replace(/\s+/g, "");
+}
+
+/** A chat reply as it is kept and posted: one line (a chat message has no line breaks), trimmed, and at most MAX_REPLY characters. */
+export function cleanReply(raw) {
+  const oneLine = String(raw ?? "").replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim();
+  return Array.from(oneLine).slice(0, MAX_REPLY).join("").trim();
 }
 
 /**
@@ -82,11 +92,13 @@ export function encodeCommands(config) {
     cd: numberOr(config.cooldown, DEFAULT_COOLDOWN),
     s: config.sound ?? DEFAULT_SOUND,
     pos: config.position ?? DEFAULT_POSITION,
+    ch: config.chat ? 1 : 0,
     a: (config.commands || []).map((c) => ({
       t: cleanTrigger(c.trigger),
       h: String(c.title || "").trim(),
       d: String(c.text || "").trim(),
       i: String(c.icon || "").trim(),
+      r: cleanReply(c.reply),
     })),
   };
   try {
@@ -139,10 +151,11 @@ export function readCommands(b64) {
           title: String(c.h ?? "").trim(),
           text: String(c.d ?? "").trim(),
           icon: String(c.i ?? "").trim(),
+          reply: cleanReply(c.r ?? ""),
         }))
         .filter((c) => c.trigger.length > 0);
     }
-    return { config: { prefix, pack, duration, cooldown, sound, position, commands }, state: "ok" };
+    return { config: { prefix, pack, duration, cooldown, sound, position, chat: raw.ch === 1, commands }, state: "ok" };
   } catch {
     return { config: defaults, state: "broken" };
   }

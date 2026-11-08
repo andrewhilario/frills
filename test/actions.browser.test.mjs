@@ -173,3 +173,46 @@ test("editor: a space is not kept in a trigger, a repeated or empty trigger is e
   assert.match(await text("#cmd-warnings"), /cut off/);
   assert.equal(await page.evaluate(`document.querySelectorAll(".action-cmd-row").length`), 5);
 });
+
+test("editor: the chat-reply controls are hidden until the editor is opened with ?chatbot=1, and then they stay on", { skip }, async () => {
+  const shown = (selector) => page.evaluate(`getComputedStyle(document.querySelector(${JSON.stringify(selector)})).display !== "none"`);
+  const parts = [".action-chat-toggle", "#chat-hint", ".action-cmd-row__replywrap"];
+  const { base } = await withHelper();
+  await page.goto(base + "/actions/", { settle: 800 });
+  for (const selector of parts) assert.equal(await shown(selector), false, `${selector} is hidden for everyone by default`);
+
+  await page.goto(base + "/actions/?chatbot=1", { settle: 800 });
+  for (const selector of parts) assert.equal(await shown(selector), true, `${selector} shows with ?chatbot=1`);
+  await page.goto(base + "/actions/", { settle: 800 });
+  assert.equal(await shown(".action-chat-toggle"), true, "and it is remembered in this browser");
+  await page.goto(base + "/actions/?chatbot=0", { settle: 800 });
+  assert.equal(await shown(".action-chat-toggle"), false, "?chatbot=0 hides it again");
+});
+
+test("editor: each command has a chat reply with a counter, the choice goes into the link, and the practice chat shows what the bot would say", { skip }, async () => {
+  const { base } = await withHelper();
+  await page.goto(base + "/actions/?chatbot=1", { settle: 800 });
+  await type("#source-channel", "pond.pal");
+
+  // the starting commands carry no chat reply, so nothing sample can ever be posted to a real chat
+  assert.equal(await page.evaluate(`document.querySelectorAll(".action-cmd-row__reply").length`), 5);
+  assert.equal(await page.evaluate(`[...document.querySelectorAll(".action-cmd-row__reply")].every((i) => i.value === "")`), true);
+  assert.equal(await page.evaluate(`document.querySelector(".action-cmd-row__reply").maxLength`), 150);
+  const start = readCommands(await linkC()).config;
+  assert.equal(start.chat, false, "chat replies are off until the streamer turns them on");
+
+  const reply = "I use a Razer Viper V3 Pro at 800 DPI";
+  await typeAt(".action-cmd-row__reply", 0, reply);
+  assert.equal(await page.evaluate(`document.querySelectorAll(".action-cmd-row__count")[0].textContent`), `${reply.length}/150`);
+
+  await page.evaluate(`document.getElementById("chat-on").click()`);
+  const on = readCommands(await linkC()).config;
+  assert.equal(on.chat, true);
+  assert.equal(on.commands[0].reply, reply);
+
+  // the practice chat says what the bot would post, without posting anything
+  await type("#sim-input", `${on.prefix}${on.commands[0].trigger}`);
+  await page.evaluate(`document.getElementById("sim-send").click()`);
+  assert.match(await text("#sim-feedback"), /the bot would say: "I use a Razer Viper V3 Pro at 800 DPI"/);
+  assert.deepEqual(page.problems, []);
+});
