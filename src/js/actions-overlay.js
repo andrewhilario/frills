@@ -2,7 +2,7 @@
 // Loaded in OBS Studio, Streamlabs, or TikTok LIVE Studio Browser Source.
 // Connects to TikTok LIVE and/or Twitch chat, listens for configured commands, and triggers on-screen cards with sounds.
 
-import { decodeCommands, matchCommand, createCooldownTracker } from "./actions.js";
+import { readCommands, matchCommand, createCooldownTracker } from "./actions.js";
 import { createActionsView } from "./actions-view.js";
 import { sourcesOf } from "./both.js";
 import { connectTo, statusText } from "./connect.js";
@@ -12,8 +12,7 @@ const $ = (id) => document.getElementById(id);
 
 export function startActionsOverlay() {
   const params = new URLSearchParams(location.search);
-  const rawConfig = params.get("c") || "";
-  const config = decodeCommands(rawConfig);
+  const { config, state } = readCommands(params.get("c") || "");
 
   const stage = $("action-stage") || document.body;
   const note = $("note");
@@ -23,6 +22,16 @@ export function startActionsOverlay() {
     note.textContent = text;
     note.hidden = !text;
   };
+
+  // A link that is cut off, or has no commands in it, must not put the sample gear on stream: do nothing, and say why.
+  if (state !== "ok") {
+    say(
+      state === "broken"
+        ? "This link looks cut off. Copy it again from the Frills commands editor."
+        : "This link has no commands in it. Make yours in the Frills commands editor.",
+    );
+    return;
+  }
 
   const cooldown = createCooldownTracker(config.cooldown);
   const view = createActionsView(stage, config);

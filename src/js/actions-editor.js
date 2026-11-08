@@ -11,7 +11,9 @@ import {
   PACK_MASCOTS,
   defaultActionsConfig,
   encodeCommands,
-  decodeCommands,
+  readCommands,
+  cleanTrigger,
+  commandProblems,
   matchCommand,
   createCooldownTracker,
 } from "./actions.js";
@@ -38,13 +40,15 @@ export function initActionsEditor() {
   const saved = loadSaved();
 
   let config = defaultActionsConfig();
+  let brokenLink = false; // a link was opened but could not be read (cut off by a chat app, say)
   if (params.get("c")) {
-    config = decodeCommands(params.get("c"));
+    const read = readCommands(params.get("c"));
+    config = read.config;
+    brokenLink = read.state === "broken";
   } else if (saved?.config) {
     config = { ...config, ...saved.config };
-    if (Array.isArray(saved.config.commands) && saved.config.commands.length) {
-      config.commands = saved.config.commands;
-    }
+    // the person's own list, even when they have deleted every command
+    if (Array.isArray(saved.config.commands)) config.commands = saved.config.commands;
   }
 
   let cooldown = createCooldownTracker(config.cooldown);
@@ -203,7 +207,7 @@ export function initActionsEditor() {
       zero: "Off (0s)",
       hint: "Seconds before the same command can trigger again, preventing spam.",
     },
-    config.cooldown || DEFAULT_COOLDOWN,
+    config.cooldown ?? DEFAULT_COOLDOWN, // 0 is "Off", so it must not become the default
     (val) => {
       config.cooldown = val;
       cooldown = createCooldownTracker(config.cooldown);
@@ -241,6 +245,26 @@ export function initActionsEditor() {
   // ── Commands Manager ──────────────────────────────────────────────────────
   const commandsContainer = $("commands-list");
 
+  // Says why a command would never pop up: no trigger, or a trigger another command already has (only the first one fires).
+  const warnings = $("cmd-warnings");
+  function renderWarnings() {
+    if (!warnings) return;
+    const notes = [];
+    if (brokenLink) {
+      notes.push("The link you opened looks cut off, so your own commands could not be read. These are the starting commands: change them, then copy a fresh link.");
+    }
+    const name = (i) => `"${config.commands[i]?.title || config.commands[i]?.trigger || `command ${i + 1}`}"`;
+    for (const p of commandProblems(config.commands)) {
+      notes.push(
+        p.kind === "empty"
+          ? `Command ${p.index + 1} has no trigger, so it can never pop up.`
+          : `${name(p.index)} uses the trigger "${p.trigger}", which ${name(p.first)} already has. Only the first one will ever pop up.`,
+      );
+    }
+    warnings.textContent = notes.join(" ");
+    warnings.hidden = notes.length === 0;
+  }
+
   function renderCommands() {
     commandsContainer.innerHTML = "";
     config.commands.forEach((cmd, idx) => {
@@ -273,7 +297,9 @@ export function initActionsEditor() {
       triggerInput.placeholder = "trigger (e.g. mouse)";
       triggerInput.spellcheck = false;
       triggerInput.addEventListener("input", (e) => {
-        cmd.trigger = e.target.value.trim().toLowerCase();
+        cmd.trigger = cleanTrigger(e.target.value);
+        if (e.target.value !== cmd.trigger) e.target.value = cmd.trigger; // a space can never be part of a trigger
+        renderWarnings();
         renderQuickTests();
         refreshLink();
         save();
@@ -333,6 +359,7 @@ export function initActionsEditor() {
       row.append(iconInput, triggerWrap, titleInput, textInput, testBtn, delBtn);
       commandsContainer.append(row);
     });
+    renderWarnings();
   }
 
   $("add-cmd-btn").addEventListener("click", () => {
@@ -349,6 +376,7 @@ export function initActionsEditor() {
   });
 
   $("reset-cmds-btn").addEventListener("click", () => {
+    brokenLink = false;
     config = defaultActionsConfig();
     cooldown = createCooldownTracker(config.cooldown);
     view.apply(config);

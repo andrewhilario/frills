@@ -918,6 +918,12 @@
   margin-bottom: 12px;
 }
 
+.action-warn {
+  margin: 10px 0 0;
+  color: #b91c1c;
+  font-weight: 600;
+}
+
 .actions-prefix-group {
   margin-top: 14px;
 }

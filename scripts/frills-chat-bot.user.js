@@ -168,21 +168,27 @@
   }
 
   // ── 4. CHAT OBSERVER (Listens to new messages appearing in DOM) ─────────────────────────────────
-  const seenMessages = new Set();
+  // The same message is often seen twice within a moment (a row and the elements inside it, or the page redrawing the row), so
+  // the same text is ignored only for a few seconds. Remembering it for good would make a command work once and then never again.
+  const DUPLICATE_WINDOW_MS = 4000;
+  const recentMessages = new Map(); // text -> when it was last seen
+
+  function isRecentDuplicate(text) {
+    const now = Date.now();
+    for (const [seen, at] of recentMessages) {
+      if (now - at > DUPLICATE_WINDOW_MS) recentMessages.delete(seen);
+    }
+    if (recentMessages.has(text)) return true;
+    recentMessages.set(text, now);
+    return false;
+  }
 
   function processMessageNode(node) {
     if (!node || !(node instanceof Element)) return;
     const text = node.textContent?.trim();
     if (!text || text.length > 300) return;
 
-    // Deduplicate
-    const key = `${node.tagName}_${text}`;
-    if (seenMessages.has(key)) return;
-    seenMessages.add(key);
-    if (seenMessages.size > 200) {
-      const first = seenMessages.values().next().value;
-      seenMessages.delete(first);
-    }
+    if (isRecentDuplicate(text)) return;
 
     const match = matchCommand(text);
     if (match) {

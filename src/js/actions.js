@@ -36,6 +36,41 @@ export function defaultActionsConfig() {
   };
 }
 
+/** A number typed or stored by a person. The fallback is for a missing or non-numeric value only, so a real 0 (cooldown Off) stays 0. */
+function numberOr(value, fallback) {
+  if (value === null || value === undefined || value === "") return fallback;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+/**
+ * A trigger as it is kept: lower case and with no spaces. A chat command is the first word of a message, so a trigger with a
+ * space in it could never match.
+ */
+export function cleanTrigger(raw) {
+  return String(raw ?? "").toLowerCase().replace(/\s+/g, "");
+}
+
+/**
+ * Things in a list of commands that stop one from ever popping up: no trigger, or a trigger another command already has
+ * (only the first of those fires). Each problem names the command by its place in the list.
+ */
+export function commandProblems(commands = []) {
+  const problems = [];
+  const firstSeen = new Map();
+  commands.forEach((c, index) => {
+    const trigger = cleanTrigger(c?.trigger);
+    if (!trigger) {
+      problems.push({ kind: "empty", index });
+    } else if (firstSeen.has(trigger)) {
+      problems.push({ kind: "duplicate", trigger, index, first: firstSeen.get(trigger) });
+    } else {
+      firstSeen.set(trigger, index);
+    }
+  });
+  return problems;
+}
+
 /**
  * Encodes actions configuration into a compact URL-safe base64 string.
  */
@@ -43,12 +78,12 @@ export function encodeCommands(config) {
   const compact = {
     p: config.prefix ?? DEFAULT_PREFIX,
     k: config.pack ?? DEFAULT_PACK,
-    d: Number(config.duration) || DEFAULT_DURATION,
-    cd: Number(config.cooldown) || DEFAULT_COOLDOWN,
+    d: numberOr(config.duration, DEFAULT_DURATION),
+    cd: numberOr(config.cooldown, DEFAULT_COOLDOWN),
     s: config.sound ?? DEFAULT_SOUND,
     pos: config.position ?? DEFAULT_POSITION,
     a: (config.commands || []).map((c) => ({
-      t: String(c.trigger || "").trim(),
+      t: cleanTrigger(c.trigger),
       h: String(c.title || "").trim(),
       d: String(c.text || "").trim(),
       i: String(c.icon || "").trim(),
@@ -67,12 +102,16 @@ export function encodeCommands(config) {
 }
 
 /**
- * Decodes a URL-safe base64 string into an actions configuration object.
- * Falls back safely to defaults on malformed input.
+ * Reads the configuration in a link and says how that went:
+ *   "none"   the link has no configuration at all
+ *   "ok"     it was read (a person may have zero commands, and that is kept)
+ *   "broken" there was something but it could not be read, for example a link a chat app cut off
+ * Whatever the state, `config` is always usable: for "none" and "broken" it is the starting defaults, so an editor can carry on.
+ * An overlay must not show those defaults (sample gear) on a real stream, so it checks `state`.
  */
-export function decodeCommands(b64) {
+export function readCommands(b64) {
   const defaults = defaultActionsConfig();
-  if (!b64 || typeof b64 !== "string") return defaults;
+  if (!b64 || typeof b64 !== "string") return { config: defaults, state: "none" };
   try {
     let standard = b64.replace(/-/g, "+").replace(/_/g, "/");
     while (standard.length % 4) standard += "=";
@@ -81,30 +120,40 @@ export function decodeCommands(b64) {
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
     const json = new TextDecoder().decode(bytes);
     const raw = JSON.parse(json);
-    if (!raw || typeof raw !== "object") return defaults;
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { config: defaults, state: "broken" };
 
     const prefix = typeof raw.p === "string" ? raw.p : defaults.prefix;
     const pack = PACK_MASCOTS[raw.k] ? raw.k : defaults.pack;
-    const duration = Math.max(2, Math.min(30, Number(raw.d) || defaults.duration));
-    const cooldown = Math.max(0, Math.min(120, Number(raw.cd) || defaults.cooldown));
+    const duration = Math.max(2, Math.min(30, numberOr(raw.d, defaults.duration)));
+    const cooldown = Math.max(0, Math.min(120, numberOr(raw.cd, defaults.cooldown)));
     const sound = typeof raw.s === "string" ? raw.s : defaults.sound;
     const position = typeof raw.pos === "string" ? raw.pos : defaults.position;
 
+    // A list that is there is the person's own, even when it is empty. Only a link with no list gets the starting commands.
     let commands = defaults.commands;
     if (Array.isArray(raw.a)) {
       commands = raw.a
-        .filter((c) => c && typeof c === "object" && typeof c.t === "string" && c.t.trim().length > 0)
+        .filter((c) => c && typeof c === "object" && typeof c.t === "string")
         .map((c) => ({
-          trigger: String(c.t).trim(),
+          trigger: cleanTrigger(c.t),
           title: String(c.h ?? "").trim(),
           text: String(c.d ?? "").trim(),
           icon: String(c.i ?? "").trim(),
-        }));
+        }))
+        .filter((c) => c.trigger.length > 0);
     }
-    return { prefix, pack, duration, cooldown, sound, position, commands: commands.length ? commands : defaults.commands };
+    return { config: { prefix, pack, duration, cooldown, sound, position, commands }, state: "ok" };
   } catch {
-    return defaults;
+    return { config: defaults, state: "broken" };
   }
+}
+
+/**
+ * Decodes a URL-safe base64 string into an actions configuration object.
+ * Falls back safely to defaults on malformed input (use readCommands to find out whether that happened).
+ */
+export function decodeCommands(b64) {
+  return readCommands(b64).config;
 }
 
 /**
@@ -131,11 +180,9 @@ export function matchCommand(messageText, commands = [], defaultPrefix = DEFAULT
     if (startsWithSymbol) {
       if (firstToken === trig) return { ...cmd };
     } else {
-      // Normal trigger: matches prefix + trigger (e.g. .mouse), or if prefix is empty, bare trigger
+      // Normal trigger: prefix + trigger (e.g. .mouse), or the bare word when the prefix is empty
       const expected = pref ? `${pref}${trig}` : trig;
       if (firstToken === expected) return { ...cmd };
-      // Also allow user typing "!trigger" if defaultPrefix is "." when trigger is common
-      if (!pref && firstToken === trig) return { ...cmd };
     }
   }
   return null;
