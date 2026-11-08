@@ -13,24 +13,32 @@ export const OVERLAYS = ["chat", "alerts", "gifts", "goal", "likers", "songs", "
 export const LOADS = ["chat", "alerts", "gifts", "goal", "likers", "songs"];
 /** Whether an overlay ran on a real account, or on practice events. */
 export const MODES = ["live", "demo"];
+/** The streaming platforms a link or overlay can be for ("both" when a chat overlay reads TikTok and Twitch together). */
+export const PLATFORMS = ["tiktok", "twitch", "both"];
+/** The Frills Plus ideas a streamer can click to express interest in. */
+export const PLUS_FEATURES = ["remote_link", "custom_upload", "scene_link", "plus_pack"];
 
 export const EVENTS = {
   /** A new visit to the site, once per browser tab session: the page it started on, and where it came from. */
   visit: { first: PAGES, second: REFS },
-  /** The overlay link was copied: from which editor. */
-  link_copied: { first: OVERLAYS },
+  /** The overlay link was copied: from which editor, and optionally for which platform. */
+  link_copied: { first: OVERLAYS, second: PLATFORMS, optionalSecond: true },
   /** An overlay page opened (OBS, a streaming app, a browser tab): which one, and whether on a real account. Counted by the Worker, with a scrambled code (see scramble). */
   overlay_load: { first: LOADS, second: MODES },
+  /** Someone clicked a Frills Plus feature preview or button: which feature, and optionally on which page. */
+  plus_interest: { first: PLUS_FEATURES, second: PAGES, optionalSecond: true },
 };
 
 const isEventName = (event) => Object.prototype.hasOwnProperty.call(EVENTS, event);
 
-/** Whether `first` and `second` are exactly the labels this event allows. `second` is "" for events that have only one. */
+/** Whether `first` and `second` are exactly the labels this event allows. `second` is "" for events that have only one (or where the second is optional and omitted). */
 export function labelsValid(event, first, second = "") {
   if (!isEventName(event)) return false;
   const spec = EVENTS[event];
   if (!spec.first.includes(first)) return false;
-  return spec.second ? spec.second.includes(second) : second === "";
+  if (!spec.second) return second === "";
+  if (spec.optionalSecond && second === "") return true;
+  return spec.second.includes(second);
 }
 
 /** What goes over the wire, for example {"e":"visit","a":"home","b":"tiktok"}. `b` is left out when there is no second label. */
@@ -51,6 +59,21 @@ export function parseEvent(text) {
 
 /** What is written to Workers Analytics Engine: the event, its labels, and (for an overlay opened on a real account) the scrambled code, counted as one. */
 export const toDataPoint = ({ event, first, second }, id = "") => ({ indexes: [event], blobs: [event, first, second, id], doubles: [1] });
+
+/** Which platform ("tiktok", "twitch", "both", or "") an overlay link or query string is for. */
+export function platformOf(link = "") {
+  const text = String(link || "");
+  const q = text.indexOf("?");
+  const params = new URLSearchParams(q >= 0 ? text.slice(q + 1) : text);
+  const tiktok = (params.get("tiktok") ?? "").trim();
+  const twitch = (params.get("twitch") ?? "").trim();
+  const channel = (params.get("channel") ?? "").trim();
+  if (tiktok && twitch) return "both";
+  if (tiktok) return "tiktok";
+  if (twitch && !channel) return "twitch";
+  if (!channel) return "";
+  return params.get("platform") === "twitch" ? "twitch" : "tiktok";
+}
 
 /** The page group of an address on the site. */
 export function pageOf(pathname) {

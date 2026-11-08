@@ -71,14 +71,14 @@ test("counts: nothing is sent for a visitor with Do Not Track, and a copied link
   await page.waitFor(`!document.getElementById("copy-link").disabled`);
   await page.evaluate(`document.getElementById("copy-link").click()`);
   await page.waitFor(`window.__beacons.length > 0`, { timeout: 4000 });
-  assert.deepEqual(await beacons(), ['/api/e {"e":"link_copied","a":"chat"}']);
+  assert.deepEqual(await beacons(), ['/api/e {"e":"link_copied","a":"chat","b":"tiktok"}']);
   await open("/goal/");
   await page.evaluate("window.__beacons.length = 0");
   await page.evaluate(`(() => { const i = document.getElementById("source-channel"); i.value = "pond.pal"; i.dispatchEvent(new Event("input", { bubbles: true })); })()`);
   await page.waitFor(`!document.getElementById("copy-link").disabled`);
   await page.evaluate(`document.getElementById("copy-link").click()`);
   await page.waitFor(`window.__beacons.length > 0`, { timeout: 4000 });
-  assert.deepEqual(await beacons(), ['/api/e {"e":"link_copied","a":"goal"}']);
+  assert.deepEqual(await beacons(), ['/api/e {"e":"link_copied","a":"goal","b":"tiktok"}']);
   assert.deepEqual(page.problems, [], page.problems.join(" | "));
 });
 
@@ -91,7 +91,7 @@ test("counts: the overlays themselves carry no counting code at all (they are at
 
 const T = Date.now();
 const day = (age) => new Date(T - age * 86400000).toISOString().slice(0, 19).replace("T", " "); // (a time of day is fine: the report counts whole days)
-const rows = [{ ev: "visit", a: "home", b: "tiktok", d: day(0), n: 30 }, { ev: "visit", a: "editor", b: "reddit", d: day(1), n: 12 }, { ev: "visit", a: "home", b: "tiktok", d: day(9), n: 20 }, { ev: "link_copied", a: "chat", b: "", d: day(1), n: 7 }, { ev: "overlay_load", a: "chat", b: "live", d: day(2), n: 40 }, { ev: "overlay_load", a: "chat", b: "demo", d: day(2), n: 90 }];
+const rows = [{ ev: "visit", a: "home", b: "tiktok", d: day(0), n: 30 }, { ev: "visit", a: "editor", b: "reddit", d: day(1), n: 12 }, { ev: "visit", a: "home", b: "tiktok", d: day(9), n: 20 }, { ev: "link_copied", a: "chat", b: "tiktok", d: day(1), n: 7 }, { ev: "overlay_load", a: "chat", b: "live", d: day(2), n: 40 }, { ev: "overlay_load", a: "chat", b: "demo", d: day(2), n: 90 }, { ev: "plus_interest", a: "remote_link", b: "editor", d: day(1), n: 5 }];
 const ids = [{ id: "a", d: day(0) }, { id: "b", d: day(1) }, { id: "a", d: day(8) }];
 const REPORT = (() => { const summary = summarize(rows, T); const active = activeOverlays(ids, T); return { ok: true, now: T, frills: { ...summary, active, scorecard: scorecard(summary, active), idsReadable: true }, valwidgets: summarize([{ ev: "visit", a: "rank", b: "search", d: day(0), n: 5 }, { ev: "pro_click", a: "footer", b: "", d: day(0), n: 2 }], T) }; })();
 
@@ -114,6 +114,9 @@ test("stats page: it draws both sites, the Frills Plus check with yes and not ye
   assert.equal(texts.bars, 28);
   assert.match(texts.frills, /Visits, last 7 days.*42/);
   assert.match(texts.frills, /Different overlays, last 7 days.*2/);
+  assert.match(texts.frills, /Funnel: Visits -> Copied \(7d\).*17%/);
+  assert.match(texts.frills, /Links copied, by platform \(28 days\)/);
+  assert.match(texts.frills, /Frills Plus feature clicks \(28 days\).*Remote-control link/);
   assert.match(texts.frills, /TikTok/);
   assert.match(texts.frills, /Practice overlays and previews, counted apart: 90/);
   assert.match(texts.tally, /Rank page/);

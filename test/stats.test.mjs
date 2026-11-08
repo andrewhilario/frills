@@ -3,7 +3,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { EVENTS, encodeEvent, labelsValid, loadOf, overlayOf, pageOf, parseEvent, refOf, toDataPoint } from "../src/js/stats-events.js";
+import { EVENTS, encodeEvent, labelsValid, loadOf, overlayOf, pageOf, parseEvent, platformOf, refOf, toDataPoint } from "../src/js/stats-events.js";
 import { countOverlay, handleEvent, scramble } from "../worker/stats.mjs";
 import { DATASETS, TARGETS, activeOverlays, report, scorecard, summarize } from "../worker/stats-report.mjs";
 import { handleAdmin } from "../worker/admin.mjs";
@@ -14,23 +14,32 @@ const post = (body, { origin = SITE, headers = {} } = {}) => new Request(`${SITE
 const sink = () => ({ points: [], writeDataPoint(p) { this.points.push(p); } });
 
 test("only the events and labels on the fixed lists can be counted, and an event survives the wire exactly", () => {
-  assert.deepEqual(Object.keys(EVENTS), ["visit", "link_copied", "overlay_load"]);
+  assert.deepEqual(Object.keys(EVENTS), ["visit", "link_copied", "overlay_load", "plus_interest"]);
   assert.equal(labelsValid("visit", "home", "tiktok"), true);
   assert.equal(labelsValid("visit", "home", "somewhere"), false, "a label that is not on the list");
   assert.equal(labelsValid("visit", "home"), false, "a visit needs where it came from");
   assert.equal(labelsValid("link_copied", "goal"), true);
-  assert.equal(labelsValid("link_copied", "goal", "x"), false, "an event with one label takes only one");
+  assert.equal(labelsValid("link_copied", "goal", "tiktok"), true);
+  assert.equal(labelsValid("link_copied", "chat", "both"), true);
+  assert.equal(labelsValid("link_copied", "goal", "x"), false, "only an allowed platform label");
+  assert.equal(labelsValid("plus_interest", "remote_link"), true);
+  assert.equal(labelsValid("plus_interest", "remote_link", "editor"), true);
+  assert.equal(labelsValid("plus_interest", "unknown_feature"), false);
   assert.equal(labelsValid("overlay_load", "chat", "live"), true);
   assert.equal(labelsValid("nothing", "a", ""), false);
-  for (const [event, first, second] of [["visit", "editor", "reddit"], ["link_copied", "songs", ""]]) assert.deepEqual(parseEvent(encodeEvent(event, first, second)), { event, first, second });
+  for (const [event, first, second] of [["visit", "editor", "reddit"], ["link_copied", "songs", ""], ["link_copied", "chat", "tiktok"], ["plus_interest", "remote_link", "editor"]]) assert.deepEqual(parseEvent(encodeEvent(event, first, second)), { event, first, second });
   for (const bad of ["", "not json", "[]", "null", '{"e":"visit","a":"home","b":"tiktok","c":"extra"}', '{"e":"visit","a":1}', '{"e":"visit","a":"home","b":5}', '{"e":"visit","a":"home","b":"<script>"}']) assert.equal(parseEvent(bad), null, bad);
   assert.deepEqual(toDataPoint({ event: "visit", first: "home", second: "tiktok" }), { indexes: ["visit"], blobs: ["visit", "home", "tiktok", ""], doubles: [1] });
 });
 
-test("a page is grouped, an editor is named, an overlay is told apart, and where a visit came from is a coarse group (a label in the link wins)", () => {
+test("a page is grouped, an editor is named, an overlay is told apart, the platform of a link is read, and where a visit came from is a coarse group (a label in the link wins)", () => {
   assert.deepEqual(["/", "/editor/", "/overlays/faq/", "/goal/", "/matcha/alerts/", "/guides/obs/", "/looks/frog-pond/", "/changelog/", "/privacy/"].map(pageOf), ["home", "editor", "overlays", "goal", "matcha", "guides", "guides", "other", "other"]);
   assert.deepEqual(["/editor/", "/alerts/", "/matcha/alerts/", "/matcha/", "/songs/", "/guides/obs/", "/"].map(overlayOf), ["chat", "alerts", "alerts", "matcha", "songs", "", ""]);
   assert.deepEqual(["/overlay/", "/overlay", "/overlay/alerts/", "/overlay/goal", "/overlay/nope/", "/overlay/layout/", "/editor/"].map(loadOf), ["chat", "chat", "alerts", "goal", "", "", ""]);
+  assert.equal(platformOf("https://frills.example/overlay/?channel=pond.pal&platform=tiktok"), "tiktok");
+  assert.equal(platformOf("https://frills.example/overlay/?channel=pond_pal&platform=twitch"), "twitch");
+  assert.equal(platformOf("https://frills.example/overlay/?tiktok=pond.pal&twitch=pond_pal"), "both");
+  assert.equal(platformOf(""), "");
   const host = "frills.example";
   assert.equal(refOf("", host), "direct");
   assert.equal(refOf("https://frills.example/editor/", host), "direct", "from this site itself is not a source");
@@ -106,8 +115,9 @@ const row = (ev, a, b, age, n) => ({ ev, a, b, d: day(age), n });
 test("the report: visits, copies and overlays this week against the week before, where visits came from, and the other counts by name", () => {
   const s = summarize([
     row("visit", "home", "tiktok", 0, 10), row("visit", "editor", "reddit", 2, 5), row("visit", "home", "tiktok", 8, 6),
-    row("link_copied", "chat", "", 1, 4), row("link_copied", "goal", "", 9, 8),
+    row("link_copied", "chat", "tiktok", 1, 3), row("link_copied", "chat", "twitch", 1, 1), row("link_copied", "goal", "", 9, 8),
     row("overlay_load", "chat", "live", 3, 7), row("overlay_load", "chat", "demo", 3, 50), row("overlay_load", "alerts", "live", 10, 2),
+    row("plus_interest", "remote_link", "editor", 2, 5),
     row("pro_click", "footer", "", 4, 3), row("visit", "home", "tiktok", 40, 99), // (older than 28 days: ignored)
   ], T);
   assert.deepEqual([s.visits.week, s.visits.before, s.visits.total], [15, 6, 21]);
@@ -116,8 +126,11 @@ test("the report: visits, copies and overlays this week against the week before,
   assert.equal(s.visits.perDay.length, 28);
   assert.deepEqual(s.visits.perDay.at(-1), { day: "2026-11-12", n: 10 });
   assert.deepEqual([s.copies.week, s.copies.before], [4, 8]);
+  assert.deepEqual(s.copies.byPlatform, [{ label: "tiktok", n: 3 }, { label: "twitch", n: 1 }]);
   assert.deepEqual([s.loads.live.week, s.loads.live.before, s.loads.demo.week], [7, 2, 50], "practice openings are counted apart from real ones");
   assert.deepEqual(s.loads.byKind, [{ label: "chat", n: 7 }, { label: "alerts", n: 2 }]);
+  assert.deepEqual(s.plus.byFeature, [{ label: "remote_link", n: 5 }]);
+  assert.equal(Math.round(s.funnel.week.copyRate * 100), 27);
   assert.deepEqual(s.others, [{ label: "pro_click", n: 3 }]);
 });
 

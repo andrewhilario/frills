@@ -34,8 +34,9 @@ function change(week, before) {
   const pct = Math.round(((week - before) / before) * 100);
   return pct === 0 ? "same as the week before" : `${pct > 0 ? "up" : "down"} ${Math.abs(pct)}% on the week before`;
 }
-const NAMES = { chat: "Chat", alerts: "Alerts", gifts: "Last gifts", goal: "Goals", likers: "Top likers", songs: "Song requests", matcha: "Matcha", home: "Home page", editor: "Chat editor", overlays: "Overlays page", start: "Quick start", guides: "Guides and looks", other: "Other pages", overlay: "Overlay page", rank: "Rank page", mastery: "Mastery page", "valorant-rank": "Rank overlay", "valorant-mastery": "Mastery overlay", direct: "Direct (typed, bookmarked or no referrer)", tiktok: "TikTok", reddit: "Reddit", discord: "Discord", youtube: "YouTube", search: "Search engines", bio: "Link in a profile", ad1: "Ad 1", ad2: "Ad 2", ad3: "Ad 3" };
+const NAMES = { chat: "Chat", alerts: "Alerts", gifts: "Last gifts", goal: "Goals", likers: "Top likers", songs: "Song requests", matcha: "Matcha", home: "Home page", editor: "Chat editor", overlays: "Overlays page", start: "Quick start", guides: "Guides and looks", other: "Other pages", overlay: "Overlay page", rank: "Rank page", mastery: "Mastery page", "valorant-rank": "Rank overlay", "valorant-mastery": "Mastery overlay", direct: "Direct (typed, bookmarked or no referrer)", tiktok: "TikTok", twitch: "Twitch", both: "TikTok + Twitch together", reddit: "Reddit", discord: "Discord", youtube: "YouTube", search: "Search engines", bio: "Link in a profile", ad1: "Ad 1", ad2: "Ad 2", ad3: "Ad 3", remote_link: "Remote-control link (update OBS live)", custom_upload: "Custom sound and sticker kit", scene_link: "One link for the whole scene", plus_pack: "Collector look packs" };
 const nameOf = (label) => NAMES[label] ?? label;
+const pct = (rate) => (rate === null || rate === undefined ? "-" : Math.round(rate * 100) + "%");
 
 function card(title, big, small) {
   return el("div", { className: "stats__card" }, el("span", { className: "stats__label", textContent: title }), el("b", { className: "stats__big", textContent: big }), el("span", { className: "stats__small", textContent: small }));
@@ -69,7 +70,7 @@ function site(host, id, title, data, { frills = false } = {}) {
     host.append(el("p", { className: "admin__note", textContent: `Cloudflare did not give the counts for this site (answer ${data.status || "none"}). If counting has only just started there may be nothing to read yet: it appears after the first visit.` }));
     return;
   }
-  const { visits, copies, loads } = data;
+  const { visits, copies, loads, plus, funnel } = data;
   const cards = el("div", { className: "admin__cards" }, card("Visits, last 7 days", number(visits.week), change(visits.week, visits.before)), card("Links copied, last 7 days", number(copies.week), change(copies.week, copies.before)), card("Overlays opened (real accounts), last 7 days", number(loads.live.week), change(loads.live.week, loads.live.before)));
   if (frills) {
     const a = data.active;
@@ -77,10 +78,21 @@ function site(host, id, title, data, { frills = false } = {}) {
       card("Different overlays, last 7 days", number(a.week), a.before ? `${number(a.before)} the week before` : "no earlier week yet"),
       card("Came back from the week before", a.returningRate === null ? "-" : Math.round(a.returningRate * 100) + "%", `${number(a.returning)} of ${number(a.before)}`),
     );
+    if (funnel) {
+      cards.append(card("Funnel: Visits -> Copied (7d)", pct(funnel.week.copyRate), `28 days: ${pct(funnel.month.copyRate)} (${number(copies.total)} of ${number(visits.total)})`));
+    }
   }
   host.append(cards, el("p", { className: "admin__note", textContent: `Visits per day, the last 28 days (${number(visits.total)} in all):` }), bars(visits.perDay));
   if (frills && !data.active.month) host.append(el("p", { className: "admin__note", textContent: "Different overlays are counted only once the STATS_SALT secret is set on the worker (and overlays have opened on a real account since)." }));
-  host.append(el("div", { className: "stats__tables" }, table("Where visits came from (28 days)", visits.sources, visits.total), table("Pages visits started on (28 days)", visits.pages, visits.total), table("Overlays opened on real accounts (28 days)", loads.byKind, loads.live.total), table("Links copied, by editor (28 days)", copies.byOverlay, copies.total)));
+  const tables = el("div", { className: "stats__tables" }, table("Where visits came from (28 days)", visits.sources, visits.total), table("Pages visits started on (28 days)", visits.pages, visits.total), table("Overlays opened on real accounts (28 days)", loads.byKind, loads.live.total), table("Links copied, by editor (28 days)", copies.byOverlay, copies.total));
+  if (frills && copies.byPlatform?.length) {
+    const platformTotal = copies.byPlatform.reduce((sum, r) => sum + r.n, 0);
+    tables.append(table("Links copied, by platform (28 days)", copies.byPlatform, platformTotal));
+  }
+  if (frills && plus?.byFeature?.length) {
+    tables.append(table("Frills Plus feature clicks (28 days)", plus.byFeature, plus.total));
+  }
+  host.append(tables);
   if (data.others?.length) host.append(el("p", { className: "admin__note", textContent: "Other counts (28 days): " + data.others.map((o) => `${nameOf(o.label)} ${number(o.n)}`).join(", ") + "." }));
   if (loads.demo.total) host.append(el("p", { className: "admin__note", textContent: `Practice overlays and previews, counted apart: ${number(loads.demo.total)} in 28 days.` }));
 }

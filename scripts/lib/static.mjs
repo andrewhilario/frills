@@ -52,6 +52,11 @@ export function createStatic(folder) {
   const root = absolute(folder); // forward slashes, a trailing slash or a relative path all end up the same
   return (req, res) => {
     const url = new URL(req.url, "http://localhost");
+    if (req.method === "POST" && url.pathname === "/api/e") {
+      res.writeHead(204, { "Cache-Control": "no-store" });
+      res.end();
+      return;
+    }
     const headers = Object.assign({}, ...loadHeaders(root).filter((r) => r.test(url.pathname)).map((r) => r.headers));
     let found;
     try {

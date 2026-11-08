@@ -4,7 +4,7 @@
 // site's own address (/api/e), never to another host. If the browser sends Do Not Track or Global Privacy Control, nothing is sent at all. Counting must never get in
 // the way of a page, so every failure is swallowed. This is for the pages with the site's menu and the editors, not for the overlays (they are at their weight cap).
 
-import { encodeEvent, labelsValid, overlayOf, pageOf, refOf } from "./stats-events.js";
+import { encodeEvent, labelsValid, overlayOf, pageOf, platformOf, refOf } from "./stats-events.js";
 
 const ENDPOINT = "/api/e";
 
@@ -24,9 +24,14 @@ export function count(event, first, second = "") {
 }
 
 /** The overlay link was copied on this page (when this page is an editor). */
-export function countCopy() {
+export function countCopy(link = "") {
   const overlay = overlayOf(location.pathname);
-  if (overlay) count("link_copied", overlay);
+  if (overlay) count("link_copied", overlay, platformOf(link));
+}
+
+/** Someone clicked a Frills Plus feature preview or button. */
+export function countPlus(feature) {
+  count("plus_interest", feature, pageOf(location.pathname));
 }
 
 let counted = false;

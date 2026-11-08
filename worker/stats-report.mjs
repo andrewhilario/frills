@@ -29,14 +29,25 @@ export function summarize(rows, now = Date.now()) {
   };
   const trio = (ev, extra) => ({ total: total(ev, 0, DAYS - 1, extra), week: total(ev, 0, 6, extra), before: total(ev, 7, 13, extra) });
   const perDay = Array.from({ length: DAYS }, (_, i) => ({ day: isoDay(today - (DAYS - 1 - i) * DAY), n: total("visit", DAYS - 1 - i, DAYS - 1 - i) }));
-  const shared = ["visit", "link_copied", "overlay_load"];
+  const shared = ["visit", "link_copied", "overlay_load", "plus_interest"];
   const others = {};
   for (const r of parsed) if (!shared.includes(r.ev)) others[r.ev] = (others[r.ev] ?? 0) + r.n;
   const live = (r) => r.b === "live";
+  const visits = { ...trio("visit"), perDay, pages: split("visit", "a"), sources: split("visit", "b") };
+  const copies = { ...trio("link_copied"), byOverlay: split("link_copied", "a"), byPlatform: split("link_copied", "b", (r) => Boolean(r.b)) };
+  const loads = { live: trio("overlay_load", live), demo: trio("overlay_load", (r) => r.b === "demo"), byKind: split("overlay_load", "a", live) };
+  const plus = { ...trio("plus_interest"), byFeature: split("plus_interest", "a") };
+  const rate = (num, den) => (den > 0 ? num / den : null);
+  const funnel = {
+    week: { visits: visits.week, copies: copies.week, live: loads.live.week, copyRate: rate(copies.week, visits.week), liveRate: rate(loads.live.week, copies.week) },
+    month: { visits: visits.total, copies: copies.total, live: loads.live.total, copyRate: rate(copies.total, visits.total), liveRate: rate(loads.live.total, copies.total) },
+  };
   return {
-    visits: { ...trio("visit"), perDay, pages: split("visit", "a"), sources: split("visit", "b") },
-    copies: { ...trio("link_copied"), byOverlay: split("link_copied", "a") },
-    loads: { live: trio("overlay_load", live), demo: trio("overlay_load", (r) => r.b === "demo"), byKind: split("overlay_load", "a", live) },
+    visits,
+    copies,
+    loads,
+    plus,
+    funnel,
     others: Object.entries(others).sort((x, y) => y[1] - x[1]).map(([label, n]) => ({ label, n })),
   };
 }
