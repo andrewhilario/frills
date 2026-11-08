@@ -120,12 +120,13 @@ test("the report: visits, copies and overlays this week against the week before,
     row("plus_interest", "remote_link", "editor", 2, 5),
     row("pro_click", "footer", "", 4, 3), row("visit", "home", "tiktok", 40, 99), // (older than 28 days: ignored)
   ], T);
-  assert.deepEqual([s.visits.week, s.visits.before, s.visits.total], [15, 6, 21]);
+  assert.deepEqual([s.visits.today, s.visits.yesterday, s.visits.week, s.visits.before, s.visits.total], [10, 0, 15, 6, 21]);
   assert.deepEqual(s.visits.sources, [{ label: "tiktok", n: 16 }, { label: "reddit", n: 5 }]);
+  assert.deepEqual(s.visits.sourcesWeek, [{ label: "tiktok", n: 10 }, { label: "reddit", n: 5 }]);
   assert.deepEqual(s.visits.pages, [{ label: "home", n: 16 }, { label: "editor", n: 5 }]);
   assert.equal(s.visits.perDay.length, 28);
   assert.deepEqual(s.visits.perDay.at(-1), { day: "2026-11-12", n: 10 });
-  assert.deepEqual([s.copies.week, s.copies.before], [4, 8]);
+  assert.deepEqual([s.copies.today, s.copies.yesterday, s.copies.week, s.copies.before], [0, 4, 4, 8]);
   assert.deepEqual(s.copies.byPlatform, [{ label: "tiktok", n: 3 }, { label: "twitch", n: 1 }]);
   assert.deepEqual([s.loads.live.week, s.loads.live.before, s.loads.demo.week], [7, 2, 50], "practice openings are counted apart from real ones");
   assert.deepEqual(s.loads.byKind, [{ label: "chat", n: 7 }, { label: "alerts", n: 2 }]);
@@ -137,7 +138,7 @@ test("the report: visits, copies and overlays this week against the week before,
 test("different overlays this week, how many came back from the week before, and the scorecard for Frills Plus", () => {
   const ids = [["a", 0], ["b", 1], ["c", 3], ["a", 2], ["a", 8], ["b", 9], ["d", 12], ["e", 20]].map(([id, age]) => ({ id, d: day(age) }));
   const a = activeOverlays(ids, T);
-  assert.deepEqual([a.week, a.before, a.month, a.returning], [3, 3, 5, 2], "a, b, c this week; a, b, d the week before; two of the three are back");
+  assert.deepEqual([a.today, a.week, a.before, a.month, a.returning], [1, 3, 3, 5, 2], "a today; a, b, c this week; a, b, d the week before; two of the three are back");
   assert.equal(Math.round(a.returningRate * 100), 67);
   assert.equal(activeOverlays([], T).returningRate, null, "no earlier week yet");
   const card = scorecard({ copies: { week: 120 } }, { week: 60, returningRate: 0.3 });

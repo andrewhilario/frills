@@ -27,41 +27,208 @@ async function load() {
 }
 
 const say = (node, text, bad = false) => { node.textContent = text; node.dataset.state = bad ? "error" : ""; };
-const number = (n) => Math.round(n).toLocaleString("en-US");
-/** "up 12%", "down 30%", "same", or "new" when there was nothing the week before. */
-function change(week, before) {
-  if (!before) return week ? "new this week" : "nothing yet";
-  const pct = Math.round(((week - before) / before) * 100);
-  return pct === 0 ? "same as the week before" : `${pct > 0 ? "up" : "down"} ${Math.abs(pct)}% on the week before`;
+const number = (n) => Math.round(n || 0).toLocaleString("en-US");
+const pct = (rate) => (rate === null || rate === undefined ? "—" : Math.round(rate * 100) + "%");
+
+/** Returns { text, tone } for a week-over-week comparison badge. */
+function deltaBadge(week, before) {
+  if (!before) return week ? { text: "NEW vs prev 7d", tone: "up" } : { text: "0 prev 7d", tone: "flat" };
+  const diff = Math.round(((week - before) / before) * 100);
+  if (diff === 0) return { text: "0% vs prev 7d", tone: "flat" };
+  return {
+    text: `${diff > 0 ? "▲ +" : "▼ "}${diff}% vs prev 7d`,
+    tone: diff > 0 ? "up" : "down",
+  };
 }
-const NAMES = { chat: "Chat", alerts: "Alerts", gifts: "Last gifts", goal: "Goals", likers: "Top likers", songs: "Song requests", matcha: "Matcha", home: "Home page", editor: "Chat editor", overlays: "Overlays page", start: "Quick start", guides: "Guides and looks", other: "Other pages", overlay: "Overlay page", rank: "Rank page", mastery: "Mastery page", "valorant-rank": "Rank overlay", "valorant-mastery": "Mastery overlay", direct: "Direct (typed, bookmarked or no referrer)", tiktok: "TikTok", twitch: "Twitch", both: "TikTok + Twitch together", reddit: "Reddit", discord: "Discord", youtube: "YouTube", search: "Search engines", bio: "Link in a profile", ad1: "Ad 1", ad2: "Ad 2", ad3: "Ad 3", remote_link: "Remote-control link (update OBS live)", custom_upload: "Custom sound and sticker kit", scene_link: "One link for the whole scene", plus_pack: "Collector look packs" };
+
+const NAMES = {
+  chat: "Chat Box",
+  alerts: "Alerts",
+  gifts: "Last Gifts",
+  goal: "Stream Goals",
+  likers: "Top Likers",
+  songs: "Song Requests (!sr)",
+  matcha: "Matcha Theme",
+  home: "Home Page (/)",
+  editor: "Chat Editor (/editor/)",
+  overlays: "Overlays Hub (/overlays/)",
+  start: "Quick Start (/start/)",
+  guides: "Guides & Looks",
+  other: "Other Pages",
+  overlay: "Overlay Page",
+  rank: "Rank Page",
+  mastery: "Mastery Page",
+  "valorant-rank": "Rank Overlay",
+  "valorant-mastery": "Mastery Overlay",
+  direct: "Direct / Bookmark",
+  tiktok: "TikTok",
+  twitch: "Twitch",
+  both: "TikTok + Twitch (Dual)",
+  reddit: "Reddit",
+  discord: "Discord",
+  youtube: "YouTube",
+  search: "Google / Search",
+  bio: "Profile Bio Link",
+  ad1: "Ad Campaign 1",
+  ad2: "Ad Campaign 2",
+  ad3: "Ad Campaign 3",
+  remote_link: "Remote-Control Link (Live OBS Update)",
+  custom_upload: "Custom Sound & Sticker Kit",
+  scene_link: "All-in-One Scene Link",
+  plus_pack: "Collector Art Packs",
+};
 const nameOf = (label) => NAMES[label] ?? label;
-const pct = (rate) => (rate === null || rate === undefined ? "-" : Math.round(rate * 100) + "%");
 
-function card(title, big, small) {
-  return el("div", { className: "stats__card" }, el("span", { className: "stats__label", textContent: title }), el("b", { className: "stats__big", textContent: big }), el("span", { className: "stats__small", textContent: small }));
+function kpiCard(title, big, badge, metaItems) {
+  const pill = el("span", { className: "stats__delta", textContent: badge.text });
+  pill.dataset.tone = badge.tone;
+  const top = el("div", { className: "stats__card-top" }, el("span", { className: "stats__label", textContent: title }), pill);
+  const meta = el(
+    "div",
+    { className: "stats__meta" },
+    ...metaItems.map(([k, v]) => el("span", { className: "stats__meta-item" }, el("span", { textContent: k + ": " }), el("b", { textContent: v }))),
+  );
+  return el("div", { className: "stats__card" }, top, el("b", { className: "stats__big", textContent: big }), meta);
 }
 
-/** The visits per day, as bars (the last 28 days; the tallest is the full height). */
-function bars(perDay) {
-  const top = Math.max(1, ...perDay.map((d) => d.n));
+/** Visual 3-stage conversion funnel (7d & 28d): Visits -> Links Copied -> Live Overlay Loads. */
+function funnelSection(visits, copies, loads, funnel) {
+  const wVisits = visits.week || 0;
+  const wCopies = copies.week || 0;
+  const wLive = loads.live.week || 0;
+  const mVisits = visits.total || 0;
+  const mCopies = copies.total || 0;
+  const mLive = loads.live.total || 0;
+
+  const stage = (step, label, count7d, rate7d, barPct, sub28d) => {
+    const fill = el("i", {});
+    fill.style.width = Math.max(3, Math.min(100, Math.round(barPct))) + "%";
+    return el(
+      "div",
+      { className: "stats__funnel-step" },
+      el(
+        "div",
+        { className: "stats__funnel-head" },
+        el("span", { className: "stats__funnel-title" }, el("b", { textContent: `${step}. ` }), el("span", { textContent: label })),
+        el("span", { className: "stats__funnel-nums" }, el("b", { textContent: number(count7d) }), el("span", { className: "stats__funnel-rate", textContent: rate7d })),
+      ),
+      el("div", { className: "stats__funnel-track" }, fill),
+      el("span", { className: "stats__funnel-sub", textContent: sub28d }),
+    );
+  };
+
+  const copyBar = wVisits > 0 ? (wCopies / wVisits) * 100 : 0;
+  const liveBar = wVisits > 0 ? Math.min(100, (wLive / wVisits) * 100) : 0;
+
+  return el(
+    "div",
+    { className: "stats__panel" },
+    el(
+      "div",
+      { className: "stats__panel-head" },
+      el("h3", { className: "stats__panel-title", textContent: "Conversion Funnel (Last 7 Days vs. 28 Days)" }),
+      el("span", { className: "stats__panel-sub", textContent: "Visitor → Copy URL → Open in OBS" }),
+    ),
+    el(
+      "div",
+      { className: "stats__funnel-grid" },
+      stage("1", "Site Visits", wVisits, "100%", 100, `28d total: ${number(mVisits)} visits`),
+      stage("2", "Overlay Links Copied", wCopies, `${pct(funnel?.week?.copyRate)} of visits`, copyBar, `28d: ${number(mCopies)} copied (${pct(funnel?.month?.copyRate)} of visits)`),
+      stage("3", "Live Stream Loads (OBS)", wLive, `${pct(funnel?.week?.liveRate)} per copy`, liveBar, `28d: ${number(mLive)} live loads (${number(loads.demo.total)} demo/preview loads)`),
+    ),
+  );
+}
+
+/** Interactive 28-day daily bar chart with tabs for Visits, Links Copied, and Live Stream Loads. */
+function dailyChartSection(visits, copies, loads) {
+  const seriesList = [
+    { id: "visits", label: "Site Visits", data: visits.perDay ?? [] },
+    { id: "copies", label: "Links Copied", data: copies.perDay ?? [] },
+    { id: "live", label: "Live Stream Loads", data: loads.livePerDay ?? [] },
+  ].filter((s) => s.data.length > 0);
+
+  const summaryNode = el("span", { className: "stats__panel-sub" });
   const box = el("div", { className: "stats__bars" });
   box.setAttribute("role", "img");
-  box.setAttribute("aria-label", "Visits per day, the last 28 days");
-  for (const { day, n } of perDay) {
-    const bar = el("i", { title: `${day}: ${number(n)}` });
-    bar.style.height = Math.max(2, Math.round((n / top) * 100)) + "%";
-    box.append(bar);
+  const tabsWrap = el("div", { className: "stats__chart-tabs" });
+
+  function renderSeries(series) {
+    const pts = series.data;
+    const sum = pts.reduce((a, d) => a + d.n, 0);
+    const avg = pts.length ? Math.round(sum / pts.length) : 0;
+    const peak = pts.reduce((best, d) => (d.n > best.n ? d : best), { day: "—", n: 0 });
+    const top = Math.max(1, peak.n);
+
+    box.setAttribute("aria-label", `${series.label} per day, the last 28 days`);
+    summaryNode.textContent = `28d Total: ${number(sum)} · Daily Avg: ${number(avg)}/day · Peak: ${number(peak.n)} (${peak.day.slice(5)})`;
+
+    box.replaceChildren();
+    pts.forEach(({ day, n }, idx) => {
+      const isToday = idx === pts.length - 1;
+      const bar = el("i", { title: `${day}${isToday ? " (Today)" : ""}: ${number(n)} ${series.label.toLowerCase()}` });
+      if (isToday) bar.dataset.today = "true";
+      bar.style.height = (n === 0 ? 3 : Math.max(8, Math.round((n / top) * 100))) + "%";
+      if (n === 0) bar.dataset.zero = "true";
+      box.append(bar);
+    });
   }
-  return el("div", { className: "stats__chart" }, box, el("div", { className: "stats__axis" }, el("span", { textContent: "28 days ago" }), el("span", { textContent: "today" })));
+
+  seriesList.forEach((s, i) => {
+    const btn = el("button", { type: "button", className: "stats__tab", textContent: s.label });
+    if (i === 0) btn.dataset.active = "true";
+    btn.addEventListener("click", () => {
+      for (const child of tabsWrap.children) delete child.dataset.active;
+      btn.dataset.active = "true";
+      renderSeries(s);
+    });
+    tabsWrap.append(btn);
+  });
+
+  if (seriesList[0]) renderSeries(seriesList[0]);
+  const firstDay = seriesList[0]?.data?.[0]?.day?.slice(5) ?? "28 days ago";
+  const lastDay = seriesList[0]?.data?.at(-1)?.day?.slice(5) ?? "Today";
+
+  return el(
+    "div",
+    { className: "stats__panel" },
+    el(
+      "div",
+      { className: "stats__panel-head" },
+      el("div", { className: "stats__panel-title-group" }, el("h3", { className: "stats__panel-title", textContent: "Daily Activity Trend (28 Days)" }), summaryNode),
+      tabsWrap,
+    ),
+    el("div", { className: "stats__chart" }, box, el("div", { className: "stats__axis" }, el("span", { textContent: firstDay }), el("span", { textContent: `${lastDay} (Today highlighted)` }))),
+  );
 }
 
-/** A small table: label, count and share of the total. */
-function table(title, rows, total) {
+/** A breakdown table with 7d, 28d, % Share, and an inline progress bar. */
+function table(title, rows28d, rows7d, total28d) {
+  const weekMap = new Map((rows7d ?? []).map((r) => [r.label, r.n]));
+  const thead = el(
+    "thead",
+    {},
+    el("tr", {}, el("th", { textContent: "Item" }), el("th", { className: "stats__n", textContent: "7d" }), el("th", { className: "stats__n", textContent: "28d" }), el("th", { className: "stats__n", textContent: "Share" })),
+  );
   const body = el("tbody");
-  for (const { label, n } of rows.slice(0, 8)) body.append(el("tr", {}, el("td", { textContent: nameOf(label) }), el("td", { className: "stats__n", textContent: number(n) }), el("td", { className: "stats__n", textContent: total ? Math.round((n / total) * 100) + "%" : "" })));
-  if (!rows.length) body.append(el("tr", {}, el("td", { colSpan: 3, textContent: "Nothing yet" })));
-  return el("div", { className: "stats__table" }, el("h3", { textContent: title }), el("table", {}, body));
+  for (const { label, n } of (rows28d ?? []).slice(0, 8)) {
+    const share = total28d ? Math.round((n / total28d) * 100) : 0;
+    const wCount = weekMap.get(label) ?? 0;
+    const bar = el("i", { className: "stats__row-bar" });
+    bar.style.width = Math.max(2, share) + "%";
+    const nameCell = el("td", { className: "stats__cell-name" }, el("span", { className: "stats__cell-text", textContent: nameOf(label) }), bar);
+    body.append(
+      el(
+        "tr",
+        {},
+        nameCell,
+        el("td", { className: "stats__n", textContent: number(wCount) }),
+        el("td", { className: "stats__n stats__n--bold", textContent: number(n) }),
+        el("td", { className: "stats__n stats__n--pct", textContent: total28d ? share + "%" : "—" }),
+      ),
+    );
+  }
+  if (!rows28d?.length) body.append(el("tr", {}, el("td", { colSpan: 4, className: "stats__empty", textContent: "No events recorded yet" })));
+  return el("div", { className: "stats__table" }, el("h3", { textContent: title }), el("table", {}, thead, body));
 }
 
 function site(host, id, title, data, { frills = false } = {}) {
@@ -71,31 +238,92 @@ function site(host, id, title, data, { frills = false } = {}) {
     return;
   }
   const { visits, copies, loads, plus, funnel } = data;
-  const cards = el("div", { className: "admin__cards" }, card("Visits, last 7 days", number(visits.week), change(visits.week, visits.before)), card("Links copied, last 7 days", number(copies.week), change(copies.week, copies.before)), card("Overlays opened (real accounts), last 7 days", number(loads.live.week), change(loads.live.week, loads.live.before)));
+  const cards = el(
+    "div",
+    { className: "admin__cards" },
+    kpiCard("Site Visits (7d)", number(visits.week), deltaBadge(visits.week, visits.before), [
+      ["Today", number(visits.today)],
+      ["Yesterday", number(visits.yesterday)],
+      ["28d", number(visits.total)],
+    ]),
+    kpiCard("Links Copied (7d)", number(copies.week), deltaBadge(copies.week, copies.before), [
+      ["Today", number(copies.today)],
+      ["Yesterday", number(copies.yesterday)],
+      ["28d", number(copies.total)],
+    ]),
+    kpiCard("Live Stream Loads (7d)", number(loads.live.week), deltaBadge(loads.live.week, loads.live.before), [
+      ["Today", number(loads.live.today)],
+      ["Yesterday", number(loads.live.yesterday)],
+      ["28d", number(loads.live.total)],
+    ]),
+  );
+
   if (frills) {
     const a = data.active;
     cards.append(
-      card("Different overlays, last 7 days", number(a.week), a.before ? `${number(a.before)} the week before` : "no earlier week yet"),
-      card("Came back from the week before", a.returningRate === null ? "-" : Math.round(a.returningRate * 100) + "%", `${number(a.returning)} of ${number(a.before)}`),
+      kpiCard("Weekly Active Streamers", number(a.week), deltaBadge(a.week, a.before), [
+        ["Today", number(a.today)],
+        ["Prev 7d", number(a.before)],
+        ["28d Unique", number(a.month)],
+      ]),
+      kpiCard(
+        "Streamer Retention (WoW)",
+        a.returningRate === null ? "—" : Math.round(a.returningRate * 100) + "%",
+        { text: a.before ? `${number(a.returning)} of ${number(a.before)} returned` : "Wait 1 more week", tone: a.returningRate >= 0.4 ? "up" : "flat" },
+        [
+          ["Returned", number(a.returning)],
+          ["Last Week Cohort", number(a.before)],
+          ["Target", "40%+"],
+        ],
+      ),
     );
     if (funnel) {
-      cards.append(card("Funnel: Visits -> Copied (7d)", pct(funnel.week.copyRate), `28 days: ${pct(funnel.month.copyRate)} (${number(copies.total)} of ${number(visits.total)})`));
+      cards.append(
+        kpiCard(
+          "Copy Conversion (7d)",
+          pct(funnel.week.copyRate),
+          { text: `28d Avg: ${pct(funnel.month.copyRate)}`, tone: (funnel.week.copyRate ?? 0) >= 0.15 ? "up" : "flat" },
+          [
+            ["7d Copied", `${number(copies.week)} / ${number(visits.week)}`],
+            ["28d Copied", `${number(copies.total)} / ${number(visits.total)}`],
+          ],
+        ),
+      );
     }
   }
-  host.append(cards, el("p", { className: "admin__note", textContent: `Visits per day, the last 28 days (${number(visits.total)} in all):` }), bars(visits.perDay));
-  if (frills && !data.active.month) host.append(el("p", { className: "admin__note", textContent: "Different overlays are counted only once the STATS_SALT secret is set on the worker (and overlays have opened on a real account since)." }));
-  const tables = el("div", { className: "stats__tables" }, table("Where visits came from (28 days)", visits.sources, visits.total), table("Pages visits started on (28 days)", visits.pages, visits.total), table("Overlays opened on real accounts (28 days)", loads.byKind, loads.live.total), table("Links copied, by editor (28 days)", copies.byOverlay, copies.total));
+
+  host.append(cards);
+  if (frills && funnel) host.append(funnelSection(visits, copies, loads, funnel));
+  host.append(dailyChartSection(visits, copies, loads));
+
+  if (frills && !data.active.month) {
+    host.append(el("p", { className: "admin__note", textContent: "Different overlays are counted only once the STATS_SALT secret is set on the worker (and overlays have opened on a real account since)." }));
+  }
+
+  const tables = el(
+    "div",
+    { className: "stats__tables" },
+    table("Traffic Sources", visits.sources, visits.sourcesWeek, visits.total),
+    table("Top Landing Pages", visits.pages, visits.pagesWeek, visits.total),
+    table("Live Overlays by Type", loads.byKind, loads.byKindWeek, loads.live.total),
+    table("Links Copied by Tool", copies.byOverlay, copies.byOverlayWeek, copies.total),
+  );
   if (frills && copies.byPlatform?.length) {
     const platformTotal = copies.byPlatform.reduce((sum, r) => sum + r.n, 0);
-    tables.append(table("Links copied, by platform (28 days)", copies.byPlatform, platformTotal));
+    tables.append(table("Links Copied by Platform", copies.byPlatform, copies.byPlatformWeek, platformTotal));
   }
   if (frills && plus?.byFeature?.length) {
-    tables.append(table("Frills Plus feature clicks (28 days)", plus.byFeature, plus.total));
+    tables.append(table("Frills Plus Interest Clicks", plus.byFeature, plus.byFeatureWeek, plus.total));
   }
   host.append(tables);
   if (data.others?.length) host.append(el("p", { className: "admin__note", textContent: "Other counts (28 days): " + data.others.map((o) => `${nameOf(o.label)} ${number(o.n)}`).join(", ") + "." }));
-  if (loads.demo.total) host.append(el("p", { className: "admin__note", textContent: `Practice overlays and previews, counted apart: ${number(loads.demo.total)} in 28 days.` }));
 }
+
+const SCORE_PROGRESS = {
+  overlays: (data) => Math.min(100, Math.round(((data.active?.week || 0) / 50) * 100)),
+  returning: (data) => (data.active?.returningRate === null || data.active?.returningRate === undefined ? 0 : Math.min(100, Math.round((data.active.returningRate / 0.4) * 100))),
+  copies: (data) => Math.min(100, Math.round(((data.copies?.week || 0) / 100) * 100)),
+};
 
 function draw(data) {
   $("setup").hidden = data.error !== "not_set";
@@ -107,21 +335,38 @@ function draw(data) {
     say($("status"), "");
     return;
   }
-  say($("status"), "Counts up to " + new Date(data.now).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) + ". Press Refresh to read them again.");
+  say($("status"), "Last updated: " + new Date(data.now).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) + " · Press Refresh for live numbers.");
   if (data.frills.scorecard) {
     $("plus").hidden = false;
-    $("score").replaceChildren(...data.frills.scorecard.map((row) => {
-      const li = el("li", { className: "stats__row" }, el("span", { className: "stats__tick", textContent: row.ok ? "Yes" : "Not yet" }), el("span", { className: "stats__what", textContent: row.label }), el("b", { textContent: row.value }), el("span", { className: "stats__target", textContent: "target: " + row.target }));
-      li.dataset.ok = String(row.ok);
-      return li;
-    }));
+    $("score").replaceChildren(
+      ...data.frills.scorecard.map((row) => {
+        const pctProgress = SCORE_PROGRESS[row.id] ? SCORE_PROGRESS[row.id](data.frills) : row.ok ? 100 : 0;
+        const fill = el("i", {});
+        fill.style.width = Math.max(4, pctProgress) + "%";
+        const li = el(
+          "li",
+          { className: "stats__row" },
+          el("span", { className: "stats__tick", textContent: row.ok ? "READY" : "IN PROGRESS" }),
+          el(
+            "div",
+            { className: "stats__goal-main" },
+            el("span", { className: "stats__what", textContent: row.label }),
+            el("div", { className: "stats__goal-track" }, fill),
+          ),
+          el("b", { className: "stats__goal-val", textContent: row.value }),
+          el("span", { className: "stats__target", textContent: `/ ${row.target}` }),
+        );
+        li.dataset.ok = String(row.ok);
+        return li;
+      }),
+    );
   }
-  site($("frills"), "frills", "Frills", data.frills, { frills: true });
-  site($("valwidgets"), "valwidgets", "valwidgets.live", data.valwidgets);
+  site($("frills"), "frills", "Frills (frills.valwidgets.live)", data.frills, { frills: true });
+  site($("valwidgets"), "valwidgets", "Valorant Widgets (valwidgets.live)", data.valwidgets);
 }
 
 async function refresh() {
-  say($("status"), "Reading the counts…");
+  say($("status"), "Reading live analytics…");
   try { draw(await load()); } catch (error) { if (error instanceof Wrong) say($("status"), error.message, true); else throw error; }
 }
 

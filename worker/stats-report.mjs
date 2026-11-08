@@ -22,21 +22,28 @@ export function summarize(rows, now = Date.now()) {
   const today = midnight(now);
   const parsed = (rows ?? []).map((r) => ({ ev: String(r.ev), a: String(r.a ?? ""), b: String(r.b ?? ""), age: ageOf(r.d, today), n: Number(r.n) || 0 })).filter((r) => r.age >= 0 && r.age < DAYS);
   const total = (ev, from, to, extra = () => true) => parsed.filter((r) => r.ev === ev && r.age >= from && r.age <= to && extra(r)).reduce((sum, r) => sum + r.n, 0);
-  const split = (ev, by, extra = () => true) => {
+  const split = (ev, by, extra = () => true, maxAge = DAYS - 1) => {
     const out = new Map();
-    for (const r of parsed) if (r.ev === ev && extra(r)) out.set(r[by] || "(none)", (out.get(r[by] || "(none)") ?? 0) + r.n);
+    for (const r of parsed) if (r.ev === ev && r.age <= maxAge && extra(r)) out.set(r[by] || "(none)", (out.get(r[by] || "(none)") ?? 0) + r.n);
     return [...out].sort((x, y) => y[1] - x[1]).map(([label, n]) => ({ label, n }));
   };
-  const trio = (ev, extra) => ({ total: total(ev, 0, DAYS - 1, extra), week: total(ev, 0, 6, extra), before: total(ev, 7, 13, extra) });
-  const perDay = Array.from({ length: DAYS }, (_, i) => ({ day: isoDay(today - (DAYS - 1 - i) * DAY), n: total("visit", DAYS - 1 - i, DAYS - 1 - i) }));
+  const trio = (ev, extra) => ({
+    today: total(ev, 0, 0, extra),
+    yesterday: total(ev, 1, 1, extra),
+    week: total(ev, 0, 6, extra),
+    before: total(ev, 7, 13, extra),
+    total: total(ev, 0, DAYS - 1, extra),
+  });
+  const daily = (ev, extra) => Array.from({ length: DAYS }, (_, i) => ({ day: isoDay(today - (DAYS - 1 - i) * DAY), n: total(ev, DAYS - 1 - i, DAYS - 1 - i, extra) }));
+  const perDay = daily("visit");
   const shared = ["visit", "link_copied", "overlay_load", "plus_interest"];
   const others = {};
   for (const r of parsed) if (!shared.includes(r.ev)) others[r.ev] = (others[r.ev] ?? 0) + r.n;
   const live = (r) => r.b === "live";
-  const visits = { ...trio("visit"), perDay, pages: split("visit", "a"), sources: split("visit", "b") };
-  const copies = { ...trio("link_copied"), byOverlay: split("link_copied", "a"), byPlatform: split("link_copied", "b", (r) => Boolean(r.b)) };
-  const loads = { live: trio("overlay_load", live), demo: trio("overlay_load", (r) => r.b === "demo"), byKind: split("overlay_load", "a", live) };
-  const plus = { ...trio("plus_interest"), byFeature: split("plus_interest", "a") };
+  const visits = { ...trio("visit"), perDay, pages: split("visit", "a"), pagesWeek: split("visit", "a", () => true, 6), sources: split("visit", "b"), sourcesWeek: split("visit", "b", () => true, 6) };
+  const copies = { ...trio("link_copied"), perDay: daily("link_copied"), byOverlay: split("link_copied", "a"), byOverlayWeek: split("link_copied", "a", () => true, 6), byPlatform: split("link_copied", "b", (r) => Boolean(r.b)), byPlatformWeek: split("link_copied", "b", (r) => Boolean(r.b), 6) };
+  const loads = { live: trio("overlay_load", live), demo: trio("overlay_load", (r) => r.b === "demo"), livePerDay: daily("overlay_load", live), byKind: split("overlay_load", "a", live), byKindWeek: split("overlay_load", "a", live, 6) };
+  const plus = { ...trio("plus_interest"), byFeature: split("plus_interest", "a"), byFeatureWeek: split("plus_interest", "a", () => true, 6) };
   const rate = (num, den) => (den > 0 ? num / den : null);
   const funnel = {
     week: { visits: visits.week, copies: copies.week, live: loads.live.week, copyRate: rate(copies.week, visits.week), liveRate: rate(loads.live.week, copies.week) },
@@ -55,6 +62,7 @@ export function summarize(rows, now = Date.now()) {
 /** How many different overlays opened on a real account in the last seven days, in the seven before, in all 28, and how many of this week's were also there the week before. */
 export function activeOverlays(rows, now = Date.now()) {
   const today = midnight(now);
+  const nowDay = new Set();
   const week = new Set();
   const before = new Set();
   const month = new Set();
@@ -62,11 +70,12 @@ export function activeOverlays(rows, now = Date.now()) {
     const age = ageOf(r.d, today);
     if (!(age >= 0 && age < DAYS) || !r.id) continue;
     month.add(r.id);
+    if (age === 0) nowDay.add(r.id);
     if (age <= 6) week.add(r.id);
     else if (age <= 13) before.add(r.id);
   }
   const returning = [...week].filter((id) => before.has(id)).length;
-  return { week: week.size, before: before.size, month: month.size, returning, returningRate: before.size ? returning / before.size : null };
+  return { today: nowDay.size, week: week.size, before: before.size, month: month.size, returning, returningRate: before.size ? returning / before.size : null };
 }
 
 /** My starting points for "is Frills Plus worth building yet" (change them here): enough different overlays a week, enough of them coming back, enough links copied. */
