@@ -118,10 +118,14 @@ export function createBotRunner({
     const own = new Set(def.ownLogins);
 
     const onChat = (data) => {
-      const m = mapChat(data);
-      if (!m || own.has(String(m.login ?? "").toLowerCase())) return;
-      const result = engine.handle({ id: m.id, user: m.user, text: m.text });
-      if (result === "queued") log(`${tag}: ${m.login || m.name} asked, a reply is waiting.`);
+      try {
+        const m = mapChat(data);
+        if (!m || own.has(String(m.login ?? "").toLowerCase())) return;
+        const result = engine.handle({ id: m.id, user: m.user, text: m.text });
+        if (result === "queued") log(`${tag}: ${m.login || m.name} asked, a reply is waiting.`);
+      } catch (error) {
+        log(`${tag}: skipped a chat message it could not read (${error?.message ?? error}).`); // one odd message must never reach the relay
+      }
     };
 
     const tick = setInterval(async () => {
@@ -179,7 +183,7 @@ export function createBotRunner({
         await sleepFor(retryMs[Math.min(attempt, retryMs.length - 1)]);
         attempt += 1;
       }
-    })();
+    })().catch((error) => log(`${tag}: stopped unexpectedly (${error?.message ?? error}).`));
 
     return {
       stop() {
@@ -219,15 +223,24 @@ export function createBotRunner({
     log(`Chat bot: ${running.size} account${running.size === 1 ? "" : "s"} running.`);
   }
 
+  // The relay serves everyone's overlays, so nothing in here may ever stop it: whatever goes wrong is logged and the relay carries on.
+  const safeReload = () => {
+    try {
+      reload();
+    } catch (error) {
+      log(`Chat bot: could not update from the bot file (${error?.message ?? error}).`);
+    }
+  };
+
   return {
     start() {
       if (!readText) return;
-      reload();
-      reloadTimer = setInterval(reload, reloadMs);
+      safeReload();
+      reloadTimer = setInterval(safeReload, reloadMs);
       reloadTimer.unref?.();
     },
     /** For tests and the owner: read the file again now. */
-    reloadNow: reload,
+    reloadNow: safeReload,
     stop() {
       stopped = true;
       clearInterval(reloadTimer);

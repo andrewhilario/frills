@@ -197,3 +197,34 @@ test("the file is checked: a link can be the c= part or a whole link, and a bot 
   assert.equal(problems.length, 3);
   assert.equal(loadBots("not json").problems.length, 1);
 });
+
+test("nothing in the bot can stop the relay: a message it cannot read, a broken file and a connection that fails are only logged", async () => {
+  const { runner, conns, logs, setText } = setup([entry()]);
+  runner.start();
+  await until(() => conns.length === 1);
+  assert.doesNotThrow(() => {
+    conns[0].emit("chat", null);
+    conns[0].emit("chat", { user: null, content: ".mouse" });
+    conns[0].emit("chat", { common: {}, user: { id: 1 }, content: { not: "text" } });
+  });
+  setText("{ this is not json");
+  assert.doesNotThrow(() => runner.reloadNow());
+  assert.ok(logs.some((l) => /not valid JSON/.test(l)));
+  runner.stop();
+
+  // a connection that cannot be made is retried quietly, and the failure is logged
+  const failing = createBotRunner({
+    readText: () => JSON.stringify({ bots: [entry()] }),
+    factory: async () => {
+      throw new Error("no network");
+    },
+    log: (line) => logs.push(line),
+    tickMs: 5,
+    reloadMs: 1e9,
+    retryMs: [5],
+  });
+  failing.start();
+  await sleep(80);
+  failing.stop();
+  assert.ok(logs.some((l) => /could not connect \(no network\)/.test(l)));
+});

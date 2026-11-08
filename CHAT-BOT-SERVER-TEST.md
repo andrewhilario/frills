@@ -18,7 +18,49 @@ anyone but you.
    account, open the developer tools (F12), then Application (or Storage), Cookies, `https://www.tiktok.com`. Copy the value of
    `sessionid` and the value of `tt-target-idc`. They stop working when you log out of that session or TikTok ends it; copy new ones then.
 
-## Steps
+## On your phone (Termux): what you run now
+
+The phone relay already reads its settings from `~/.frills-relay.env` (your owner password and Euler key live there), and
+`update-relay.sh` loads that file before it starts the relay. The bot uses the same file. Do these in Termux.
+
+**1. Make the bot file** (the JSON is in step 3 further down; the two cookies are the throwaway bot account's):
+
+```bash
+nano ~/frills-bot.json
+```
+
+```bash
+chmod 600 ~/frills-bot.json
+```
+
+If `nano` is missing, run `pkg install nano` first.
+
+**2. Switch the bot on** by adding one line to the settings file (the single quotes are right: the file is read by bash, which fills in `$HOME`):
+
+```bash
+echo 'BOT_CONFIG_FILE="$HOME/frills-bot.json"' >> ~/.frills-relay.env
+```
+
+**3. Update and restart the relay.** This also pulls the bot code from GitHub:
+
+```bash
+bash ~/frills/update-relay.sh
+```
+
+**4. Watch it.** `tmux attach -t relay`, then Ctrl+B and D to leave it running. You should see `Chat bot: ON for the channels in ...`,
+then `Chat bot: 1 account running`, then `connected` once you are LIVE.
+
+**To stop it:** remove the `BOT_CONFIG_FILE` line from `~/.frills-relay.env` and run `bash ~/frills/update-relay.sh` again.
+
+Things to know about the phone:
+
+- The bot file holds a TikTok login. Use a throwaway account. Termux's home folder is private to the Termux app on Android.
+- The phone relay serves everyone's overlays. Whatever goes wrong inside the bot is caught and logged and does not stop the relay
+  (there is a test for that). The bot adds one more connection to TikTok and a little work for the phone.
+- If the relay starts by itself when the phone restarts (`~/.termux/boot/frills-relay.sh`), check that script also reads
+  `~/.frills-relay.env`. If you are unsure, run `update-relay.sh` once after a restart.
+
+## Steps on a server (later, if you move the relay to one)
 
 **1. Put the code on the server.** Push it to GitHub (the website updates by itself; the bot controls stay hidden), then on the server:
 
