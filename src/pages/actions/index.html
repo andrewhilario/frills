@@ -1,0 +1,112 @@
+<!--
+{
+  "title": "Stream commands & gear pop-up overlay | Frills",
+  "description": "Custom chat commands for TikTok LIVE and Twitch with cute mascot pop-ups for your gear, sens, specs and links. 100% free, no account needed.",
+  "path": "/actions/",
+  "updated": "2026-11-08",
+  "published": "2026-11-08",
+  "css": "widget",
+  "js": "actions",
+  "bodyClass": "page-editor page-alerts",
+  "chrome": "appbar",
+  "footer": false,
+  "intro": "intro-actions",
+  "about": "about-actions",
+  "jsonld": ["webapp"]
+}
+-->
+<main class="workspace" id="main">
+  <section class="preview" id="preview" data-back="dark" aria-label="Live preview of your stream command pop-ups">
+    <div class="preview__bar">
+      <span class="preview__tag">Preview</span>
+      <div id="preview-canvas"></div>
+      <label class="visually-hidden" for="backdrop">What sits behind the overlay</label>
+      <select id="backdrop">
+        <option value="dark">Dark game</option>
+        <option value="bright">Bright game</option>
+        <option value="busy">Busy scene</option>
+        <option value="checker">See-through</option>
+      </select>
+    </div>
+    <div class="chatstage" id="stage" aria-hidden="true"><div id="widget"></div></div>
+    <div class="preview__tests" id="quick-tests" role="group" aria-label="Try your commands"></div>
+    <div class="preview__sim" aria-label="Interactive chat simulator">
+      <div class="sim-row">
+        <label class="visually-hidden" for="sim-input">Test command input</label>
+        <input type="text" id="sim-input" placeholder="Type .mouse, !specs, or .sens to test..." autocomplete="off" spellcheck="false">
+        <button class="btn btn--sm" type="button" id="sim-send">Send</button>
+      </div>
+      <p class="sim-feedback" id="sim-feedback" aria-live="polite">Try typing any command above to see it pop up live on the stream stage!</p>
+    </div>
+  </section>
+
+  <div class="panel">
+    <noscript><p class="note">Frills needs JavaScript to draw your overlay. Turn it on for this page and reload.</p></noscript>
+    {{{intro}}}
+    <p class="watch"><a href="/guides/obs/"><span aria-hidden="true">▶</span> New here? Watch the 20-second setup</a></p>
+
+    <section class="step-card" aria-labelledby="s1">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">1</span>
+        <h2 class="step-card__title" id="s1">Mascot & look</h2>
+      </div>
+      <label class="ctl__label" for="pack-chips">Choose a mascot pack</label>
+      <div class="chips" id="pack-chips" role="group" aria-label="Mascot packs"></div>
+
+      <div class="actions-prefix-group">
+        <label class="ctl__label" for="prefix-chips">Command prefix</label>
+        <div class="chips" id="prefix-chips" role="group" aria-label="Command prefixes"></div>
+      </div>
+
+      <div class="stack actions-opt-group" id="opt-controls"></div>
+    </section>
+
+    <section class="step-card" aria-labelledby="s2">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">2</span>
+        <h2 class="step-card__title" id="s2">Your commands & gear</h2>
+      </div>
+      <p class="ctl__hint">Set the commands viewers can type in chat. Each command displays a badge, title, and your specs/answer.</p>
+      <div id="commands-list"></div>
+      <div class="action-cmds-actions">
+        <button class="btn btn--sm" type="button" id="add-cmd-btn">+ Add command</button>
+        <button class="btn btn--soft btn--sm" type="button" id="reset-cmds-btn">Reset to defaults</button>
+      </div>
+    </section>
+
+    <section class="step-card" aria-labelledby="s3">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">3</span>
+        <h2 class="step-card__title" id="s3">Connect your stream</h2>
+      </div>
+      <p class="ctl__hint">Choose TikTok, Twitch, or both. The overlay listens to chat and triggers on-screen cards automatically.</p>
+      <div id="source"></div>
+    </section>
+
+    <section class="step-card" aria-labelledby="s4">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">4</span>
+        <h2 class="step-card__title" id="s4">Add to your stream</h2>
+      </div>
+      <div class="linkfield">
+        <label class="ctl__label" for="link">Your overlay link</label>
+        <input type="text" id="link" readonly placeholder="Appears once you type a name in step 3" spellcheck="false" autocomplete="off">
+        <div class="linkfield__actions">
+          <button class="btn" type="button" id="copy-link" disabled>Copy link</button>
+        </div>
+      </div>
+      <p class="ctl__hint" id="link-hint">Paste this link into a Browser Source in OBS, Streamlabs, or TikTok LIVE Studio.</p>
+
+      <div class="setup-tabs actions-setup-tabs">
+        <h3 class="subtitle">Quick setup guide</h3>
+        <ol class="setup-steps">
+          <li><strong>OBS Studio:</strong> Click <strong>+</strong> under Sources &rarr; choose <strong>Browser</strong> &rarr; name it "Frills Commands" &rarr; paste your link &rarr; set width <strong>1920</strong> and height <strong>1080</strong> (or 1080 &times; 1920 for vertical).</li>
+          <li><strong>Streamlabs:</strong> Click <strong>+</strong> &rarr; choose <strong>Browser Source</strong> &rarr; paste your link &rarr; done.</li>
+          <li><strong>TikTok LIVE Studio:</strong> Click <strong>Add Source</strong> &rarr; choose <strong>Link / Webcast</strong> &rarr; paste your link &rarr; done.</li>
+        </ol>
+      </div>
+    </section>
+
+    {{{about}}}
+  </div>
+</main>
