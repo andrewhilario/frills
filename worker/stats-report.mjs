@@ -1,9 +1,9 @@
-// The numbers for the private stats page (/admin/stats/): Frills' own counts (frills_events) and valwidgets.live's (tally_events), read from Cloudflare's Analytics
-// Engine over its SQL API, and boiled down to what the owner decides with: visits and where they came from, link copies, overlays opened, how many DIFFERENT overlays opened
-// this week and how many came back, and a scorecard for the Frills Plus question. It reads with two Worker secrets that only the owner sets (CF_ACCOUNT_ID, and CF_API_TOKEN,
-// a token with the one permission Account > Account Analytics > Read); without them the page says how to set them. Pure code over fetch, so it is tested with a made-up Cloudflare.
+// The numbers for the private stats page (/admin/stats/): Frills' own counts (frills_events), valwidgets.live's (tally_events),
+// live health of the TikTok relay fleet (relay.valwidgets.live + any extra RELAY_URLS), and Google Search Console (when GSC_SERVICE_ACCOUNT
+// or GSC OAuth secrets are set). Pure code over fetch, so it is tested with a made-up Cloudflare, relay, and Google API.
 
 export const DATASETS = { frills: "frills_events", valwidgets: "tally_events" };
+export const DEFAULT_RELAYS = ["https://relay.valwidgets.live"];
 
 const DAY = 86_400_000;
 const DAYS = 28;
@@ -97,17 +97,220 @@ async function ask(env, query, fetchImpl) {
   return (await res.json()).data ?? [];
 }
 
+/** Parses `env.RELAY_URLS` (comma-separated) or falls back to DEFAULT_RELAYS. */
+export function parseRelayUrls(env) {
+  const raw = String(env?.RELAY_URLS ?? "").trim();
+  const list = raw ? raw.split(",").map((s) => s.trim().replace(/\/+$/, "")).filter((s) => /^https?:\/\//i.test(s)) : [];
+  return list.length ? list : DEFAULT_RELAYS;
+}
+
+/** Probes all configured relay servers (`/health` JSON endpoint, falling back to `/tiktok/ping`) and returns their live status. */
+export async function checkRelays(env, { fetchImpl = globalThis.fetch?.bind(globalThis) } = {}) {
+  const urls = parseRelayUrls(env);
+  const ownerKey = String(env?.RELAY_OWNER_KEY ?? "").trim();
+  return Promise.all(
+    urls.map(async (base, index) => {
+      const host = (() => { try { return new URL(base).host; } catch { return base; } })();
+      const label = urls.length > 1 ? `Relay ${index + 1} (${host})` : `Primary Relay (${host})`;
+      const t0 = Date.now();
+      try {
+        const headers = { accept: "application/json", ...(ownerKey ? { authorization: `Bearer ${ownerKey}` } : {}) };
+        let res = await fetchImpl(`${base}/health`, { method: "GET", headers });
+        if (res.status === 401 && ownerKey) {
+          res = await fetchImpl(`${base}/health`, { method: "GET", headers: { accept: "application/json" } });
+        }
+        if (!res.ok) {
+          res = await fetchImpl(`${base}/tiktok/ping`, { method: "GET", headers: { accept: "application/json" } });
+        }
+        const latencyMs = Math.max(1, Date.now() - t0);
+        if (!res.ok) return { url: base, host, label, ok: false, level: "down", status: res.status, latencyMs };
+        const body = await res.json().catch(() => null);
+        if (!body || body.ok !== true) return { url: base, host, label, ok: false, level: "down", status: 502, latencyMs };
+        const slots = body.slots ?? { used: 0, max: 30, waiting: 0 };
+        const free = typeof body.free === "number" ? body.free : Math.max(0, (slots.max || 30) - (slots.used || 0));
+        const level = body.level ?? (free === 0 ? "full" : free <= 10 ? "low" : "ok");
+        return {
+          url: base,
+          host,
+          label,
+          ok: true,
+          latencyMs,
+          version: body.version ?? "—",
+          level,
+          free,
+          slots: { used: Number(slots.used) || 0, max: Number(slots.max) || 30, waiting: Number(slots.waiting) || 0 },
+          uptimeS: typeof body.uptimeS === "number" ? body.uptimeS : null,
+          signing: body.signing ?? null,
+          capacity: body.capacity ?? null,
+          streams: body.streams ?? null,
+          device: body.device ?? null,
+          roster: Array.isArray(body.roster) ? body.roster : null,
+        };
+      } catch {
+        return { url: base, host, label, ok: false, level: "down", status: 0, latencyMs: Math.max(1, Date.now() - t0) };
+      }
+    }),
+  );
+}
+
+const b64url = (bytes) => {
+  const bin = typeof bytes === "string" ? bytes : String.fromCharCode(...new Uint8Array(bytes));
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+};
+
+/** Signs a Google Service Account JWT using Web Crypto RSASSA-PKCS1-v1_5 and exchanges it for an access token. */
+async function serviceAccountToken(sa, fetchImpl, nowMs) {
+  const pem = String(sa.private_key ?? "").replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\s+/g, "");
+  const der = Uint8Array.from(atob(pem), (c) => c.charCodeAt(0));
+  const key = await crypto.subtle.importKey("pkcs8", der.buffer, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["sign"]);
+  const iat = Math.floor(nowMs / 1000);
+  const header = b64url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
+  const claim = b64url(JSON.stringify({
+    iss: sa.client_email,
+    scope: "https://www.googleapis.com/auth/webmasters.readonly",
+    aud: "https://oauth2.googleapis.com/token",
+    iat,
+    exp: iat + 3600,
+  }));
+  const input = new TextEncoder().encode(`${header}.${claim}`);
+  const sig = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, input);
+  const assertion = `${header}.${claim}.${b64url(sig)}`;
+  const res = await fetchImpl("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion }).toString(),
+  });
+  if (!res.ok) throw Object.assign(new Error("gsc_auth"), { status: res.status });
+  const data = await res.json();
+  return data.access_token;
+}
+
+/** Exchanges a Google OAuth2 refresh token for an access token. */
+async function refreshTokenAuth(env, fetchImpl) {
+  const res = await fetchImpl("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: env.GSC_CLIENT_ID,
+      client_secret: env.GSC_CLIENT_SECRET,
+      refresh_token: env.GSC_REFRESH_TOKEN,
+      grant_type: "refresh_token",
+    }).toString(),
+  });
+  if (!res.ok) throw Object.assign(new Error("gsc_auth"), { status: res.status });
+  const data = await res.json();
+  return data.access_token;
+}
+
+/** Fetches Google Search Console metrics (7d & 28d totals, top queries, top pages, top countries) when credentials are set. */
+export async function fetchGsc(env, { now = Date.now(), fetchImpl = globalThis.fetch?.bind(globalThis) } = {}) {
+  const rawSa = String(env?.GSC_SERVICE_ACCOUNT ?? "").trim();
+  const hasRefresh = Boolean(env?.GSC_CLIENT_ID && env?.GSC_CLIENT_SECRET && env?.GSC_REFRESH_TOKEN);
+  if (!rawSa && !hasRefresh) return { configured: false };
+
+  let token;
+  try {
+    if (rawSa) {
+      const jsonText = rawSa.startsWith("{") ? rawSa : atob(rawSa);
+      const sa = JSON.parse(jsonText);
+      token = await serviceAccountToken(sa, fetchImpl, now);
+    } else {
+      token = await refreshTokenAuth(env, fetchImpl);
+    }
+  } catch (err) {
+    return { configured: true, error: "auth_failed", status: err?.status ?? 0 };
+  }
+
+  const today = midnight(now);
+  // GSC data has a ~2 day lag, so we query up to today with 28d and 7d windows
+  const endDate = isoDay(today);
+  const start28d = isoDay(today - 27 * DAY);
+  const start7d = isoDay(today - 6 * DAY);
+
+  const candidates = env?.GSC_SITE_URL ? [env.GSC_SITE_URL] : ["https://frills.valwidgets.live/", "sc-domain:valwidgets.live"];
+  let siteUrl = candidates[0];
+
+  const queryGsc = async (site, body) => {
+    const res = await fetchImpl(`https://www.googleapis.com/webmasters/v3/sites/${encodeURIComponent(site)}/searchAnalytics/query`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    return res;
+  };
+
+  let testRes = await queryGsc(siteUrl, { startDate: start28d, endDate, rowLimit: 1 });
+  if (!testRes.ok && candidates.length > 1) {
+    const fallbackRes = await queryGsc(candidates[1], { startDate: start28d, endDate, rowLimit: 1 });
+    if (fallbackRes.ok) {
+      siteUrl = candidates[1];
+      testRes = fallbackRes;
+    }
+  }
+  if (!testRes.ok) return { configured: true, siteUrl, error: "query_failed", status: testRes.status };
+
+  const askDim = async (startDate, dimensions = [], rowLimit = 10) => {
+    const res = await queryGsc(siteUrl, { startDate, endDate, ...(dimensions.length ? { dimensions } : {}), rowLimit });
+    if (!res.ok) return [];
+    const data = await res.json().catch(() => ({}));
+    return data.rows ?? [];
+  };
+
+  const [totals28dRows, totals7dRows, queries, pages, countries] = await Promise.all([
+    askDim(start28d, [], 1),
+    askDim(start7d, [], 1),
+    askDim(start28d, ["query"], 10),
+    askDim(start28d, ["page"], 10),
+    askDim(start28d, ["country"], 10),
+  ]);
+
+  const packTotal = (rows) => {
+    const r = rows[0] ?? { clicks: 0, impressions: 0, ctr: 0, position: 0 };
+    return { clicks: Number(r.clicks) || 0, impressions: Number(r.impressions) || 0, ctr: Number(r.ctr) || 0, position: Number(r.position) || 0 };
+  };
+  const packRows = (rows) => rows.map((r) => ({
+    key: String(r.keys?.[0] ?? ""),
+    clicks: Number(r.clicks) || 0,
+    impressions: Number(r.impressions) || 0,
+    ctr: Number(r.ctr) || 0,
+    position: Number(r.position) || 0,
+  }));
+
+  return {
+    configured: true,
+    siteUrl,
+    week: packTotal(totals7dRows),
+    month: packTotal(totals28dRows),
+    queries: packRows(queries),
+    pages: packRows(pages),
+    countries: packRows(countries),
+  };
+}
+
 /** The whole report. `{ ok: false, error: "not_set" }` until the owner has set the two secrets. A site whose counts cannot be read says why, and the other still shows. */
 export async function report(env, { now = Date.now(), fetchImpl = globalThis.fetch?.bind(globalThis) } = {}) {
   if (!env?.CF_ACCOUNT_ID || !env?.CF_API_TOKEN) return { ok: false, error: "not_set" };
-  const [events, ids, tally] = await Promise.allSettled([ask(env, eventsQuery(DATASETS.frills), fetchImpl), ask(env, idsQuery(DATASETS.frills), fetchImpl), ask(env, eventsQuery(DATASETS.valwidgets), fetchImpl)]);
+  const [events, ids, tally, relays, gsc] = await Promise.allSettled([
+    ask(env, eventsQuery(DATASETS.frills), fetchImpl),
+    ask(env, idsQuery(DATASETS.frills), fetchImpl),
+    ask(env, eventsQuery(DATASETS.valwidgets), fetchImpl),
+    checkRelays(env, { fetchImpl }),
+    fetchGsc(env, { now, fetchImpl }),
+  ]);
   const failed = (r) => ({ error: "unreadable", status: r.reason?.status ?? 0 });
   let frills;
   if (events.status === "fulfilled") {
     const summary = summarize(events.value, now);
-    const active = ids.status === "fulfilled" ? activeOverlays(ids.value, now) : { week: 0, before: 0, month: 0, returning: 0, returningRate: null };
+    const active = ids.status === "fulfilled" ? activeOverlays(ids.value, now) : { today: 0, week: 0, before: 0, month: 0, returning: 0, returningRate: null };
     frills = { ...summary, active, scorecard: scorecard(summary, active), idsReadable: ids.status === "fulfilled" };
   } else frills = failed(events);
   const valwidgets = tally.status === "fulfilled" ? summarize(tally.value, now) : failed(tally);
-  return { ok: true, now, frills, valwidgets };
+  return {
+    ok: true,
+    now,
+    frills,
+    valwidgets,
+    relays: relays.status === "fulfilled" ? relays.value : [],
+    gsc: gsc.status === "fulfilled" ? gsc.value : { configured: false },
+  };
 }

@@ -5,7 +5,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { EVENTS, encodeEvent, labelsValid, loadOf, overlayOf, pageOf, parseEvent, platformOf, refOf, toDataPoint } from "../src/js/stats-events.js";
 import { countOverlay, handleEvent, scramble } from "../worker/stats.mjs";
-import { DATASETS, TARGETS, activeOverlays, report, scorecard, summarize } from "../worker/stats-report.mjs";
+import { DATASETS, TARGETS, activeOverlays, checkRelays, fetchGsc, parseRelayUrls, report, scorecard, summarize } from "../worker/stats-report.mjs";
 import { handleAdmin } from "../worker/admin.mjs";
 import { localDatabase } from "../scripts/lib/d1-sqlite.mjs";
 
@@ -148,11 +148,14 @@ test("different overlays this week, how many came back from the week before, and
   assert.deepEqual(TARGETS, { overlays: 50, returningRate: 0.4, copies: 100 });
 });
 
-test("the report asks Cloudflare for both sites with the owner's token, says how to set it up when it is missing, and one site failing does not hide the other", async () => {
+test("the report asks Cloudflare for both sites with the owner's token, checks relay health, and one site failing does not hide the other", async () => {
   assert.deepEqual(await report({}, { now: T }), { ok: false, error: "not_set" });
   const asked = [];
-  const cloudflare = async (url, init) => {
-    asked.push({ url, token: init.headers.authorization, query: init.body });
+  const cloudflare = async (url, init = {}) => {
+    if (url.startsWith("https://relay.")) {
+      return Response.json({ ok: true, name: "frills-relay", version: "0.5.9", free: 24, level: "ok", slots: { used: 6, max: 30, waiting: 0 }, uptimeS: 3600 });
+    }
+    asked.push({ url, token: init.headers?.authorization, query: init.body });
     if (init.body.includes(DATASETS.valwidgets)) return new Response("nope", { status: 400 });
     if (init.body.includes("blob4 AS id")) return Response.json({ data: [{ id: "a", d: day(0) }] });
     return Response.json({ data: [row("visit", "home", "tiktok", 0, 3), row("link_copied", "chat", "", 0, 1)] });
@@ -162,9 +165,47 @@ test("the report asks Cloudflare for both sites with the owner's token, says how
   assert.equal(out.frills.visits.week, 3);
   assert.equal(out.frills.active.week, 1);
   assert.equal(out.frills.scorecard.length, 3);
+  assert.equal(out.relays.length, 1);
+  assert.equal(out.relays[0].ok, true);
+  assert.equal(out.relays[0].free, 24);
+  assert.equal(out.gsc.configured, false);
   assert.deepEqual(out.valwidgets, { error: "unreadable", status: 400 }, "Tally's counts could not be read: said so, and Frills' still show");
   assert.ok(asked.every((q) => q.token === "Bearer tok" && q.url === "https://api.cloudflare.com/client/v4/accounts/acct/analytics_engine/sql"));
   assert.ok(asked.some((q) => q.query.includes(`FROM ${DATASETS.frills}`)) && asked.some((q) => q.query.includes(`FROM ${DATASETS.valwidgets}`)));
+});
+
+test("multi-relay status check and Google Search Console integration", async () => {
+  assert.deepEqual(parseRelayUrls({ RELAY_URLS: "https://relay.valwidgets.live/, https://relay2.valwidgets.live " }), ["https://relay.valwidgets.live", "https://relay2.valwidgets.live"]);
+  const relays = await checkRelays(
+    { RELAY_URLS: "https://relay1.example,https://relay2.example" },
+    {
+      fetchImpl: async (url) => {
+        if (url.startsWith("https://relay1.example")) return Response.json({ ok: true, version: "0.5.9", slots: { used: 10, max: 30, waiting: 2 } });
+        return new Response("down", { status: 502 });
+      },
+    },
+  );
+  assert.equal(relays.length, 2);
+  assert.deepEqual([relays[0].ok, relays[0].free, relays[0].slots.waiting], [true, 20, 2]);
+  assert.deepEqual([relays[1].ok, relays[1].level], [false, "down"]);
+
+  const gsc = await fetchGsc(
+    { GSC_CLIENT_ID: "id", GSC_CLIENT_SECRET: "sec", GSC_REFRESH_TOKEN: "ref" },
+    {
+      now: T,
+      fetchImpl: async (url, init) => {
+        if (url === "https://oauth2.googleapis.com/token") return Response.json({ access_token: "gsc-tok" });
+        const body = JSON.parse(init.body);
+        if (body.dimensions?.[0] === "query") return Response.json({ rows: [{ keys: ["free tiktok overlay"], clicks: 12, impressions: 150, ctr: 0.08, position: 4.2 }] });
+        if (body.dimensions?.[0] === "country") return Response.json({ rows: [{ keys: ["usa"], clicks: 8, impressions: 90, ctr: 0.088, position: 3.9 }] });
+        return Response.json({ rows: [{ clicks: 25, impressions: 400, ctr: 0.0625, position: 5.1 }] });
+      },
+    },
+  );
+  assert.equal(gsc.configured, true);
+  assert.equal(gsc.month.clicks, 25);
+  assert.equal(gsc.queries[0].key, "free tiktok overlay");
+  assert.equal(gsc.countries[0].key, "usa");
 });
 
 test("the stats come only through the admin password: none without it, none with a wrong one, and the report with the right one", async () => {

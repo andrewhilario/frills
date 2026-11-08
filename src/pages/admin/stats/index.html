@@ -1,7 +1,7 @@
 <!--
 {
   "title": "Stats | Frills admin",
-  "description": "The private stats page for Frills and valwidgets.live: visits, links copied, overlays opened and the Frills Plus check.",
+  "description": "The private stats page for Frills and valwidgets.live: visits, links copied, overlays opened, relay status, Google Search Console, and the Frills Plus check.",
   "path": "/admin/stats/",
   "css": "admin",
   "js": "adminStats",
@@ -14,9 +14,11 @@
 -->
 <main class="admin stats" id="main">
   <header class="admin__bar">
-    <h1 class="admin__title">Stats</h1>
+    <h1 class="admin__title">Stats &amp; System Status</h1>
     <div class="admin__bar-actions" id="bar-actions" hidden>
       <a class="btn btn--soft btn--sm" href="/admin/">Feedback and files</a>
+      <button class="btn btn--soft btn--sm" type="button" id="export-csv">Export CSV</button>
+      <button class="btn btn--soft btn--sm" type="button" id="export-json">Export JSON</button>
       <button class="btn btn--soft btn--sm" type="button" id="refresh">Refresh</button>
       <button class="btn btn--outline btn--sm" type="button" id="logout">Log out</button>
     </div>
@@ -38,12 +40,14 @@
   <div id="dash" hidden>
     <p class="admin__note admin__note--warn" id="setup" hidden></p>
     <p class="admin__note" id="status" role="status"></p>
+    <section class="stats__site" id="relays" aria-labelledby="relays-title" hidden></section>
     <section class="stats__plus" id="plus" aria-labelledby="plus-title" hidden>
       <h2 class="admin__h" id="plus-title">Is Frills Plus worth building yet?</h2>
       <p class="admin__note">Three numbers, each against a starting point of mine (not a rule: they are in <code>worker/stats-report.mjs</code>). Watch them for a few weeks before deciding.</p>
       <ul class="stats__score" id="score"></ul>
     </section>
     <section class="stats__site" id="frills" aria-labelledby="frills-title"></section>
+    <section class="stats__site" id="gsc" aria-labelledby="gsc-title" hidden></section>
     <section class="stats__site" id="valwidgets" aria-labelledby="valwidgets-title"></section>
     <p class="admin__note">Counts are anonymous: no cookies, no addresses, no names. Cloudflare keeps them for three months. Overlays opened on a real account are counted as different ones by a scrambled, one-way code of the account (it cannot be turned back into a name). Practice overlays and the editors' previews are counted apart.</p>
   </div>

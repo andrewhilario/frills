@@ -1,5 +1,5 @@
-// The private stats page (/admin/stats/): the numbers for Frills and valwidgets.live, read by the Worker from Cloudflare (worker/stats-report.mjs) and drawn here.
-// It uses the admin password (kept in this tab's session storage, the same place the admin page keeps it), and everything is put in with textContent, never as HTML.
+// The private stats page (/admin/stats/): the numbers for Frills and valwidgets.live, live TikTok relay fleet status,
+// Google Search Console metrics, and one-click CSV/JSON export. Everything is put in with textContent, never as HTML.
 
 import { el } from "./feed.js";
 
@@ -7,6 +7,7 @@ const $ = (id) => document.getElementById(id);
 const KEY = "frills:admin:key";
 
 let key = "";
+let latestReport = null;
 try { key = sessionStorage.getItem(KEY) ?? ""; } catch { /* storage can be blocked; the password is then asked for each visit */ }
 
 class Wrong extends Error {}
@@ -29,6 +30,16 @@ async function load() {
 const say = (node, text, bad = false) => { node.textContent = text; node.dataset.state = bad ? "error" : ""; };
 const number = (n) => Math.round(n || 0).toLocaleString("en-US");
 const pct = (rate) => (rate === null || rate === undefined ? "—" : Math.round(rate * 100) + "%");
+const pct1 = (rate) => (rate === null || rate === undefined ? "—" : (rate * 100).toFixed(1) + "%");
+const pos1 = (pos) => (!pos ? "—" : Number(pos).toFixed(1));
+const uptimeText = (s) => {
+  if (typeof s !== "number" || s < 0) return "—";
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  if (d > 0) return `${d}d ${h}h`;
+  return h > 0 ? `${h}h ${m}m` : `${m}m`;
+};
 
 /** Returns { text, tone } for a week-over-week comparison badge. */
 function deltaBadge(week, before) {
@@ -89,6 +100,198 @@ function kpiCard(title, big, badge, metaItems) {
     ...metaItems.map(([k, v]) => el("span", { className: "stats__meta-item" }, el("span", { textContent: k + ": " }), el("b", { textContent: v }))),
   );
   return el("div", { className: "stats__card" }, top, el("b", { className: "stats__big", textContent: big }), meta);
+}
+
+/** Draws the live Relay Fleet Status section (supports 1 or multiple relays). */
+function drawRelays(host, relays) {
+  host.replaceChildren();
+  if (!Array.isArray(relays) || !relays.length) {
+    host.hidden = true;
+    return;
+  }
+  host.hidden = false;
+  const onlineCount = relays.filter((r) => r.ok).length;
+  const totalFree = relays.reduce((s, r) => s + (r.free || 0), 0);
+  const totalMax = relays.reduce((s, r) => s + (r.slots?.max || 0), 0);
+  const totalUsed = relays.reduce((s, r) => s + (r.slots?.used || 0), 0);
+  const totalWait = relays.reduce((s, r) => s + (r.slots?.waiting || 0), 0);
+
+  const fleetBadge = el("span", {
+    className: "stats__delta",
+    textContent: onlineCount === relays.length ? `● ${onlineCount}/${relays.length} ONLINE · ${totalFree} FREE SPOTS` : `${onlineCount}/${relays.length} ONLINE · DEGRADED`,
+  });
+  fleetBadge.dataset.tone = onlineCount === relays.length && totalFree > 0 ? "up" : "down";
+
+  const head = el(
+    "div",
+    { className: "stats__panel-head" },
+    el(
+      "div",
+      { className: "stats__panel-title-group" },
+      el("h2", { className: "admin__h", id: "relays-title", textContent: "TikTok Relay Fleet Status" }),
+      el("span", { className: "stats__panel-sub", textContent: `Total Fleet Capacity: ${number(totalUsed)} / ${number(totalMax)} rooms in use · ${number(totalWait)} queued · Multi-relay ready (RELAY_URLS)` }),
+    ),
+    fleetBadge,
+  );
+
+  const grid = el("div", { className: "stats__relay-grid" });
+  for (const r of relays) {
+    const statusPill = el("span", { className: "stats__delta" });
+    if (!r.ok) {
+      statusPill.textContent = `OFFLINE (${r.status || "unreachable"})`;
+      statusPill.dataset.tone = "down";
+    } else if (r.level === "full") {
+      statusPill.textContent = `FULL · ${r.latencyMs}ms`;
+      statusPill.dataset.tone = "down";
+    } else if (r.level === "low") {
+      statusPill.textContent = `LOW SPOTS · ${r.latencyMs}ms`;
+      statusPill.dataset.tone = "flat";
+    } else {
+      statusPill.textContent = `ONLINE · ${r.latencyMs}ms`;
+      statusPill.dataset.tone = "up";
+    }
+
+    const cardHead = el(
+      "div",
+      { className: "stats__card-top" },
+      el("div", { className: "stats__relay-name" }, el("strong", { textContent: r.label }), el("a", { className: "stats__relay-link", href: r.url, target: "_blank", rel: "noopener", textContent: "Open relay status ↗" })),
+      statusPill,
+    );
+
+    if (!r.ok) {
+      grid.append(
+        el(
+          "div",
+          { className: "stats__panel stats__relay-card" },
+          cardHead,
+          el("p", { className: "admin__note", textContent: `Could not reach ${r.url}/health (latency ${r.latencyMs}ms). Check if the relay server or Cloudflare tunnel is running.` }),
+        ),
+      );
+      continue;
+    }
+
+    const usedPct = r.slots.max > 0 ? Math.min(100, Math.round((r.slots.used / r.slots.max) * 100)) : 0;
+    const fill = el("i", {});
+    fill.style.width = Math.max(3, usedPct) + "%";
+    const track = el("div", { className: "stats__funnel-track stats__relay-bar" }, fill);
+    track.dataset.level = r.level || "ok";
+
+    const signText = r.signing
+      ? `${r.signing.busy ? "Busy (rate-limited)" : "Healthy"}${typeof r.signing.connectsHour === "number" ? ` · ${r.signing.connectsHour}/hr (${r.signing.connectsDay}/24h)` : ""}`
+      : "—";
+    const streamsText = r.streams ? `${number(r.streams.open)} open (${number(r.streams.turnedAway)} turned away)` : "—";
+    const capText = r.capacity ? `~${number(r.capacity.estimate)} max accounts (${r.capacity.perRoomMB} MB/room)` : "—";
+
+    const miniGrid = el(
+      "div",
+      { className: "stats__relay-metrics" },
+      el("div", { className: "stats__relay-stat" }, el("span", { textContent: "Free Spots" }), el("b", { textContent: `${number(r.free)} of ${number(r.slots.max)}` })),
+      el("div", { className: "stats__relay-stat" }, el("span", { textContent: "In Use / Queue" }), el("b", { textContent: `${number(r.slots.used)} active · ${number(r.slots.waiting)} waiting` })),
+      el("div", { className: "stats__relay-stat" }, el("span", { textContent: "Open Browser Streams" }), el("b", { textContent: streamsText })),
+      el("div", { className: "stats__relay-stat" }, el("span", { textContent: "Signing Service" }), el("b", { textContent: signText })),
+      el("div", { className: "stats__relay-stat" }, el("span", { textContent: "Uptime & Version" }), el("b", { textContent: `${uptimeText(r.uptimeS)} · v${r.version}` })),
+      el("div", { className: "stats__relay-stat" }, el("span", { textContent: "Est. Device Capacity" }), el("b", { textContent: capText })),
+    );
+
+    grid.append(el("div", { className: "stats__panel stats__relay-card" }, cardHead, track, miniGrid));
+  }
+
+  host.append(head, grid);
+}
+
+/** Draws the Google Search Console section (or setup instructions when not yet connected). */
+function drawGsc(host, gsc) {
+  host.replaceChildren();
+  host.hidden = false;
+  host.append(el("h2", { className: "admin__h", id: "gsc-title", textContent: "Google Search Console (Organic SEO)" }));
+
+  if (!gsc || !gsc.configured) {
+    host.append(
+      el(
+        "div",
+        { className: "stats__panel" },
+        el("h3", { className: "stats__panel-title", textContent: "Connect Google Search Console (Optional 2-Minute Setup)" }),
+        el("p", { className: "admin__note", textContent: "To pull live Google Search clicks, impressions, rankings, queries, and countries into this dashboard:" }),
+        el(
+          "ol",
+          { className: "stats__setup-list" },
+          el("li", { textContent: "In Google Cloud Console, enable the 'Google Search Console API' and create a Service Account with a JSON key." }),
+          el("li", { textContent: "In Google Search Console (Settings -> Users and permissions), add the Service Account's client_email as a Restricted (Read-Only) user." }),
+          el("li", { textContent: "In Cloudflare (Workers & Pages -> frills -> Settings -> Variables and Secrets), add secret GSC_SERVICE_ACCOUNT with the JSON key contents, then press Refresh." }),
+        ),
+      ),
+    );
+    return;
+  }
+
+  if (gsc.error) {
+    host.append(
+      el("p", {
+        className: "admin__note admin__note--warn",
+        textContent: `Google Search Console returned an error (${gsc.error}, status ${gsc.status || "none"}). Check that the Service Account email is added to Search Console under Settings -> Users and permissions.`,
+      }),
+    );
+    return;
+  }
+
+  const w = gsc.week ?? { clicks: 0, impressions: 0, ctr: 0, position: 0 };
+  const m = gsc.month ?? { clicks: 0, impressions: 0, ctr: 0, position: 0 };
+
+  const cards = el(
+    "div",
+    { className: "admin__cards" },
+    kpiCard("Search Clicks (7d)", number(w.clicks), { text: `28d: ${number(m.clicks)}`, tone: w.clicks > 0 ? "up" : "flat" }, [
+      ["28d Clicks", number(m.clicks)],
+      ["Property", gsc.siteUrl || "frills.valwidgets.live"],
+    ]),
+    kpiCard("Search Impressions (7d)", number(w.impressions), { text: `28d: ${number(m.impressions)}`, tone: w.impressions > 0 ? "up" : "flat" }, [
+      ["28d Impressions", number(m.impressions)],
+      ["7d Clicks", number(w.clicks)],
+    ]),
+    kpiCard("Search CTR (7d)", pct1(w.ctr), { text: `28d Avg: ${pct1(m.ctr)}`, tone: w.ctr >= 0.03 ? "up" : "flat" }, [
+      ["28d CTR", pct1(m.ctr)],
+      ["Target", "3.0%+"],
+    ]),
+    kpiCard("Avg Search Position (7d)", pos1(w.position), { text: `28d Avg: ${pos1(m.position)}`, tone: w.position > 0 && w.position <= 15 ? "up" : "flat" }, [
+      ["28d Position", pos1(m.position)],
+      ["Page 1 Target", "1.0 – 10.0"],
+    ]),
+  );
+
+  const gscTable = (title, colLabel, rows) => {
+    const thead = el(
+      "thead",
+      {},
+      el("tr", {}, el("th", { textContent: colLabel }), el("th", { className: "stats__n", textContent: "Clicks" }), el("th", { className: "stats__n", textContent: "Impr." }), el("th", { className: "stats__n", textContent: "CTR" }), el("th", { className: "stats__n", textContent: "Pos" })),
+    );
+    const body = el("tbody");
+    for (const r of (rows ?? []).slice(0, 10)) {
+      const label = r.key.replace(/^https?:\/\/[^/]+/, "") || "/";
+      body.append(
+        el(
+          "tr",
+          {},
+          el("td", { className: "stats__cell-name" }, el("span", { className: "stats__cell-text", textContent: label })),
+          el("td", { className: "stats__n stats__n--bold", textContent: number(r.clicks) }),
+          el("td", { className: "stats__n", textContent: number(r.impressions) }),
+          el("td", { className: "stats__n stats__n--pct", textContent: pct1(r.ctr) }),
+          el("td", { className: "stats__n stats__n--pct", textContent: pos1(r.position) }),
+        ),
+      );
+    }
+    if (!rows?.length) body.append(el("tr", {}, el("td", { colSpan: 5, className: "stats__empty", textContent: "No search data in last 28 days" })));
+    return el("div", { className: "stats__table" }, el("h3", { textContent: title }), el("table", {}, thead, body));
+  };
+
+  const tables = el(
+    "div",
+    { className: "stats__tables" },
+    gscTable("Top Google Search Queries (28d)", "Query", gsc.queries),
+    gscTable("Top Google Search Pages (28d)", "Page", gsc.pages),
+    gscTable("Top Search Countries (28d)", "Country (ISO)", gsc.countries),
+  );
+
+  host.append(cards, tables);
 }
 
 /** Visual 3-stage conversion funnel (7d & 28d): Visits -> Links Copied -> Live Overlay Loads. */
@@ -326,8 +529,11 @@ const SCORE_PROGRESS = {
 };
 
 function draw(data) {
+  latestReport = data;
   $("setup").hidden = data.error !== "not_set";
   $("plus").hidden = true;
+  $("relays").hidden = true;
+  $("gsc").hidden = true;
   $("frills").replaceChildren();
   $("valwidgets").replaceChildren();
   if (data.error === "not_set") {
@@ -336,6 +542,7 @@ function draw(data) {
     return;
   }
   say($("status"), "Last updated: " + new Date(data.now).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) + " · Press Refresh for live numbers.");
+  drawRelays($("relays"), data.relays);
   if (data.frills.scorecard) {
     $("plus").hidden = false;
     $("score").replaceChildren(
@@ -362,11 +569,114 @@ function draw(data) {
     );
   }
   site($("frills"), "frills", "Frills (frills.valwidgets.live)", data.frills, { frills: true });
+  drawGsc($("gsc"), data.gsc);
   site($("valwidgets"), "valwidgets", "Valorant Widgets (valwidgets.live)", data.valwidgets);
 }
 
+/** Triggers a browser download of `content` with `filename` and `mime`. */
+function downloadFile(filename, mime, content) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = el("a", { href: url, download: filename });
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+const csvCell = (v) => {
+  const s = String(v ?? "");
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
+const csvRow = (cols) => cols.map(csvCell).join(",");
+
+function exportCsv() {
+  if (!latestReport?.ok) return;
+  const stamp = new Date(latestReport.now || Date.now()).toISOString().slice(0, 10);
+  const f = latestReport.frills ?? {};
+  const v = latestReport.valwidgets ?? {};
+  const lines = [];
+
+  lines.push(csvRow(["Frills Analytics & System Status Export", new Date(latestReport.now || Date.now()).toISOString()]));
+  lines.push("");
+
+  // 1. Summary KPIs
+  lines.push(csvRow(["Section", "Metric", "Today", "Yesterday", "Last 7 Days", "Prev 7 Days", "Last 28 Days"]));
+  if (!f.error) {
+    lines.push(csvRow(["Frills", "Site Visits", f.visits?.today, f.visits?.yesterday, f.visits?.week, f.visits?.before, f.visits?.total]));
+    lines.push(csvRow(["Frills", "Links Copied", f.copies?.today, f.copies?.yesterday, f.copies?.week, f.copies?.before, f.copies?.total]));
+    lines.push(csvRow(["Frills", "Live Stream Loads", f.loads?.live?.today, f.loads?.live?.yesterday, f.loads?.live?.week, f.loads?.live?.before, f.loads?.live?.total]));
+    lines.push(csvRow(["Frills", "Unique Active Streamers", f.active?.today, "", f.active?.week, f.active?.before, f.active?.month]));
+    lines.push(csvRow(["Frills", "Streamer Retention (WoW)", "", "", pct(f.active?.returningRate), `${f.active?.returning || 0} of ${f.active?.before || 0}`, ""]));
+  }
+  if (!v.error) {
+    lines.push(csvRow(["valwidgets.live", "Site Visits", v.visits?.today, v.visits?.yesterday, v.visits?.week, v.visits?.before, v.visits?.total]));
+    lines.push(csvRow(["valwidgets.live", "Links Copied", v.copies?.today, v.copies?.yesterday, v.copies?.week, v.copies?.before, v.copies?.total]));
+    lines.push(csvRow(["valwidgets.live", "Live Stream Loads", v.loads?.live?.today, v.loads?.live?.yesterday, v.loads?.live?.week, v.loads?.live?.before, v.loads?.live?.total]));
+  }
+  lines.push("");
+
+  // 2. Relay Fleet Status
+  if (latestReport.relays?.length) {
+    lines.push(csvRow(["Relay Label", "URL", "Status", "Latency (ms)", "Free Spots", "Used Spots", "Max Spots", "Queue Waiting", "Uptime (s)", "Version"]));
+    for (const r of latestReport.relays) {
+      lines.push(csvRow([r.label, r.url, r.ok ? r.level : "down", r.latencyMs, r.free ?? "", r.slots?.used ?? "", r.slots?.max ?? "", r.slots?.waiting ?? "", r.uptimeS ?? "", r.version ?? ""]));
+    }
+    lines.push("");
+  }
+
+  // 3. 28-Day Daily Time Series
+  if (f.visits?.perDay?.length) {
+    lines.push(csvRow(["Date", "Frills Visits", "Frills Links Copied", "Frills Live Stream Loads", "valwidgets.live Visits"]));
+    const cMap = new Map((f.copies?.perDay ?? []).map((d) => [d.day, d.n]));
+    const lMap = new Map((f.loads?.livePerDay ?? []).map((d) => [d.day, d.n]));
+    const vMap = new Map((v.visits?.perDay ?? []).map((d) => [d.day, d.n]));
+    for (const { day, n } of f.visits.perDay) {
+      lines.push(csvRow([day, n, cMap.get(day) ?? 0, lMap.get(day) ?? 0, vMap.get(day) ?? 0]));
+    }
+    lines.push("");
+  }
+
+  // 4. Breakdowns
+  const dumpSplit = (cat, rows28d, rows7d) => {
+    const wMap = new Map((rows7d ?? []).map((r) => [r.label, r.n]));
+    for (const { label, n } of rows28d ?? []) {
+      lines.push(csvRow([cat, nameOf(label), label, wMap.get(label) ?? 0, n]));
+    }
+  };
+  if (!f.error) {
+    lines.push(csvRow(["Breakdown Category", "Name", "Raw Key", "Last 7 Days", "Last 28 Days"]));
+    dumpSplit("Traffic Sources", f.visits?.sources, f.visits?.sourcesWeek);
+    dumpSplit("Landing Pages", f.visits?.pages, f.visits?.pagesWeek);
+    dumpSplit("Live Overlays by Type", f.loads?.byKind, f.loads?.byKindWeek);
+    dumpSplit("Links Copied by Tool", f.copies?.byOverlay, f.copies?.byOverlayWeek);
+    dumpSplit("Links Copied by Platform", f.copies?.byPlatform, f.copies?.byPlatformWeek);
+    dumpSplit("Frills Plus Clicks", f.plus?.byFeature, f.plus?.byFeatureWeek);
+    lines.push("");
+  }
+
+  // 5. Google Search Console
+  if (latestReport.gsc?.configured && !latestReport.gsc.error) {
+    const g = latestReport.gsc;
+    lines.push(csvRow(["GSC Dimension", "Key", "Clicks (28d)", "Impressions (28d)", "CTR", "Position"]));
+    lines.push(csvRow(["Summary (7d)", g.siteUrl, g.week?.clicks, g.week?.impressions, pct1(g.week?.ctr), pos1(g.week?.position)]));
+    lines.push(csvRow(["Summary (28d)", g.siteUrl, g.month?.clicks, g.month?.impressions, pct1(g.month?.ctr), pos1(g.month?.position)]));
+    for (const r of g.queries ?? []) lines.push(csvRow(["Query", r.key, r.clicks, r.impressions, pct1(r.ctr), pos1(r.position)]));
+    for (const r of g.pages ?? []) lines.push(csvRow(["Page", r.key, r.clicks, r.impressions, pct1(r.ctr), pos1(r.position)]));
+    for (const r of g.countries ?? []) lines.push(csvRow(["Country", r.key, r.clicks, r.impressions, pct1(r.ctr), pos1(r.position)]));
+  }
+
+  downloadFile(`frills-analytics-${stamp}.csv`, "text/csv;charset=utf-8", lines.join("\r\n"));
+}
+
+function exportJson() {
+  if (!latestReport?.ok) return;
+  const stamp = new Date(latestReport.now || Date.now()).toISOString().slice(0, 10);
+  downloadFile(`frills-analytics-${stamp}.json`, "application/json;charset=utf-8", JSON.stringify(latestReport, null, 2));
+}
+
 async function refresh() {
-  say($("status"), "Reading live analytics…");
+  say($("status"), "Reading live analytics & relay status…");
   try { draw(await load()); } catch (error) { if (error instanceof Wrong) say($("status"), error.message, true); else throw error; }
 }
 
@@ -403,4 +713,6 @@ $("login-form").addEventListener("submit", async (event) => {
 });
 $("logout").addEventListener("click", () => logout());
 $("refresh").addEventListener("click", () => refresh());
+$("export-csv")?.addEventListener("click", () => exportCsv());
+$("export-json")?.addEventListener("click", () => exportJson());
 if (key) { showDash(true); refresh(); }
