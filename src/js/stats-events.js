@@ -4,13 +4,13 @@
 // where the meaning is the same: visit, link_copied, overlay_load), so the two sites can be read side by side on the stats page.
 
 /** Where a visit started, in coarse groups. */
-export const PAGES = ["home", "editor", "overlays", "alerts", "gifts", "goal", "likers", "songs", "matcha", "start", "actions", "guides", "other"];
+export const PAGES = ["home", "editor", "overlays", "alerts", "gifts", "goal", "likers", "songs", "matcha", "start", "guides", "other"];
 /** Where a visit came from, in coarse groups. The address itself is never kept. "bio" and "ad1" to "ad3" are for links we put in a profile or an ad (?ref=bio, ?ref=ad1). */
 export const REFS = ["direct", "tiktok", "reddit", "discord", "youtube", "search", "bio", "ad1", "ad2", "ad3", "other"];
 /** The editor a link was copied from. */
-export const OVERLAYS = ["chat", "alerts", "gifts", "goal", "likers", "songs", "matcha", "actions"];
+export const OVERLAYS = ["chat", "alerts", "gifts", "goal", "likers", "songs", "matcha"];
 /** The overlay pages that count when they open. */
-export const LOADS = ["chat", "alerts", "gifts", "goal", "likers", "songs", "actions"];
+export const LOADS = ["chat", "alerts", "gifts", "goal", "likers", "songs"];
 /** Whether an overlay ran on a real account, or on practice events. */
 export const MODES = ["live", "demo"];
 /** The streaming platforms a link or overlay can be for ("both" when a chat overlay reads TikTok and Twitch together). */
@@ -81,7 +81,7 @@ export function pageOf(pathname) {
   if (path === "/") return "home";
   if (path.startsWith("/editor")) return "editor";
   if (path.startsWith("/overlays")) return "overlays";
-  for (const name of ["alerts", "gifts", "goal", "likers", "songs", "matcha", "start", "actions"]) if (path.startsWith("/" + name)) return name;
+  for (const name of ["alerts", "gifts", "goal", "likers", "songs", "matcha", "start"]) if (path.startsWith("/" + name)) return name;
   if (path.startsWith("/guides") || path.startsWith("/looks")) return "guides";
   return "other";
 }
@@ -91,7 +91,7 @@ export function overlayOf(pathname) {
   const path = String(pathname || "/");
   if (path.startsWith("/matcha/alerts")) return "alerts";
   if (path.startsWith("/editor")) return "chat";
-  for (const name of ["alerts", "gifts", "goal", "likers", "songs", "matcha", "actions"]) if (path.startsWith("/" + name)) return name;
+  for (const name of ["alerts", "gifts", "goal", "likers", "songs", "matcha"]) if (path.startsWith("/" + name)) return name;
   return "";
 }
 

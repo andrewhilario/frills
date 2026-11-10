@@ -334,25 +334,11 @@ async function mainRelay() {
     const s = helper.hub.stats();
     say(`spots ${s.used}/${s.max}, ${s.waiting} waiting`);
   }, 5 * 60000).unref();
-  // The chat bot is a private test: it runs only when BOT_CONFIG_FILE names a file, and only for the channels in that file. Without it nothing here changes.
-  let botRunner = null;
-  if (process.env.BOT_CONFIG_FILE?.trim()) {
-    try {
-      const { createBotRunner } = await import("./bot.mjs");
-      botRunner = createBotRunner({ file: process.env.BOT_CONFIG_FILE.trim(), apiKey: (process.env.EULER_API_KEY ?? "").trim(), log: say });
-      console.log(`  Chat bot: ON for the channels in ${process.env.BOT_CONFIG_FILE.trim()} (this uses a TikTok login: keep that file private).`);
-      botRunner.start();
-    } catch (error) {
-      botRunner = null; // the relay serves everyone's overlays: a bot that cannot start must not stop it
-      say(`Chat bot could not start (${error.message}). The relay carries on without it.`);
-    }
-  }
   let stopping = false;
   const stop = async () => {
     if (stopping) return;
     stopping = true;
     console.log("Stopping…");
-    botRunner?.stop();
     await helper.close();
     process.exit(0);
   };

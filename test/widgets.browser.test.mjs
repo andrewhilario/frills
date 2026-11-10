@@ -194,9 +194,9 @@ test("overlays page: the live and beta ones link to their editors, and the comin
   const { base } = await withHelper();
   await page.goto(base + "/overlays/", { settle: 600 });
   const links = await page.evaluate(`[...document.querySelectorAll(".tool:not(.tool--soon) a.btn")].map((a) => a.getAttribute("href"))`);
-  assert.deepEqual(links, ["/editor/", "/alerts/", "/gifts/", "/goal/", "/likers/", "/editor/", "/songs/", "/songs/#spotify-step", "/actions/"], "the chat editor's Both is TikTok and Twitch chat together; then song requests, its Spotify step and the commands overlay");
+  assert.deepEqual(links, ["/editor/", "/alerts/", "/gifts/", "/goal/", "/likers/", "/editor/", "/songs/", "/songs/#spotify-step"], "the chat editor's Both is TikTok and Twitch chat together; the last two are song requests and its Spotify step");
   const beta = await page.evaluate(`[...document.querySelectorAll(".tool:has(.tool__badge--beta) .subtitle")].map((t) => t.textContent)`);
-  assert.deepEqual(beta, ["Alerts", "Last gifts", "Goals", "Top likers", "TikTok and Twitch chat together", "Song requests", "Spotify player", "Stream commands & gear pop-ups"], "it is marked Beta, like the others that are new");
+  assert.deepEqual(beta, ["Alerts", "Last gifts", "Goals", "Top likers", "TikTok and Twitch chat together", "Song requests", "Spotify player"], "it is marked Beta, like the others that are new");
   const soon = await page.evaluate(`[...document.querySelectorAll(".tool--soon")].map((t) => [t.querySelector(".subtitle").textContent, t.querySelectorAll("a").length])`);
   assert.deepEqual(soon.map((s) => s[0]), ["Free sound library", "Like and subscriber alerts", "Actions", "Starting soon, Be right back and Stream ending screens", "Your own layout", "Pets that move", "Top gifters"]);
   assert.ok(soon.every((s) => s[1] === 0), "a coming-soon card links nowhere");

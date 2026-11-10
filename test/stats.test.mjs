@@ -33,9 +33,9 @@ test("only the events and labels on the fixed lists can be counted, and an event
 });
 
 test("a page is grouped, an editor is named, an overlay is told apart, the platform of a link is read, and where a visit came from is a coarse group (a label in the link wins)", () => {
-  assert.deepEqual(["/", "/editor/", "/overlays/faq/", "/goal/", "/actions/", "/matcha/alerts/", "/guides/obs/", "/looks/frog-pond/", "/changelog/", "/privacy/"].map(pageOf), ["home", "editor", "overlays", "goal", "actions", "matcha", "guides", "guides", "other", "other"]);
-  assert.deepEqual(["/editor/", "/alerts/", "/matcha/alerts/", "/matcha/", "/songs/", "/actions/", "/guides/obs/", "/"].map(overlayOf), ["chat", "alerts", "alerts", "matcha", "songs", "actions", "", ""]);
-  assert.deepEqual(["/overlay/", "/overlay", "/overlay/alerts/", "/overlay/goal", "/overlay/actions/", "/overlay/nope/", "/overlay/layout/", "/editor/"].map(loadOf), ["chat", "chat", "alerts", "goal", "actions", "", "", ""]);
+  assert.deepEqual(["/", "/editor/", "/overlays/faq/", "/goal/", "/matcha/alerts/", "/guides/obs/", "/looks/frog-pond/", "/changelog/", "/privacy/"].map(pageOf), ["home", "editor", "overlays", "goal", "matcha", "guides", "guides", "other", "other"]);
+  assert.deepEqual(["/editor/", "/alerts/", "/matcha/alerts/", "/matcha/", "/songs/", "/guides/obs/", "/"].map(overlayOf), ["chat", "alerts", "alerts", "matcha", "songs", "", ""]);
+  assert.deepEqual(["/overlay/", "/overlay", "/overlay/alerts/", "/overlay/goal", "/overlay/nope/", "/overlay/layout/", "/editor/"].map(loadOf), ["chat", "chat", "alerts", "goal", "", "", ""]);
   assert.equal(platformOf("https://frills.example/overlay/?channel=pond.pal&platform=tiktok"), "tiktok");
   assert.equal(platformOf("https://frills.example/overlay/?channel=pond_pal&platform=twitch"), "twitch");
   assert.equal(platformOf("https://frills.example/overlay/?tiktok=pond.pal&twitch=pond_pal"), "both");
