@@ -154,6 +154,51 @@ test("editor: the buttons move the preview clock and post to the box, and the li
   await until(async () => (await page.evaluate(`document.querySelector(".timer").dataset.status`)) === "ready");
 });
 
+test("overlay: each layout draws the clock its own way, and the tiles show hours, minutes and seconds", { skip }, async () => {
+  const at = (layout, minutes = 75) => `${served}/overlay/timer/?channel=pond_cafe&platform=tiktok&startMinutes=${minutes}&layout=${layout}`;
+  const style = (selector, prop) => page.evaluate(`getComputedStyle(document.querySelector(${JSON.stringify(selector)}))[${JSON.stringify(prop)}]`);
+  await page.goto(at("box"), { settle: 800 });
+  assert.equal(await clock(), "1:15:00");
+  assert.notEqual(await style(".timer__box", "borderTopWidth"), "0px", "the box has its edge");
+  await page.goto(at("minimal"), { settle: 800 });
+  assert.equal(await page.evaluate(`document.querySelector(".timer").dataset.layout`), "minimal");
+  assert.equal(await style(".timer__box", "borderTopWidth"), "0px", "minimal has no edge");
+  assert.equal(await style(".timer__box", "backgroundColor"), "rgba(0, 0, 0, 0)", "and no card");
+  await page.goto(at("bar"), { settle: 800 });
+  assert.equal(await style(".timer__box", "flexDirection"), "row", "one line: the words and the clock side by side");
+  await page.goto(at("tiles"), { settle: 800 });
+  assert.equal(await style(".timer__clock", "display"), "none", "the tiles replace the one clock");
+  assert.deepEqual(await page.evaluate(`[...document.querySelectorAll(".timer__tile:not([hidden])")].map((t) => t.querySelector(".timer__num").textContent + " " + t.querySelector(".timer__unit").textContent)`), ["01 hours", "15 minutes", "00 seconds"]);
+  await page.goto(at("tiles", 5), { settle: 800 });
+  assert.deepEqual(await page.evaluate(`[...document.querySelectorAll(".timer__tile:not([hidden])")].map((t) => t.querySelector(".timer__unit").textContent)`), ["minutes", "seconds"], "no hours card while there are no hours");
+});
+
+test("every overlay's card can be made see-through with the opacity setting", { skip }, async () => {
+  const bg = (url, selector) => page.goto(served + url, { settle: 800 }).then(() => page.evaluate(`getComputedStyle(document.querySelector(${JSON.stringify(selector)})).backgroundColor`));
+  assert.notEqual(await bg("/overlay/timer/?demo=1", ".timer__box"), "rgba(0, 0, 0, 0)", "solid by default");
+  assert.equal(await bg("/overlay/timer/?demo=1&bgAlpha=0", ".timer__box"), "rgba(255, 246, 214, 0)", "the timer card is see-through at 0");
+  assert.equal(await bg("/overlay/counter/?demo=1&bgAlpha=50", ".counter__item"), "rgba(255, 246, 214, 0.5)", "half see-through for the counter");
+  assert.equal(await bg("/overlay/gifts/?demo=1&bgAlpha=0", ".giftlist__title"), "rgba(255, 246, 214, 0)");
+});
+
+test("editor: the gifts are a list of rows to pick or type, with a time each, and the link carries them", { skip }, async () => {
+  await page.goto(served + "/timer/", { settle: 900 });
+  const rows = () => page.evaluate(`[...document.querySelectorAll(".pairs__row")].map((r) => r.querySelector(".pairs__name").value + "|" + r.querySelector(".pairs__amount").value + "|" + r.querySelector(".pairs__unit").value)`);
+  assert.deepEqual(await rows(), ["Rose|10|sec", "Finger Heart|30|sec"], "the starting list is two rows");
+  assert.ok((await page.evaluate(`document.querySelectorAll("#c-giftRules-names option").length`)) >= 10, "common gifts to pick from");
+  await click(".pairs__add");
+  await page.evaluate(`(() => { const r = [...document.querySelectorAll(".pairs__row")].pop(); const set = (el, v) => { el.value = v; el.dispatchEvent(new Event("input", { bubbles: true })); el.dispatchEvent(new Event("change", { bubbles: true })); }; set(r.querySelector(".pairs__name"), "Galaxy"); set(r.querySelector(".pairs__amount"), "5"); set(r.querySelector(".pairs__unit"), "min"); })()`);
+  await page.evaluate(`document.querySelector(".pairs__remove").click()`); // takes Rose away
+  assert.deepEqual(await rows(), ["Finger Heart|30|sec", "Galaxy|5|min"]);
+  await page.evaluate(`(() => { const i = document.querySelector("#source-channel"); i.value = "pond.pal"; i.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+  const url = new URL(await page.evaluate(`document.getElementById("link").value`));
+  assert.equal(url.searchParams.get("giftRules"), "Finger Heart=30, Galaxy=300", "the rows are written into the link, minutes as seconds");
+  await click('[data-test="start"]');
+  await click('[data-test="gift"]');
+  await page.goto(url.href.replace(url.origin, served), { settle: 900 });
+  assert.equal(await page.evaluate(`document.querySelector(".timer")?.dataset.layout`), "box", "the link opens the overlay");
+});
+
 test("the overlays page lists the timer, marked beta", { skip }, async () => {
   await page.goto(served + "/overlays/", { settle: 500 });
   const card = await page.evaluate(`[...document.querySelectorAll(".tool")].filter((t) => t.querySelector("a[href='/timer/']")).map((t) => t.querySelector(".tool__badge")?.textContent.trim())`);

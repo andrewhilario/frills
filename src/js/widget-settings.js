@@ -7,7 +7,7 @@ import { CONTROLS as ALERT_CONTROLS, DEFAULTS as ALERT_DEFAULTS, LOOKS, LOOK_KEY
 
 export { LOOKS, LOOK_NAMES, alertVars as lookVars, currentLook, looksFor } from "./alerts-settings.js";
 
-const LOOK_PICKS = ["accent", "bg", "text", "pop", "font", "size", "letterSpacing", "align", "radius", "border", "shadow", "deco"];
+const LOOK_PICKS = ["accent", "bg", "bgAlpha", "text", "pop", "font", "size", "letterSpacing", "align", "radius", "border", "shadow", "deco"];
 /** The look options every overlay shares (colours, font, size, corners, edge, shadow), taken from the alerts so they can never differ. */
 export const LOOK_CONTROLS = ALERT_CONTROLS.filter((c) => c.section === "look" && LOOK_PICKS.includes(c.key)).map((c) => (c.key === "deco" ? publicDecoControl(c) : c)); // (the pictures: only a season's pack, or none)
 export const LOOK_DEFAULTS = Object.fromEntries(LOOK_PICKS.map((k) => [k, ALERT_DEFAULTS[k]]));
@@ -16,10 +16,28 @@ export const range = (key, label, min, max, step, unit, extra = {}) => ({ key, t
 export const number = (key, label, min, max, extra = {}) => ({ key, type: "number", label, min, max, ...extra });
 export const toggle = (key, label, hint) => ({ key, type: "toggle", label, hint });
 export const text = (key, label, max = 80, hint) => ({ key, type: "text", label, max, hint });
+/** A list of rows, each a name and a number (kept as the text "Rose=10, Galaxy=300"). `suggest` are names to pick from; the name can also be typed. */
+export const pairs = (key, label, { max = 600, suggest = [], hint, namePlaceholder = "Name", unit = "seconds" } = {}) => ({ key, type: "pairs", label, max, suggest, hint, namePlaceholder, unit });
 /** A picture the streamer uploads (the setting holds only its id, "" for none). */
 export const imageOf = (key, label, hint) => ({ key, type: "media", media: "image", label, hint });
 export const chipsOf = (key, label, options) => ({ key, type: "chips", label, options: options.map(([id, name]) => ({ id, name })) });
 export const selectOf = (key, label, options, hint) => ({ key, type: "select", label, options: options.map(([id, name]) => ({ id, name })), hint });
+
+/** "Rose=10, Galaxy=300" -> [{ name: "Rose", seconds: 10 }, ...], the names as written. Anything that is not name=number (0 to 86,400) is skipped. */
+export function parsePairs(textValue) {
+  const rows = [];
+  for (const part of String(textValue ?? "").split(/[,\n;]/)) {
+    const at = part.lastIndexOf("=");
+    if (at < 1) continue;
+    const name = part.slice(0, at).trim().replace(/\s+/g, " ");
+    const seconds = Math.round(Number(part.slice(at + 1).trim()));
+    if (name && Number.isFinite(seconds) && seconds >= 0 && seconds <= 86400) rows.push({ name, seconds });
+  }
+  return rows;
+}
+
+/** [{ name, seconds }] -> "Rose=10, Galaxy=300". A name cannot carry the signs the text is made of; a row with no name is left out. */
+export const pairsText = (rows) => rows.map(({ name, seconds }) => [String(name).replace(/[=,;\n]/g, " ").replace(/\s+/g, " ").trim(), Math.round(Number(seconds) || 0)]).filter(([name]) => name).map(([name, seconds]) => `${name}=${Math.max(0, Math.min(86400, seconds))}`).join(", ");
 
 /** One value, checked against its control. Returns undefined if it isn't acceptable. */
 export function coerce(control, value) {
@@ -34,7 +52,7 @@ export function coerce(control, value) {
   }
   if (control.type === "toggle") return typeof value === "boolean" ? value : undefined;
   if (control.type === "media") return value === "" || (typeof value === "string" && MEDIA_ID.test(value)) ? value : undefined;
-  if (control.type === "text") return typeof value === "string" ? value.replace(/[\u0000-\u001f\u007f]+/g, " ").slice(0, control.max) : undefined;
+  if (control.type === "text" || control.type === "pairs") return typeof value === "string" ? value.replace(/[\u0000-\u001f\u007f]+/g, " ").slice(0, control.max) : undefined;
   return control.options.some((o) => o.id === value) ? value : undefined;
 }
 

@@ -5,6 +5,7 @@ import { el } from "./feed.js";
 import { initAnnouncement } from "./nav.js";
 import { countCopy } from "./stats.js";
 import { activeSeason } from "./season.js";
+import { pairsText, parsePairs } from "./widget-settings.js";
 
 initAnnouncement();
 
@@ -151,6 +152,45 @@ export function buildControl(control, value, onSet, { id = "c-" + control.key } 
     knob.setAttribute("aria-hidden", "true");
     row.append(label(), el("span", { className: "switch" }, input, knob));
     write = (v) => { input.checked = v; };
+  } else if (control.type === "pairs") {
+    // A list: one row for each gift (or whatever the pairs are), a name to pick or type and a time, with a button to add another.
+    row.classList.add("ctl--wide");
+    const list = el("div", { className: "pairs" });
+    const names = el("datalist", { id: id + "-names" });
+    for (const name of control.suggest ?? []) names.append(el("option", { value: name }));
+    const rows = [];
+    const emit = () => onSet(pairsText(rows.map((r) => ({ name: r.name.value, seconds: Number(r.amount.value || 0) * (r.unit.value === "min" ? 60 : 1) }))));
+    const addRow = (name = "", seconds = 10, focus = false) => {
+      const r = { name: el("input", { type: "text", className: "pairs__name", maxLength: 40, placeholder: control.namePlaceholder, autocomplete: "off", spellcheck: false }), amount: el("input", { type: "number", className: "pairs__amount", min: 0, step: 1, inputMode: "numeric" }), unit: el("select", { className: "pairs__unit" }) };
+      r.name.setAttribute("list", id + "-names");
+      r.name.setAttribute("aria-label", control.label + ": name");
+      r.amount.setAttribute("aria-label", control.label + ": time");
+      r.unit.setAttribute("aria-label", control.label + ": unit");
+      r.unit.append(el("option", { value: "sec", textContent: "seconds" }), el("option", { value: "min", textContent: "minutes" }));
+      const minutes = seconds >= 60 && seconds % 60 === 0;
+      r.name.value = name;
+      r.amount.value = String(minutes ? seconds / 60 : seconds);
+      r.unit.value = minutes ? "min" : "sec";
+      const remove = el("button", { type: "button", className: "pairs__remove", textContent: "×" });
+      remove.setAttribute("aria-label", "Remove this row");
+      r.node = el("div", { className: "pairs__row" }, r.name, r.amount, r.unit, remove);
+      for (const input of [r.name, r.amount]) input.addEventListener("input", emit);
+      r.unit.addEventListener("change", emit);
+      remove.addEventListener("click", () => { rows.splice(rows.indexOf(r), 1); r.node.remove(); emit(); });
+      rows.push(r);
+      list.append(r.node);
+      if (focus) r.name.focus();
+    };
+    const add = el("button", { type: "button", className: "btn btn--soft btn--sm pairs__add", textContent: "+ Add a gift" });
+    add.addEventListener("click", () => { addRow("", 10, true); emit(); });
+    row.append(el("span", { className: "ctl__label", textContent: control.label }), list, add, names);
+    write = (v) => {
+      // only when the text is not already what the rows say: rebuilding while someone types would take the cursor away
+      const now = pairsText(rows.map((r) => ({ name: r.name.value, seconds: Number(r.amount.value || 0) * (r.unit.value === "min" ? 60 : 1) })));
+      if (now === pairsText(parsePairs(v))) return;
+      for (const r of rows.splice(0)) r.node.remove();
+      for (const { name, seconds } of parsePairs(v)) addRow(name, seconds);
+    };
   } else {
     row.classList.add("ctl--wide");
     const box = el("div", { className: "chips" });

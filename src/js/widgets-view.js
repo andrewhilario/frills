@@ -660,9 +660,16 @@ export function createTimerView(host) {
   const box = el("div", { className: "timer__box" });
   const label = el("p", { className: "timer__label" });
   const clock = el("div", { className: "timer__clock" });
+  // the Tiles layout writes the clock as three cards instead: hours, minutes, seconds
+  const tiles = el("div", { className: "timer__tiles" });
+  const tile = {};
+  for (const [part, name] of [["h", "hours"], ["m", "minutes"], ["s", "seconds"]]) {
+    tile[part] = { num: el("b", { className: "timer__num" }), unit: el("small", { className: "timer__unit", textContent: name }) };
+    tiles.append(el("div", { className: "timer__tile" }, tile[part].num, tile[part].unit));
+  }
   const note = el("p", { className: "timer__note", hidden: true });
   const plus = el("span", { className: "timer__plus", hidden: true });
-  box.append(label, clock, note, plus);
+  box.append(label, clock, tiles, note, plus);
   root.append(box);
   host.append(root);
   let settings = null;
@@ -676,9 +683,17 @@ export function createTimerView(host) {
       applyLook(root, next);
       label.textContent = next.label;
       label.hidden = !next.label;
+      root.dataset.layout = next.layout;
+      shown.text = ""; // written again: the layout (and so the way the time is written) may have changed
     },
     render({ text, status }) {
-      if (text !== shown.text) clock.textContent = text;
+      if (text !== shown.text) {
+        clock.textContent = text;
+        const parts = text.split(":");
+        while (parts.length < 3) parts.unshift("0");
+        tile.h.num.parentElement.hidden = settings?.hours !== "always" && parts[0] === "0"; // no hours card while there are none, unless they are always shown
+        [tile.h.num.textContent, tile.m.num.textContent, tile.s.num.textContent] = [parts[0].padStart(2, "0"), parts[1], parts[2]];
+      }
       if (status !== shown.status) {
         root.dataset.status = status;
         note.hidden = status !== "paused" && status !== "ended";

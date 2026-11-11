@@ -2,17 +2,23 @@
 // and that grows when viewers send gifts: each gift can add its own number of seconds. No page and no clock of its own (the time is given in),
 // so it is tested without a browser.
 
-import { defineWidget, chipsOf, number, text, toggle } from "./widget-settings.js";
+import { defineWidget, chipsOf, number, pairs, parsePairs, text, toggle } from "./widget-settings.js";
+
+export { parsePairs as parseRuleRows, pairsText as ruleText } from "./widget-settings.js";
+
+/** Gifts people often send, to pick from (the name still has to be the one TikTok shows, so any other can be typed). */
+export const COMMON_GIFTS = ["Rose", "TikTok", "Finger Heart", "Heart Me", "Doughnut", "Hand Hearts", "Sunglasses", "Corgi", "Money Gun", "Swan", "Galaxy", "Whale Diving", "Lion", "Universe"];
 
 export const TIMER = defineWidget({
-  defaults: { startMinutes: 60, capMinutes: 0, revive: false, perDiamonds: 60, giftRules: "Rose=10, Finger Heart=30", followSeconds: 10, shareSeconds: 0, label: "Time left", showPlus: true, hours: "auto", autoStart: false, code: "" },
+  defaults: { layout: "box", startMinutes: 60, capMinutes: 0, revive: false, perDiamonds: 60, giftRules: "Rose=10, Finger Heart=30", followSeconds: 10, shareSeconds: 0, label: "Time left", showPlus: true, hours: "auto", autoStart: false, code: "" },
   controls: [
+    { section: "time", ...chipsOf("layout", "Layout", [["box", "Box"], ["minimal", "Minimal"], ["bar", "One line"], ["tiles", "Tiles"]]) },
     { section: "time", ...number("startMinutes", "Starts at (minutes)", 1, 10080, { hint: "The clock starts here when you press Start." }) },
     { section: "time", ...number("capMinutes", "Longest it can get (minutes)", 0, 10080, { hint: "0 means no limit. Gifts cannot push the clock past this." }) },
     { section: "time", ...toggle("revive", "A gift after time is up starts it again") },
     { section: "time", ...toggle("autoStart", "Start by itself with the first gift", "Without this, you press Start in the editor.") },
     { section: "rules", ...number("perDiamonds", "Seconds for every 100 diamonds", 0, 100000, { hint: "For gifts that are not in the list below. 0 means other gifts add nothing." }) },
-    { section: "rules", ...text("giftRules", "Gifts that add their own time", 600, "Name=seconds, separated by commas, for each of that gift: Rose=10, Galaxy=300.") },
+    { section: "rules", ...pairs("giftRules", "Gifts that add their own time", { suggest: COMMON_GIFTS, namePlaceholder: "Gift name", hint: "Pick a gift or type its name exactly as TikTok shows it, then how much time each one adds. Any gift not here adds time by its diamonds (the rate above)." }) },
     { section: "rules", ...number("followSeconds", "Seconds for a new follower", 0, 3600) },
     { section: "rules", ...number("shareSeconds", "Seconds for a share", 0, 3600) },
     { section: "words", ...text("label", "Words above the clock", 30, "Leave empty for none.") },
@@ -178,5 +184,6 @@ export class SubTimer {
     this.began = saved.began === true || this.running;
     this.endsAt = n(saved.endsAt, 8.64e15);
     this.left = n(saved.left, 7 * 86400000 * 4);
+    if (!this.began) this.left = this.settings.startMinutes * 60000; // a clock that was never started follows the starting time in the link, not what was kept
   }
 }

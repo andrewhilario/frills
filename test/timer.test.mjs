@@ -3,7 +3,8 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { TIMER, SubTimer, formatClock, parseGiftRules, secondsFor } from "../src/js/timer.js";
+import { TIMER, SubTimer, formatClock, parseGiftRules, parseRuleRows, ruleText, secondsFor } from "../src/js/timer.js";
+import { lookVars } from "../src/js/widget-settings.js";
 import { CODE, readCommands, sendCommand, timerIdentity, validCode } from "../src/js/timer-bridge.js";
 
 const settings = (over = {}) => TIMER.sanitize({ startMinutes: 10, perDiamonds: 60, giftRules: "Rose=10, Galaxy=300", followSeconds: 10, shareSeconds: 0, ...over });
@@ -25,6 +26,28 @@ test("the timer's settings are checked, and a link carries only what was changed
   assert.deepEqual([params.get("startMinutes"), params.get("giftRules"), params.get("code"), params.has("hours")], ["90", "Rose=5", "abcdefghij123456", false]);
   const back = TIMER.sanitize(TIMER.fromParams(params));
   assert.deepEqual([back.startMinutes, back.giftRules], [90, "Rose=5"], "the link reads back the same");
+});
+
+test("the layouts are a short list, the default is the box, and the gift list rows turn into the link's text and back", () => {
+  assert.equal(TIMER.sanitize({}).layout, "box");
+  for (const layout of ["box", "minimal", "bar", "tiles"]) assert.equal(TIMER.sanitize({ layout }).layout, layout);
+  assert.equal(TIMER.sanitize({ layout: "spiral" }).layout, "box", "an unknown layout is the default");
+  assert.deepEqual(parseRuleRows("Rose=10, Finger Heart = 30; junk, Galaxy=300"), [{ name: "Rose", seconds: 10 }, { name: "Finger Heart", seconds: 30 }, { name: "Galaxy", seconds: 300 }], "names keep their case");
+  assert.equal(ruleText([{ name: "Rose", seconds: 10 }, { name: "  ", seconds: 5 }, { name: "Big, = Gift;", seconds: 2.6 }, { name: "Late", seconds: 999999 }]), "Rose=10, Big Gift=3, Late=86400", "a row with no name is left out, the signs the text is made of are taken out of names, numbers are whole and kept in range");
+  assert.deepEqual(parseRuleRows(ruleText(parseRuleRows("Rose=10, Galaxy=300"))), parseRuleRows("Rose=10, Galaxy=300"), "rows -> text -> rows is the same");
+});
+
+test("every overlay's look has a card opacity: solid by default, and it turns the card colour see-through", () => {
+  const solid = TIMER.sanitize({});
+  assert.equal(solid.bgAlpha, 100);
+  assert.equal(lookVars(solid)["--a-bg"], solid.bg, "solid: the colour as it is");
+  const half = TIMER.sanitize({ bgAlpha: 40, bg: "#ffffff" });
+  assert.equal(lookVars(half)["--a-bg"], "rgba(255,255,255,0.4)");
+  assert.equal(TIMER.sanitize({ bgAlpha: 400 }).bgAlpha, 100, "kept in range");
+  assert.equal(lookVars(TIMER.sanitize({ bgAlpha: 0, bg: "#102030" }))["--a-bg"], "rgba(16,32,48,0)", "0 shows nothing of the card");
+  const link = TIMER.url("https://frills.test/overlay/timer/", { channel: "x.y", settings: { ...solid, bgAlpha: 0 } });
+  assert.equal(new URL(link).searchParams.get("bgAlpha"), "0");
+  assert.equal(TIMER.sanitize(TIMER.fromParams(new URL(link).searchParams)).bgAlpha, 0, "the link reads back the same");
 });
 
 // ── gifts become seconds ───────────────────────────────────────────────────────────────────────────
@@ -177,6 +200,9 @@ test("what is kept for a reload carries the clock on, a running one by the momen
   assert.equal(damaged.state(T0), "ready");
   damaged.restore(null);
   damaged.restore("junk");
+  const waiting = new SubTimer(settings({ startMinutes: 5 }));
+  waiting.restore({ running: false, endsAt: 0, left: 75 * 60000, began: false });
+  assert.equal(waiting.remaining(T0), 300_000, "a clock that was never started follows the starting time in the link, not what was kept from an older link");
 });
 
 // ── the controls: the editor's post and the overlay's reading ──────────────────────────────────────────────────────

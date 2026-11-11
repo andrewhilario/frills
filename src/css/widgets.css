@@ -615,3 +615,27 @@
 @keyframes w-rise { from { opacity: 0; transform: translateY(0.6em) scale(0.7); } to { opacity: 1; transform: none; } }
 @keyframes w-pulse { 50% { opacity: 0.45; } }
 @media (prefers-reduced-motion: reduce) { .timer__plus--in, .timer[data-status="ended"] .timer__clock { animation: none; } }
+
+/* The timer's other layouts. Box is the one above. */
+.timer__tiles { display: none; }
+/* Minimal: only the clock, with a thin outline in the card colour so it reads over anything. No card, no edge, no shadow. */
+.timer[data-layout="minimal"] .timer__box { padding: 0; background: none; border: 0; box-shadow: none; }
+.timer[data-layout="minimal"] .timer__clock, .timer[data-layout="minimal"] .timer__label, .timer[data-layout="minimal"] .timer__note { text-shadow: 0 0.04em 0 var(--a-bg, #fff), 0 -0.04em 0 var(--a-bg, #fff), 0.04em 0 0 var(--a-bg, #fff), -0.04em 0 0 var(--a-bg, #fff), 0 0.06em 0.2em rgba(0, 0, 0, 0.45); }
+.timer[data-layout="minimal"] .timer__plus { top: -0.6em; }
+/* One line: the words and the clock side by side in a slim pill. */
+.timer[data-layout="bar"] .timer__box { flex-direction: row; align-items: baseline; gap: 0.6em; padding: 0.2em 1em 0.3em; border-radius: 999px; }
+.timer[data-layout="bar"] .timer__clock { font-size: 1.5em; }
+.timer[data-layout="bar"] .timer__label { font-size: 0.8em; }
+.timer[data-layout="bar"] .timer__note { font-size: 0.7em; }
+/* Tiles: hours, minutes and seconds each on a small card, with the words above. */
+.timer[data-layout="tiles"] .timer__box { padding: 0; background: none; border: 0; box-shadow: none; gap: 0.3em; }
+.timer[data-layout="tiles"] .timer__label { padding: 0.1em 0.8em 0.15em; color: var(--a-text, #222); background: var(--a-bg, #fff); border: var(--a-border, 2px) solid var(--a-accent, #fc0); border-radius: var(--a-radius, 20px); }
+.timer[data-layout="tiles"] .timer__clock { display: none; }
+.timer[data-layout="tiles"] .timer__tiles { display: flex; gap: 0.35em; }
+.timer__tile { display: grid; justify-items: center; min-width: 2.4em; padding: 0.15em 0.5em 0.2em; color: var(--a-text, #222); background: var(--a-bg, #fff); border: var(--a-border, 2px) solid var(--a-accent, #fc0); border-radius: var(--a-radius, 20px); box-shadow: var(--a-shadow, none); }
+.timer__tile[hidden] { display: none; }
+.timer__num { font-size: 1.9em; font-weight: 900; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.timer__unit { font-size: 0.55em; font-weight: 700; opacity: 0.8; }
+.timer[data-layout="tiles"][data-status="paused"] .timer__tiles { opacity: 0.6; }
+.timer[data-layout="tiles"][data-status="ended"] .timer__tiles { animation: w-pulse 1.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .timer[data-layout="tiles"][data-status="ended"] .timer__tiles { animation: none; } }

@@ -1,7 +1,7 @@
 // Alerts are plain data, like chat looks: one list of options builds the editor, checks anything that arrives (saved in the browser, or in
 // a link), and writes the link. Everything here is pure, so it is tested without a page.
 
-import { HEX } from "./color.js";
+import { HEX, rgba } from "./color.js";
 import { FONTS } from "./settings.js";
 import { SEASONAL_NAMES } from "./seasonal-looks.js";
 import { DECOS } from "./decor.js";
@@ -95,6 +95,8 @@ export const DEFAULTS = {
   card: "card",
   // little pictures on the card (a pack from decor.js); only the private Matcha editor offers them
   deco: "none",
+  // how solid the card is: 100 is the card colour as it is, 0 shows nothing of it, so only the words (and the edge, if there is one) sit over the game
+  bgAlpha: 100,
   // the space between letters, in pixels (negative pulls them closer)
   letterSpacing: 0,
   // text alignment: left, center or right
@@ -135,6 +137,7 @@ export const CONTROLS = [
   { section: "look", ...chipsOf("deco", "Pictures on the card", [{ id: "none", name: "None" }, ...DECOS.filter((d) => d.id !== "none").map((d) => ({ id: d.id, name: d.name, ...(d.season ? { season: d.season } : {}) }))]), hint: "Little pictures on any card style: a friend peeking over the top, a scene on a corner, sparkles.", secret: true },
   { section: "look", key: "accent", type: "color", label: "Accent color" },
   { section: "look", key: "bg", type: "color", label: "Card color" },
+  { section: "look", ...range("bgAlpha", "Card opacity", 0, 100, 5, " %", { hint: "100 is a solid card. Lower it to let your game show through, and at 0 only the words are left. The edge and the shadow have their own settings below." }) },
   { section: "look", key: "text", type: "color", label: "Text color" },
   { section: "look", key: "pop", type: "color", label: "Highlight color", hint: "The color of the name and the gift." },
   { section: "look", key: "font", type: "select", label: "Font", options: Object.keys(FONTS).map((f) => ({ id: f, name: f })) },
@@ -313,7 +316,7 @@ export function alertVars(s) {
     "--a-text": s.text,
     "--a-accent": s.accent,
     "--a-pop": s.pop,
-    "--a-bg": s.bg,
+    "--a-bg": s.bgAlpha < 100 ? rgba(s.bg, s.bgAlpha / 100) : s.bg,
     "--a-border": s.border + "px",
     "--a-radius": s.radius + "px",
     "--a-shadow": shadows[s.shadow],
