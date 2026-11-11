@@ -59,6 +59,7 @@ const NAMES = {
   goal: "Stream Goals",
   likers: "Top Likers",
   counter: "Viewer + Like Counter",
+  timer: "Subathon Timer",
   songs: "Song Requests (!sr)",
   matcha: "Matcha Theme",
   home: "Home Page (/)",

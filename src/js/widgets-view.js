@@ -642,3 +642,64 @@ export function createCounterView(host) {
     },
   };
 }
+
+// ── The subathon timer ──────────────────────────────────────────────────────────────────────────────────────────────
+
+/** Seconds written short for the "+" bump: 30s, 2m 30s, 1h 5m. */
+function shortSeconds(seconds) {
+  const n = Math.abs(Math.round(seconds));
+  const h = Math.floor(n / 3600);
+  const m = Math.floor((n % 3600) / 60);
+  const s = n % 60;
+  return [h && `${h}h`, m && `${m}m`, (s || (!h && !m)) && !h && `${s}s`].filter(Boolean).join(" ");
+}
+
+/** The subathon timer. Returns { apply(settings), render({ text, status }), pop(seconds) }. `status` is ready, running, paused or ended. */
+export function createTimerView(host) {
+  const root = el("div", { className: "timer" });
+  const box = el("div", { className: "timer__box" });
+  const label = el("p", { className: "timer__label" });
+  const clock = el("div", { className: "timer__clock" });
+  const note = el("p", { className: "timer__note", hidden: true });
+  const plus = el("span", { className: "timer__plus", hidden: true });
+  box.append(label, clock, note, plus);
+  root.append(box);
+  host.append(root);
+  let settings = null;
+  let total = 0;
+  let hide = 0;
+  let shown = { text: "", status: "" };
+
+  return {
+    apply(next) {
+      settings = next;
+      applyLook(root, next);
+      label.textContent = next.label;
+      label.hidden = !next.label;
+    },
+    render({ text, status }) {
+      if (text !== shown.text) clock.textContent = text;
+      if (status !== shown.status) {
+        root.dataset.status = status;
+        note.hidden = status !== "paused" && status !== "ended";
+        note.textContent = status === "ended" ? "Time’s up!" : "Paused";
+      }
+      shown = { text, status };
+    },
+    /** A bump for time that was added (or taken away): several in a short time add up in one bump. */
+    pop(seconds) {
+      if (!settings?.showPlus || !seconds) return;
+      total += seconds;
+      plus.hidden = false;
+      plus.textContent = `${total > 0 ? "+" : "−"}${shortSeconds(total)}`;
+      plus.dataset.tone = total > 0 ? "up" : "down";
+      plus.classList.remove("timer__plus--in");
+      if (!reducedMotion()) {
+        void plus.offsetWidth; // so the bump starts over for each gift
+        plus.classList.add("timer__plus--in");
+      }
+      clearTimeout(hide);
+      hide = setTimeout(() => { plus.hidden = true; total = 0; }, 1800);
+    },
+  };
+}

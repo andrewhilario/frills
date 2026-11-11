@@ -81,3 +81,19 @@ CREATE TABLE IF NOT EXISTS spotify_logins (
   created_at INTEGER NOT NULL,
   used_at INTEGER NOT NULL      -- last time the login was used; the clean-up deletes rows idle for 14 days
 );
+
+-- The subathon timer's controls, handed from the streamer's browser tab to their timer overlay (see worker/timer.mjs). Run this part once.
+CREATE TABLE IF NOT EXISTS timer_boxes (
+  code TEXT PRIMARY KEY,     -- 16 random characters, in the overlay link
+  key_hash TEXT NOT NULL,    -- sha-256 of the key that may send commands (the key itself is never stored)
+  seq INTEGER NOT NULL,      -- the number of the latest command
+  updated_at INTEGER NOT NULL -- milliseconds since 1970
+);
+CREATE TABLE IF NOT EXISTS timer_commands (
+  code TEXT NOT NULL,
+  seq INTEGER NOT NULL,      -- 1, 2, 3 ... for each box
+  cmd TEXT NOT NULL,         -- start, pause, resume, reset or add
+  value INTEGER NOT NULL,    -- seconds (for reset and add)
+  at INTEGER NOT NULL,
+  PRIMARY KEY (code, seq)
+);
