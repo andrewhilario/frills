@@ -621,7 +621,7 @@
 /* Minimal: only the clock, with a thin outline in the card colour so it reads over anything. No card, no edge, no shadow. */
 .timer[data-layout="minimal"] .timer__box { padding: 0; background: none; border: 0; box-shadow: none; }
 .timer[data-layout="minimal"] .timer__clock, .timer[data-layout="minimal"] .timer__label, .timer[data-layout="minimal"] .timer__note { text-shadow: 0 0.04em 0 var(--a-bg, #fff), 0 -0.04em 0 var(--a-bg, #fff), 0.04em 0 0 var(--a-bg, #fff), -0.04em 0 0 var(--a-bg, #fff), 0 0.06em 0.2em rgba(0, 0, 0, 0.45); }
-.timer[data-layout="minimal"] .timer__plus { top: -0.6em; }
+.timer[data-layout="minimal"] .timer__plus { top: calc(50% - 0.7em); right: auto; left: 100%; margin-left: 0.5em; } /* beside the clock, not over the words above it */
 /* One line: the words and the clock side by side in a slim pill. */
 .timer[data-layout="bar"] .timer__box { flex-direction: row; align-items: baseline; gap: 0.6em; padding: 0.2em 1em 0.3em; border-radius: 999px; }
 .timer[data-layout="bar"] .timer__clock { font-size: 1.5em; }
