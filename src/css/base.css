@@ -165,7 +165,7 @@ code, kbd { font-family: var(--font-label); font-size: 0.9em; }
 .ctl__label { font-size: var(--text-sm); font-weight: 600; color: var(--color-ink); }
 
 /* ── Form controls: one height (44px), a 1px border that never changes width, a focus ring that appears instantly ──────── */
-input[type="text"], select {
+input[type="text"], input[type="number"], select {
   min-height: 44px;
   max-width: 100%;
   padding: 0 var(--space-sm);
@@ -176,8 +176,8 @@ input[type="text"], select {
   outline: 2px solid transparent;
   outline-offset: 1px;
 }
-@media (hover: hover) { input[type="text"]:hover, select:hover { background: var(--color-paper-2); } }
-input[type="text"]:focus-visible, select:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 1px; border-color: var(--color-ink); }
+@media (hover: hover) { input[type="text"]:hover, input[type="number"]:hover, select:hover { background: var(--color-paper-2); } }
+input[type="text"]:focus-visible, input[type="number"]:focus-visible, select:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 1px; border-color: var(--color-ink); }
 input::placeholder { color: var(--color-ink-2); opacity: 1; }
 input[aria-invalid="true"] { border-color: var(--color-error); }
 input:disabled, select:disabled { opacity: 0.55; cursor: not-allowed; }

@@ -10,8 +10,8 @@ import { SOUNDS } from "../src/js/alerts-settings.js";
 
 const css = readFileSync(join(import.meta.dirname, "..", "src", "css", "widgets.css"), "utf8");
 
-test("the goal has seven designs, the first is the classic bar, and the celebration sound is quiet unless it is chosen", () => {
-  assert.deepEqual(GOAL_STYLES.map((s) => s.id), ["bar", "candy", "blocks", "hearts", "stars", "neon", "ring"]);
+test("the goal has eight designs, the first is the classic bar, and the celebration sound is quiet unless it is chosen", () => {
+  assert.deepEqual(GOAL_STYLES.map((s) => s.id), ["bar", "candy", "blocks", "hearts", "stars", "neon", "ring", "line"]);
   assert.equal(GOAL.defaults.barStyle, "bar");
   assert.equal(GOAL.defaults.celebrateSound, "none", "a goal that was silent stays silent until a sound is picked");
   const design = GOAL.controls.find((c) => c.key === "barStyle");

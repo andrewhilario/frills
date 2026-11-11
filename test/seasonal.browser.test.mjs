@@ -46,9 +46,9 @@ const pressed = (selector) => page.evaluate(`[...document.querySelectorAll(${JSO
 const chipsOfLabel = (label) => `[aria-label="${label}"]`;
 const click = (selector, text) => page.evaluate(`[...document.querySelectorAll(${JSON.stringify(selector)})].find((e) => e.textContent.trim() === ${JSON.stringify(text)}).click()`);
 const names = (season) => Object.keys(SEASONAL[season]);
-const usual = ["Blueberry", "Frost", "Mint", "Bubblegum", "Butter", "Arcade", "Whisper"];
+const usual = ["Blueberry", "Frost", "Mint", "Bubblegum", "Butter", "Arcade", "Minimal", "Whisper"];
 
-test("chat editor: in Halloween the four Halloween looks come first, marked, then the usual seven; the Halloween pictures are offered too", { skip }, async () => {
+test("chat editor: in Halloween the four Halloween looks come first, marked, then the usual eight; the Halloween pictures are offered too", { skip }, async () => {
   await open("/editor/?season=halloween");
   const all = await chipNames("#presets");
   assert.deepEqual(all, ["Pumpkin patch", "Friendly ghost", "Witch's brew", "Blood moon", ...usual]);

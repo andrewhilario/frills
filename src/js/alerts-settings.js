@@ -40,21 +40,26 @@ export const FX = [
 ];
 
 /** The starting looks. A look sets only these settings. */
-export const LOOKS = {
+const solid = (looks) => Object.fromEntries(Object.entries(looks).map(([id, look]) => [id, { bgAlpha: 100, ...look }])); // a look that does not say how solid its card is has a solid one
+export const LOOKS = solid({
   sticker: { font: "Baloo 2", size: 40, text: "#2b1d00", accent: "#ffd23f", pop: "#d93a78", bg: "#fff6d6", border: 3, radius: 22, shadow: "hard" },
   matcha: { font: "Fredoka", size: 40, text: "#33432a", accent: "#8dae5f", pop: "#c4572f", bg: "#f5f0e1", border: 2, radius: 28, shadow: "soft" },
   night: { font: "Plus Jakarta Sans", size: 36, text: "#f4f6fa", accent: "#9db4ff", pop: "#ffd166", bg: "#10131a", border: 2, radius: 18, shadow: "glow" },
   bubblegum: { font: "Bricolage Grotesque", size: 40, text: "#fff0fa", accent: "#ff5fc8", pop: "#58f0ff", bg: "#1a0a1f", border: 2, radius: 16, shadow: "glow" },
   arcade: { font: "Press Start 2P", size: 24, text: "#e8f6ff", accent: "#59ffa0", pop: "#ffd23f", bg: "#101a2e", border: 3, radius: 0, shadow: "hard" },
-};
-export const LOOK_NAMES = { sticker: "Sticker", matcha: "Matcha", night: "Night", bubblegum: "Bubblegum", arcade: "Arcade" };
+  // the clean ones: no card to look at, or a quiet one. White words get a soft shadow by themselves when the card is mostly see-through (see alertVars).
+  minimal: { font: "Geist", size: 34, text: "#ffffff", accent: "#ffffff", pop: "#9ee7ff", bg: "#000000", bgAlpha: 0, border: 0, radius: 0, shadow: "none" },
+  glass: { font: "Geist", size: 32, text: "#ffffff", accent: "#ffffff", pop: "#9ee7ff", bg: "#0b0f17", bgAlpha: 55, border: 1, radius: 14, shadow: "none" },
+  paper: { font: "Geist", size: 32, text: "#14161a", accent: "#14161a", pop: "#d6336c", bg: "#ffffff", bgAlpha: 92, border: 0, radius: 10, shadow: "soft" },
+});
+export const LOOK_NAMES = { sticker: "Sticker", matcha: "Matcha", night: "Night", bubblegum: "Bubblegum", arcade: "Arcade", minimal: "Minimal", glass: "Glass", paper: "Paper" };
 export const LOOK_KEYS = Object.keys(LOOKS.sticker);
 
 /**
  * Seasonal looks for the alert cards (the same moods as the chat's seasonal looks, in the colors and sizes an alert card uses, and with the season's pictures). The editors offer a season's looks
  * first while it lasts (see season.js); every one is understood all year, so a link that names one, or an overlay saved with one, keeps working.
  */
-export const SEASONAL_LOOKS = {
+const SEASONAL_RAW = {
   halloween: {
     pumpkin: { font: "Baloo 2", size: 40, text: "#fff3e0", accent: "#ff8a1f", pop: "#b6ff5a", bg: "#1c0f06", border: 4, radius: 24, shadow: "hard", deco: "halloween" },
     ghost: { font: "Fredoka", size: 40, text: "#2a2350", accent: "#b9a8ff", pop: "#7a4dff", bg: "#f4f0ff", border: 3, radius: 32, shadow: "glow", deco: "halloween" },
@@ -68,6 +73,7 @@ export const SEASONAL_LOOKS = {
     cozy: { font: "Baloo 2", size: 40, text: "#3a1d12", accent: "#c1272d", pop: "#1f7a4d", bg: "#fff4e0", border: 4, radius: 20, shadow: "hard", deco: "christmas" },
   },
 };
+export const SEASONAL_LOOKS = Object.fromEntries(Object.entries(SEASONAL_RAW).map(([season, looks]) => [season, solid(looks)])); // (a season's look is solid too, so choosing one resets a see-through card like every other look)
 /** Every seasonal look by its id, whatever the season. */
 export const SEASON_LOOKS = Object.assign({}, ...Object.values(SEASONAL_LOOKS));
 const ANY_LOOKS = { ...LOOKS, ...SEASON_LOOKS };
@@ -317,6 +323,8 @@ export function alertVars(s) {
     "--a-accent": s.accent,
     "--a-pop": s.pop,
     "--a-bg": s.bgAlpha < 100 ? rgba(s.bg, s.bgAlpha / 100) : s.bg,
+    // words with little or no card behind them need something to read against: a soft dark shadow, only then
+    "--a-ts": s.bgAlpha <= 40 ? "0 1px 4px rgba(0,0,0,.7), 0 0 2px rgba(0,0,0,.5)" : "none",
     "--a-border": s.border + "px",
     "--a-radius": s.radius + "px",
     "--a-shadow": shadows[s.shadow],

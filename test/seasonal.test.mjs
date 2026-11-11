@@ -95,7 +95,7 @@ test("a seasonal look still works when its season is over: an address names it, 
 });
 
 test("the usual looks and the defaults are exactly what they were", () => {
-  assert.deepEqual(Object.keys(PRESETS), ["blueberry", "frost", "mint", "bubblegum", "butter", "arcade", "whisper"]);
+  assert.deepEqual(Object.keys(PRESETS), ["blueberry", "frost", "mint", "bubblegum", "butter", "arcade", "minimal", "whisper"]);
   assert.equal(DEFAULTS.deco, "none");
-  assert.deepEqual(Object.keys(alerts.LOOKS), ["sticker", "matcha", "night", "bubblegum", "arcade"]);
+  assert.deepEqual(Object.keys(alerts.LOOKS), ["sticker", "matcha", "night", "bubblegum", "arcade", "minimal", "glass", "paper"]);
 });

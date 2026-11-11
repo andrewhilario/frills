@@ -639,3 +639,11 @@
 .timer[data-layout="tiles"][data-status="paused"] .timer__tiles { opacity: 0.6; }
 .timer[data-layout="tiles"][data-status="ended"] .timer__tiles { animation: w-pulse 1.2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .timer[data-layout="tiles"][data-status="ended"] .timer__tiles { animation: none; } }
+
+/* Words over a see-through card get a soft shadow (set by the look: see --a-ts). The overlay's own root carries it down to every word. */
+.alert, .giftlist, .goal, .likers, .songs, .counter, .timer { text-shadow: var(--a-ts, none); }
+.timer[data-layout="minimal"] .timer__clock, .timer[data-layout="minimal"] .timer__label, .timer[data-layout="minimal"] .timer__note { text-shadow: var(--a-ts, none), 0 0.04em 0 var(--a-bg, #fff), 0 -0.04em 0 var(--a-bg, #fff), 0.04em 0 0 var(--a-bg, #fff), -0.04em 0 0 var(--a-bg, #fff); }
+/* Goal, Thin line: the words and a slim bar, no card. */
+.goal[data-style="line"] .goal__head { margin: 0 0 0.3em; padding: 0; font-size: 0.8em; background: none; border: 0; box-shadow: none; border-radius: 0; }
+.goal[data-style="line"] .goal__track { height: 0.3em; border: 0; border-radius: 999px; box-shadow: none; background: rgba(128, 128, 128, 0.35); }
+.goal[data-style="line"] .goal__fill { border-radius: inherit; }

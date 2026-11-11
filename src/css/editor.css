@@ -38,6 +38,32 @@
 .ctl__hint { font-size: var(--text-sm); color: var(--color-ink-2); }
 .ctl select { max-width: 14rem; }
 
+/* Hallmark · component: list-rows control (gift = time) · genre: modern-minimal · theme: Hum (site tokens)
+ * states: default · hover · focus · active · disabled · loading (n/a) · error · success (n/a)
+ * contrast: pass · widths checked 320 / 375 / 414 / 768 */
+.pairs, .pairs__add { grid-column: 1 / -1; }
+.pairs { display: grid; gap: var(--space-xs); min-width: 0; }
+.pairs:empty { display: none; }
+.pairs__row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs); min-width: 0; }
+.pairs__name { flex: 1 1 11rem; min-width: 0; }
+.pairs__amount { flex: 0 0 5.5rem; width: 5.5rem; min-width: 0; font-variant-numeric: tabular-nums; }
+.pairs__unit { flex: 0 0 auto; }
+.pairs__remove {
+  display: inline-grid; place-items: center; flex: none; width: 44px; height: 44px; padding: 0; margin-left: auto;
+  font: inherit; font-size: var(--text-md); line-height: 1; color: var(--color-ink-2); background: var(--color-paper);
+  border: 1px solid var(--color-rule-2); border-radius: var(--radius-input); outline: 2px solid transparent; outline-offset: 1px; cursor: pointer;
+  transition: background-color var(--dur-micro) var(--ease-out), color var(--dur-micro) var(--ease-out);
+}
+@media (hover: hover) { .pairs__remove:hover { color: var(--color-error); background: var(--color-paper-2); } }
+.pairs__remove:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 1px; border-color: var(--color-ink); }
+.pairs__remove:active { color: var(--color-error); background: var(--color-paper-3); }
+.pairs__remove:disabled { opacity: 0.55; cursor: not-allowed; }
+.pairs__add { justify-self: start; white-space: nowrap; margin-block: var(--space-2xs); }
+@media (max-width: 30rem) { .pairs__name { flex-basis: 100%; } .pairs { gap: var(--space-md); } .pairs__amount { flex-basis: 4rem; width: 4rem; padding-inline: var(--space-xs); } .pairs__unit { flex: 1 1 0; min-width: 0; padding-inline: var(--space-xs); } .pairs__remove { margin-left: 0; } }
+
+/* a text box beside its label would push the label under it on a phone: stack them */
+@media (max-width: 30rem) { .ctl:has(> input[type="text"]) { grid-template-columns: minmax(0, 1fr); } .ctl > input[type="text"] { width: 100%; } }
+
 .more { border-top: 2px dashed var(--color-rule-2); }
 .more > summary { display: flex; align-items: center; justify-content: space-between; min-height: 3.25rem; padding: 0; font-weight: 650; list-style: none; cursor: pointer; }
 @media (hover: hover) { .more > summary:hover { background: var(--color-paper-2); } }

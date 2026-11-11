@@ -14,6 +14,7 @@ export const GOAL_STYLES = [
   { id: "stars", name: "Stars" },
   { id: "neon", name: "Neon glow" },
   { id: "ring", name: "Ring" },
+  { id: "line", name: "Thin line" },
 ];
 
 /** What a goal can count. `kind` is the relay event it listens for; `small` and `big` are what the editor's test buttons add. */

@@ -56,11 +56,12 @@ export const PRESETS = {
   bubblegum: { font: "Bricolage Grotesque", size: 18, text: "#fff0fa", accent: "#ff5fc8", pop: "#58f0ff", bg: "#1a0a1f", bgAlpha: 84, shape: "filled", borderW: 2, radius: 14, shadow: "glow", blur: 0, anim: "pop", speed: 380, avatar: true },
   butter: { font: "Baloo 2", size: 19, text: "#2b1d00", accent: "#2b1d00", pop: "#ff9bd0", bg: "#ffe066", bgAlpha: 100, shape: "filled", borderW: 3, radius: 18, shadow: "hard", blur: 0, anim: "pop", speed: 380, avatar: true },
   arcade: { font: "Press Start 2P", size: 13, text: "#e8f6ff", accent: "#59ffa0", pop: "#ffd23f", bg: "#101a2e", bgAlpha: 100, shape: "filled", borderW: 3, radius: 0, shadow: "hard", blur: 0, anim: "step", speed: 360, avatar: true },
+  minimal: { font: "Geist", size: 18, text: "#ffffff", accent: "#ffffff", pop: "#9ee7ff", bg: "#000000", bgAlpha: 0, shape: "none", borderW: 0, radius: 0, shadow: "none", blur: 0, anim: "fade", speed: 300, avatar: false },
   whisper: { font: "Fredoka", size: 21, text: "#ffffff", accent: "#ffd23f", pop: "#ff9bd0", bg: "#000000", bgAlpha: 0, shape: "none", borderW: 0, radius: 0, shadow: "none", blur: 0, anim: "fade", speed: 300, avatar: false },
 };
 
 export const PRESET_NAMES = {
-  blueberry: "Blueberry", frost: "Frost", mint: "Mint", bubblegum: "Bubblegum", butter: "Butter", arcade: "Arcade", whisper: "Whisper",
+  blueberry: "Blueberry", frost: "Frost", mint: "Mint", bubblegum: "Bubblegum", butter: "Butter", arcade: "Arcade", whisper: "Whisper", minimal: "Minimal",
 };
 
 export const LOOK_KEYS = Object.keys(PRESETS.blueberry);

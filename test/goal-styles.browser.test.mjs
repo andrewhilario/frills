@@ -119,7 +119,7 @@ test("goal designs: the editor offers them as choices, the preview changes at on
   await page.goto(`${base}/goal/`, { settle: 900 });
   const row = (label) => `[...document.querySelectorAll("#main-controls .ctl, .panel .ctl")].find((r) => r.querySelector(".ctl__label")?.textContent.trim() === ${JSON.stringify(label)})`;
   const names = await page.evaluate(`[...${row("Bar design")}.querySelectorAll(".chip")].map((b) => b.textContent.trim())`);
-  assert.deepEqual(names, ["Classic", "Candy stripes", "Blocks", "Hearts", "Stars", "Neon glow", "Ring"]);
+  assert.deepEqual(names, ["Classic", "Candy stripes", "Blocks", "Hearts", "Stars", "Neon glow", "Ring", "Thin line"]);
   assert.equal(await page.evaluate(`document.querySelector(".preview .goal").dataset.style`), "bar");
   await page.evaluate(`[...${row("Bar design")}.querySelectorAll(".chip")].find((b) => b.textContent.trim() === "Hearts").click()`);
   assert.equal(await page.evaluate(`document.querySelector(".preview .goal").dataset.style`), "hearts");
