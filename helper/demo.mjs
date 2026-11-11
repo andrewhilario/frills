@@ -56,9 +56,17 @@ export class DemoConnection extends EventEmitter {
   tick(after) {
     this.timer = setTimeout(() => {
       if (this.gone) return;
+      this.watching();
       this.say();
       this.tick(this.pace[0] + Math.random() * (this.pace[1] - this.pace[0]));
     }, after);
+  }
+
+  /** How many are watching: a made-up number that drifts, said now and then like TikTok does. */
+  watching() {
+    this.viewers ??= 42;
+    this.viewers = Math.max(5, this.viewers + Math.round((Math.random() - 0.42) * 6));
+    if (this.count % 2 === 0) this.emit("roomUser", { viewerCount: this.viewers });
   }
 
   /** A made-up person by number (for a crowd). */

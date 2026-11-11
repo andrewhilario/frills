@@ -48,6 +48,9 @@ export class Room {
     this.base = 0; // the account's follower count when we connected (0 when TikTok did not say)
     this.followed = 0; // follows seen since then, so a page that joins later is told a current number
     this.likeTimer = 0;
+    this.viewers = 0; // how many are watching, as TikTok last said (0: not known yet)
+    this.viewerTimer = 0;
+    this.viewerSentAt = 0;
     this.lastLookAt = 0; // when we last asked TikTok whether the account is LIVE (see add)
     this.liveEndedAt = 0; // when the LIVE we were connected to ended (0: none has, since we started); the owner's list says "ended 20 min ago"
     this.lastSeenAt = 0; // when a chat line, gift, follow or share last came through, so the list can tell a busy LIVE from a quiet one
@@ -61,7 +64,7 @@ export class Room {
     this.clients.add(client);
     this.emptySince = 0;
     client.send("status", this.status);
-    if (this.base > 0 || this.live) client.send("info", this.info());
+    if (this.base > 0 || this.live || this.viewers > 0) client.send("info", this.info());
     if (!this.running) this.start();
     // A page that opens while the room is between two looks for a LIVE (the account is offline, and looked at less and less often the longer
     // that lasts) makes it look right now, so a streamer who just went LIVE and reloads the overlay is not made to wait. Not more than once
@@ -69,9 +72,26 @@ export class Room {
     else if (this.sleeper && this.status.state === "offline" && Date.now() - this.lastLookAt >= this.hub.opts.wakeGapMs) this.sleeper();
   }
 
-  /** What the room knows about the account itself: whether it is LIVE, and its follower count when TikTok gave one (0 when not). */
+  /** What the room knows about the account itself: whether it is LIVE, its follower count when TikTok gave one (0 when not), and how many are watching (only once known). */
   info() {
-    return { live: this.live, followers: this.base > 0 ? this.base + this.followed : 0 };
+    return { live: this.live, followers: this.base > 0 ? this.base + this.followed : 0, ...(this.viewers > 0 ? { viewers: this.viewers } : {}) };
+  }
+
+  /**
+   * TikTok says how many are watching every few seconds. A change is passed on to the pages, at most once every 3 seconds (a big LIVE changes it all the time),
+   * and the newest number always gets there: a number that arrives too soon waits and is sent when the 3 seconds are up.
+   */
+  seeViewers(d) {
+    const n = Math.round(Number(d?.viewerCount ?? d?.viewer_count ?? d?.totalUser));
+    if (!Number.isFinite(n) || n < 0 || n >= 1e9 || n === this.viewers) return;
+    this.viewers = n;
+    if (this.viewerTimer) return;
+    const wait = Math.max(0, this.viewerSentAt + 3000 - Date.now());
+    this.viewerTimer = setTimeout(() => {
+      this.viewerTimer = 0;
+      this.viewerSentAt = Date.now();
+      this.broadcast("info", this.info());
+    }, wait);
   }
 
   /** Reads the follower count from the room details TikTok gave when we connected, and tells the pages. */
@@ -162,6 +182,7 @@ export class Room {
       this.alert(mapGiftAlert(d));
     });
     conn.on("like", (d) => this.like(mapLike(d)));
+    conn.on("roomUser", (d) => this.seeViewers(d));
     conn.on("follow", (d) => this.alert(mapFollow(d)));
     conn.on("share", (d) => this.alert(mapShare(d)));
     conn.on("imDelete", (d) => {
@@ -258,6 +279,7 @@ export class Room {
       this.live = false;
       this.liveEndedAt = Date.now();
     }
+    this.viewers = 0; // nobody is watching a LIVE that is over (a reconnect to a LIVE that is still on hears the number again)
     return how;
   }
 
@@ -354,6 +376,7 @@ export class Room {
     clearTimeout(this.idleTimer);
     clearInterval(this.report);
     clearTimeout(this.likeTimer);
+    clearTimeout(this.viewerTimer);
     this.sleeper?.();
     if (this.conn) this.letGo(this.conn);
   }

@@ -3,6 +3,7 @@
 
 import { cleanName, connectTo, statusText } from "./connect.js";
 import { relayForPage } from "./tiktok.js";
+import { acceptInfo } from "./info.js";
 
 /**
  * Connects and calls `onAlert(event)` for each event of the `events` kinds. `say(text)` shows a note on the page ("" clears it).
@@ -20,7 +21,7 @@ export function connectEvents({ channel, events, onAlert, onInfo, onChat, say })
     keepTrying: true, // an overlay in OBS has no button to press: if the relay is not answering when it opens, it looks again by itself
     events,
     onAlert,
-    onInfo,
+    onInfo: (raw) => { const info = acceptInfo(raw); if (info) onInfo?.(info); },
     onFound: (found) => {
       if (found && !found.features.includes("alerts")) {
         old = true;

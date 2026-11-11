@@ -174,7 +174,7 @@ export function mountSource(host, { feeds, pace, channel = "", twitch = "", plat
       relay,
       events,
       // TikTok says the room is LIVE: that is reading it, even before anyone says or does anything.
-      onInfo: (info) => { if (info.live) seen(); onInfo?.(info); },
+      onInfo: (info) => { if (info?.live === true) seen(); onInfo?.(info); },
       // Anything arriving proves the account is LIVE and we are reading it: a follow or a like counts, not only a chat message.
       onAlert: onAlert && ((event) => { seen(); onAlert(event); }),
       onFirstMessage: seen,

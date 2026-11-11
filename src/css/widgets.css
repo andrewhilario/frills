@@ -427,7 +427,7 @@
 .widget__deco .deco__spark--1 { top: 4%; right: 5%; width: 1.1em; }
 .widget__deco .deco__spark--2 { top: 34%; right: 1.5%; width: 0.85em; }
 .widget__deco .deco__spark--3 { bottom: 24%; left: 40%; width: 0.7em; }
-.giftlist[data-deco]:not([data-deco="none"]), .likers[data-deco]:not([data-deco="none"]), .songs[data-deco]:not([data-deco="none"]) { padding-bottom: calc(2% + 3.4em); }
+.giftlist[data-deco]:not([data-deco="none"]), .counter[data-deco]:not([data-deco="none"]), .likers[data-deco]:not([data-deco="none"]), .songs[data-deco]:not([data-deco="none"]) { padding-bottom: calc(2% + 3.4em); }
 .goal .widget__deco .deco__peek { right: 4%; bottom: calc(100% - 3px); }
 .goal .widget__deco .deco__corner { left: -1.2em; bottom: -1.5em; width: 3.2em; }
 .goal .widget__deco .deco__spark--1 { top: -0.9em; left: 30%; right: auto; }
@@ -572,3 +572,27 @@
 @media (prefers-reduced-motion: reduce) { .songs[data-layout="neon"] .song--now .song__title { animation: none; } }
 /* the neon glow of the words would be cut to a box by the words' own clipping, so the words get room for it */
 .songs[data-layout="neon"] .song--now .song__title, .songs[data-layout="neon"] .song--now .song__artist { padding: 0.25em 0.4em; margin: -0.25em -0.4em; }
+
+
+/* ── The Live Counter: the people watching and the likes ─────────────────────────────────────────────────────────── */
+.counter { position: absolute; inset: 0; display: flex; padding: 2%; overflow: hidden; pointer-events: none; font-family: var(--a-font, sans-serif); font-size: var(--a-size, 24px); letter-spacing: var(--a-letter, 0px); }
+.counter__box { display: flex; gap: 0.5em; align-items: flex-start; align-self: flex-start; }
+.counter[data-layout="stack"] .counter__box { flex-direction: column; }
+.counter[data-align="center"] .counter__box { margin: 0 auto; }
+.counter[data-align="right"] .counter__box { margin-left: auto; }
+.counter[data-align="right"][data-layout="stack"] .counter__box { align-items: flex-end; }
+.counter[data-align="center"][data-layout="stack"] .counter__box { align-items: center; }
+.counter__item { display: inline-flex; align-items: center; gap: 0.45em; padding: 0.25em 0.85em 0.3em; color: var(--a-text, #222); background: var(--a-bg, #fff); border: var(--a-border, 2px) solid var(--a-accent, #fc0); border-radius: var(--a-radius, 20px); box-shadow: var(--a-shadow, none); font-weight: 800; white-space: nowrap; }
+.counter__item[hidden], .counter__icon[hidden], .counter__label[hidden] { display: none; }
+.counter__icon { display: inline-grid; place-items: center; width: 1.1em; height: 1.1em; }
+.counter__icon svg { width: 100%; height: 100%; fill: none; stroke: var(--a-accent, #fc0); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.counter__item--likes .counter__icon svg { fill: var(--a-accent, #fc0); }
+.counter__num { display: inline-block; font-variant-numeric: tabular-nums; }
+.counter__label { font-size: 0.78em; font-weight: 600; opacity: 0.85; }
+.counter__num--bump { animation: w-bump 320ms cubic-bezier(0.2, 1.4, 0.4, 1); }
+@keyframes w-bump { 40% { transform: scale(1.22); } }
+/* One small pill: both numbers share one edge, with a thin line between them. */
+.counter[data-layout="pill"] .counter__box { gap: 0; padding: 0.25em 0.85em 0.3em; background: var(--a-bg, #fff); border: var(--a-border, 2px) solid var(--a-accent, #fc0); border-radius: var(--a-radius, 20px); box-shadow: var(--a-shadow, none); }
+.counter[data-layout="pill"] .counter__item { padding: 0; background: none; border: 0; border-radius: 0; box-shadow: none; }
+.counter[data-layout="pill"] .counter__item + .counter__item:not([hidden]) { margin-left: 0.8em; padding-left: 0.8em; border-left: 2px solid var(--a-accent, #fc0); }
+@media (prefers-reduced-motion: reduce) { .counter__num--bump { animation: none; } }

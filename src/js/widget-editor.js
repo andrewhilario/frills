@@ -8,6 +8,7 @@ import { mountSource } from "./source.js";
 import { fontsReady, generalFaces } from "./look.js";
 import { luminance } from "./color.js";
 import { mountMediaPicker } from "./alerts-media.js";
+import { acceptInfo } from "./info.js";
 
 const $ = (id) => document.getElementById(id);
 const CANVASES = { vertical: [1080, 1920], landscape: [1920, 1080], square: [1080, 1080] };
@@ -93,7 +94,7 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
     tools: false,
     idleHint,
     events,
-    onInfo: (info) => api.onInfo?.(info),
+    onInfo: (raw) => { const info = acceptInfo(raw); if (info) api.onInfo?.(info); },
     onAlert: (event) => api.onEvent(event),
     onFound: (found) => {
       $("relay-note").textContent = !found ? ""

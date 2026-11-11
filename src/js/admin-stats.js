@@ -58,6 +58,7 @@ const NAMES = {
   gifts: "Last Gifts",
   goal: "Stream Goals",
   likers: "Top Likers",
+  counter: "Viewer + Like Counter",
   songs: "Song Requests (!sr)",
   matcha: "Matcha Theme",
   home: "Home Page (/)",

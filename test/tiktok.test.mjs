@@ -4,6 +4,7 @@
 import test, { mock } from "node:test";
 import assert from "node:assert/strict";
 import { acceptAlert, acceptMessage, cleanTikTokUser, connectTikTok, explainRefusal, isAvatarUrl } from "../src/js/tiktok.js";
+import { acceptInfo } from "../src/js/info.js";
 import { cleanName, statusText } from "../src/js/connect.js";
 import { overlayUrl } from "../src/js/settings.js";
 import { matchaOverlayUrl } from "../src/js/matcha.js";
@@ -231,21 +232,18 @@ test("a bad TikTok name fails at once, without opening a connection", () => {
   assert.equal(status[0].fatal, true);
 });
 
-test("the page side takes the account's follower count, and ignores a damaged one", () => {
+test("the page side passes the account's details on as they came, and acceptInfo keeps only what is sound", () => {
   const source = fakeEventSource();
   const infos = [];
   connectTikTok({ user: "pond.pal", eventSourceFactory: () => source, onInfo: (i) => infos.push(i) });
-  source.send("info", { followers: 81371 });
-  source.send("info", { followers: "lots" });
-  source.send("info", { followers: -5 });
-  source.send("info", { followers: 1e12 });
-  source.send("info", {});
+  source.send("info", { followers: 81371, viewers: 40 });
   source.send("info", "{ not json");
-  assert.deepEqual(infos, [{ live: false, followers: 81371 }]);
-  source.send("info", { live: true });
-  source.send("info", { live: "yes" });
-  assert.deepEqual(infos.at(-1), { live: true, followers: 0 }, "the room being LIVE is passed on on its own");
-  assert.equal(infos.length, 2);
+  assert.deepEqual(infos, [{ followers: 81371, viewers: 40 }], "a damaged event is skipped and the rest comes as it was sent");
+  assert.deepEqual(acceptInfo({ followers: 81371 }), { live: false, followers: 81371, viewers: 0 });
+  assert.deepEqual(acceptInfo({ followers: 81371, viewers: 1234.6, live: true }), { live: true, followers: 81371, viewers: 1235 });
+  for (const odd of [{ followers: "lots" }, { followers: -5 }, { followers: 1e12 }, { viewers: -3 }, { viewers: 1e12 }, { viewers: "many" }, {}, null, undefined, "x"]) assert.equal(acceptInfo(odd), null, JSON.stringify(odd));
+  assert.deepEqual(acceptInfo({ live: true }), { live: true, followers: 0, viewers: 0 }, "the room being LIVE is passed on on its own");
+  assert.equal(acceptInfo({ live: "yes" }), null);
 });
 
 // ── TikTok's own emotes: pictures put in the words at the places TikTok names ───────────────────────────────────────────────────

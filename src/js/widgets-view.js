@@ -3,6 +3,7 @@
 
 import { el } from "./feed.js";
 import { GOAL_TYPES, MOMENTS } from "./goal.js";
+import { formatCount } from "./counter.js";
 import { commandWord } from "./songs.js";
 import { MEDIA_ID, mediaUrl } from "./alerts-settings.js";
 import { fillTemplate } from "./alerts.js";
@@ -555,5 +556,89 @@ export function createSongsView(host) {
       if (nowKey && nodes.get(nowKey)?.t) requestAnimationFrame(() => measure(nodes.get(nowKey)));
     },
     render(view) { last = view; show(); },
+  };
+}
+
+// ── The Live Counter ────────────────────────────────────────────────────────────────────────────────────────────────
+
+const ICON_PATHS = {
+  eye: ["M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"],
+  heart: ["M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7Z"],
+};
+
+/** A small drawn picture (an eye, a heart): our own shapes, not anything a viewer wrote. */
+function counterIcon(name) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  for (const d of ICON_PATHS[name]) {
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", d);
+    svg.append(path);
+  }
+  if (name === "eye") {
+    const pupil = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    pupil.setAttribute("cx", "12");
+    pupil.setAttribute("cy", "12");
+    pupil.setAttribute("r", "3");
+    svg.append(pupil);
+  }
+  return svg;
+}
+
+/** The Live Counter: how many are watching and the likes. Returns { apply(settings), render({ viewers, likes }) }. */
+export function createCounterView(host) {
+  const root = el("div", { className: "counter" });
+  const box = el("div", { className: "counter__box" });
+  root.append(box);
+  host.append(root);
+  const parts = {};
+  for (const [kind, icon] of [["viewers", "eye"], ["likes", "heart"]]) {
+    const picture = el("span", { className: "counter__icon" });
+    picture.append(counterIcon(icon));
+    const num = el("span", { className: "counter__num" });
+    const label = el("span", { className: "counter__label" });
+    const item = el("div", { className: `counter__item counter__item--${kind}`, hidden: true });
+    item.append(picture, num, label);
+    box.append(item);
+    parts[kind] = { item, picture, num, label, shown: -1 };
+  }
+  let settings = null;
+  let last = { viewers: null, likes: null };
+
+  function paint({ viewers, likes }, bumpAllowed) {
+    const values = { viewers, likes };
+    for (const kind of ["viewers", "likes"]) {
+      const part = parts[kind];
+      const wanted = kind === "viewers" ? settings.showViewers : settings.showLikes;
+      const value = values[kind];
+      part.item.hidden = !wanted || value === null; // (each number stays hidden until it is known)
+      part.picture.hidden = !settings.icons;
+      part.label.textContent = kind === "viewers" ? settings.viewersLabel : settings.likesLabel;
+      part.label.hidden = !part.label.textContent;
+      if (value === null || value === part.shown) continue;
+      part.num.textContent = formatCount(value, settings.short);
+      if (bumpAllowed && settings.bump && part.shown >= 0 && value > part.shown && !reducedMotion()) {
+        part.num.classList.remove("counter__num--bump");
+        void part.num.offsetWidth; // so the bump starts over when numbers come quickly
+        part.num.classList.add("counter__num--bump");
+      }
+      part.shown = value;
+    }
+  }
+
+  return {
+    apply(next) {
+      settings = next;
+      applyLook(root, next);
+      root.dataset.layout = next.layout;
+      for (const part of Object.values(parts)) part.shown = -1; // written again: the number's look (short or not) may have changed
+      paint(last, false);
+    },
+    render(state) {
+      if (!settings) return;
+      last = state;
+      paint(state, true);
+    },
   };
 }

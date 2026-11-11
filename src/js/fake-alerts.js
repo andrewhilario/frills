@@ -136,3 +136,30 @@ export function fakeSongSource(push, getPace = () => [2500, 5000]) {
   timer = setTimeout(loop, 300);
   return { stop() { stopped = true; clearTimeout(timer); } };
 }
+
+// ── practice counter ────────────────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Made-up numbers for the Live Counter: the people watching drift up and down, and the likes of the LIVE keep growing (each like event carries the
+ * total, as TikTok's do). `onViewers(n)` and `onLike({ kind: "like", count, total })` are called now and then. Returns { stop() }.
+ */
+export function fakeCounterSource({ onViewers, onLike }, getPace = () => [600, 1500]) {
+  let stopped = false;
+  let timer = 0;
+  let viewers = 86;
+  let total = 4200;
+  const loop = () => {
+    if (stopped) return;
+    viewers = Math.max(5, viewers + Math.round((Math.random() - 0.42) * 7));
+    onViewers(viewers);
+    const count = 1 + Math.floor(Math.random() * 38);
+    total += count;
+    onLike({ kind: "like", id: "", user: "practice", name: "practice", avatar: "", count, total });
+    const [lo, hi] = getPace();
+    timer = setTimeout(loop, lo + Math.random() * (hi - lo));
+  };
+  onViewers(viewers);
+  onLike({ kind: "like", id: "", user: "practice", name: "practice", avatar: "", count: 0, total });
+  timer = setTimeout(loop, 500);
+  return { stop() { stopped = true; clearTimeout(timer); } };
+}

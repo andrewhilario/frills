@@ -109,7 +109,7 @@ test("stats page: it draws both sites, the Frills Plus check with yes and not ye
   await stats({ status: 200, body: REPORT });
   await page.waitFor(`document.querySelectorAll("#score li").length === 3`, { timeout: 5000 });
   const score = await page.evaluate(`[...document.querySelectorAll("#score li")].map((li) => li.dataset.ok + ":" + li.querySelector(".stats__tick").textContent)`);
-  assert.deepEqual(score, ["false:Not yet", "true:Yes", "false:Not yet"], "two overlays and seven copies are not enough, but the one overlay of the week before did come back");
+  assert.deepEqual(score, ["false:IN PROGRESS", "true:READY", "false:IN PROGRESS"], "two overlays and seven copies are not enough, but the one overlay of the week before did come back");
   const texts = await page.evaluate(`({ frills: document.getElementById("frills").textContent, tally: document.getElementById("valwidgets").textContent, bars: document.querySelectorAll("#frills .stats__bars i").length })`);
   assert.equal(texts.bars, 28);
   assert.match(texts.frills, /Visits, last 7 days.*42/);
