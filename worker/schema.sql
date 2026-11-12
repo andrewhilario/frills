@@ -116,7 +116,7 @@ CREATE INDEX IF NOT EXISTS pro_passes_hash ON pro_passes (pass_hash);
 CREATE TABLE IF NOT EXISTS pro_links (
   ref_id TEXT PRIMARY KEY,
   pass_code TEXT NOT NULL,
-  updated_at INTEGER NOT NULL
+  updated_at INTEGER NOT NULL      -- the time of the latest payment notice that changed this row (the provider's clock), so an older notice arriving late is ignored
 );
 
 -- Frills Plus accounts (see worker/accounts.mjs and PLAN-FRILLS-PLUS.md): an email address, nothing else about the person. No passwords: a person signs in with a link sent to their inbox. Run this part once.
@@ -150,8 +150,9 @@ CREATE INDEX IF NOT EXISTS sessions_account ON sessions (account_id);
 CREATE TABLE IF NOT EXISTS plus (
   account_id TEXT PRIMARY KEY,
   provider_ref TEXT NOT NULL DEFAULT '', -- the payment provider's subscription id
-  status TEXT NOT NULL DEFAULT 'active',  -- active, paused, canceled
-  renews_at INTEGER,               -- when the current month ends (milliseconds), null if unknown
+  order_ref TEXT NOT NULL DEFAULT '',    -- the payment provider's order id (a refund names the order)
+  status TEXT NOT NULL DEFAULT 'active',  -- active, canceled (paid until renews_at), paused, unpaid, expired, refunded
+  renews_at INTEGER,               -- paid until (milliseconds): the end of the current month, or the end date of a cancelled one; null if unknown
   tts_used INTEGER NOT NULL DEFAULT 0,
   tts_limit INTEGER NOT NULL DEFAULT 1500,
   period_start INTEGER NOT NULL,

@@ -108,9 +108,23 @@ export async function endAllSessions(db, accountId) {
   await db.prepare("DELETE FROM sessions WHERE account_id = ?").bind(String(accountId)).run();
 }
 
+/** How long after the date a payment should have renewed an active Plus is still honoured, in case a notice from the payment service is late or lost. */
+export const PLUS_GRACE_MS = 3 * 24 * 3600 * 1000;
+
+/**
+ * Whether what an account bought gives it Plus right now. "active" does (until three days past its renewal date, if that date is known); "canceled" is a
+ * subscription that was cancelled but is paid until its end date, so it counts until that date; every other status (paused, unpaid, expired, refunded) does not.
+ */
+export function plusActive(row, now = Date.now()) {
+  if (!row) return false;
+  if (row.status === "active") return row.renews_at == null || now <= row.renews_at + PLUS_GRACE_MS;
+  if (row.status === "canceled") return row.renews_at != null && now < row.renews_at;
+  return false;
+}
+
 /** What an account has bought, or null. */
 export async function getPlus(db, accountId) {
-  return (await db.prepare("SELECT account_id, provider_ref, status, renews_at, tts_used, tts_limit, period_start, updated_at FROM plus WHERE account_id = ?").bind(String(accountId)).first()) ?? null;
+  return (await db.prepare("SELECT account_id, provider_ref, order_ref, status, renews_at, tts_used, tts_limit, period_start, updated_at FROM plus WHERE account_id = ?").bind(String(accountId)).first()) ?? null;
 }
 
 /** Deletes an account and everything kept about it: its sessions, its sign-in links, what it bought. Returns true if there was such an account. */

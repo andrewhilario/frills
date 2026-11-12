@@ -17,6 +17,7 @@ import { handleAdmin } from "../worker/admin.mjs";
 import { handleFollows } from "../worker/follows.mjs";
 import { handleTimer } from "../worker/timer.mjs";
 import { handleAccount } from "../worker/account-routes.mjs";
+import { handlePlusWebhook } from "../worker/plus-webhook.mjs";
 import { handleProStatus } from "../worker/region.mjs";
 import { handleDevPass, handleTts } from "../worker/tts.mjs";
 import { handleActivateLicense, handleLemonWebhook } from "../worker/billing.mjs";
@@ -28,7 +29,7 @@ const serveFiles = createStatic(process.env.DIST_DIR ? resolve(root, process.env
 // SPOTIFY_TOKEN_KEY is the key the Spotify logins are kept under (32 random bytes, base64). Here, without one, a throwaway key is made each time the
 // server starts, so a login kept in the local database cannot be read after a restart (the page then asks to log in again).
 const throwaway = Buffer.from(globalThis.crypto.getRandomValues(new Uint8Array(32))).toString("base64");
-const env = { DEV: true, LEMON_CHECKOUT_URL: process.env.LEMON_CHECKOUT_URL, DB: localDatabase(process.env.FEEDBACK_DB ?? join(root, ".dev-feedback.sqlite")), ADMIN_KEY: process.env.ADMIN_KEY, SPOTIFY_TOKEN_KEY: process.env.SPOTIFY_TOKEN_KEY ?? throwaway, OPENAI_TTS_KEY: process.env.OPENAI_TTS_KEY, GOOGLE_TTS_KEY: process.env.GOOGLE_TTS_KEY, GROQ_TTS_KEY: process.env.GROQ_TTS_KEY, PRO_DEV_KEY: process.env.PRO_DEV_KEY, PRO_COUNTRIES: process.env.PRO_COUNTRIES, REQUIRE_PRO_PASS: process.env.REQUIRE_PRO_PASS, LEMON_CHECKOUT_URL: process.env.LEMON_CHECKOUT_URL, LEMON_STORE_ID: process.env.LEMON_STORE_ID, LEMON_PRODUCT_ID: process.env.LEMON_PRODUCT_ID, LEMON_WEBHOOK_SECRET: process.env.LEMON_WEBHOOK_SECRET, LEMON_TEST_MODE: process.env.LEMON_TEST_MODE ?? "1", PRO_MONTHLY_LIMIT: process.env.PRO_MONTHLY_LIMIT };
+const env = { DEV: true, LEMON_CHECKOUT_URL: process.env.LEMON_CHECKOUT_URL, LEMON_WEBHOOK_SECRET: process.env.LEMON_WEBHOOK_SECRET, LEMON_STORE_ID: process.env.LEMON_STORE_ID, LEMON_PRODUCT_ID: process.env.LEMON_PRODUCT_ID, PLUS_MONTHLY_LIMIT: process.env.PLUS_MONTHLY_LIMIT, DB: localDatabase(process.env.FEEDBACK_DB ?? join(root, ".dev-feedback.sqlite")), ADMIN_KEY: process.env.ADMIN_KEY, SPOTIFY_TOKEN_KEY: process.env.SPOTIFY_TOKEN_KEY ?? throwaway, OPENAI_TTS_KEY: process.env.OPENAI_TTS_KEY, GOOGLE_TTS_KEY: process.env.GOOGLE_TTS_KEY, GROQ_TTS_KEY: process.env.GROQ_TTS_KEY, PRO_DEV_KEY: process.env.PRO_DEV_KEY, PRO_COUNTRIES: process.env.PRO_COUNTRIES, REQUIRE_PRO_PASS: process.env.REQUIRE_PRO_PASS, LEMON_CHECKOUT_URL: process.env.LEMON_CHECKOUT_URL, LEMON_STORE_ID: process.env.LEMON_STORE_ID, LEMON_PRODUCT_ID: process.env.LEMON_PRODUCT_ID, LEMON_WEBHOOK_SECRET: process.env.LEMON_WEBHOOK_SECRET, LEMON_TEST_MODE: process.env.LEMON_TEST_MODE ?? "1", PRO_MONTHLY_LIMIT: process.env.PRO_MONTHLY_LIMIT };
 
 createServer(async (req, res) => {
   const path = req.url?.split("?")[0] ?? "";
@@ -65,7 +66,7 @@ createServer(async (req, res) => {
     res.end(Buffer.from(await response.arrayBuffer()));
     return;
   }
-  if (path.startsWith("/api/account/") || path === "/api/dev/outbox") {
+  if (path.startsWith("/api/account/") || path === "/api/dev/outbox" || path === "/api/webhooks/lemonsqueezy") {
     // (the local mailer writes each email down; this is how a test, or you, reads the sign-in link. It exists only in this local server.)
     if (path === "/api/dev/outbox") {
       res.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
@@ -74,7 +75,7 @@ createServer(async (req, res) => {
     }
     const chunks = [];
     for await (const chunk of req) chunks.push(chunk);
-    const response = await handleAccount(new Request(`http://${req.headers.host}${req.url}`, { method: req.method, headers: req.headers, body: ["GET", "HEAD"].includes(req.method) ? undefined : Buffer.concat(chunks) }), env);
+    const response = await (path === "/api/webhooks/lemonsqueezy" ? handlePlusWebhook : handleAccount)(new Request(`http://${req.headers.host}${req.url}`, { method: req.method, headers: req.headers, body: ["GET", "HEAD"].includes(req.method) ? undefined : Buffer.concat(chunks) }), env);
     res.writeHead(response.status, Object.fromEntries(response.headers));
     res.end(Buffer.from(await response.arrayBuffer()));
     return;

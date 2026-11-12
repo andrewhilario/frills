@@ -98,7 +98,7 @@ test("who is signed in: nobody without the cookie, the email with it, and what t
   const id = env.DB.raw.prepare("SELECT id FROM accounts").get().id;
   env.DB.raw.prepare("INSERT INTO plus (account_id, provider_ref, status, renews_at, tts_used, tts_limit, period_start, updated_at) VALUES (?, 'sub_9', 'active', ?, 12, 1500, ?, ?)").run(id, T0 + 86400000, T0, T0);
   const bought = await call(env, "me", { method: "GET", cookie, now: T0 + 5000 });
-  assert.deepEqual(bought.body.plus, { status: "active", renewsAt: T0 + 86400000, used: 12, limit: 1500 });
+  assert.deepEqual(bought.body.plus, { status: "active", active: true, renewsAt: T0 + 86400000, used: 12, limit: 1500 });
   assert.equal(JSON.stringify(bought.body).includes("sub_9"), false, "the payment provider's id is not handed to the browser");
   assert.equal(bought.headers.get("cache-control"), "no-store");
 });

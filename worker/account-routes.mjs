@@ -8,7 +8,7 @@
 // to press "Sign in", so an email scanner that opens every link in a message cannot spend the one-use token before the person gets to it.
 // Every change needs the request to come from this site itself (the Origin header), and the cookie is HttpOnly, SameSite=Lax, and Secure on the real site.
 
-import { LIMITS, createLoginLink, endSession, getPlus, normalizeEmail, sessionAccount, sweep, useLoginLink } from "./accounts.mjs";
+import { LIMITS, createLoginLink, endSession, getPlus, normalizeEmail, plusActive, sessionAccount, sweep, useLoginLink } from "./accounts.mjs";
 import { getMailer, signInMessage } from "./mailer.mjs";
 import { checkoutLink, checkoutReady } from "./checkout.mjs";
 
@@ -54,7 +54,7 @@ export async function handleAccount(request, env, { now = Date.now(), mailer = n
         signedIn: true,
         email: who.email,
         checkout: checkoutReady(env.LEMON_CHECKOUT_URL, Boolean(env.DEV)),
-        plus: plus ? { status: plus.status, renewsAt: plus.renews_at, used: plus.tts_used, limit: plus.tts_limit } : null,
+        plus: plus ? { status: plus.status, active: plusActive(plus, now), renewsAt: plus.renews_at, used: plus.tts_used, limit: plus.tts_limit } : null,
       });
     }
 
@@ -69,7 +69,7 @@ export async function handleAccount(request, env, { now = Date.now(), mailer = n
       const who = await sessionAccount(db, cookieOf(request, COOKIE), { now });
       if (!who) return json(401, { ok: false, error: "sign_in_first" });
       const plus = await getPlus(db, who.accountId);
-      if (plus?.status === "active") return json(409, { ok: false, error: "already_plus" });
+      if (plusActive(plus, now)) return json(409, { ok: false, error: "already_plus" });
       const link = checkoutLink(env.LEMON_CHECKOUT_URL, { email: who.email, accountId: who.accountId }, { dev: Boolean(env.DEV) });
       if (!link) return json(503, { ok: false, error: "checkout_off" });
       return json(200, { ok: true, url: link });

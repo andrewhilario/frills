@@ -95,13 +95,44 @@ if ($("acct-form")) {
     }
   });
 
-  // What the Frills Plus panel says and whether it offers the button: on already, on sale, or not on sale yet.
-  const showPlus = (me) => {
-    const on = me.plus?.status === "active";
-    $("acct-plus-state").textContent = on ? "Frills Plus is on for this account." : me.checkout ? "You do not have Frills Plus. It is a paid plan that adds extras to Frills." : "Frills Plus is not on sale yet.";
-    $("acct-buy").hidden = on || !me.checkout;
-    $("acct-buy-hint").hidden = on || !me.checkout;
+  // What the Frills Plus panel says, and whether it offers the button. The button is offered only when there is nothing to pay for already: not while Plus is on, and not while it is
+  // paused or unpaid (a second subscription would be paid for twice; managing those comes with the account details later).
+  const day = (ms) => new Date(ms).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+  const plusWords = (me) => {
+    const plus = me.plus;
+    if (plus?.active) {
+      if (plus.status === "canceled") return `Frills Plus is on until ${day(plus.renewsAt)}. It will not renew.`;
+      return `Frills Plus is on for this account.${plus.renewsAt ? ` It renews around ${day(plus.renewsAt)}.` : ""}`;
+    }
+    if (plus?.status === "refunded") return "Your Frills Plus was refunded and is off.";
+    if (plus?.status === "paused") return "Your Frills Plus is paused.";
+    if (plus?.status === "unpaid") return "Your last payment did not go through, so Frills Plus is off.";
+    if (plus) return "Your Frills Plus has ended.";
+    return me.checkout ? "You do not have Frills Plus. It is a paid plan that adds extras to Frills." : "Frills Plus is not on sale yet.";
   };
+  const canBuy = (me) => Boolean(me.checkout) && !me.plus?.active && !["paused", "unpaid"].includes(me.plus?.status);
+  const showPlus = (me) => {
+    $("acct-plus-state").textContent = plusWords(me);
+    $("acct-buy").hidden = !canBuy(me);
+    $("acct-buy-hint").hidden = !canBuy(me);
+  };
+
+  // Coming back from paying (the product's confirmation page is /account/?welcome=1): the payment notice from Lemon Squeezy can take a few seconds, so ask again until Plus is on.
+  const confirmPayment = async () => {
+    const note = $("acct-buy-status");
+    note.dataset.state = "";
+    note.textContent = "Thank you! Confirming your payment…";
+    for (let tries = 0; tries < 30; tries++) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      try {
+        const me = await (await fetch("/api/account/me", { credentials: "same-origin" })).json();
+        if (me.signedIn && me.plus?.active) { showPlus(me); note.textContent = "Your payment is confirmed. Frills Plus is on."; return; }
+      } catch { /* try again */ }
+    }
+    note.dataset.state = "error";
+    note.textContent = "We have not heard about your payment yet. It can take a few minutes: reload this page in a little while. If Plus is still off after that, check your email for the Lemon Squeezy receipt and get in touch.";
+  };
+
   $("acct-buy").addEventListener("click", async () => {
     const button = $("acct-buy");
     const note = $("acct-buy-status");
@@ -123,7 +154,12 @@ if ($("acct-form")) {
   fetch("/api/account/me", { credentials: "same-origin" })
     .then((res) => res.json())
     .then((me) => {
-      if (me.signedIn) { $("acct-who").textContent = me.email; showPlus(me); show("acct-in"); }
+      if (me.signedIn) {
+        $("acct-who").textContent = me.email;
+        showPlus(me);
+        show("acct-in");
+        if (new URLSearchParams(location.search).get("welcome") === "1" && !me.plus?.active) confirmPayment();
+      }
       else show("acct-form");
     })
     .catch(() => { show("acct-form"); say("We could not check whether you are signed in.", true); });
