@@ -238,6 +238,8 @@
 .tool__badge--live { background: var(--color-mint-tint); }
 .tool__badge--beta { background: var(--color-accent); }
 .tool__badge--soon { background: var(--color-lavender-tint); }
+.tool [data-plus][hidden] { display: none; }
+.tool [data-plus][aria-pressed="true"] { --btn-face: var(--color-mint-tint); cursor: default; }
 
 /* The private Spotify test page. */
 .spotify__card { display: grid; gap: var(--space-sm); padding: var(--space-md); margin-block: var(--space-md); border: 2px solid var(--color-ink); border-radius: var(--radius-card); background: var(--color-paper-2); }
