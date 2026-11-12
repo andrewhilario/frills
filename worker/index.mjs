@@ -10,6 +10,7 @@ import { handleSpotify, pruneSpotify } from "./spotify.mjs";
 import { handleAdmin } from "./admin.mjs";
 import { handleFollows } from "./follows.mjs";
 import { handleTimer } from "./timer.mjs";
+import { handleAccount } from "./account-routes.mjs";
 import { handleProStatus } from "./region.mjs";
 import { handleDevPass, handleTts } from "./tts.mjs";
 import { handleActivateLicense, handleLemonWebhook } from "./billing.mjs";
@@ -29,6 +30,7 @@ export default {
     if (pathname.startsWith("/api/spotify/")) return handleSpotify(request, env);
     if (pathname.startsWith("/api/follows/")) return handleFollows(request, env);
     if (pathname.startsWith("/api/timer/")) return handleTimer(request, env);
+    if (pathname.startsWith("/api/account/")) return handleAccount(request, env);
     if (pathname === "/api/pro/status") return handleProStatus(request, env);
     if (pathname === "/api/pro/activate") return handleActivateLicense(request, env);
     if (pathname === "/api/pro/dev-pass") return handleDevPass(request, env);

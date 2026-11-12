@@ -1,0 +1,53 @@
+<!--
+{
+  "title": "Your Frills account",
+  "description": "Sign in to Frills with a link sent to your email. No password.",
+  "path": "/account/",
+  "css": "page",
+  "js": "account",
+  "bodyClass": "page-guide",
+  "chrome": "nav",
+  "footer": true,
+  "noindex": true,
+  "listed": false,
+  "feature": "plusAccounts"
+}
+-->
+<main id="main">
+  <article class="article shell">
+    <header class="article__head">
+      <h1 class="display" id="acct-title">Your Frills account</h1>
+      <p class="lede" id="acct-lede">Frills is free and needs no account. An account is only for Frills Plus: you sign in with a link we email you, so there is no password to remember or leak.</p>
+    </header>
+
+    <div class="article__body">
+      <noscript><p class="note">Signing in needs JavaScript. Turn it on for this page and reload.</p></noscript>
+
+      <p class="form__status" id="acct-loading" role="status">Checking…</p>
+
+      <form class="form" id="acct-form" novalidate hidden>
+        <div class="form__group">
+          <label class="form__label" for="acct-email">Your email</label>
+          <input type="text" id="acct-email" name="email" inputmode="email" autocomplete="email" maxlength="254" autocapitalize="none" spellcheck="false" aria-describedby="acct-hint">
+          <p class="form__hint" id="acct-hint">We send one sign-in link to this address. It works once, for 15 minutes. We keep your email and nothing else about you.</p>
+        </div>
+        <div class="form__actions">
+          <button class="btn" type="submit" id="acct-send">Email me a sign-in link <span class="btn__arrow" aria-hidden="true">→</span></button>
+        </div>
+        <p class="form__status" id="acct-status" role="status" aria-live="polite"></p>
+      </form>
+
+      <div class="note note--warm" id="acct-sent" tabindex="-1" hidden>
+        <p><strong>Check your inbox.</strong> We sent a sign-in link to <span id="acct-sent-to"></span>. It works once, for 15 minutes. If you cannot see it, look in your spam folder.</p>
+        <p><button class="btn btn--outline btn--sm" type="button" id="acct-again" disabled>Send it again</button> <span class="form__hint" id="acct-wait"></span></p>
+      </div>
+
+      <div id="acct-in" hidden>
+        <p>You are signed in as <strong id="acct-who"></strong>.</p>
+        <p class="form__hint">Your Frills Plus details will appear here.</p>
+        <p><button class="btn btn--outline btn--sm" type="button" id="acct-out">Sign out</button></p>
+        <p class="form__status" id="acct-out-status" role="status" aria-live="polite"></p>
+      </div>
+    </div>
+  </article>
+</main>

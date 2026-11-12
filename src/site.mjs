@@ -11,6 +11,8 @@ export const site = {
   url: pick("SITE_URL", "url").replace(/\/+$/, ""),
   // The feedback form on the site itself (a Worker and a D1 database, see worker/). When on, "Feedback" links point at /feedback/.
   feedbackForm: (process.env.FEEDBACK_FORM ?? String(config.feedbackForm ?? "")) === "true" || process.env.FEEDBACK_FORM === "1",
+  // Frills Plus accounts (sign in by email, see worker/accounts.mjs and PLAN-FRILLS-PLUS.md). Off until the whole flow is ready: the account pages are not built at all while it is off.
+  plusAccounts: (process.env.PLUS_ACCOUNTS ?? String(config.plusAccounts ?? "")) === "true" || process.env.PLUS_ACCOUNTS === "1",
   feedbackUrl: pick("FEEDBACK_URL", "feedbackUrl"),
   waitlistUrl: pick("WAITLIST_URL", "waitlistUrl"),
   // Where the TikTok helper can be downloaded. Empty until it can be: the pages then say there is no download yet, and nothing links nowhere.
