@@ -3,12 +3,14 @@
 //   POST /api/account/verify  { token }   -> uses the link's token, starts a session, sets the cookie.
 //   GET  /api/account/me                  -> who is signed in (and what they bought), or signedIn: false.
 //   POST /api/account/logout              -> ends this browser's session.
+//   POST /api/account/checkout            -> the address to pay at (Lemon Squeezy), with this account's email and id in it. Signed in only.
 // The link in the email points at a page (/account/verify/#token) and the token sits after the #, which a browser never sends to a server. The page then asks the person
 // to press "Sign in", so an email scanner that opens every link in a message cannot spend the one-use token before the person gets to it.
 // Every change needs the request to come from this site itself (the Origin header), and the cookie is HttpOnly, SameSite=Lax, and Secure on the real site.
 
 import { LIMITS, createLoginLink, endSession, getPlus, normalizeEmail, sessionAccount, sweep, useLoginLink } from "./accounts.mjs";
 import { getMailer, signInMessage } from "./mailer.mjs";
+import { checkoutLink, checkoutReady } from "./checkout.mjs";
 
 export const COOKIE = "frills_session";
 const MAX_BODY = 512;
@@ -36,7 +38,7 @@ const readBody = async (request) => {
 export async function handleAccount(request, env, { now = Date.now(), mailer = null } = {}) {
   const url = new URL(request.url);
   const action = url.pathname.split("/").filter(Boolean)[2] ?? "";
-  if (!["login", "verify", "me", "logout"].includes(action)) return json(404, { ok: false, error: "not_found" });
+  if (!["login", "verify", "me", "logout", "checkout"].includes(action)) return json(404, { ok: false, error: "not_found" });
   const wanted = action === "me" ? "GET" : "POST";
   if (request.method !== wanted) return json(405, { ok: false, error: "method" }, { allow: wanted });
   if (!env?.DB) return json(503, { ok: false, error: "not_ready" });
@@ -51,6 +53,7 @@ export async function handleAccount(request, env, { now = Date.now(), mailer = n
         ok: true,
         signedIn: true,
         email: who.email,
+        checkout: checkoutReady(env.LEMON_CHECKOUT_URL, Boolean(env.DEV)),
         plus: plus ? { status: plus.status, renewsAt: plus.renews_at, used: plus.tts_used, limit: plus.tts_limit } : null,
       });
     }
@@ -60,6 +63,16 @@ export async function handleAccount(request, env, { now = Date.now(), mailer = n
     if (action === "logout") {
       await endSession(db, cookieOf(request, COOKIE));
       return json(200, { ok: true }, { "set-cookie": setCookie(env, "", 0) });
+    }
+
+    if (action === "checkout") {
+      const who = await sessionAccount(db, cookieOf(request, COOKIE), { now });
+      if (!who) return json(401, { ok: false, error: "sign_in_first" });
+      const plus = await getPlus(db, who.accountId);
+      if (plus?.status === "active") return json(409, { ok: false, error: "already_plus" });
+      const link = checkoutLink(env.LEMON_CHECKOUT_URL, { email: who.email, accountId: who.accountId }, { dev: Boolean(env.DEV) });
+      if (!link) return json(503, { ok: false, error: "checkout_off" });
+      return json(200, { ok: true, url: link });
     }
 
     const { body, tooBig } = await readBody(request);

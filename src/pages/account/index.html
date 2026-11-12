@@ -44,7 +44,13 @@
 
       <div id="acct-in" hidden>
         <p>You are signed in as <strong id="acct-who"></strong>.</p>
-        <p class="form__hint">Your Frills Plus details will appear here.</p>
+        <section class="acct-plus" id="acct-plus" aria-labelledby="acct-plus-title">
+          <h2 class="acct-plus__title" id="acct-plus-title">Frills Plus</h2>
+          <p id="acct-plus-state"></p>
+          <p class="acct-plus__row"><button class="btn" type="button" id="acct-buy" hidden>Get Frills Plus <span class="btn__arrow" aria-hidden="true">→</span></button></p>
+          <p class="form__hint" id="acct-buy-hint" hidden>You pay on Lemon Squeezy’s secure checkout and Frills never sees your card. The price and what is included are shown there, before you pay.</p>
+          <p class="form__status" id="acct-buy-status" role="status" aria-live="polite"></p>
+        </section>
         <p><button class="btn btn--outline btn--sm" type="button" id="acct-out">Sign out</button></p>
         <p class="form__status" id="acct-out-status" role="status" aria-live="polite"></p>
       </div>

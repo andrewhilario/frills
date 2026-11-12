@@ -12,6 +12,9 @@ const WORDS = {
   mail_failed: "We could not send the email just now. Please try again in a minute.",
   not_ready: "Accounts are not working right now. Please try again later.",
   full: "Accounts are full right now. Please try again later.",
+  checkout_off: "Frills Plus is not on sale yet. Please check back soon.",
+  already_plus: "Frills Plus is already on for this account.",
+  sign_in_first: "Please sign in first.",
 };
 const RESEND_SECONDS = 30;
 
@@ -92,10 +95,35 @@ if ($("acct-form")) {
     }
   });
 
+  // What the Frills Plus panel says and whether it offers the button: on already, on sale, or not on sale yet.
+  const showPlus = (me) => {
+    const on = me.plus?.status === "active";
+    $("acct-plus-state").textContent = on ? "Frills Plus is on for this account." : me.checkout ? "You do not have Frills Plus. It is a paid plan that adds extras to Frills." : "Frills Plus is not on sale yet.";
+    $("acct-buy").hidden = on || !me.checkout;
+    $("acct-buy-hint").hidden = on || !me.checkout;
+  };
+  $("acct-buy").addEventListener("click", async () => {
+    const button = $("acct-buy");
+    const note = $("acct-buy-status");
+    button.disabled = true;
+    note.dataset.state = "";
+    note.textContent = "Opening the checkout…";
+    try {
+      const res = await post("checkout");
+      if (res.ok && res.body.ok === true && typeof res.body.url === "string") { location.assign(res.body.url); return; }
+      note.dataset.state = "error";
+      note.textContent = WORDS[res.body.error] ?? "Sorry, the checkout did not open. Please try again.";
+    } catch {
+      note.dataset.state = "error";
+      note.textContent = "Sorry, the checkout did not open. Check your connection and try again.";
+    }
+    button.disabled = false;
+  });
+
   fetch("/api/account/me", { credentials: "same-origin" })
     .then((res) => res.json())
     .then((me) => {
-      if (me.signedIn) { $("acct-who").textContent = me.email; show("acct-in"); }
+      if (me.signedIn) { $("acct-who").textContent = me.email; showPlus(me); show("acct-in"); }
       else show("acct-form");
     })
     .catch(() => { show("acct-form"); say("We could not check whether you are signed in.", true); });

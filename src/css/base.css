@@ -107,7 +107,7 @@ code, kbd { font-family: var(--font-label); font-size: 0.9em; }
 .btn--sm { min-height: 40px; padding: var(--space-xs) var(--space-md); font-size: var(--text-sm); }
 .btn--lg { padding: var(--space-md) var(--space-lg); font-size: var(--text-md); }
 @media (pointer: coarse) { .btn--sm { min-height: 44px; } }
-.btn[hidden] { display: none; } /* the hidden attribute must win over the button's own display, or a button meant to be off still shows */
+[hidden] { display: none !important; } /* the hidden attribute must always win: a component with its own display (a form, a button) would otherwise stay on screen */
 
 /* Soft: a flat lift, no colored edge. Outline: a hairline that fills on hover. */
 .btn--soft { --btn-face: var(--color-paper); --btn-ink: var(--color-ink); box-shadow: 0 0 0 1px var(--color-rule-2), 0 6px 14px -8px var(--color-ink-cast); }

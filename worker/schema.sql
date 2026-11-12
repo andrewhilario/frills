@@ -121,7 +121,7 @@ CREATE TABLE IF NOT EXISTS pro_links (
 
 -- Frills Plus accounts (see worker/accounts.mjs and PLAN-FRILLS-PLUS.md): an email address, nothing else about the person. No passwords: a person signs in with a link sent to their inbox. Run this part once.
 CREATE TABLE IF NOT EXISTS accounts (
-  id TEXT PRIMARY KEY,             -- 16 random hex characters, never shown in a link
+  id TEXT PRIMARY KEY,             -- 16 random hex characters; it goes only into the person's own checkout address, so the payment can be matched to the account
   email TEXT NOT NULL UNIQUE,      -- lower case; needed to send the sign-in link
   created_at INTEGER NOT NULL,     -- milliseconds since 1970
   last_login_at INTEGER NOT NULL

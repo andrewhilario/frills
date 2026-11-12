@@ -24,7 +24,7 @@ let page;
 before(async () => {
   if (skip) return;
   execFileSync(process.execPath, ["build.mjs"], { cwd: root, stdio: "ignore", env: { ...process.env, PLUS_ACCOUNTS: "1", OUT_DIR: variant } });
-  server = spawn(process.execPath, ["scripts/serve.mjs", String(port)], { cwd: root, stdio: "ignore", env: { ...process.env, DIST_DIR: variant, FEEDBACK_DB: join(folder, "db.sqlite") } });
+  server = spawn(process.execPath, ["scripts/serve.mjs", String(port)], { cwd: root, stdio: "ignore", env: { ...process.env, DIST_DIR: variant, FEEDBACK_DB: join(folder, "db.sqlite"), LEMON_CHECKOUT_URL: `${served}/pretend-checkout/` } });
   await waitForServer(served);
   page = await launch();
   await page.viewport(1000, 800);
@@ -37,13 +37,13 @@ after(async () => {
 });
 
 const text = (selector) => page.evaluate(`document.querySelector(${JSON.stringify(selector)})?.textContent.trim() ?? null`);
-const shown = (id) => page.evaluate(`!document.getElementById(${JSON.stringify(id)}).hidden`);
+const shown = (id) => page.evaluate(`getComputedStyle(document.getElementById(${JSON.stringify(id)})).display !== "none"`); // (what is on screen, not only the attribute)
 const outbox = async () => (await fetch(`${served}/api/dev/outbox`)).json();
 const typeEmail = (value) => page.evaluate(`(() => { const i = document.getElementById("acct-email"); i.value = ${JSON.stringify(value)}; i.dispatchEvent(new Event("input", { bubbles: true })); })()`);
 
 test("the page asks for an email, says to check the inbox, and the emailed link signs in, stays signed in after a reload, and signs out", { skip }, async () => {
   await page.goto(`${served}/account/`, { settle: 500 });
-  await page.waitFor(`!document.getElementById("acct-form").hidden`, { timeout: 5000 });
+  await page.waitFor(`getComputedStyle(document.getElementById("acct-form")).display !== "none"`, { timeout: 5000 });
   assert.equal(await shown("acct-in"), false);
 
   await typeEmail("not an email");
@@ -53,7 +53,7 @@ test("the page asks for an email, says to check the inbox, and the emailed link 
 
   await typeEmail("Streamer@Example.com");
   await page.evaluate(`document.getElementById("acct-send").click()`);
-  await page.waitFor(`!document.getElementById("acct-sent").hidden`, { timeout: 5000 });
+  await page.waitFor(`getComputedStyle(document.getElementById("acct-sent")).display !== "none"`, { timeout: 5000 });
   assert.equal(await text("#acct-sent-to"), "Streamer@Example.com");
   assert.match(await text("#acct-sent"), /look in your spam folder/);
   assert.equal(await page.evaluate(`document.getElementById("acct-again").disabled`), true, "a second request has to wait");
@@ -68,18 +68,19 @@ test("the page asks for an email, says to check the inbox, and the emailed link 
   assert.equal(await shown("verify-ready"), true);
   assert.equal((await fetch(`${served}/api/account/me`)).status, 200);
   await page.evaluate(`document.getElementById("verify-go").click()`);
-  await page.waitFor(`location.pathname === "/account/" && !document.getElementById("acct-in").hidden`, { timeout: 8000 });
+  await page.waitFor(`location.pathname === "/account/" && getComputedStyle(document.getElementById("acct-in")).display !== "none"`, { timeout: 8000 });
   assert.equal(await text("#acct-who"), "streamer@example.com");
+  assert.deepEqual(await Promise.all(["acct-loading", "acct-form", "acct-sent", "acct-in"].map(shown)), [false, false, false, true], "only the signed-in view is on screen");
 
   await page.goto(`${served}/account/`, { settle: 500 });
-  await page.waitFor(`!document.getElementById("acct-in").hidden`, { timeout: 5000 });
+  await page.waitFor(`getComputedStyle(document.getElementById("acct-in")).display !== "none"`, { timeout: 5000 });
   assert.equal(await text("#acct-who"), "streamer@example.com", "still signed in after a reload");
   assert.equal(await page.evaluate(`document.cookie.includes("frills_session")`), false, "the cookie cannot be read by the page's script");
 
   await page.evaluate(`document.getElementById("acct-out").click()`);
-  await page.waitFor(`!document.getElementById("acct-form").hidden`, { timeout: 5000 });
+  await page.waitFor(`getComputedStyle(document.getElementById("acct-form")).display !== "none"`, { timeout: 5000 });
   await page.goto(`${served}/account/`, { settle: 500 });
-  await page.waitFor(`!document.getElementById("acct-form").hidden`, { timeout: 5000 });
+  await page.waitFor(`getComputedStyle(document.getElementById("acct-form")).display !== "none"`, { timeout: 5000 });
   assert.equal(await shown("acct-in"), false, "signed out stays signed out");
   assert.deepEqual(page.problems, [], page.problems.join(" | "));
 });
@@ -87,10 +88,10 @@ test("the page asks for an email, says to check the inbox, and the emailed link 
 test("a link that was already used, or is damaged, or is missing, says so and offers a new one", { skip }, async () => {
   const before = (await outbox()).length;
   await page.goto(`${served}/account/`, { settle: 500 });
-  await page.waitFor(`!document.getElementById("acct-form").hidden`, { timeout: 5000 });
+  await page.waitFor(`getComputedStyle(document.getElementById("acct-form")).display !== "none"`, { timeout: 5000 });
   await typeEmail("second@example.com");
   await page.evaluate(`document.getElementById("acct-send").click()`);
-  await page.waitFor(`!document.getElementById("acct-sent").hidden`, { timeout: 5000 });
+  await page.waitFor(`getComputedStyle(document.getElementById("acct-sent")).display !== "none"`, { timeout: 5000 });
   const link = /(http:\/\/localhost:\d+\/account\/verify\/#[A-Za-z0-9_-]{43})/.exec((await outbox())[before].text)[1];
 
   await page.goto(link, { settle: 500 });
@@ -120,4 +121,27 @@ test("the account pages carry noindex, and a site built with the feature off has
   assert.equal(sitemap.includes("/account"), false, "not listed for search engines");
   const off = join(root, "dist", "account");
   assert.equal(existsSync(off), false, "the normal build (feature off) has no account pages");
+});
+
+test("a signed-in person sees the Frills Plus panel, and Get Frills Plus opens the checkout with their email and account id", { skip }, async () => {
+  await page.goto(`${served}/account/`, { settle: 500 });
+  await page.waitFor(`!document.getElementById("acct-form").hidden || !document.getElementById("acct-in").hidden`, { timeout: 5000 });
+  const before = (await outbox()).length;
+  const post = (action, body) => page.evaluate(`fetch("/api/account/${action}", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(${JSON.stringify(body)}) }).then((r) => r.status)`);
+  assert.equal(await post("login", { email: "buyer@example.com" }), 200);
+  const token = /#([A-Za-z0-9_-]{43})/.exec((await outbox())[before].text)[1];
+  assert.equal(await post("verify", { token }), 200);
+  await page.goto(`${served}/account/`, { settle: 500 });
+  await page.waitFor(`getComputedStyle(document.getElementById("acct-in")).display !== "none"`, { timeout: 5000 });
+  assert.equal(await text("#acct-who"), "buyer@example.com");
+  assert.match(await text("#acct-plus-state"), /do not have Frills Plus/);
+  assert.equal(await shown("acct-buy-hint"), true);
+  assert.match(await text("#acct-buy-hint"), /Frills never sees your card/);
+  assert.equal(await page.evaluate(`getComputedStyle(document.getElementById("acct-buy")).display !== "none"`), true, "the button shows");
+
+  await page.evaluate(`document.getElementById("acct-buy").click()`);
+  await page.waitFor(`location.pathname === "/pretend-checkout/"`, { timeout: 8000 });
+  const url = new URL(await page.evaluate("location.href"));
+  assert.equal(url.searchParams.get("checkout[email]"), "buyer@example.com");
+  assert.match(url.searchParams.get("checkout[custom][account_id]"), /^[0-9a-f]{16}$/);
 });

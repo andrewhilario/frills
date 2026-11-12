@@ -20,3 +20,9 @@
 .form__privacy { max-width: 40rem; font-size: var(--text-sm); color: var(--color-ink-2); }
 #fb-thanks { max-width: 40rem; }
 #fb-thanks:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
+
+/* The Frills Plus panel on the account page: one card, a title, the state, the button, and a plain note about paying. Site tokens only. */
+.acct-plus { display: grid; gap: var(--space-sm); max-width: 40rem; margin-block: var(--space-lg); padding: var(--space-lg); background: var(--color-paper); border: 2px solid var(--color-rule-2); border-radius: var(--radius-card); }
+.acct-plus > * { margin: 0; min-width: 0; }
+.acct-plus__title { font-size: var(--text-md); font-weight: 800; letter-spacing: -0.015em; }
+.acct-plus .btn { justify-self: start; }
