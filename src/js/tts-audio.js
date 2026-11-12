@@ -86,9 +86,10 @@ export function createTtsPlayer({ onLevel = () => {}, onNotice = () => {}, onUsa
     if (!info.aiReady) return { allow: false, code: "ai_not_configured" };
     if (!info.eligible) return { allow: false, code: "region_unavailable" };
     if (info.country !== "DEV") {
-      if (!settings.code && !settings.passToken) return { allow: false, code: "no_pass" };
-      if (info.pass && !info.pass.valid) return { allow: false, code: "invalid_pass" };
-      if (info.pass && info.pass.remaining <= 0) return { allow: false, code: "quota_exceeded" };
+      // The server says who this is (an overlay link's code, a signed-in browser, or an older pass key) and what they may do: nothing here guesses.
+      if (!info.pass) return { allow: false, code: "no_pass" };
+      if (!info.pass.valid) return { allow: false, code: "invalid_pass" };
+      if (info.pass.remaining <= 0) return { allow: false, code: "quota_exceeded" };
     }
     return { allow: true, code: "" };
   };

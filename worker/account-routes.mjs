@@ -28,7 +28,7 @@ const sameOrigin = (request) => {
   const origin = request.headers.get("origin");
   return Boolean(origin) && origin === new URL(request.url).origin;
 };
-const cookieOf = (request, name) => {
+export const cookieOf = (request, name) => {
   for (const part of (request.headers.get("cookie") ?? "").split(";")) {
     const at = part.indexOf("=");
     if (at > 0 && part.slice(0, at).trim() === name) return part.slice(at + 1).trim();

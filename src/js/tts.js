@@ -40,8 +40,8 @@ export const TTS = defineWidget({
     code: "",
   },
   controls: [
-    { section: "voice", ...chipsOf("engine", "Voice mode", [["auto", "Auto (AI + free fallback)"], ["browser", "Browser voice (free)"], ["ai", "Pro AI voice only"]]) },
-    { section: "voice", ...selectOf("voice", "Voice style / AI voice", VOICES, "Maps across AI providers (OpenAI, Google, Groq) and distinct browser personas.") },
+    { section: "voice", ...chipsOf("engine", "Voice mode", [["auto", "Auto (Plus AI voice, free voice if not)"], ["browser", "Browser voice (free)"], ["ai", "Plus AI voice only"]]) },
+    { section: "voice", ...selectOf("voice", "Voice style", VOICES, "The AI voices are part of Frills Plus. Without Plus, each style is matched to a free voice installed in your browser.") },
     { section: "voice", ...text("browserVoice", "Browser voice filter", 64, "Auto-matches your voice style, or pick/type any installed Windows/Edge voice name.") },
     { section: "voice", ...range("rate", "Voice speed", 70, 150, 5, "%") },
     { section: "voice", ...range("volume", "Volume", 10, 100, 5, "%") },

@@ -2,7 +2,7 @@
 // Calls OpenAI Speech, Google Cloud TTS, or Groq Orpheus from the Worker so keys stay server-side and CSP stays strict.
 
 import { PASS_WINDOW_MS, checkProRegion, issueProPass, json, lookupProPass, regionOf } from "./region.mjs";
-import { plusForOverlayCode } from "./overlay-links.mjs";
+import { plusGate, spendCredit } from "./plus-gate.mjs";
 
 export const ALLOWED_VOICES = new Set(["alloy", "nova", "shimmer", "echo", "onyx", "fable"]);
 export const TTS_LIMITS = { maxBody: 2048, maxChars: 220, minRate: 0.7, maxRate: 1.5, windowMs: PASS_WINDOW_MS };
@@ -118,20 +118,15 @@ export async function handleTts(request, env, { fetchFn = globalThis.fetch, now 
   const devSecret = String(env?.PRO_DEV_KEY ?? "").trim();
   const isDevKey = Boolean(devSecret && passToken && passToken === devSecret);
   const country = regionOf(request, env);
-  // A Frills Plus overlay speaks for an account by the code in its link (see overlay-links.mjs); the credits are the account's, in the plus table.
-  const overlayCode = String(request.headers.get("x-overlay") || parsed.overlay || "").trim();
-  const isLocalTesting = country === "DEV" && !passToken && !overlayCode && env?.REQUIRE_PRO_PASS !== "1";
+  // Frills Plus goes through the one gate (plus-gate.mjs): an overlay link's code, or being signed in on the website. The credits are the account's, in the plus table.
+  const gate = env?.DB ? await plusGate(request, env, { now, overlayCode: parsed.overlay }) : { present: false };
+  const isLocalTesting = country === "DEV" && !passToken && !gate.present && env?.REQUIRE_PRO_PASS !== "1";
 
   let passRow = null;
   let accountPlus = null;
-  if (overlayCode) {
-    if (!env?.DB) return json(503, { ok: false, error: "not_ready" });
-    const found = await plusForOverlayCode(env.DB, overlayCode, { now });
-    if (!found) return json(401, { ok: false, error: "invalid_pass" }); // a code that is not live, or an account without Plus
-    const reg = checkProRegion(request, env, { allowRoam: false, passToken: "" });
-    if (!reg.eligible) return json(403, { ok: false, error: "region_unavailable", country: reg.country });
-    if (found.plus.tts_used >= found.plus.tts_limit) return json(402, { ok: false, error: "quota_exceeded", limit: found.plus.tts_limit });
-    accountPlus = found.plus;
+  if (gate.present) {
+    if (!gate.ok) return json(gate.status, { ok: false, error: gate.error, ...(gate.country ? { country: gate.country } : {}), ...(gate.limit ? { limit: gate.limit } : {}) });
+    accountPlus = gate.plus;
   } else if (!isDevKey && !isLocalTesting) {
     if (!passToken) return json(401, { ok: false, error: "no_pass" });
     if (!env?.DB) return json(503, { ok: false, error: "not_ready" });
@@ -153,11 +148,10 @@ export async function handleTts(request, env, { fetchFn = globalThis.fetch, now 
 
   const extraHeaders = {};
   if (accountPlus && env?.DB) {
-    await env.DB.prepare("UPDATE plus SET tts_used = tts_used + 1 WHERE account_id = ?").bind(accountPlus.account_id).run();
-    const used = accountPlus.tts_used + 1;
-    extraHeaders["x-tts-used"] = String(used);
-    extraHeaders["x-tts-limit"] = String(accountPlus.tts_limit);
-    extraHeaders["x-tts-remaining"] = String(Math.max(0, accountPlus.tts_limit - used));
+    const left = await spendCredit(env.DB, accountPlus);
+    extraHeaders["x-tts-used"] = String(left.used);
+    extraHeaders["x-tts-limit"] = String(left.limit);
+    extraHeaders["x-tts-remaining"] = String(left.remaining);
   } else if (passRow && env?.DB) {
     await env.DB.prepare("UPDATE pro_passes SET tts_used = tts_used + 1 WHERE code = ?").bind(passRow.code).run();
     const used = passRow.tts_used + 1;
