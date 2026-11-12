@@ -118,3 +118,42 @@ CREATE TABLE IF NOT EXISTS pro_links (
   pass_code TEXT NOT NULL,
   updated_at INTEGER NOT NULL
 );
+
+-- Frills Plus accounts (see worker/accounts.mjs and PLAN-FRILLS-PLUS.md): an email address, nothing else about the person. No passwords: a person signs in with a link sent to their inbox. Run this part once.
+CREATE TABLE IF NOT EXISTS accounts (
+  id TEXT PRIMARY KEY,             -- 16 random hex characters, never shown in a link
+  email TEXT NOT NULL UNIQUE,      -- lower case; needed to send the sign-in link
+  created_at INTEGER NOT NULL,     -- milliseconds since 1970
+  last_login_at INTEGER NOT NULL
+);
+-- A sign-in link waiting to be used: only the token's hash is kept, it works once, and for 15 minutes.
+CREATE TABLE IF NOT EXISTS login_links (
+  token_hash TEXT PRIMARY KEY,     -- sha-256 of the token in the emailed link
+  email TEXT NOT NULL,
+  ip_hash TEXT NOT NULL,           -- sha-256 of the internet address that asked, to slow down abuse; swept after a day
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL,
+  used_at INTEGER                  -- null until it is used
+);
+CREATE INDEX IF NOT EXISTS login_links_email ON login_links (email, created_at);
+CREATE INDEX IF NOT EXISTS login_links_ip ON login_links (ip_hash, created_at);
+-- A signed-in browser: only the hash of the cookie value is kept.
+CREATE TABLE IF NOT EXISTS sessions (
+  token_hash TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL,
+  last_seen_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS sessions_account ON sessions (account_id);
+-- What an account has bought (filled in by the payment webhook, later): one row per account.
+CREATE TABLE IF NOT EXISTS plus (
+  account_id TEXT PRIMARY KEY,
+  provider_ref TEXT NOT NULL DEFAULT '', -- the payment provider's subscription id
+  status TEXT NOT NULL DEFAULT 'active',  -- active, paused, canceled
+  renews_at INTEGER,               -- when the current month ends (milliseconds), null if unknown
+  tts_used INTEGER NOT NULL DEFAULT 0,
+  tts_limit INTEGER NOT NULL DEFAULT 1500,
+  period_start INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
