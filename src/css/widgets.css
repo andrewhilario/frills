@@ -647,3 +647,138 @@
 .goal[data-style="line"] .goal__head { margin: 0 0 0.3em; padding: 0; font-size: 0.8em; background: none; border: 0; box-shadow: none; border-radius: 0; }
 .goal[data-style="line"] .goal__track { height: 0.3em; border: 0; border-radius: 999px; box-shadow: none; background: rgba(128, 128, 128, 0.35); }
 .goal[data-style="line"] .goal__fill { border-radius: inherit; }
+
+/* ── AI Talking Pet TTS ─────────────────────────────────────────────────────────────── */
+.tts {
+  --tts-level: 0;
+  font-family: var(--a-font, var(--font));
+  color: var(--a-text, #1a1822);
+  width: min(100%, 440px);
+}
+.tts__stage {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+}
+.tts__pet {
+  flex: 0 0 auto;
+  width: 96px;
+  height: 96px;
+  display: grid;
+  place-items: end center;
+  transform-origin: bottom center;
+  transform:
+    translateY(calc(var(--tts-level) * -12px))
+    scale(calc(1 + var(--tts-level) * 0.08));
+  transition: transform 90ms ease-out;
+  filter: drop-shadow(0 8px 14px rgb(0 0 0 / 0.22));
+}
+.tts[data-speaking="0"] .tts__pet { opacity: 0.92; }
+.tts__sprite {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.tts__bubble {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 12px 16px;
+  border-radius: var(--a-radius, 18px);
+  background: var(--a-bg, rgb(255 255 255 / 0.92));
+  border: var(--a-border, 2px solid rgb(26 24 34 / 0.14));
+  box-shadow: var(--a-shadow, 0 10px 24px rgb(0 0 0 / 0.16));
+  backdrop-filter: blur(10px);
+  transform-origin: bottom left;
+  animation: tts-pop 220ms cubic-bezier(.2,.9,.3,1.2) both;
+}
+.tts[data-look="minimal"] .tts__bubble,
+.tts[data-look="glass"] .tts__bubble { text-shadow: var(--a-ts); }
+.tts__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+  font-size: calc(var(--a-size, 18px) * 0.72);
+  letter-spacing: var(--a-ls, 0em);
+}
+.tts__author {
+  font-weight: 800;
+  color: var(--a-accent, #7e8a16);
+}
+.tts__badge {
+  font-size: 0.85em;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--a-accent, #7e8a16) 18%, transparent);
+  color: var(--a-text, #1a1822);
+}
+.tts__text {
+  margin: 0;
+  font-size: var(--a-size, 18px);
+  font-weight: 700;
+  line-height: 1.32;
+  letter-spacing: var(--a-ls, 0em);
+  overflow-wrap: anywhere;
+}
+@keyframes tts-pop {
+  from { opacity: 0; transform: translateY(8px) scale(0.94); }
+  to { opacity: 1; transform: none; }
+}
+.tts-saybox {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  margin-top: 4px;
+}
+.tts-saybox input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.pro-status {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  background: rgb(255 255 255 / 0.06);
+  border: 1px solid rgb(128 128 128 / 0.25);
+}
+.pro-status[data-tone="ok"] { border-color: rgb(60 179 113 / 0.45); }
+.pro-status[data-tone="warn"] { border-color: rgb(235 165 55 / 0.55); }
+.pro-status[data-tone="lock"] { border-color: rgb(225 90 100 / 0.65); background: rgb(225 90 100 / 0.08); }
+.pro-paywall {
+  margin-top: 10px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgb(235 165 55 / 0.5);
+  background: rgb(235 165 55 / 0.08);
+  display: grid;
+  gap: 6px;
+}
+.pro-paywall__title { margin: 0; font-size: 0.96rem; font-weight: 800; }
+.pro-paywall__body { margin: 0; font-size: 0.88rem; line-height: 1.45; }
+.pro-paywall__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.pro-paywall__form { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+.pro-paywall__form input { flex: 1 1 200px; min-width: 0; }
+.pro-tester {
+  margin-top: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px dashed rgb(128 128 128 / 0.4);
+  display: grid;
+  gap: 10px;
+}
+.pro-tester__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.pro-tester__row select { flex: 1 1 180px; }
+@media (prefers-reduced-motion: reduce) {
+  .tts__pet { transform: none; transition: none; }
+  .tts__bubble { animation: none; }
+}

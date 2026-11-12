@@ -194,9 +194,9 @@ test("overlays page: the live and beta ones link to their editors, and the comin
   const { base } = await withHelper();
   await page.goto(base + "/overlays/", { settle: 600 });
   const links = await page.evaluate(`[...document.querySelectorAll(".tool:not(.tool--soon) a.btn")].map((a) => a.getAttribute("href"))`);
-  assert.deepEqual(links, ["/editor/", "/alerts/", "/gifts/", "/goal/", "/likers/", "/counter/", "/timer/", "/editor/", "/songs/", "/songs/#spotify-step"], "the chat editor's Both is TikTok and Twitch chat together; the last two are song requests and its Spotify step");
+  assert.deepEqual(links, ["/editor/", "/alerts/", "/gifts/", "/goal/", "/likers/", "/counter/", "/timer/", "/tts/", "/editor/", "/songs/", "/songs/#spotify-step"], "the chat editor's Both is TikTok and Twitch chat together; the last two are song requests and its Spotify step");
   const beta = await page.evaluate(`[...document.querySelectorAll(".tool:has(.tool__badge--beta) .subtitle")].map((t) => t.textContent)`);
-  assert.deepEqual(beta, ["Alerts", "Last gifts", "Goals", "Top likers", "Viewer and like counter", "Subathon timer", "TikTok and Twitch chat together", "Song requests", "Spotify player"], "it is marked Beta, like the others that are new");
+  assert.deepEqual(beta, ["Alerts", "Last gifts", "Goals", "Top likers", "Viewer and like counter", "Subathon timer", "Talking pet TTS", "TikTok and Twitch chat together", "Song requests", "Spotify player"], "it is marked Beta, like the others that are new");
   const soon = await page.evaluate(`[...document.querySelectorAll(".tool--soon")].map((t) => [t.querySelector(".subtitle").textContent, t.querySelectorAll("a").length])`);
   assert.deepEqual(soon.map((s) => s[0]), ["Free sound library", "Like and subscriber alerts", "Actions", "Starting soon, Be right back and Stream ending screens", "Your own layout", "Pets that move", "Top gifters"]);
   assert.ok(soon.every((s) => s[1] === 0), "a coming-soon card links nowhere");
@@ -319,4 +319,48 @@ test("editor: the milestone choices are there, the test button shows the celebra
   assert.equal(url.searchParams.get("milestone"), "5000");
   assert.equal(url.searchParams.has("celebrate"), false, "switched on is the usual, so it is not in the link");
   assert.deepEqual(page.problems, [], page.problems.join(" | "));
+});
+
+test("tts editor & overlay: helper serves /api/pro/status, switching pets swaps sprites, custom preview speaks, paywall simulator works, and link builds", { skip }, async () => {
+  const prevDb = process.env.FEEDBACK_DB;
+  process.env.FEEDBACK_DB = ":memory:";
+  try {
+    const { base } = await withHelper();
+    await page.goto(base + "/tts/", { settle: 800 });
+    await until(async () => (await text("#pro-status")).includes("Local test mode"), 4000);
+    assert.equal(await page.evaluate(`document.getElementById("pro-tester").hidden`), false);
+
+    // Simulate region-locked country -> paywall explains unavailability
+    await page.evaluate(`(() => { const s = document.getElementById("sim-country"); s.value = "PH"; s.dispatchEvent(new Event("change")); })()`);
+    await until(async () => (await text("#pro-paywall-title")).includes("Not available in PH"), 3000);
+
+    // Simulate Tier-1 country without pass -> paywall requests Pro Pass
+    await page.evaluate(`(() => { const s = document.getElementById("sim-country"); s.value = "US"; s.dispatchEvent(new Event("change")); })()`);
+    await until(async () => (await text("#pro-paywall-title")).includes("Frills Pro Pass required"), 3000);
+
+    // Mint 5-credit local pass -> fills c-passToken and clears paywall
+    await click("#mint-pass");
+    await until(async () => (await text("#pro-status")).includes("5/5"), 4000);
+    assert.equal(await page.evaluate(`document.getElementById("pro-paywall").hidden`), true);
+
+    await type("#say-input", "Hello from local stream test!");
+    await page.evaluate(`document.querySelector("#say-form button").click()`);
+    await until(async () => (await text(".tts__text")).includes("Hello from local stream test!"), 3000);
+    await page.evaluate(`[...document.querySelectorAll("#opt-controls .chip")].find((b) => b.textContent.trim() === "Cat")?.click()`);
+    const spriteSrc = await page.evaluate(`document.querySelector(".tts__sprite--a")?.getAttribute("src")`);
+    assert.equal(spriteSrc, "/decor/neko/peeker-a.webp");
+    await type("#source-channel", "pond.pal");
+    const url = new URL(await page.evaluate(`document.getElementById("link").value`));
+    assert.equal(url.pathname, "/overlay/tts/");
+    assert.equal(url.searchParams.get("pet"), "neko");
+    assert.deepEqual(page.problems, [], page.problems.join(" | "));
+
+    await page.goto(`${base}/overlay/tts/?demo=1&pet=bunny`, { settle: 600 });
+    await until(async () => (await text(".tts__text")).length > 0, 3000);
+    const bunnySrc = await page.evaluate(`document.querySelector(".tts__sprite--a")?.getAttribute("src")`);
+    assert.equal(bunnySrc, "/decor/bunny/peeker-a.webp");
+    assert.deepEqual(page.problems, [], page.problems.join(" | "));
+  } finally {
+    if (prevDb === undefined) delete process.env.FEEDBACK_DB; else process.env.FEEDBACK_DB = prevDb;
+  }
 });

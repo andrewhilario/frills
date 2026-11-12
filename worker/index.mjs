@@ -10,6 +10,9 @@ import { handleSpotify, pruneSpotify } from "./spotify.mjs";
 import { handleAdmin } from "./admin.mjs";
 import { handleFollows } from "./follows.mjs";
 import { handleTimer } from "./timer.mjs";
+import { handleProStatus } from "./region.mjs";
+import { handleDevPass, handleTts } from "./tts.mjs";
+import { handleActivateLicense, handleLemonWebhook } from "./billing.mjs";
 import { countOverlay, handleEvent } from "./stats.mjs";
 
 /** How long the edge keeps a file it has already read from the database. Short, so a deleted or reported file is gone within the hour. */
@@ -26,6 +29,11 @@ export default {
     if (pathname.startsWith("/api/spotify/")) return handleSpotify(request, env);
     if (pathname.startsWith("/api/follows/")) return handleFollows(request, env);
     if (pathname.startsWith("/api/timer/")) return handleTimer(request, env);
+    if (pathname === "/api/pro/status") return handleProStatus(request, env);
+    if (pathname === "/api/pro/activate") return handleActivateLicense(request, env);
+    if (pathname === "/api/pro/dev-pass") return handleDevPass(request, env);
+    if (pathname === "/api/webhooks/lemonsqueezy") return handleLemonWebhook(request, env);
+    if (pathname === "/api/tts") return handleTts(request, env);
     if (pathname.startsWith("/api/admin/")) {
       const response = await handleAdmin(request, env);
       // a file the owner removed also goes from the copy this edge holds right now (other edges clear within the hour)

@@ -24,6 +24,9 @@ import { DEMO_USER, DemoConnection } from "./demo.mjs";
 import { ALERT_AT, Signing, capacity, deviceFacts, snapshot, statusPage } from "./status.mjs";
 import { SlotAlerts, termuxNotifier } from "./alerts.mjs";
 import { OWNER, ownerGate } from "./owner.mjs";
+import { handleProStatus } from "../worker/region.mjs";
+import { handleDevPass, handleTts } from "../worker/tts.mjs";
+import { handleActivateLicense, handleLemonWebhook } from "../worker/billing.mjs";
 
 const VERSION = "0.6.0";
 /** What this program can do, so a page can tell an old one ("chat" only) from one that sends alerts. */
@@ -122,8 +125,37 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
     res.end(JSON.stringify(body));
   };
   let restartAt = 0; // when the owner last asked for a restart
+  const proEnv = {
+    DEV: true,
+    DB: null,
+    OPENAI_TTS_KEY: process.env.OPENAI_TTS_KEY || "",
+    GOOGLE_TTS_KEY: process.env.GOOGLE_TTS_KEY || "",
+    GROQ_TTS_KEY: process.env.GROQ_TTS_KEY || "",
+    PRO_DEV_KEY: process.env.PRO_DEV_KEY || "",
+    PRO_COUNTRIES: process.env.PRO_COUNTRIES || "",
+    REQUIRE_PRO_PASS: process.env.REQUIRE_PRO_PASS || "",
+    LEMON_CHECKOUT_URL: process.env.LEMON_CHECKOUT_URL || "",
+    LEMON_STORE_ID: process.env.LEMON_STORE_ID || "",
+    LEMON_PRODUCT_ID: process.env.LEMON_PRODUCT_ID || "",
+    LEMON_WEBHOOK_SECRET: process.env.LEMON_WEBHOOK_SECRET || "",
+    LEMON_TEST_MODE: process.env.LEMON_TEST_MODE || "1",
+    PRO_MONTHLY_LIMIT: process.env.PRO_MONTHLY_LIMIT || "",
+  };
+  let dbInit = null;
+  const ensureDb = async () => {
+    if (proEnv.DB || dbInit) return dbInit;
+    dbInit = import("../scripts/lib/d1-sqlite.mjs")
+      .then(({ localDatabase }) => {
+        const dbPath = process.env.FEEDBACK_DB ?? (existsSync(fileURLToPath(new URL("../scripts/serve.mjs", import.meta.url)))
+          ? fileURLToPath(new URL("../.dev-feedback.sqlite", import.meta.url))
+          : ":memory:");
+        proEnv.DB = localDatabase(dbPath);
+      })
+      .catch(() => {});
+    return dbInit;
+  };
 
-  const server = http.createServer((req, res) => {
+  const server = http.createServer(async (req, res) => {
     let cors = {};
     const url = new URL(req.url, "http://localhost");
     if (relay) {
@@ -180,6 +212,28 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
     } else if (url.pathname === "/tiktok/ping" || (relay && url.pathname === "/health")) {
       res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", ...cors });
       res.end(JSON.stringify(relay && url.pathname === "/health" ? numbers(owner, proven) : relay ? { ok: true, name: "frills-relay", version: VERSION, features: FEATURES, slots: hub.stats() } : { ok: true, name: "frills-helper", version: VERSION, features: FEATURES }));
+    } else if (!relay && (url.pathname === "/api/pro/status" || url.pathname === "/api/pro/activate" || url.pathname === "/api/pro/dev-pass" || url.pathname === "/api/webhooks/lemonsqueezy" || url.pathname === "/api/tts")) {
+      try {
+        await ensureDb();
+        const chunks = [];
+        if (!["GET", "HEAD"].includes(req.method)) for await (const chunk of req) chunks.push(chunk);
+        const request = new Request(`http://${req.headers.host || "127.0.0.1"}${req.url}`, { method: req.method, headers: req.headers, body: chunks.length ? Buffer.concat(chunks) : undefined });
+        const response = await (
+          url.pathname === "/api/pro/status"
+            ? handleProStatus(request, proEnv)
+            : url.pathname === "/api/pro/activate"
+              ? handleActivateLicense(request, proEnv)
+              : url.pathname === "/api/pro/dev-pass"
+                ? handleDevPass(request, proEnv)
+                : url.pathname === "/api/webhooks/lemonsqueezy"
+                  ? handleLemonWebhook(request, proEnv)
+                  : handleTts(request, proEnv)
+        );
+        res.writeHead(response.status, Object.fromEntries(response.headers));
+        res.end(Buffer.from(await response.arrayBuffer()));
+      } catch {
+        json(res, 500, { ok: false, error: "tts_failed" });
+      }
     } else if (url.pathname === "/tiktok/stream") {
       stream(req, res, url, cors);
     } else {
@@ -280,6 +334,7 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
     },
     close() {
       hub.closeAll();
+      try { proEnv.DB?.raw?.close?.(); } catch { /* ignore */ }
       server.closeAllConnections?.();
       return new Promise((resolve) => server.close(resolve));
     },

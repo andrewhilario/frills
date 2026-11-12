@@ -97,3 +97,24 @@ CREATE TABLE IF NOT EXISTS timer_commands (
   at INTEGER NOT NULL,
   PRIMARY KEY (code, seq)
 );
+
+-- Frills Pro passes for metered AI features (AI Talking Pet TTS) and regional availability gating (see worker/region.mjs, worker/tts.mjs).
+CREATE TABLE IF NOT EXISTS pro_passes (
+  code TEXT PRIMARY KEY,           -- random 16-char pass id
+  pass_hash TEXT NOT NULL,         -- sha-256 of the pass token (the token itself is never stored)
+  status TEXT NOT NULL DEFAULT 'active', -- active, paused, canceled
+  country TEXT NOT NULL DEFAULT 'US',    -- billing/checkout country (2-letter ISO)
+  allow_roam INTEGER NOT NULL DEFAULT 0, -- 1 lets owner or traveling buyer run Pro APIs from any country
+  tts_used INTEGER NOT NULL DEFAULT 0,
+  tts_limit INTEGER NOT NULL DEFAULT 1500,
+  period_start INTEGER NOT NULL,   -- start of current 30-day quota window (ms since 1970)
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS pro_passes_hash ON pro_passes (pass_hash);
+
+-- Maps external payment provider order/subscription/license ids (e.g. Lemon Squeezy) to pro_passes.code.
+CREATE TABLE IF NOT EXISTS pro_links (
+  ref_id TEXT PRIMARY KEY,
+  pass_code TEXT NOT NULL,
+  updated_at INTEGER NOT NULL
+);

@@ -60,6 +60,7 @@ const NAMES = {
   likers: "Top Likers",
   counter: "Viewer + Like Counter",
   timer: "Subathon Timer",
+  tts: "Talking Pet TTS",
   songs: "Song Requests (!sr)",
   matcha: "Matcha Theme",
   home: "Home Page (/)",

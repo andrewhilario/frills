@@ -718,3 +718,109 @@ export function createTimerView(host) {
     },
   };
 }
+
+// ── AI Talking Pet TTS ───────────────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Talking pet mascot + speech bubble view. Swaps between peeker-a and peeker-b while audio
+ * amplitude pulses `--tts-level` (0..1) so the pet hops along with its voice.
+ */
+export function createTtsView(host) {
+  const root = el("div", { className: "tts", "data-speaking": "0" });
+  const stage = el("div", { className: "tts__stage" });
+  const petBox = el("div", { className: "tts__pet", "aria-hidden": "true" });
+  const imgA = el("img", { className: "tts__sprite tts__sprite--a", alt: "" });
+  const imgB = el("img", { className: "tts__sprite tts__sprite--b", alt: "", hidden: true });
+  petBox.append(imgA, imgB);
+
+  const bubble = el("div", { className: "tts__bubble", hidden: true });
+  const meta = el("div", { className: "tts__meta" });
+  const author = el("span", { className: "tts__author" });
+  const badge = el("span", { className: "tts__badge" });
+  meta.append(author, badge);
+  const textEl = el("p", { className: "tts__text" });
+  bubble.append(meta, textEl);
+
+  stage.append(petBox, bubble);
+  root.append(stage);
+  host.append(root);
+
+  let settings = null;
+  let speaking = false;
+  let idleTimer = 0;
+  let lastFlip = 0;
+  let useB = false;
+
+  const syncPet = (pet) => {
+    const off = !pet || pet === "none";
+    petBox.hidden = off;
+    if (off) return;
+    const a = decoPieces(pet, 0, { peek: true, corner: false, spark: false })?.peek;
+    const b = decoPieces(pet, 1, { peek: true, corner: false, spark: false })?.peek;
+    if (a?.src) imgA.src = a.src;
+    if (b?.src || a?.src) imgB.src = b?.src || a.src;
+    if (!speaking) {
+      imgA.hidden = false;
+      imgB.hidden = true;
+    }
+  };
+
+  return {
+    apply(next) {
+      settings = next;
+      applyLook(root, next);
+      syncPet(next.pet);
+      root.dataset.pet = next.pet || "none";
+      if (!next.showBubble) bubble.hidden = true;
+      else if (speaking) bubble.hidden = false;
+    },
+    start(item) {
+      clearTimeout(idleTimer);
+      speaking = true;
+      root.dataset.speaking = "1";
+      root.dataset.kind = item.kind || "chat";
+      author.textContent = item.author || "";
+      badge.textContent = item.badge || "";
+      badge.hidden = !item.badge || item.badge === "chat";
+      textEl.textContent = item.kind === "gift" ? item.text : item.message || item.text;
+      bubble.hidden = settings ? !settings.showBubble : false;
+    },
+    level(v) {
+      const clamped = Math.max(0, Math.min(1, Number(v) || 0));
+      root.style.setProperty("--tts-level", clamped.toFixed(3));
+      const now = performance.now();
+      if (speaking && clamped > 0.24 && now - lastFlip > 130) {
+        useB = !useB;
+        lastFlip = now;
+        imgA.hidden = useB;
+        imgB.hidden = !useB;
+      } else if (!speaking || clamped <= 0.05) {
+        useB = false;
+        imgA.hidden = false;
+        imgB.hidden = true;
+      }
+    },
+    idle() {
+      speaking = false;
+      root.style.setProperty("--tts-level", "0");
+      useB = false;
+      imgA.hidden = false;
+      imgB.hidden = true;
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        if (speaking) return;
+        root.dataset.speaking = "0";
+        bubble.hidden = true;
+      }, 900);
+    },
+    clear() {
+      clearTimeout(idleTimer);
+      speaking = false;
+      root.dataset.speaking = "0";
+      root.style.setProperty("--tts-level", "0");
+      imgA.hidden = false;
+      imgB.hidden = true;
+      bubble.hidden = true;
+    },
+  };
+}
