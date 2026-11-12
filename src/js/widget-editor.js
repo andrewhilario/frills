@@ -25,7 +25,7 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
   let source = null;
   // `ctx.restart()` reconnects (for an overlay whose settings change what it waits for); `ctx.info(fn)` is for what the account says.
   let ready = false; // the editor is whole once everything below has been made
-  const api = create($("widget"), settings, { restart: () => source?.restart(), channel: () => source?.cleanChannel() ?? "", features: () => source?.features ?? null, refresh: () => { if (ready) { paint(); refreshLink(); } } });
+  const api = create($("widget"), settings, { restart: () => source?.restart(), channel: () => source?.cleanChannel() ?? "", features: () => source?.features ?? null, refresh: () => { if (ready) { paint(); refreshLink(); } }, save: () => { if (ready) save(); } });
 
   // ── the look and the options ────────────────────────────────────────────────────────────────────────────────────
   const swatch = (p) => (luminance(p.accent) < 0.08 ? p.bg : p.accent);

@@ -133,6 +133,7 @@ export async function deleteAccount(db, accountId) {
   if (!account) return false;
   await db.prepare("DELETE FROM sessions WHERE account_id = ?").bind(String(accountId)).run();
   await db.prepare("DELETE FROM plus WHERE account_id = ?").bind(String(accountId)).run();
+  await db.prepare("DELETE FROM overlay_links WHERE account_id = ?").bind(String(accountId)).run();
   await db.prepare("DELETE FROM login_links WHERE email = ?").bind(account.email).run();
   await db.prepare("DELETE FROM accounts WHERE id = ?").bind(String(accountId)).run();
   return true;

@@ -37,6 +37,7 @@ export const TTS = defineWidget({
     maxChars: 140,
     showBubble: true,
     passToken: "",
+    code: "",
   },
   controls: [
     { section: "voice", ...chipsOf("engine", "Voice mode", [["auto", "Auto (AI + free fallback)"], ["browser", "Browser voice (free)"], ["ai", "Pro AI voice only"]]) },
@@ -54,6 +55,7 @@ export const TTS = defineWidget({
     { section: "rules", ...number("cooldownSec", "Per-viewer cooldown (seconds)", 0, 120) },
     { section: "rules", ...range("maxChars", "Max spoken characters", 40, 220, 10, "") },
     { section: "pro", ...text("passToken", "Pro Pass key", 128, "Leave blank when testing locally on your own computer.") },
+    { section: "pro", ...text("code", "Frills Plus link code", 32), hidden: true }, // filled in by the Plus link panel: it rides in the overlay link and stands for the account (never the payment)
   ],
 });
 

@@ -1,6 +1,9 @@
 // Regional availability, Pro Pass storage/verification, and dev bypasses for paid Frills features (AI Talking Pet TTS).
 // Enforced server-side inside the Worker using Cloudflare's `request.cf.country`. Regular static pages remain globally free.
 
+import { accountForOverlayCode } from "./overlay-links.mjs";
+import { plusActive } from "./accounts.mjs";
+
 export const PASS_WINDOW_MS = 30 * 86400 * 1000;
 
 export const DEFAULT_PRO_COUNTRIES = new Set([
@@ -126,8 +129,9 @@ export function checkProRegion(request, env, { allowRoam = false, passToken = ""
 export async function handleProStatus(request, env, { now = Date.now() } = {}) {
   if (request.method !== "GET") return json(405, { ok: false, error: "method_not_allowed" }, { allow: "GET" });
   const url = new URL(request.url);
+  const overlayCode = String(request.headers.get("x-overlay") || url.searchParams.get("overlay") || "").trim();
   const passToken = String(request.headers.get("x-pass") || url.searchParams.get("pass") || "").trim();
-  const passRow = passToken && env?.DB ? await lookupProPass(env.DB, passToken, { now, resetExpired: false }) : null;
+  const passRow = !overlayCode && passToken && env?.DB ? await lookupProPass(env.DB, passToken, { now, resetExpired: false }) : null;
 
   const check = checkProRegion(request, env, { allowRoam: passRow?.allow_roam === 1, passToken });
   const aiReady = Boolean(env?.OPENAI_TTS_KEY || env?.GOOGLE_TTS_KEY || env?.GROQ_TTS_KEY);
@@ -136,7 +140,16 @@ export async function handleProStatus(request, env, { now = Date.now() } = {}) {
   const checkoutUrl = String(env?.LEMON_CHECKOUT_URL ?? "").trim();
   if (checkoutUrl.startsWith("https://")) out.checkoutUrl = checkoutUrl;
   if (env?.DEV) out.dev = true;
-  if (passToken) {
+  if (overlayCode) {
+    // a Frills Plus overlay link: what the account has bought, and what is left of this month
+    const found = env?.DB ? await accountForOverlayCode(env.DB, overlayCode) : null;
+    if (!env?.DB) out.pass = { valid: false, error: "not_ready" };
+    else if (!found || !plusActive(found.plus, now)) out.pass = { valid: false, error: "invalid_pass" };
+    else {
+      const p = found.plus;
+      out.pass = { valid: true, status: p.status, used: p.tts_used, limit: p.tts_limit, remaining: Math.max(0, p.tts_limit - p.tts_used), periodStart: p.period_start };
+    }
+  } else if (passToken) {
     if (!env?.DB) {
       out.pass = { valid: false, error: "not_ready" };
     } else if (!passRow) {

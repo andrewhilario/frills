@@ -26,7 +26,7 @@ startWidgetEditor({
   overlayPath: "/overlay/tts/",
   events: ["gift"],
   idleHint: "Type someone’s TikTok username (or @name) and press Connect to test live gifts & chat.",
-  create(host, initial) {
+  create(host, initial, ctx) {
     let settings = initial;
     let simCountry = "";
     const view = createTtsView(host);
@@ -186,6 +186,79 @@ startWidgetEditor({
     };
 
     void refreshProStatus();
+
+    // ── Frills Plus link: a person signs in on /account/; this panel then makes the code that rides in the overlay link. The code stands for the account (never the payment), and a new
+    // one ends the old. The panel appears only on a site built with the account pages, and where the person can be asked who they are.
+    const plusBox = document.getElementById("plus-link");
+    if (plusBox && plusBox.dataset.accounts === "on") { // (the account pages are built only when switched on)
+      const el = (id) => document.getElementById(id);
+      const say = (text, bad = false) => { el("plus-link-status").textContent = text; el("plus-link-status").dataset.state = bad ? "error" : ""; };
+      const post = (action) => fetch(`/api/account/${action}`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}", credentials: "same-origin" }).then(async (res) => ({ ok: res.ok, body: await res.json().catch(() => ({})) }));
+      const setCode = (code) => {
+        settings.code = code;
+        ctx?.refresh?.(); // the overlay link below is rebuilt with (or without) the code
+        ctx?.save?.();
+        player.invalidate();
+        void refreshProStatus();
+      };
+      const draw = (me) => {
+        const plus = Boolean(me.signedIn && me.plus?.active);
+        const mine = Boolean(settings.code) && Boolean(me.overlayLink);
+        let words;
+        if (!me.signedIn) words = "Sign in to use Frills Plus AI voices on your stream. The free browser voices need no account.";
+        else if (!plus) words = "You do not have Frills Plus, so your stream uses the free browser voice.";
+        else if (mine) words = "Your Plus link is on. The overlay link below carries it, so your overlay can use your AI voice lines.";
+        else if (me.overlayLink) words = "A Plus link was made on another computer or browser. Make a new one to use it here: the old link stops working.";
+        else words = "Make your Plus link, then copy the overlay link below into your streaming app.";
+        el("plus-link-state").textContent = words;
+        el("plus-link-make").hidden = !plus;
+        el("plus-link-make").textContent = mine || me.overlayLink ? "Make a new link" : "Make my Plus link";
+        el("plus-link-off").hidden = !(plus && (mine || me.overlayLink));
+        el("plus-link-account").hidden = plus;
+        el("plus-link-account").textContent = me.signedIn ? "Get Frills Plus" : "Sign in";
+        el("plus-link-hint").hidden = !plus;
+      };
+      const load = async () => (await fetch("/api/account/me", { credentials: "same-origin" })).json();
+      void (async () => {
+        try {
+          el("plus-link-account").setAttribute("href", "/account/"); // (set here, so a page built without accounts has no link to a missing page)
+          const me = await load();
+          if (!me?.ok) return;
+          // a link code kept here that the server no longer knows (made new elsewhere, turned off, or the account is gone) is dropped
+          if (settings.code && !(me.signedIn && me.overlayLink)) setCode("");
+          plusBox.hidden = false;
+          draw(me);
+        } catch { /* offline, or a static preview: the panel stays hidden */ }
+      })();
+      el("plus-link-make").addEventListener("click", async () => {
+        el("plus-link-make").disabled = true;
+        say("Making your link…");
+        try {
+          const res = await post("overlay-link");
+          if (!res.ok || !res.body.code) { say(res.body.error === "plus_required" ? "Frills Plus is not on for this account." : "Sorry, that did not work. Please try again.", true); return; }
+          setCode(res.body.code);
+          say("Your new link is ready. Copy the overlay link below into your streaming app (any older link has stopped working).");
+          draw(await load());
+        } catch {
+          say("Sorry, that did not work. Check your connection and try again.", true);
+        } finally {
+          el("plus-link-make").disabled = false;
+        }
+      });
+      el("plus-link-off").addEventListener("click", async () => {
+        el("plus-link-off").disabled = true;
+        try {
+          await post("overlay-link-off");
+          setCode("");
+          say("Your Plus link is off. Any overlay using it now speaks with the free browser voice.");
+          draw(await load());
+        } catch {
+          say("Sorry, that did not work. Please try again.", true);
+        } finally {
+          el("plus-link-off").disabled = false;
+        }
+      });
+    }
 
     simSelect?.addEventListener("change", () => {
       simCountry = String(simSelect.value || "").trim().toUpperCase();

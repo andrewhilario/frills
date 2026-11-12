@@ -158,3 +158,12 @@ CREATE TABLE IF NOT EXISTS plus (
   period_start INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
+
+-- The link a streamer puts in their streaming app for a Frills Plus overlay (the talking pet): a random code in the link stands for the account, so the payment itself never appears in a link. Only the code's hash is kept. One live link per account and kind; making a new one ends the old. Run this part once.
+CREATE TABLE IF NOT EXISTS overlay_links (
+  code_hash TEXT PRIMARY KEY,      -- sha-256 of the code in the overlay link
+  account_id TEXT NOT NULL,
+  kind TEXT NOT NULL,              -- 'tts' (the talking pet)
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS overlay_links_account ON overlay_links (account_id, kind);

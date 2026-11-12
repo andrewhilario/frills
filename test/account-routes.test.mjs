@@ -94,7 +94,7 @@ test("who is signed in: nobody without the cookie, the email with it, and what t
   assert.deepEqual((await call(env, "me", { method: "GET", cookie: `${COOKIE}=${"x".repeat(43)}` })).body, { ok: true, signedIn: false });
   const { cookie } = await signedIn(env, mail);
   const me = await call(env, "me", { method: "GET", cookie, now: T0 + 5000 });
-  assert.deepEqual(me.body, { ok: true, signedIn: true, email: "streamer@example.com", checkout: false, portal: false, plus: null });
+  assert.deepEqual(me.body, { ok: true, signedIn: true, email: "streamer@example.com", checkout: false, portal: false, overlayLink: false, plus: null });
   const id = env.DB.raw.prepare("SELECT id FROM accounts").get().id;
   env.DB.raw.prepare("INSERT INTO plus (account_id, provider_ref, status, renews_at, tts_used, tts_limit, period_start, updated_at) VALUES (?, 'sub_9', 'active', ?, 12, 1500, ?, ?)").run(id, T0 + 86400000, T0, T0);
   const bought = await call(env, "me", { method: "GET", cookie, now: T0 + 5000 });

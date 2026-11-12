@@ -6,6 +6,8 @@
 //   POST /api/account/portal              -> a fresh link to Lemon Squeezy's billing page (change card, receipts, cancel). Signed in, and only with a subscription.
 //   POST /api/account/logout-all          -> ends every browser's session for this account.
 //   POST /api/account/delete   { email }  -> deletes the account and what is kept about it, if the email typed is theirs and no subscription is still renewing.
+//   POST /api/account/overlay-link       -> makes a new link code for the talking pet overlay (ending the old one). Signed in, with Plus on.
+//   POST /api/account/overlay-link-off    -> ends the link code.
 //   POST /api/account/checkout            -> the address to pay at (Lemon Squeezy), with this account's email and id in it. Signed in only.
 // The link in the email points at a page (/account/verify/#token) and the token sits after the #, which a browser never sends to a server. The page then asks the person
 // to press "Sign in", so an email scanner that opens every link in a message cannot spend the one-use token before the person gets to it.
@@ -15,6 +17,7 @@ import { LIMITS, createLoginLink, deleteAccount, endAllSessions, endSession, get
 import { getMailer, signInMessage } from "./mailer.mjs";
 import { checkoutLink, checkoutReady } from "./checkout.mjs";
 import { portalLink, portalReady } from "./portal.mjs";
+import { endOverlayLink, hasOverlayLink, makeOverlayLink } from "./overlay-links.mjs";
 
 export const COOKIE = "frills_session";
 const MAX_BODY = 512;
@@ -42,7 +45,7 @@ const readBody = async (request) => {
 export async function handleAccount(request, env, { now = Date.now(), mailer = null, fetchFn = globalThis.fetch } = {}) {
   const url = new URL(request.url);
   const action = url.pathname.split("/").filter(Boolean)[2] ?? "";
-  if (!["login", "verify", "me", "logout", "checkout", "portal", "logout-all", "delete"].includes(action)) return json(404, { ok: false, error: "not_found" });
+  if (!["login", "verify", "me", "logout", "checkout", "portal", "logout-all", "delete", "overlay-link", "overlay-link-off"].includes(action)) return json(404, { ok: false, error: "not_found" });
   const wanted = action === "me" ? "GET" : "POST";
   if (request.method !== wanted) return json(405, { ok: false, error: "method" }, { allow: wanted });
   if (!env?.DB) return json(503, { ok: false, error: "not_ready" });
@@ -59,6 +62,7 @@ export async function handleAccount(request, env, { now = Date.now(), mailer = n
         email: who.email,
         checkout: checkoutReady(env.LEMON_CHECKOUT_URL, Boolean(env.DEV)),
         portal: portalReady(env),
+        overlayLink: await hasOverlayLink(db, who.accountId),
         plus: plus ? { status: plus.status, active: plusActive(plus, now), renewsAt: plus.renews_at, used: plus.tts_used, limit: plus.tts_limit } : null,
       });
     }
@@ -80,10 +84,19 @@ export async function handleAccount(request, env, { now = Date.now(), mailer = n
       return json(200, { ok: true, url: link });
     }
 
-    if (action === "portal" || action === "logout-all" || action === "delete") {
+    if (action === "portal" || action === "logout-all" || action === "delete" || action === "overlay-link" || action === "overlay-link-off") {
       const cookie = cookieOf(request, COOKIE);
       const who = await sessionAccount(db, cookie, { now });
       if (!who) return json(401, { ok: false, error: "sign_in_first" });
+
+      if (action === "overlay-link") {
+        if (!plusActive(await getPlus(db, who.accountId), now)) return json(403, { ok: false, error: "plus_required" });
+        return json(200, { ok: true, code: await makeOverlayLink(db, who.accountId, "tts", { now }) });
+      }
+      if (action === "overlay-link-off") {
+        await endOverlayLink(db, who.accountId, "tts");
+        return json(200, { ok: true });
+      }
 
       if (action === "portal") {
         const plus = await getPlus(db, who.accountId);

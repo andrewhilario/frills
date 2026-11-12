@@ -47,6 +47,18 @@
 
     <div class="pro-status" id="pro-status" role="status" hidden></div>
 
+    <section class="plus-link" id="plus-link" data-accounts="{{plusAccounts}}" aria-labelledby="plus-link-title" hidden>
+      <h2 class="plus-link__title" id="plus-link-title">Your Frills Plus link</h2>
+      <p id="plus-link-state"></p>
+      <div class="plus-link__row">
+        <button class="btn btn--sm" type="button" id="plus-link-make" hidden>Make my Plus link</button>
+        <button class="btn btn--soft btn--sm" type="button" id="plus-link-off" hidden>Turn my link off</button>
+        <a class="btn btn--outline btn--sm" id="plus-link-account" hidden>Open my account</a>
+      </div>
+      <p class="form__hint" id="plus-link-hint" hidden>Anyone who has your overlay link can use your AI voice lines, so do not share it. If it leaks, make a new link: the old one stops working at once.</p>
+      <p class="form__status" id="plus-link-status" role="status" aria-live="polite"></p>
+    </section>
+
     <aside class="pro-paywall" id="pro-paywall" hidden>
       <p class="pro-paywall__title" id="pro-paywall-title">Frills Pro required for AI voices</p>
       <p class="pro-paywall__body" id="pro-paywall-body"></p>

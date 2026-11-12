@@ -141,6 +141,7 @@ const shared = {
   waitlist: site.waitlistUrl,
   helperGet,
   relay: site.relayUrl,
+  plusAccounts: site.plusAccounts ? "on" : "", // ("on" when the Frills Plus account pages are built: a page that links to them checks this)
   siteAddress: site.url,
   spotifyClientId: site.spotifyClientId ?? "",
   twitchClientId: site.twitchClientId ?? "",
