@@ -21,8 +21,33 @@
 #fb-thanks { max-width: 40rem; }
 #fb-thanks:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; }
 
-/* The Frills Plus panel on the account page: one card, a title, the state, the button, and a plain note about paying. Site tokens only. */
-.acct-plus { display: grid; gap: var(--space-sm); max-width: 40rem; margin-block: var(--space-lg); padding: var(--space-lg); background: var(--color-paper); border: 2px solid var(--color-rule-2); border-radius: var(--radius-card); }
-.acct-plus > * { margin: 0; min-width: 0; }
-.acct-plus__title { font-size: var(--text-md); font-weight: 800; letter-spacing: -0.015em; }
-.acct-plus .btn { justify-self: start; }
+/* Hallmark · component: account panels (Frills Plus card, account card) · genre: modern-minimal · theme: Hum (site tokens)
+ * states: default · hover/focus/active (buttons, summary, input from the site) · disabled · loading (status line) · error (form__status) · success (badge tone)
+ * widths checked 320 / 375 / 414 / 768 · tokens only */
+.acct-who { margin: 0 0 var(--space-md); }
+.acct-card { display: grid; gap: var(--space-sm); max-width: 40rem; margin-block: 0 var(--space-lg); padding: var(--space-lg); background: var(--color-paper); border: 2px solid var(--color-rule-2); border-radius: var(--radius-card); }
+.acct-card > * { margin: 0; min-width: 0; }
+.acct-card__head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2xs) var(--space-sm); }
+.acct-card__title { margin: 0; font-size: var(--text-md); font-weight: 800; letter-spacing: -0.015em; }
+.acct-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-sm); }
+.acct-badge { padding: 2px var(--space-sm); border: 2px solid var(--color-ink); border-radius: var(--radius-pill); background: var(--color-paper-2); font-family: var(--font-label); font-size: var(--text-xs); letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; }
+.acct-badge[data-tone="on"] { background: var(--color-mint-tint); }
+.acct-badge[data-tone="soon"] { background: var(--color-accent-tint); }
+.acct-credits { display: grid; gap: var(--space-2xs); }
+.acct-credits > * { margin: 0; }
+.acct-credits__text { font-size: var(--text-sm); color: var(--color-ink-2); font-variant-numeric: tabular-nums; }
+.acct-meter { height: 0.6rem; overflow: hidden; background: var(--color-paper-3); border: 1px solid var(--color-rule-2); border-radius: var(--radius-pill); }
+.acct-meter > i { display: block; width: calc(var(--used, 0) * 100%); height: 100%; background: var(--color-accent-2-deep); border-radius: inherit; transition: width var(--dur-short) var(--ease-out); }
+.acct-meter[data-level="high"] > i { background: var(--color-accent-3); }
+@media (prefers-reduced-motion: reduce) { .acct-meter > i { transition: none; } }
+.acct-danger { margin-top: var(--space-xs); border-top: 2px dashed var(--color-rule-2); }
+.acct-danger > summary { display: flex; align-items: center; min-height: 44px; font-weight: 650; list-style: none; cursor: pointer; }
+.acct-danger > summary::-webkit-details-marker { display: none; }
+.acct-danger > summary::after { content: "+"; margin-left: auto; padding-left: var(--space-sm); font-size: var(--text-md); line-height: 1; }
+.acct-danger[open] > summary::after { content: "−"; }
+@media (hover: hover) { .acct-danger > summary:hover { background: var(--color-paper-2); } }
+.acct-danger > summary:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+.acct-danger__body { display: grid; gap: var(--space-sm); padding-bottom: var(--space-xs); }
+.acct-danger__body > * { margin: 0; min-width: 0; }
+.acct-danger__go:not(:disabled) { color: var(--color-error); }
+.acct-danger input { width: 100%; }

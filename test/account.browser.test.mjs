@@ -26,7 +26,7 @@ let page;
 before(async () => {
   if (skip) return;
   execFileSync(process.execPath, ["build.mjs"], { cwd: root, stdio: "ignore", env: { ...process.env, PLUS_ACCOUNTS: "1", OUT_DIR: variant } });
-  server = spawn(process.execPath, ["scripts/serve.mjs", String(port)], { cwd: root, stdio: "ignore", env: { ...process.env, DIST_DIR: variant, FEEDBACK_DB: join(folder, "db.sqlite"), LEMON_CHECKOUT_URL: `${served}/pretend-checkout/`, LEMON_WEBHOOK_SECRET: SECRET } });
+  server = spawn(process.execPath, ["scripts/serve.mjs", String(port)], { cwd: root, stdio: "ignore", env: { ...process.env, DIST_DIR: variant, FEEDBACK_DB: join(folder, "db.sqlite"), LEMON_CHECKOUT_URL: `${served}/pretend-checkout/`, LEMON_PORTAL_URL: `${served}/pretend-billing/`, LEMON_WEBHOOK_SECRET: SECRET } });
   await waitForServer(served);
   page = await launch();
   await page.viewport(1000, 800);
@@ -211,4 +211,96 @@ test("the checkout is not offered a second time while Plus is on (the server ref
   await notice({ name: "subscription_created", account: accountId, subscription: "5003", order: "6003", at: Date.now() + 5000 });
   const second = await page.evaluate(`fetch("/api/account/checkout", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" }).then((r) => [r.status, r.headers.get("content-type")])`);
   assert.equal(second[0], 409);
+});
+
+// ── the My Plus card and the account card ─────────────────────────────────────────────────────────────
+
+const inPage = (action, body = {}) => page.evaluate(`fetch("/api/account/${action}", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(${JSON.stringify(body)}) }).then((r) => r.json().then((j) => [r.status, j]))`);
+/** Signs the browser in as this email (through the page's own address, so the cookie is the page's) and returns the account id. */
+async function signInAs(email) {
+  await page.goto(`${served}/account/`, { settle: 400 });
+  const asked = (await outbox()).length;
+  await inPage("login", { email });
+  await inPage("verify", { token: /#([A-Za-z0-9_-]{43})/.exec((await outbox())[asked].text)[1] });
+  const [, checkout] = await inPage("checkout");
+  return new URL(checkout.url).searchParams.get("checkout[custom][account_id]");
+}
+const signedInView = () => page.waitFor(`getComputedStyle(document.getElementById("acct-in")).display !== "none"`, { timeout: 8000 });
+const formView = () => page.waitFor(`getComputedStyle(document.getElementById("acct-form")).display !== "none"`, { timeout: 8000 });
+const visible = (id) => page.evaluate(`getComputedStyle(document.getElementById(${JSON.stringify(id)})).display !== "none"`);
+
+test("the Frills Plus card shows the status badge, the credits and Manage or cancel (which opens the billing page), and the intro words go once signed in", { skip }, async () => {
+  const id = await signInAs("card@example.com");
+  await page.goto(`${served}/account/`, { settle: 400 });
+  await signedInView();
+  assert.equal(await visible("acct-lede"), false, "the 'no account needed' intro is for people who are signed out");
+  assert.equal(await visible("acct-badge"), false, "nothing bought: no badge");
+  assert.equal(await visible("acct-credits"), false);
+  assert.equal(await visible("acct-manage"), false, "nothing to manage yet");
+  assert.equal(await visible("acct-buy"), true);
+
+  await notice({ name: "subscription_created", account: id, subscription: "7001", order: "8001" });
+  await page.goto(`${served}/account/`, { settle: 400 });
+  await signedInView();
+  assert.deepEqual([await text("#acct-badge"), await page.evaluate(`document.getElementById("acct-badge").dataset.tone`)], ["On", "on"]);
+  assert.match(await text("#acct-credits-text"), /AI voice lines used this month: 0 of 1,500/);
+  assert.equal(await page.evaluate(`document.getElementById("acct-meter").getAttribute("aria-valuemax")`), "1500");
+  assert.equal(await visible("acct-manage"), true);
+  assert.equal(await visible("acct-buy"), false);
+  assert.match(await text("#acct-manage-hint"), /change your card, see your receipts and cancel/);
+  await page.evaluate(`document.getElementById("acct-manage").click()`);
+  await page.waitFor(`location.pathname === "/pretend-billing/"`, { timeout: 8000 });
+
+  await notice({ name: "subscription_cancelled", account: id, subscription: "7001", status: "cancelled", endsInDays: 12, at: Date.now() + 1000 });
+  await page.goto(`${served}/account/`, { settle: 400 });
+  await signedInView();
+  assert.match(await text("#acct-badge"), /^Ends /);
+  assert.equal(await page.evaluate(`document.getElementById("acct-badge").dataset.tone`), "soon");
+  await notice({ name: "subscription_expired", account: id, subscription: "7001", status: "expired", endsInDays: 0, at: Date.now() + 2000 });
+  await page.goto(`${served}/account/`, { settle: 400 });
+  await signedInView();
+  assert.deepEqual([await text("#acct-badge"), await visible("acct-credits"), await visible("acct-manage")], ["Off", false, true], "ended: off, no credits, but the billing page (receipts) is still reachable");
+  assert.deepEqual(page.problems, [], page.problems.join(" | "));
+});
+
+test("sign out everywhere ends this browser's session and says so", { skip }, async () => {
+  await signInAs("everywhere@example.com");
+  await page.goto(`${served}/account/`, { settle: 400 });
+  await signedInView();
+  await page.evaluate(`document.getElementById("acct-out-all").click()`);
+  await formView();
+  assert.match(await text("#acct-status"), /signed out on every device/);
+  assert.equal((await (await page.evaluate(`fetch("/api/account/me").then((r) => r.json())`))).signedIn, false);
+  assert.deepEqual(page.problems, [], page.problems.join(" | "));
+});
+
+test("deleting an account: the typed email must be the person's own, a renewing subscription must be cancelled first, and then everything is deleted", { skip }, async () => {
+  const id = await signInAs("leaving@example.com");
+  await notice({ name: "subscription_created", account: id, subscription: "7002", order: "8002" });
+  await page.goto(`${served}/account/`, { settle: 400 });
+  await signedInView();
+  const open = () => page.evaluate(`document.getElementById("acct-delete").open = true`);
+  const type = (value) => page.evaluate(`(() => { const i = document.getElementById("acct-delete-email"); i.value = ${JSON.stringify(value)}; })()`);
+  const press = async () => { await page.evaluate(`document.getElementById("acct-delete-go").click()`); await sleep(500); };
+
+  await open();
+  await press();
+  assert.match(await text("#acct-delete-status"), /not the email of this account/, "nothing typed");
+  await type("someone.else@example.com");
+  await press();
+  assert.match(await text("#acct-delete-status"), /not the email of this account/, "somebody else's email");
+  await type("leaving@example.com");
+  await press();
+  assert.match(await text("#acct-delete-status"), /still renewing/, "a renewing subscription is not deleted away");
+  assert.equal((await page.evaluate(`fetch("/api/account/me").then((r) => r.json())`)).signedIn, true, "still signed in, nothing deleted");
+
+  await notice({ name: "subscription_cancelled", account: id, subscription: "7002", status: "cancelled", endsInDays: 5, at: Date.now() + 1000 });
+  await press();
+  await formView();
+  assert.match(await text("#acct-status"), /account and its data were deleted/);
+  assert.equal((await page.evaluate(`fetch("/api/account/me").then((r) => r.json())`)).signedIn, false);
+  assert.equal(await visible("acct-in"), false);
+  // the browser logs the two refusals above (400 for a wrong email, 409 for a renewing subscription) as it should; nothing else may be logged
+  const unexpected = page.problems.filter((p) => !/status of (400|409) .*\/api\/account\/delete/.test(p));
+  assert.deepEqual(unexpected, [], unexpected.join(" | "));
 });

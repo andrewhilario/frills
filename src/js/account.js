@@ -15,6 +15,11 @@ const WORDS = {
   checkout_off: "Frills Plus is not on sale yet. Please check back soon.",
   already_plus: "Frills Plus is already on for this account.",
   sign_in_first: "Please sign in first.",
+  portal_off: "The billing page is not available yet. Please check back soon.",
+  no_subscription: "There is no subscription on this account.",
+  provider_error: "Lemon Squeezy did not answer. Please try again in a minute.",
+  confirm_mismatch: "That is not the email of this account. Please type it exactly.",
+  cancel_first: "Your subscription is still renewing. Press Manage or cancel and cancel it first, then delete your account.",
 };
 const RESEND_SECONDS = 30;
 
@@ -25,7 +30,10 @@ if ($("acct-form")) {
   const status = $("acct-status");
   const send = $("acct-send");
   const say = (text, bad = false) => { status.textContent = text; status.dataset.state = bad ? "error" : ""; };
-  const show = (which) => { for (const id of ["acct-loading", "acct-form", "acct-sent", "acct-in"]) $(id).hidden = id !== which; };
+  const show = (which) => {
+    for (const id of ["acct-loading", "acct-form", "acct-sent", "acct-in"]) $(id).hidden = id !== which;
+    $("acct-lede").hidden = which === "acct-in"; // (the "no account needed" words are for people who are not signed in)
+  };
 
   const ask = async (address) => {
     const res = await post("login", { email: address });
@@ -95,9 +103,10 @@ if ($("acct-form")) {
     }
   });
 
-  // What the Frills Plus panel says, and whether it offers the button. The button is offered only when there is nothing to pay for already: not while Plus is on, and not while it is
-  // paused or unpaid (a second subscription would be paid for twice; managing those comes with the account details later).
+  // What the Frills Plus card says and offers. The Buy button is only offered when there is nothing to pay for already: not while Plus is on, and not while it is paused or
+  // unpaid (a second subscription would be paid for twice; those are sorted out with Manage or cancel).
   const day = (ms) => new Date(ms).toLocaleDateString(undefined, { year: "numeric", month: "long", day: "numeric" });
+  const shortDay = (ms) => new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" });
   const plusWords = (me) => {
     const plus = me.plus;
     if (plus?.active) {
@@ -110,11 +119,34 @@ if ($("acct-form")) {
     if (plus) return "Your Frills Plus has ended.";
     return me.checkout ? "You do not have Frills Plus. It is a paid plan that adds extras to Frills." : "Frills Plus is not on sale yet.";
   };
+  const badgeOf = (me) => {
+    const plus = me.plus;
+    if (!plus) return null;
+    if (plus.active) return plus.status === "canceled" ? { text: `Ends ${shortDay(plus.renewsAt)}`, tone: "soon" } : { text: "On", tone: "on" };
+    return { text: "Off", tone: "off" };
+  };
   const canBuy = (me) => Boolean(me.checkout) && !me.plus?.active && !["paused", "unpaid"].includes(me.plus?.status);
   const showPlus = (me) => {
     $("acct-plus-state").textContent = plusWords(me);
+    const badge = badgeOf(me);
+    $("acct-badge").hidden = !badge;
+    if (badge) { $("acct-badge").textContent = badge.text; $("acct-badge").dataset.tone = badge.tone; }
+    const credits = me.plus?.active && me.plus.limit > 0;
+    $("acct-credits").hidden = !credits;
+    if (credits) {
+      const used = Math.min(me.plus.used, me.plus.limit);
+      $("acct-credits-text").textContent = `AI voice lines used this month: ${used.toLocaleString()} of ${me.plus.limit.toLocaleString()}`;
+      const meter = $("acct-meter");
+      meter.setAttribute("aria-valuemax", String(me.plus.limit));
+      meter.setAttribute("aria-valuenow", String(used));
+      meter.dataset.level = used / me.plus.limit >= 0.9 ? "high" : "ok";
+      $("acct-meter-fill").style.setProperty("--used", String(used / me.plus.limit));
+    }
     $("acct-buy").hidden = !canBuy(me);
     $("acct-buy-hint").hidden = !canBuy(me);
+    const manage = Boolean(me.portal) && Boolean(me.plus);
+    $("acct-manage").hidden = !manage;
+    $("acct-manage-hint").hidden = !manage;
   };
 
   // Coming back from paying (the product's confirmation page is /account/?welcome=1): the payment notice from Lemon Squeezy can take a few seconds, so ask again until Plus is on.
@@ -147,6 +179,67 @@ if ($("acct-form")) {
     } catch {
       note.dataset.state = "error";
       note.textContent = "Sorry, the checkout did not open. Check your connection and try again.";
+    }
+    button.disabled = false;
+  });
+
+  $("acct-manage").addEventListener("click", async () => {
+    const button = $("acct-manage");
+    const note = $("acct-buy-status");
+    button.disabled = true;
+    note.dataset.state = "";
+    note.textContent = "Opening your billing page…";
+    try {
+      const res = await post("portal");
+      if (res.ok && res.body.ok === true && typeof res.body.url === "string") { location.assign(res.body.url); return; }
+      note.dataset.state = "error";
+      note.textContent = WORDS[res.body.error] ?? "Sorry, the billing page did not open. Please try again.";
+    } catch {
+      note.dataset.state = "error";
+      note.textContent = "Sorry, the billing page did not open. Check your connection and try again.";
+    }
+    button.disabled = false;
+  });
+
+  $("acct-out-all").addEventListener("click", async () => {
+    const button = $("acct-out-all");
+    button.disabled = true;
+    try {
+      await post("logout-all");
+      show("acct-form");
+      say("You were signed out on every device.");
+      email.focus();
+    } catch {
+      $("acct-out-status").textContent = "Sorry, that did not work. Please try again.";
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  $("acct-delete-go").addEventListener("click", async () => {
+    const button = $("acct-delete-go");
+    const note = $("acct-delete-status");
+    const typed = $("acct-delete-email").value.trim();
+    note.dataset.state = "";
+    if (!typed) { note.dataset.state = "error"; note.textContent = WORDS.confirm_mismatch; $("acct-delete-email").focus(); return; }
+    button.disabled = true;
+    note.textContent = "Deleting…";
+    try {
+      const res = await post("delete", { email: typed });
+      if (res.ok && res.body.ok === true) {
+        $("acct-delete-email").value = "";
+        $("acct-delete").open = false;
+        note.textContent = "";
+        button.disabled = false;
+        show("acct-form");
+        say("Your account and its data were deleted.");
+        return;
+      }
+      note.dataset.state = "error";
+      note.textContent = WORDS[res.body.error] ?? "Sorry, that did not work. Please try again.";
+    } catch {
+      note.dataset.state = "error";
+      note.textContent = "Sorry, that did not work. Check your connection and try again.";
     }
     button.disabled = false;
   });
