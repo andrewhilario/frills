@@ -57,8 +57,8 @@ export function parseEvent(text) {
   return labelsValid(e, a, second) ? { event: e, first: a, second } : null;
 }
 
-/** What is written to Workers Analytics Engine: the event, its labels, and (for an overlay opened on a real account) the scrambled code, counted as one. */
-export const toDataPoint = ({ event, first, second }, id = "") => ({ indexes: [event], blobs: [event, first, second, id], doubles: [1] });
+/** What is written to Workers Analytics Engine: the event, its labels, (for an overlay opened on a real account) the scrambled code, and the country the request came from (two letters, "" when not known), counted as one. */
+export const toDataPoint = ({ event, first, second }, id = "", country = "") => ({ indexes: [event], blobs: [event, first, second, id, country], doubles: [1] });
 
 /** Which platform ("tiktok", "twitch", "both", or "") an overlay link or query string is for. */
 export function platformOf(link = "") {

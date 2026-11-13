@@ -8,6 +8,12 @@
 
 import { loadOf, parseEvent, toDataPoint } from "../src/js/stats-events.js";
 
+/** The country a request came from, as Cloudflare works it out from the connection: two capital letters, or "" when unknown (Cloudflare's XX, or T1 for Tor). Never an address, never a place smaller than a country. */
+export function countryOf(request) {
+  const code = String(request?.cf?.country ?? "").toUpperCase();
+  return /^[A-Z]{2}$/.test(code) && code !== "XX" && code !== "T1" ? code : "";
+}
+
 const MAX_BODY = 256; // a valid event is under 100 characters, so anything near this is not one
 
 const reply = (status, stored) => new Response(null, { status, headers: { "cache-control": "no-store", ...(stored === undefined ? {} : { "x-counted": stored ? "yes" : "no" }) } });
@@ -32,7 +38,7 @@ export async function handleEvent(request, env) {
   let stored = false;
   try {
     if (env?.EVENTS) {
-      env.EVENTS.writeDataPoint(toDataPoint(counted));
+      env.EVENTS.writeDataPoint(toDataPoint(counted, "", countryOf(request)));
       stored = true;
     }
   } catch { /* a counter must never turn into an error on somebody's page */ }
@@ -65,7 +71,7 @@ export async function countOverlay(request, env) {
     if (kind && request.method === "GET" && env?.EVENTS && !optedOut) {
       const account = url.searchParams.get("demo") === "1" ? "" : accountOf(url.searchParams);
       const id = account && env.STATS_SALT ? await scramble(env.STATS_SALT, account) : "";
-      env.EVENTS.writeDataPoint(toDataPoint({ event: "overlay_load", first: kind, second: account ? "live" : "demo" }, id));
+      env.EVENTS.writeDataPoint(toDataPoint({ event: "overlay_load", first: kind, second: account ? "live" : "demo" }, id, countryOf(request)));
     }
   } catch { /* the overlay must open whatever the counter does */ }
   return env.ASSETS.fetch(request);

@@ -4,8 +4,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { EVENTS, encodeEvent, labelsValid, loadOf, overlayOf, pageOf, parseEvent, platformOf, refOf, toDataPoint } from "../src/js/stats-events.js";
-import { countOverlay, handleEvent, scramble } from "../worker/stats.mjs";
-import { DATASETS, TARGETS, activeOverlays, checkRelays, fetchGsc, parseRelayUrls, report, scorecard, summarize } from "../worker/stats-report.mjs";
+import { countOverlay, handleEvent, scramble, countryOf } from "../worker/stats.mjs";
+import { DATASETS, TARGETS, activeOverlays, eventsByCountry, overlaysByCountry, checkRelays, fetchGsc, parseRelayUrls, report, scorecard, summarize } from "../worker/stats-report.mjs";
 import { handleAdmin } from "../worker/admin.mjs";
 import { localDatabase } from "../scripts/lib/d1-sqlite.mjs";
 
@@ -29,7 +29,8 @@ test("only the events and labels on the fixed lists can be counted, and an event
   assert.equal(labelsValid("nothing", "a", ""), false);
   for (const [event, first, second] of [["visit", "editor", "reddit"], ["link_copied", "songs", ""], ["link_copied", "chat", "tiktok"], ["plus_interest", "remote_link", "editor"]]) assert.deepEqual(parseEvent(encodeEvent(event, first, second)), { event, first, second });
   for (const bad of ["", "not json", "[]", "null", '{"e":"visit","a":"home","b":"tiktok","c":"extra"}', '{"e":"visit","a":1}', '{"e":"visit","a":"home","b":5}', '{"e":"visit","a":"home","b":"<script>"}']) assert.equal(parseEvent(bad), null, bad);
-  assert.deepEqual(toDataPoint({ event: "visit", first: "home", second: "tiktok" }), { indexes: ["visit"], blobs: ["visit", "home", "tiktok", ""], doubles: [1] });
+  assert.deepEqual(toDataPoint({ event: "visit", first: "home", second: "tiktok" }), { indexes: ["visit"], blobs: ["visit", "home", "tiktok", "", ""], doubles: [1] });
+  assert.deepEqual(toDataPoint({ event: "visit", first: "home", second: "tiktok" }, "", "PH").blobs, ["visit", "home", "tiktok", "", "PH"], "and the country rides along when it is known");
 });
 
 test("a page is grouped, an editor is named, an overlay is told apart, the platform of a link is read, and where a visit came from is a coarse group (a label in the link wins)", () => {
@@ -57,7 +58,7 @@ test("the Worker takes only a same-site POST of one allowed event, says whether 
   const s = sink();
   const ok = await handleEvent(post('{"e":"visit","a":"home","b":"tiktok"}'), { EVENTS: s });
   assert.deepEqual([ok.status, ok.headers.get("x-counted")], [204, "yes"]);
-  assert.deepEqual(s.points, [{ indexes: ["visit"], blobs: ["visit", "home", "tiktok", ""], doubles: [1] }]);
+  assert.deepEqual(s.points, [{ indexes: ["visit"], blobs: ["visit", "home", "tiktok", "", ""], doubles: [1] }]);
   const dropped = await handleEvent(post('{"e":"link_copied","a":"chat"}'), {});
   assert.deepEqual([dropped.status, dropped.headers.get("x-counted")], [204, "no"], "with no dataset it is checked and dropped, and says so");
   assert.equal((await handleEvent(new Request(`${SITE}/api/e`), { EVENTS: s })).status, 405);
@@ -92,12 +93,12 @@ test("an overlay opening is counted and the page still comes back: the kind, rea
   assert.equal(s.points[3].blobs[3], point.blobs[3], "both at once counts by the TikTok name");
   assert.notEqual(point.blobs[3], await scramble("another salt", "tiktok:pond.pal"), "the secret salt is part of it");
   await open("/overlay/songs/?demo=1&channel=pond.pal", env);
-  assert.deepEqual(s.points[4].blobs, ["overlay_load", "songs", "demo", ""], "a practice overlay has no code, and is counted apart");
+  assert.deepEqual(s.points[4].blobs, ["overlay_load", "songs", "demo", "", ""], "a practice overlay has no code, and is counted apart");
   await open("/overlay/likers/", env);
   assert.deepEqual(s.points[5].blobs.slice(0, 3), ["overlay_load", "likers", "demo"], "no account named: counted as practice");
   const before = s.points.length;
   await open("/overlay/alerts/?channel=pond.pal", { EVENTS: s });
-  assert.deepEqual(s.points[before].blobs, ["overlay_load", "alerts", "live", ""], "without the salt the opening is counted but no code is made");
+  assert.deepEqual(s.points[before].blobs, ["overlay_load", "alerts", "live", "", ""], "without the salt the opening is counted but no code is made");
   await open("/overlay/alerts/?channel=pond.pal", env, { "sec-gpc": "1" });
   await open("/overlay/alerts/?channel=pond.pal", env, { dnt: "1" });
   assert.equal(s.points.length, before + 1, "Global Privacy Control and Do Not Track mean nothing is counted");
@@ -218,4 +219,93 @@ test("the stats come only through the admin password: none without it, none with
   assert.deepEqual(await ok.json(), { ok: false, error: "not_set" }, "right password, no Cloudflare secrets yet: it says so");
   const post = await handleAdmin(new Request(`${SITE}/api/admin/stats`, { method: "POST", headers: { authorization: `Bearer ${"k".repeat(16)}`, origin: SITE } }), env);
   assert.equal(post.status, 405);
+});
+
+// ── the country ───────────────────────────────────────────────────────────────────────────────────────
+
+const inCountry = (country) => { const r = new Request(`${SITE}/x`); if (country !== undefined) r.cf = { country }; return r; };
+
+test("the country is the two letters Cloudflare gives, in capitals, and nothing for 'unknown' or Tor or anything odd", () => {
+  assert.equal(countryOf(inCountry("PH")), "PH");
+  assert.equal(countryOf(inCountry("ph")), "PH");
+  for (const odd of [undefined, "", "XX", "T1", "USA", "1", "P", "P H", null, 7]) assert.equal(countryOf(inCountry(odd)), "", String(odd));
+  assert.equal(countryOf(new Request(`${SITE}/x`)), "", "a request with no Cloudflare details at all");
+});
+
+test("a visit and an overlay opening are counted with their country, and nothing else about where from", async () => {
+  const assets = { fetch: async () => new Response("page") };
+  const s = sink();
+  const request = (path, country) => { const r = new Request(`${SITE}${path}`); r.cf = { country, city: "Manila", postalCode: "1000", latitude: "14.6", longitude: "121.0", colo: "MNL" }; return r; };
+  await countOverlay(request("/overlay/alerts/?channel=pond.pal&platform=tiktok", "PH"), { ASSETS: assets, EVENTS: s, STATS_SALT: "pepper" });
+  assert.equal(s.points[0].blobs[4], "PH");
+  const posted = post('{"e":"visit","a":"home","b":"tiktok"}');
+  posted.cf = { country: "US", city: "Austin", postalCode: "78701" };
+  await handleEvent(posted, { EVENTS: s });
+  assert.equal(s.points[1].blobs[4], "US");
+  const written = JSON.stringify(s.points);
+  for (const never of ["Manila", "Austin", "1000", "78701", "14.6", "MNL", "pond"]) assert.equal(written.includes(never), false, `${never} is nowhere in what is written`);
+  assert.equal(s.points[0].blobs.length, 5, "the code, the kind, real or practice, the account's scrambled code, the country: five labels");
+});
+
+test("someone with Do Not Track is still not counted, country or not", async () => {
+  const assets = { fetch: async () => new Response("page") };
+  const s = sink();
+  const r = new Request(`${SITE}/overlay/?channel=pond.pal`, { headers: { dnt: "1" } });
+  r.cf = { country: "PH" };
+  await countOverlay(r, { ASSETS: assets, EVENTS: s });
+  assert.deepEqual(s.points, []);
+});
+
+const ROWS = (list) => list.map(([id, c, age]) => ({ id, c, d: day(age) }));
+
+test("overlays by country: each overlay counts once, in the country it last opened from; the share Frills Plus would reach is of the ones whose country is known", () => {
+  const out = overlaysByCountry(ROWS([["a", "US", 0], ["a", "PH", 3], ["b", "PH", 1], ["c", "PH", 2], ["d", "GB", 5], ["e", "", 1], ["f", "BR", 12], ["g", "US", 20], ["h", "", 40]]), T);
+  assert.deepEqual(out.week, [{ label: "PH", n: 2 }, { label: "GB", n: 1 }, { label: "US", n: 1 }], "a is in the US (its latest opening), b and c in the Philippines, d in the UK; ties are in letter order");
+  assert.deepEqual([out.weekKnown, out.weekUnknown], [4, 1], "e opened this week with no country recorded");
+  assert.deepEqual([out.inPlus, out.plusRate], [2, 0.5], "the US and the UK are Plus countries, the Philippines is not: 2 of 4");
+  assert.deepEqual(out.month.map((r) => [r.label, r.n]), [["PH", 2], ["US", 2], ["BR", 1], ["GB", 1]], "all 28 days: f (BR) and g (US) join in; h is older than 28 days and is not counted");
+  assert.deepEqual([out.monthKnown, out.monthUnknown], [6, 1]);
+});
+
+test("overlays by country: with nothing recorded there is no share to give, and a damaged country is the same as none", () => {
+  assert.equal(overlaysByCountry([], T).plusRate, null);
+  assert.equal(overlaysByCountry(undefined, T).weekKnown, 0);
+  const odd = overlaysByCountry(ROWS([["a", "usa", 0], ["b", "u", 0], ["c", null, 0], ["d", "us", 0]]), T);
+  assert.deepEqual([odd.weekKnown, odd.weekUnknown, odd.plusRate], [0, 4, null], "only two capital letters are a country");
+});
+
+test("visits and copied links by country, this week and all 28 days, with the ones that have no country counted apart", () => {
+  const rows = [
+    { ev: "visit", c: "US", d: day(0), n: 20 }, { ev: "visit", c: "PH", d: day(1), n: 15 }, { ev: "visit", c: "PH", d: day(10), n: 30 }, { ev: "visit", c: "", d: day(1), n: 7 }, { ev: "visit", c: "US", d: day(40), n: 99 },
+    { ev: "link_copied", c: "PH", d: day(1), n: 4 }, { ev: "plus_interest", c: "US", d: day(1), n: 9 },
+  ];
+  const out = eventsByCountry(rows, T);
+  assert.deepEqual(out.visits.week, [{ label: "US", n: 20 }, { label: "PH", n: 15 }]);
+  assert.deepEqual(out.visits.month, [{ label: "PH", n: 45 }, { label: "US", n: 20 }]);
+  assert.deepEqual([out.visits.weekTotal, out.visits.monthTotal, out.visits.unknown], [35, 65, 7]);
+  assert.deepEqual(out.copies.month, [{ label: "PH", n: 4 }], "only copied links, nothing else");
+  assert.deepEqual(eventsByCountry([], T).visits, { week: [], month: [], weekTotal: 0, monthTotal: 0, unknown: 0 });
+});
+
+test("the report carries the countries, asks Cloudflare for them, and still works when the country question fails", async () => {
+  const asked = [];
+  const cloudflare = (failCountry) => async (url, init = {}) => {
+    if (url.startsWith("https://relay.")) return Response.json({ ok: true, version: "0.5.9", free: 24, level: "ok", slots: { used: 6, max: 30, waiting: 0 }, uptimeS: 3600 });
+    asked.push(init.body);
+    if (init.body.includes(DATASETS.valwidgets)) return new Response("nope", { status: 400 });
+    if (init.body.includes("blob4 AS id")) return Response.json({ data: [{ id: "a", c: "PH", d: day(0) }, { id: "b", c: "US", d: day(1) }] });
+    if (init.body.includes("blob5 AS c")) return failCountry ? new Response("nope", { status: 400 }) : Response.json({ data: [{ ev: "visit", c: "PH", d: day(0), n: 5 }] });
+    return Response.json({ data: [row("visit", "home", "tiktok", 0, 3)] });
+  };
+  const env = { CF_ACCOUNT_ID: "acct", CF_API_TOKEN: "tok" };
+  const ok = await report(env, { now: T, fetchImpl: cloudflare(false) });
+  assert.deepEqual(ok.frills.countries.overlays.week, [{ label: "PH", n: 1 }, { label: "US", n: 1 }]);
+  assert.equal(ok.frills.countries.overlays.plusRate, 0.5);
+  assert.deepEqual(ok.frills.countries.visits.week, [{ label: "PH", n: 5 }]);
+  assert.ok(asked.some((q) => q.includes("blob5 AS c") && q.includes("blob1 IN ('visit', 'link_copied')")), "one question for visits and copies by country");
+  assert.ok(asked.some((q) => q.includes("blob4 AS id") && q.includes("blob5 AS c")), "and the overlay question names the country too");
+  const partial = await report(env, { now: T, fetchImpl: cloudflare(true) });
+  assert.equal(partial.frills.visits.week, 3, "the rest of the report is unaffected");
+  assert.deepEqual(partial.frills.countries.overlays.week.length, 2, "the overlays by country still show");
+  assert.equal(partial.frills.countries.visits, undefined, "only the visits by country are missing");
 });

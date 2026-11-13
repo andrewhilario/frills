@@ -2,6 +2,8 @@
 // live health of the TikTok relay fleet (relay.valwidgets.live + any extra RELAY_URLS), and Google Search Console (when GSC_SERVICE_ACCOUNT
 // or GSC OAuth secrets are set). Pure code over fetch, so it is tested with a made-up Cloudflare, relay, and Google API.
 
+import { PLUS_COUNTRIES } from "./plus-regions.mjs";
+
 export const DATASETS = { frills: "frills_events", valwidgets: "tally_events" };
 export const DEFAULT_RELAYS = ["https://relay.valwidgets.live"];
 
@@ -9,7 +11,9 @@ const DAY = 86_400_000;
 const DAYS = 28;
 
 const eventsQuery = (dataset) => `SELECT blob1 AS ev, blob2 AS a, blob3 AS b, toStartOfInterval(timestamp, INTERVAL '1' DAY) AS d, SUM(_sample_interval) AS n FROM ${dataset} WHERE timestamp > NOW() - INTERVAL '${DAYS}' DAY GROUP BY ev, a, b, d ORDER BY d`;
-const idsQuery = (dataset) => `SELECT blob4 AS id, toStartOfInterval(timestamp, INTERVAL '1' DAY) AS d FROM ${dataset} WHERE blob1 = 'overlay_load' AND blob3 = 'live' AND blob4 != '' AND timestamp > NOW() - INTERVAL '${DAYS}' DAY GROUP BY id, d LIMIT 20000`;
+const idsQuery = (dataset) => `SELECT blob4 AS id, blob5 AS c, toStartOfInterval(timestamp, INTERVAL '1' DAY) AS d FROM ${dataset} WHERE blob1 = 'overlay_load' AND blob3 = 'live' AND blob4 != '' AND timestamp > NOW() - INTERVAL '${DAYS}' DAY GROUP BY id, c, d LIMIT 20000`;
+/** Visits and copied links by country, by day: the country is the fifth label of a count, empty for counts made before it was recorded. */
+const countryQuery = (dataset) => `SELECT blob1 AS ev, blob5 AS c, toStartOfInterval(timestamp, INTERVAL '1' DAY) AS d, SUM(_sample_interval) AS n FROM ${dataset} WHERE blob1 IN ('visit', 'link_copied') AND timestamp > NOW() - INTERVAL '${DAYS}' DAY GROUP BY ev, c, d LIMIT 20000`;
 
 const midnight = (ms) => Date.UTC(new Date(ms).getUTCFullYear(), new Date(ms).getUTCMonth(), new Date(ms).getUTCDate());
 const dayOf = (d) => Date.parse(String(d).replace(" ", "T").replace(/Z?$/, "Z")); // "2026-11-05 00:00:00" (UTC) as a time
@@ -76,6 +80,62 @@ export function activeOverlays(rows, now = Date.now()) {
   }
   const returning = [...week].filter((id) => before.has(id)).length;
   return { today: nowDay.size, week: week.size, before: before.size, month: month.size, returning, returningRate: before.size ? returning / before.size : null };
+}
+
+/** Rows of { label, n }, biggest first, from a map. */
+const ranked = (map) => [...map].sort((x, y) => y[1] - x[1] || String(x[0]).localeCompare(String(y[0]))).map(([label, n]) => ({ label, n }));
+const codeOf = (c) => (/^[A-Z]{2}$/.test(String(c ?? "")) ? String(c) : "");
+
+/**
+ * Where the overlays that opened on a real account are, by country: how many different overlays in the last seven days and in all 28 (each counted in the country it was last opened from),
+ * and what share of this week's, among those whose country is known, are in countries Frills Plus is planned for. Overlays opened before the country was recorded have no country: they are
+ * counted as unknown and left out of the shares.
+ */
+export function overlaysByCountry(rows, now = Date.now()) {
+  const today = midnight(now);
+  const latest = new Map(); // id -> { age, country } of its most recent opening
+  for (const r of rows ?? []) {
+    const age = ageOf(r.d, today);
+    if (!(age >= 0 && age < DAYS) || !r.id) continue;
+    const country = codeOf(r.c);
+    const seen = latest.get(r.id);
+    if (!seen || age < seen.age || (age === seen.age && country && !seen.country)) latest.set(r.id, { age, country });
+  }
+  const week = new Map();
+  const month = new Map();
+  let weekUnknown = 0;
+  let monthUnknown = 0;
+  for (const { age, country } of latest.values()) {
+    if (country) month.set(country, (month.get(country) ?? 0) + 1); else monthUnknown += 1;
+    if (age <= 6) { if (country) week.set(country, (week.get(country) ?? 0) + 1); else weekUnknown += 1; }
+  }
+  const sum = (map) => [...map.values()].reduce((a, n) => a + n, 0);
+  const inPlus = [...week].filter(([c]) => PLUS_COUNTRIES.has(c)).reduce((a, [, n]) => a + n, 0);
+  return { week: ranked(week), month: ranked(month), weekKnown: sum(week), monthKnown: sum(month), weekUnknown, monthUnknown, inPlus, plusRate: sum(week) ? inPlus / sum(week) : null };
+}
+
+/** Visits and copied links by country: the last seven days and all 28, and how many had no country recorded. */
+export function eventsByCountry(rows, now = Date.now()) {
+  const today = midnight(now);
+  const out = {};
+  for (const [event, key] of [["visit", "visits"], ["link_copied", "copies"]]) {
+    const week = new Map();
+    const month = new Map();
+    let unknown = 0;
+    for (const r of rows ?? []) {
+      if (r.ev !== event) continue;
+      const age = ageOf(r.d, today);
+      const n = Number(r.n) || 0;
+      if (!(age >= 0 && age < DAYS)) continue;
+      const country = codeOf(r.c);
+      if (!country) { unknown += n; continue; }
+      month.set(country, (month.get(country) ?? 0) + n);
+      if (age <= 6) week.set(country, (week.get(country) ?? 0) + n);
+    }
+    const sum = (map) => [...map.values()].reduce((a, n) => a + n, 0);
+    out[key] = { week: ranked(week), month: ranked(month), weekTotal: sum(week), monthTotal: sum(month), unknown };
+  }
+  return out;
 }
 
 /** My starting points for "is Frills Plus worth building yet" (change them here): enough different overlays a week, enough of them coming back, enough links copied. */
@@ -290,19 +350,20 @@ export async function fetchGsc(env, { now = Date.now(), fetchImpl = globalThis.f
 /** The whole report. `{ ok: false, error: "not_set" }` until the owner has set the two secrets. A site whose counts cannot be read says why, and the other still shows. */
 export async function report(env, { now = Date.now(), fetchImpl = globalThis.fetch?.bind(globalThis) } = {}) {
   if (!env?.CF_ACCOUNT_ID || !env?.CF_API_TOKEN) return { ok: false, error: "not_set" };
-  const [events, ids, tally, relays, gsc] = await Promise.allSettled([
+  const [events, ids, tally, relays, gsc, where] = await Promise.allSettled([
     ask(env, eventsQuery(DATASETS.frills), fetchImpl),
     ask(env, idsQuery(DATASETS.frills), fetchImpl),
     ask(env, eventsQuery(DATASETS.valwidgets), fetchImpl),
     checkRelays(env, { fetchImpl }),
     fetchGsc(env, { now, fetchImpl }),
+    ask(env, countryQuery(DATASETS.frills), fetchImpl),
   ]);
   const failed = (r) => ({ error: "unreadable", status: r.reason?.status ?? 0 });
   let frills;
   if (events.status === "fulfilled") {
     const summary = summarize(events.value, now);
     const active = ids.status === "fulfilled" ? activeOverlays(ids.value, now) : { today: 0, week: 0, before: 0, month: 0, returning: 0, returningRate: null };
-    frills = { ...summary, active, scorecard: scorecard(summary, active), idsReadable: ids.status === "fulfilled" };
+    frills = { ...summary, active, scorecard: scorecard(summary, active), idsReadable: ids.status === "fulfilled", countries: { overlays: ids.status === "fulfilled" ? overlaysByCountry(ids.value, now) : null, ...(where.status === "fulfilled" ? eventsByCountry(where.value, now) : {}) } };
   } else frills = failed(events);
   const valwidgets = tally.status === "fulfilled" ? summarize(tally.value, now) : failed(tally);
   return {

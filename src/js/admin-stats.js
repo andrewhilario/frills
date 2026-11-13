@@ -90,7 +90,10 @@ const NAMES = {
   scene_link: "All-in-One Scene Link",
   plus_pack: "Collector Art Packs",
 };
-const nameOf = (label) => NAMES[label] ?? label;
+// A two-letter capital label is a country (the counts' fifth label): shown by its English name.
+const regions = (() => { try { return new Intl.DisplayNames(["en"], { type: "region" }); } catch { return null; } })();
+const regionName = (code) => { try { return regions?.of(code) ?? code; } catch { return code; } };
+const nameOf = (label) => NAMES[label] ?? (/^[A-Z]{2}$/.test(label) ? regionName(label) : label);
 
 function kpiCard(title, big, badge, metaItems) {
   const pill = el("span", { className: "stats__delta", textContent: badge.text });
@@ -520,8 +523,20 @@ function site(host, id, title, data, { frills = false } = {}) {
   if (frills && plus?.byFeature?.length) {
     tables.append(table("Frills Plus Interest Clicks", plus.byFeature, plus.byFeatureWeek, plus.total));
   }
+  const where = frills ? data.countries : null;
+  if (where?.overlays) tables.append(table("Overlays by Country", where.overlays.month, where.overlays.week, where.overlays.monthKnown));
+  if (where?.visits?.month?.length) tables.append(table("Visitors by Country", where.visits.month, where.visits.week, where.visits.monthTotal));
   host.append(tables);
+  if (where?.overlays) host.append(el("p", { className: "admin__note", id: "country-note", textContent: countryNote(where.overlays) }));
   if (data.others?.length) host.append(el("p", { className: "admin__note", textContent: "Other counts (28 days): " + data.others.map((o) => `${nameOf(o.label)} ${number(o.n)}`).join(", ") + "." }));
+}
+
+/** One plain sentence about where this week's overlays are, and how many of them Frills Plus (planned for Tier-1 countries) would reach. */
+function countryNote(o) {
+  if (!o.weekKnown && !o.weekUnknown) return "Where overlays are opened from: nothing yet this week. A country is recorded each time an overlay opens, so this fills in as streams run.";
+  const early = o.weekUnknown ? ` ${number(o.weekUnknown)} of this week's overlays have no country yet: they last opened before countries were recorded, and each fills in the next time it opens.` : "";
+  if (!o.weekKnown) return `Where overlays are opened from: no country recorded yet.${early}`;
+  return `Of this week's overlays with a country (${number(o.weekKnown)}), ${Math.round(o.plusRate * 100)}% (${number(o.inPlus)}) are in the countries Frills Plus is planned for (the US, Canada, UK, Ireland, EU and EFTA countries, Australia and New Zealand).${early}`;
 }
 
 const SCORE_PROGRESS = {
@@ -654,6 +669,8 @@ function exportCsv() {
     dumpSplit("Links Copied by Tool", f.copies?.byOverlay, f.copies?.byOverlayWeek);
     dumpSplit("Links Copied by Platform", f.copies?.byPlatform, f.copies?.byPlatformWeek);
     dumpSplit("Frills Plus Clicks", f.plus?.byFeature, f.plus?.byFeatureWeek);
+    dumpSplit("Overlays by Country", f.countries?.overlays?.month, f.countries?.overlays?.week);
+    dumpSplit("Visitors by Country", f.countries?.visits?.month, f.countries?.visits?.week);
     lines.push("");
   }
 

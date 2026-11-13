@@ -8,7 +8,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { findChrome, launch, sleep } from "../scripts/lib/chrome.mjs";
 import { createStatic } from "../scripts/lib/static.mjs";
-import { activeOverlays, scorecard, summarize } from "../worker/stats-report.mjs";
+import { activeOverlays, eventsByCountry, overlaysByCountry, scorecard, summarize } from "../worker/stats-report.mjs";
 
 const dist = join(import.meta.dirname, "..", "dist");
 if (!existsSync(join(dist, "admin", "stats", "index.html"))) throw new Error("dist/ has no stats page. Run `npm run build` first (`npm test` does that for you).");
@@ -92,8 +92,9 @@ test("counts: the overlays themselves carry no counting code at all (they are at
 const T = Date.now();
 const day = (age) => new Date(T - age * 86400000).toISOString().slice(0, 19).replace("T", " "); // (a time of day is fine: the report counts whole days)
 const rows = [{ ev: "visit", a: "home", b: "tiktok", d: day(0), n: 30 }, { ev: "visit", a: "editor", b: "reddit", d: day(1), n: 12 }, { ev: "visit", a: "home", b: "tiktok", d: day(9), n: 20 }, { ev: "link_copied", a: "chat", b: "tiktok", d: day(1), n: 7 }, { ev: "overlay_load", a: "chat", b: "live", d: day(2), n: 40 }, { ev: "overlay_load", a: "chat", b: "demo", d: day(2), n: 90 }, { ev: "plus_interest", a: "remote_link", b: "editor", d: day(1), n: 5 }];
-const ids = [{ id: "a", d: day(0) }, { id: "b", d: day(1) }, { id: "a", d: day(8) }];
-const REPORT = (() => { const summary = summarize(rows, T); const active = activeOverlays(ids, T); return { ok: true, now: T, frills: { ...summary, active, scorecard: scorecard(summary, active), idsReadable: true }, valwidgets: summarize([{ ev: "visit", a: "rank", b: "search", d: day(0), n: 5 }, { ev: "pro_click", a: "footer", b: "", d: day(0), n: 2 }], T) }; })();
+const ids = [{ id: "a", c: "US", d: day(0) }, { id: "b", c: "PH", d: day(1) }, { id: "a", c: "US", d: day(8) }];
+const countryRows = [{ ev: "visit", c: "US", d: day(0), n: 20 }, { ev: "visit", c: "PH", d: day(1), n: 15 }, { ev: "visit", c: "", d: day(1), n: 7 }, { ev: "link_copied", c: "PH", d: day(1), n: 4 }];
+const REPORT = (() => { const summary = summarize(rows, T); const active = activeOverlays(ids, T); return { ok: true, now: T, frills: { ...summary, active, scorecard: scorecard(summary, active), idsReadable: true, countries: { overlays: overlaysByCountry(ids, T), ...eventsByCountry(countryRows, T) } }, valwidgets: summarize([{ ev: "visit", a: "rank", b: "search", d: day(0), n: 5 }, { ev: "pro_click", a: "footer", b: "", d: day(0), n: 2 }], T) }; })();
 
 /** The stats page with a pretend Worker: what /api/admin/stats answers is given. */
 async function stats(reply, { signedIn = true } = {}) {
@@ -112,14 +113,17 @@ test("stats page: it draws both sites, the Frills Plus check with yes and not ye
   assert.deepEqual(score, ["false:IN PROGRESS", "true:READY", "false:IN PROGRESS"], "two overlays and seven copies are not enough, but the one overlay of the week before did come back");
   const texts = await page.evaluate(`({ frills: document.getElementById("frills").textContent, tally: document.getElementById("valwidgets").textContent, bars: document.querySelectorAll("#frills .stats__bars i").length })`);
   assert.equal(texts.bars, 28);
-  assert.match(texts.frills, /Visits, last 7 days.*42/);
-  assert.match(texts.frills, /Different overlays, last 7 days.*2/);
-  assert.match(texts.frills, /Funnel: Visits -> Copied \(7d\).*17%/);
-  assert.match(texts.frills, /Links copied, by platform \(28 days\)/);
-  assert.match(texts.frills, /Frills Plus feature clicks \(28 days\).*Remote-control link/);
+  assert.match(texts.frills, /Site Visits \(7d\).*42/);
+  assert.match(texts.frills, /Weekly Active Streamers.*2/);
+  assert.match(texts.frills, /Overlay Links Copied.*17% of visits/);
+  assert.match(texts.frills, /Links Copied by Platform/);
+  assert.match(texts.frills, /Frills Plus Interest Clicks.*Remote-Control Link/);
+  assert.match(texts.frills, /Overlays by Country.*(Philippines.*United States|United States.*Philippines)/, "the country table names the countries, not their codes");
+  assert.match(texts.frills, /Visitors by Country.*United States.*Philippines/, "visitors by country, biggest first");
+  assert.equal(await page.evaluate(`document.getElementById("country-note").textContent`), "Of this week's overlays with a country (2), 50% (1) are in the countries Frills Plus is planned for (the US, Canada, UK, Ireland, EU and EFTA countries, Australia and New Zealand).");
   assert.match(texts.frills, /TikTok/);
-  assert.match(texts.frills, /Practice overlays and previews, counted apart: 90/);
-  assert.match(texts.tally, /Rank page/);
+  assert.match(texts.frills, /90 demo\/preview loads/);
+  assert.match(texts.tally, /Rank Page/);
   assert.match(texts.tally, /pro_click 2/, "an event only that site has is listed by name");
   assert.equal(await page.evaluate(`document.getElementById("login").hidden`), true);
   assert.deepEqual(page.problems.filter((p) => !p.includes("api/admin/stats")), [], page.problems.join(" | "));
