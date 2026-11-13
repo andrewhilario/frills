@@ -9,6 +9,7 @@ import { gzipSync } from "node:zlib";
 import { join, relative } from "node:path";
 import { site } from "../src/site.mjs";
 import { CONTROLS, PRESETS } from "../src/js/settings.js";
+import "../src/js/chat-sound-settings.js"; // (adds the message-sound settings: the home page counts them)
 import { DECO_IDS } from "../src/js/decor.js";
 
 const dist = join(import.meta.dirname, "..", "dist");
@@ -140,7 +141,9 @@ test("the overlay stays light, and the site's own numbers are true", () => {
   // The budget is now 21.5 KB (the home page still says 21, which is what it rounds to): the two seasonal decoration packs, Halloween and Christmas, cost 0.2 KB (October 2026).
   // The seasonal looks themselves are kept out of the overlay (seasonal-looks.js is only loaded by the editors) to spend nothing more. The twelve extra fonts (fonts.css) cost
   // another 0.4 KB: only their declarations are in the overlay, the font files load only when a look uses one. It is now right at the cap: the next addition must make room.
-  assert.ok(bytes <= 21.5 * 1024, `the overlay is ${(bytes / 1024).toFixed(1)} KB gzipped; the budget is 21.5 KB`);
+  // The budget is now 21.6 KB (the home page now says 22, which is what it rounds to): the message sound (November 2026) costs 0.1 KB in the overlay, which only has to know to load the sound
+  // file when the link asks for a sound. The sound settings, the sound player and the rule for when to play are all kept out of the overlay (chat-sound-settings.js, chat-sounds.js, chat-sound.js).
+  assert.ok(bytes <= 21.6 * 1024, `the overlay is ${(bytes / 1024).toFixed(1)} KB gzipped; the budget is 21.6 KB`);
   const home = pages.find((p) => p.url === "/").html;
   assert.match(home, new RegExp(`data-count="${Math.round(bytes / 1024)}"`), "the KB on the home page matches what was measured");
   assert.match(home, new RegExp(`data-count="${CONTROLS.length}"`), "the settings count matches");

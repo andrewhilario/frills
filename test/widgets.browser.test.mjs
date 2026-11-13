@@ -197,10 +197,13 @@ test("overlays page: the live and beta ones link to their editors, and the comin
   assert.deepEqual(links, ["/editor/", "/alerts/", "/gifts/", "/goal/", "/likers/", "/counter/", "/timer/", "/editor/", "/songs/", "/songs/#spotify-step"], "the chat editor's Both is TikTok and Twitch chat together; the last two are song requests and its Spotify step");
   const beta = await page.evaluate(`[...document.querySelectorAll(".tool:has(.tool__badge--beta) .subtitle")].map((t) => t.textContent)`);
   assert.deepEqual(beta, ["Alerts", "Last gifts", "Goals", "Top likers", "Viewer and like counter", "Subathon timer", "TikTok and Twitch chat together", "Song requests", "Spotify player"], "it is marked Beta, like the others that are new");
-  const soon = await page.evaluate(`[...document.querySelectorAll(".tool--soon")].map((t) => [t.querySelector(".subtitle").textContent, t.querySelectorAll("a").length])`);
+  const soon = await page.evaluate(`[...document.querySelectorAll("#coming-soon + ul .tool--soon")].map((t) => [t.querySelector(".subtitle").textContent, t.querySelectorAll("a").length])`);
   assert.deepEqual(soon.map((s) => s[0]), ["Free sound library", "Like and subscriber alerts", "Actions", "Starting soon, Be right back and Stream ending screens", "Your own layout", "Pets that move", "Top gifters"]);
   assert.ok(soon.every((s) => s[1] === 0), "a coming-soon card links nowhere");
-  assert.equal(await page.evaluate(`document.querySelectorAll(".tool__badge--soon").length`), 7);
+  assert.equal(await page.evaluate(`document.querySelectorAll("#coming-soon + ul .tool__badge--soon").length`), 7);
+  const ideas = await page.evaluate(`[...document.querySelectorAll("#plus-ideas ~ ul .tool")].map((t) => [t.querySelector(".subtitle").textContent, t.querySelectorAll("a").length, t.querySelectorAll("button[data-plus]").length])`);
+  assert.deepEqual(ideas.map((i) => i[0]), ["Change it while you are live", "A bigger sound and sticker kit", "One link for a whole scene", "Collector art packs"], "the paid-plan ideas are their own list, not coming-soon items");
+  assert.ok(ideas.every((i) => i[1] === 0 && i[2] === 1), "each idea has its one button and links nowhere");
 });
 
 const like = (id, name, likeCount, totalLikeCount = 0) => ({ common: { msgId: id }, user: person(name.toLowerCase(), name), likeCount, totalLikeCount });

@@ -11,6 +11,7 @@ import { dirname, join, relative, resolve } from "node:path";
 import { gzipSync } from "node:zlib";
 import { site, checkSite } from "./src/site.mjs";
 import { CONTROLS, PRESETS, PRESET_NAMES } from "./src/js/settings.js";
+import "./src/js/chat-sound-settings.js"; // (the message-sound settings are part of the chat editor, so they count)
 import { faq } from "./src/faq.mjs";
 import { overlaysFaq } from "./src/overlays-faq.mjs";
 import { tokenHex } from "./scripts/tokens.mjs";
@@ -56,7 +57,7 @@ mkdirSync(dist, { recursive: true });
 if (existsSync(join(root, "public"))) cpSync(join(root, "public"), dist, { recursive: true });
 
 const common = { absWorkingDir: root, bundle: true, minify: true, metafile: true, logLevel: "warning", outdir: join(dist, "assets"), entryNames: "[name]-[hash]", target: ["chrome100", "firefox100", "safari15"] };
-const jsEntries = { home: "src/js/home.js", check: "src/js/check.js", editor: "src/js/editor.js", overlay: "src/js/overlay.js", matcha: "src/js/matcha-page.js", page: "src/js/page.js", start: "src/js/start.js", feedback: "src/js/feedback.js", alerts: "src/js/alerts-editor.js", alertsOverlay: "src/js/alerts-overlay.js", gifts: "src/js/gifts-editor.js", likers: "src/js/likers-editor.js", likersOverlay: "src/js/likers-overlay.js", songs: "src/js/songs-editor.js", songsOverlay: "src/js/songs-overlay.js", spotify: "src/js/spotify-page.js", twitch: "src/js/twitch-page.js", admin: "src/js/admin.js", adminStats: "src/js/admin-stats.js", ticker: "src/js/ticker.js", goal: "src/js/goal-editor.js", giftsOverlay: "src/js/gifts-overlay.js", goalOverlay: "src/js/goal-overlay.js", counter: "src/js/counter-editor.js", counterOverlay: "src/js/counter-overlay.js", timer: "src/js/timer-editor.js", timerOverlay: "src/js/timer-overlay.js", ...(withOgCard && { og: "src/js/og.js" }) };
+const jsEntries = { home: "src/js/home.js", check: "src/js/check.js", editor: "src/js/editor.js", overlay: "src/js/overlay.js", matcha: "src/js/matcha-page.js", page: "src/js/page.js", start: "src/js/start.js", feedback: "src/js/feedback.js", chatSounds: "src/js/chat-sounds.js", alerts: "src/js/alerts-editor.js", alertsOverlay: "src/js/alerts-overlay.js", gifts: "src/js/gifts-editor.js", likers: "src/js/likers-editor.js", likersOverlay: "src/js/likers-overlay.js", songs: "src/js/songs-editor.js", songsOverlay: "src/js/songs-overlay.js", spotify: "src/js/spotify-page.js", twitch: "src/js/twitch-page.js", admin: "src/js/admin.js", adminStats: "src/js/admin-stats.js", ticker: "src/js/ticker.js", goal: "src/js/goal-editor.js", giftsOverlay: "src/js/gifts-overlay.js", goalOverlay: "src/js/goal-overlay.js", counter: "src/js/counter-editor.js", counterOverlay: "src/js/counter-overlay.js", timer: "src/js/timer-editor.js", timerOverlay: "src/js/timer-overlay.js", ...(withOgCard && { og: "src/js/og.js" }) };
 const cssEntries = { home: "src/css/entry/home.css", check: "src/css/entry/check.css", page: "src/css/entry/page.css", start: "src/css/entry/start.css", editor: "src/css/entry/editor.css", matcha: "src/css/entry/matcha.css", overlay: "src/css/entry/overlay.css", alerts: "src/css/entry/alerts.css", alertsOverlay: "src/css/entry/alerts-overlay.css", widget: "src/css/entry/widget.css", admin: "src/css/entry/admin.css", widgetOverlay: "src/css/entry/widget-overlay.css", ...(withOgCard && { og: "src/css/entry/og.css" }) };
 const jsBuild = await esbuild({ ...common, entryPoints: jsEntries, format: "iife", legalComments: "none" });
 const cssBuild = await esbuild({ ...common, entryPoints: cssEntries, external: ["/fonts/*", "/decor/*"], legalComments: "inline" });
@@ -145,6 +146,7 @@ const shared = {
   spotifyClientId: site.spotifyClientId ?? "",
   twitchClientId: site.twitchClientId ?? "",
   tickerJs: assets.js.ticker,
+  soundsJs: assets.js.chatSounds, // (the sound player, loaded by the chat overlay only when a sound is chosen, so the overlay stays light)
   privacyAlerts: relayOn ? `\n      <h2 class="subtitle">Alerts, last gifts and goals</h2>\n      <p>These work like chat: follows, gifts and shares pass through the free Frills relay to your overlay and nobody keeps them. The list of gifts, the follower count and the like ranking live only in your overlay page\u2019s memory. If you turn on \u201cremember\u201d, the count is kept in your own browser or streaming app and nowhere else.</p>` : "",
   // Everything the site's database keeps, in one list. Each item says what is kept, for how long, and who can see it.
   privacyStored: `\n      <h2 class="subtitle">What Frills keeps on its server</h2>

@@ -19,6 +19,13 @@ const stage = document.getElementById("stage");
 const feed = new Feed(document.getElementById("chat"));
 const note = document.getElementById("note");
 
+// A sound for each message, only if the link asks for one (&sound=pop). The sound player and its settings are a file of their own, loaded only then, so a chat without sound carries none of it.
+const sound = params.get("sound");
+if (sound && sound !== "none") {
+  globalThis.frillsFeed = feed;
+  document.head.append(Object.assign(document.createElement("script"), { src: stage.dataset.sounds }));
+}
+
 let faces;
 let mark = true; // whether the little platform icon is wanted (it only shows when two chats are read)
 if (isMatchaStyle(params.get("style"))) {

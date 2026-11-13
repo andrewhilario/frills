@@ -1,6 +1,9 @@
 // The editor: pick a look, change anything, connect a channel, copy one link.
 
 import { Feed } from "./feed.js";
+import "./chat-sound-settings.js"; // (adds the message-sound settings to the list below)
+import { createSounds } from "./sounds.js";
+import { chatPing } from "./chat-sound.js";
 import { CONTROLS, DEFAULTS, currentPreset as presetOf, fromParams as paramsToSettings, overlayUrl, sanitize } from "./settings.js";
 import { SEASON_PRESETS, looksFor } from "./seasonal-looks.js";
 import { activeSeason } from "./season.js";
@@ -28,6 +31,8 @@ let settings = sanitize({ ...saved?.settings, ...fromParams(params) });
 const stage = $("stage");
 const preview = $("preview");
 const feed = new Feed($("chat"));
+const sounds = createSounds();
+feed.onShow = chatPing(() => settings, () => sounds); // (the preview plays the chosen message sound, so it can be heard before it goes on stream)
 const paint = () => feed.configure(paintGeneral(stage, settings));
 
 // ── Step 1: the look ──────────────────────────────────────────────────────────────────────────────────────────────────
@@ -37,6 +42,8 @@ let presetChips;
 
 function change(key, value) {
   settings[key] = value;
+  // choosing a sound, or changing its volume, plays it once (that click is also what lets the page make sound)
+  if ((key === "sound" || key === "soundVolume") && settings.sound !== "none") sounds.unlock().then(() => sounds.play(settings.sound, { volume: settings.soundVolume }));
   if (key === "font") fontsReady(generalFaces(settings), 600).then(paint);
   else paint();
   showNeeded(); // the settings that depend on another one (the decorations) appear and go with it

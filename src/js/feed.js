@@ -192,6 +192,7 @@ export class Feed {
       const msg = this.queue.shift();
       if (!msg) return;
       this.show(msg);
+      this.onShow?.(msg); // (a sound, if one is wanted: see chat-sound.js)
       this.last = performance.now();
       if (this.queue.length) this.drain();
     }, wait);
