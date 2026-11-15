@@ -35,9 +35,9 @@ Free Frills stays exactly as it is: no account. Plus uses an account made of jus
 - Live smoke checklist after deploy (the same gate matrix with curl).
 
 ## Decisions the owner must make
-1. Name: "Frills Plus" (the interest buttons) or "Frills Pro" (the current code). One name everywhere.
-2. What is in Plus at launch: AI voices only, or also bigger uploads, scenes, packs.
-3. Price and type: monthly subscription or one-time. (Credits and renewal logic assume monthly.)
+1. Name: DECIDED 15 Nov 2026: Plus and Pro are the same thing; the site says "Frills Plus" everywhere (internal names such as PRO_COUNTRIES stay).
+2. What is in Plus at launch: OPEN (owner has no list yet; AI voices are the only built feature). Advice given 15 Nov 2026: launch with AI voices only, count the interest taps, and change the AI allowance from lines to characters so the monthly cost is bounded (see the cost note).
+3. Price and type: DECIDED 15 Nov 2026: $5.99 a month, subscription, sold through Lemon Squeezy. (Set in the Lemon Squeezy product; the site does not hard-code it.)
 4. Region lock: keep Tier-1 only, or allow everyone now that Lemon Squeezy handles tax and receipts. (The owner may be in a locked region and could not test as themselves.)
 5. Email service and the sending address on valwidgets.live (needs DNS records added in Cloudflare by the owner).
 6. Whether Lemon Squeezy can pay out to the owner's country.
@@ -52,3 +52,8 @@ Free Frills stays exactly as it is: no account. Plus uses an account made of jus
 - Email can land in spam; the sign-in page must say "check spam" and offer to resend.
 - Anyone with a TTS overlay link can use that account's credits until the link is replaced; the "new link" button and the credit limit cap the harm.
 - Lemon Squeezy's checkout email field is editable; that is why the account id, not the email, links a payment.
+
+## Cost note (15 Nov 2026, prices from the providers pages found by search, to be re-checked before launch)
+- Voice: OpenAI tts-1 $15 per 1M characters; Google Neural2 $16 per 1M (first 1M characters a month free for the whole account); Groq Orpheus $22 per 1M (200 characters a request).
+- Lemon Squeezy: 5% + 50c a payment, reported surcharges of about 2% more (international cards, subscriptions): about $0.92 on $5.99, leaving about $5.07 before voice cost and any tax shown to the buyer.
+- The current limit is 1,500 LINES a month at up to 220 characters: worst case 330,000 characters = $4.95 (OpenAI), $5.28 (Google), $6.60 (Groq at 200). That can erase or beat the $5.07. A limit in CHARACTERS (for example 150,000 a month) caps the worst case at about $2.25 / $2.40 / $3.30.
