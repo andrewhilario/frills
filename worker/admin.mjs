@@ -8,7 +8,6 @@
 import { KINDS } from "./feedback.mjs";
 import { MEDIA } from "./media.mjs";
 import { report } from "./stats-report.mjs";
-import { issueProPass } from "./region.mjs";
 
 export const ADMIN = { minKey: 12, maxWrong: 10, windowMs: 10 * 60 * 1000, pageSize: 40, maxPage: 100 };
 export const STATUSES = ["new", "done"];
@@ -151,26 +150,6 @@ export async function handleAdmin(request, env, { now = Date.now(), fetchImpl } 
       if (!rest) return method === "GET" ? await listMedia(url, env) : json(405, { ok: false, error: "method" }, { allow: "GET" });
       if (method === "DELETE") return await removeMedia(rest, env);
       return json(405, { ok: false, error: "method" }, { allow: "DELETE" });
-    }
-    if (more.length === 0 && area === "passes") {
-      if (!rest && method === "GET") {
-        const rows = (await env.DB.prepare("SELECT code, status, country, allow_roam, tts_used, tts_limit, period_start, created_at FROM pro_passes ORDER BY created_at DESC LIMIT 50").all()).results;
-        return json(200, { ok: true, items: rows });
-      }
-      if (!rest && method === "POST") {
-        const body = await request.json().catch(() => ({}));
-        const created = await issueProPass(env.DB, { country: body?.country, limit: body?.limit, allowRoam: Boolean(body?.allowRoam), now });
-        return json(201, { ok: true, ...created });
-      }
-      if (rest && method === "PATCH" && /^[a-f0-9]{16}$/.test(rest)) {
-        const body = await request.json().catch(() => null);
-        if (!["active", "paused", "canceled"].includes(body?.status)) return json(400, { ok: false, error: "bad_status" });
-        const exists = await env.DB.prepare("SELECT code FROM pro_passes WHERE code = ?").bind(rest).first();
-        if (!exists) return json(404, { ok: false, error: "not_found" });
-        await env.DB.prepare("UPDATE pro_passes SET status = ? WHERE code = ?").bind(body.status, rest).run();
-        return json(200, { ok: true });
-      }
-      return json(405, { ok: false, error: "method" }, { allow: "GET, POST, PATCH" });
     }
   } catch {
     return json(503, { ok: false, error: "not_ready" });

@@ -1,11 +1,12 @@
-// Paid & free-tier AI Voice synthesis endpoint (POST /api/tts) protected by region lock (worker/region.mjs) and Pro Pass quota in D1.
+// AI voice synthesis endpoint (POST /api/tts) for Frills Plus: an overlay link's code or a signed-in browser (the one gate, plus-gate.mjs), the region rule (region.mjs) and the account's monthly credits.
 // Calls OpenAI Speech, Google Cloud TTS, or Groq Orpheus from the Worker so keys stay server-side and CSP stays strict.
 
-import { PASS_WINDOW_MS, checkProRegion, issueProPass, json, lookupProPass, regionOf } from "./region.mjs";
+import { json, regionOf } from "./region.mjs";
 import { plusGate, spendCredit } from "./plus-gate.mjs";
+import { resolveCredential } from "./plus-credential.mjs";
 
 export const ALLOWED_VOICES = new Set(["alloy", "nova", "shimmer", "echo", "onyx", "fable"]);
-export const TTS_LIMITS = { maxBody: 2048, maxChars: 220, minRate: 0.7, maxRate: 1.5, windowMs: PASS_WINDOW_MS };
+export const TTS_LIMITS = { maxBody: 2048, maxChars: 220, minRate: 0.7, maxRate: 1.5 };
 
 const GOOGLE_VOICE_MAP = {
   alloy: { name: "en-US-Neural2-F", ssmlGender: "FEMALE" },
@@ -30,7 +31,7 @@ const sameOrigin = (request) => {
   return Boolean(origin) && origin === new URL(request.url).origin;
 };
 
-/** Cleans and validates incoming TTS parameters. Returns { text, voice, rate, pass } or null. */
+/** Cleans and validates incoming TTS parameters. Returns { text, voice, rate, overlay } or null. */
 export function parseTtsInput(raw) {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const text = String(raw.text ?? "").replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, TTS_LIMITS.maxChars);
@@ -38,9 +39,8 @@ export function parseTtsInput(raw) {
   const voice = ALLOWED_VOICES.has(raw.voice) ? raw.voice : "nova";
   const numRate = Number(raw.rate);
   const rate = Number.isFinite(numRate) ? Math.max(TTS_LIMITS.minRate, Math.min(TTS_LIMITS.maxRate, Math.round(numRate * 10) / 10)) : 1.0;
-  const pass = String(raw.pass ?? "").trim().slice(0, 128);
   const overlay = String(raw.overlay ?? "").trim().slice(0, 64);
-  return { text, voice, rate, pass, overlay };
+  return { text, voice, rate, overlay };
 }
 
 /** Parses upstream provider HTTP error into a safe, actionable UI code. */
@@ -103,7 +103,7 @@ async function synthesizeSpeech({ text, voice, rate }, env, fetchFn) {
   return { ok: false, status: 503, error: "ai_not_configured" };
 }
 
-/** POST /api/tts — validates pass, region lock, and quota, then streams spoken audio. */
+/** POST /api/tts — checks who is asking, the region and the credits, then answers with spoken audio. */
 export async function handleTts(request, env, { fetchFn = globalThis.fetch, now = Date.now() } = {}) {
   if (request.method !== "POST") return json(405, { ok: false, error: "method_not_allowed" }, { allow: "POST" });
   if (!sameOrigin(request)) return json(403, { ok: false, error: "wrong_origin" });
@@ -114,33 +114,18 @@ export async function handleTts(request, env, { fetchFn = globalThis.fetch, now 
   try { parsed = parseTtsInput(JSON.parse(rawBody)); } catch { parsed = null; }
   if (!parsed) return json(400, { ok: false, error: "bad_data" });
 
-  const passToken = request.headers.get("x-pass") || parsed.pass;
-  const devSecret = String(env?.PRO_DEV_KEY ?? "").trim();
-  const isDevKey = Boolean(devSecret && passToken && passToken === devSecret);
   const country = regionOf(request, env);
   // Frills Plus goes through the one gate (plus-gate.mjs): an overlay link's code, or being signed in on the website. The credits are the account's, in the plus table.
   const gate = env?.DB ? await plusGate(request, env, { now, overlayCode: parsed.overlay }) : { present: false };
-  const isLocalTesting = country === "DEV" && !passToken && !gate.present && env?.REQUIRE_PRO_PASS !== "1";
+  // A local server (no Cloudflare country) lets the editor try AI voices with no account, unless it is told to ask for one (REQUIRE_PRO_PASS=1) to rehearse the real thing.
+  const isLocalTesting = country === "DEV" && !gate.present && env?.REQUIRE_PRO_PASS !== "1";
 
-  let passRow = null;
   let accountPlus = null;
   if (gate.present) {
     if (!gate.ok) return json(gate.status, { ok: false, error: gate.error, ...(gate.country ? { country: gate.country } : {}), ...(gate.limit ? { limit: gate.limit } : {}) });
     accountPlus = gate.plus;
-  } else if (!isDevKey && !isLocalTesting) {
-    if (!passToken) return json(401, { ok: false, error: "no_pass" });
-    if (!env?.DB) return json(503, { ok: false, error: "not_ready" });
-    passRow = await lookupProPass(env.DB, passToken, { now, resetExpired: true });
-    if (!passRow || passRow.status !== "active") return json(401, { ok: false, error: "invalid_pass" });
-
-    // Region lock enforcement (US, EU, UK, CA, AU, etc., unless allow_roam=1 for owner/travel)
-    const reg = checkProRegion(request, env, { allowRoam: passRow.allow_roam === 1, passToken });
-    if (!reg.eligible) return json(403, { ok: false, error: "region_unavailable", country: reg.country });
-
-    if (passRow.tts_used >= passRow.tts_limit) return json(402, { ok: false, error: "quota_exceeded", limit: passRow.tts_limit });
-  } else {
-    const reg = checkProRegion(request, env, { allowRoam: isDevKey, passToken });
-    if (!reg.eligible) return json(403, { ok: false, error: "region_unavailable", country: reg.country });
+  } else if (!isLocalTesting) {
+    return json(401, { ok: false, error: "no_pass" }); // nothing was brought: a free visitor
   }
 
   const audio = await synthesizeSpeech(parsed, env, fetchFn);
@@ -152,12 +137,6 @@ export async function handleTts(request, env, { fetchFn = globalThis.fetch, now 
     extraHeaders["x-tts-used"] = String(left.used);
     extraHeaders["x-tts-limit"] = String(left.limit);
     extraHeaders["x-tts-remaining"] = String(left.remaining);
-  } else if (passRow && env?.DB) {
-    await env.DB.prepare("UPDATE pro_passes SET tts_used = tts_used + 1 WHERE code = ?").bind(passRow.code).run();
-    const used = passRow.tts_used + 1;
-    extraHeaders["x-tts-used"] = String(used);
-    extraHeaders["x-tts-limit"] = String(passRow.tts_limit);
-    extraHeaders["x-tts-remaining"] = String(Math.max(0, passRow.tts_limit - used));
   }
 
   return new Response(audio.bytes, {
@@ -171,19 +150,23 @@ export async function handleTts(request, env, { fetchFn = globalThis.fetch, now 
   });
 }
 
-/** POST /api/pro/dev-pass — strictly local-dev endpoint (never enabled on Cloudflare) to mint a test Pro Pass in SQLite. */
+/**
+ * POST /api/pro/dev-pass — a local-development helper only (never on Cloudflare): gives the signed-in test account a small Frills Plus (a few credits) so the credit count and the
+ * "used up" message can be tried without a payment. Sign in on /account/ first.
+ */
 export async function handleDevPass(request, env, { now = Date.now() } = {}) {
   if (!env?.DEV) return json(404, { ok: false, error: "not_found" });
   if (request.method !== "POST") return json(405, { ok: false, error: "method_not_allowed" }, { allow: "POST" });
   if (!sameOrigin(request)) return json(403, { ok: false, error: "wrong_origin" });
   if (!env?.DB) return json(503, { ok: false, error: "not_ready" });
 
+  const who = await resolveCredential(request, env, { now });
+  if (who.kind !== "session") return json(401, { ok: false, error: "sign_in_first" });
   const body = await request.json().catch(() => ({}));
-  const pass = await issueProPass(env.DB, {
-    country: body?.country || "US",
-    limit: Math.max(1, Math.min(500, Math.round(Number(body?.limit) || 5))),
-    allowRoam: Boolean(body?.allowRoam),
-    now,
-  });
-  return json(201, { ok: true, ...pass });
+  const limit = Math.max(1, Math.min(500, Math.round(Number(body?.limit) || 5)));
+  await env.DB.prepare(
+    "INSERT INTO plus (account_id, provider_ref, order_ref, status, renews_at, tts_used, tts_limit, period_start, updated_at) VALUES (?, ?, '', 'active', ?, 0, ?, ?, ?) " +
+    "ON CONFLICT(account_id) DO UPDATE SET provider_ref = excluded.provider_ref, order_ref = '', status = 'active', renews_at = excluded.renews_at, tts_used = 0, tts_limit = excluded.tts_limit, period_start = excluded.period_start, updated_at = excluded.updated_at",
+  ).bind(who.accountId, "dev-" + who.accountId, now + 30 * 86400 * 1000, limit, now, now).run();
+  return json(201, { ok: true, used: 0, limit });
 }

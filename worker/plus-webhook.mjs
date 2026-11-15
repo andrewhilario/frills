@@ -10,8 +10,34 @@
 //  - A cancelled subscription keeps Plus until its end date. A refund, a pause, an unpaid or an ended subscription does not.
 //  - Anything we do not use is answered "ignored" with 200, so Lemon Squeezy does not keep retrying it. A failure on our side answers 500, so it does retry.
 
-import { verifyLemonSignature } from "./billing.mjs";
 import { plusActive } from "./accounts.mjs";
+
+const hexToBytes = (hex) => {
+  const clean = String(hex ?? "").trim().toLowerCase();
+  if (!/^[0-9a-f]+$/.test(clean) || clean.length % 2 !== 0) return null;
+  const out = new Uint8Array(clean.length / 2);
+  for (let i = 0; i < out.length; i++) out[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
+  return out;
+};
+
+/** Verifies Lemon Squeezy's `X-Signature` HMAC-SHA256 hex digest over the raw request body bytes. */
+export async function verifyLemonSignature(rawBody, signatureHex, secret) {
+  const cleanSecret = String(secret ?? "");
+  const received = hexToBytes(signatureHex);
+  if (!cleanSecret || !received) return false;
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(cleanSecret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const mac = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(rawBody)));
+  if (mac.length !== received.length) return false;
+  let diff = 0;
+  for (let i = 0; i < mac.length; i++) diff |= mac[i] ^ received[i];
+  return diff === 0;
+}
 
 const ACCOUNT_ID = /^[0-9a-f]{16}$/;
 const MAX_BODY = 200_000;

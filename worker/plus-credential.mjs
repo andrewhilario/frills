@@ -1,7 +1,7 @@
 // Who is asking for a Frills Plus feature, worked out from what they brought. Two things can speak for an account:
 //   - "overlay": the code in an overlay link (made on the account page or the talking pet page; see overlay-links.mjs). This is how a streaming app, where nobody is signed in, asks.
 //   - "session": the signed-in cookie (see accounts.mjs). This is how the website's own editor asks, for a preview, without making a link first.
-// This file only says WHO. Whether they may have the feature is decided in plus-gate.mjs. Nothing here reads a payment key or a Pro Pass.
+// This file only says WHO. Whether they may have the feature is decided in plus-gate.mjs. Nothing here reads a payment key.
 
 import { COOKIE, cookieOf } from "./account-routes.mjs";
 import { getPlus, sessionAccount } from "./accounts.mjs";

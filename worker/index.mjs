@@ -14,7 +14,6 @@ import { handleAccount } from "./account-routes.mjs";
 import { handlePlusWebhook } from "./plus-webhook.mjs";
 import { handleProStatus } from "./region.mjs";
 import { handleDevPass, handleTts } from "./tts.mjs";
-import { handleActivateLicense, handleLemonWebhook } from "./billing.mjs";
 import { countOverlay, handleEvent } from "./stats.mjs";
 
 /** How long the edge keeps a file it has already read from the database. Short, so a deleted or reported file is gone within the hour. */
@@ -33,9 +32,8 @@ export default {
     if (pathname.startsWith("/api/timer/")) return handleTimer(request, env);
     if (pathname.startsWith("/api/account/")) return handleAccount(request, env);
     if (pathname === "/api/pro/status") return handleProStatus(request, env);
-    if (pathname === "/api/pro/activate") return handleActivateLicense(request, env);
     if (pathname === "/api/pro/dev-pass") return handleDevPass(request, env);
-    if (pathname === "/api/webhooks/lemonsqueezy") return handlePlusWebhook(request, env); // (the account-based Plus; the older license-key handler is removed in a later step)
+    if (pathname === "/api/webhooks/lemonsqueezy") return handlePlusWebhook(request, env);
     if (pathname === "/api/tts") return handleTts(request, env);
     if (pathname.startsWith("/api/admin/")) {
       const response = await handleAdmin(request, env);

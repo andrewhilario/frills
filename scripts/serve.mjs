@@ -20,7 +20,6 @@ import { handleAccount } from "../worker/account-routes.mjs";
 import { handlePlusWebhook } from "../worker/plus-webhook.mjs";
 import { handleProStatus } from "../worker/region.mjs";
 import { handleDevPass, handleTts } from "../worker/tts.mjs";
-import { handleActivateLicense, handleLemonWebhook } from "../worker/billing.mjs";
 
 const root = join(import.meta.dirname, "..");
 const port = Number(process.argv[2] ?? process.env.PORT ?? 3020);
@@ -80,19 +79,15 @@ createServer(async (req, res) => {
     res.end(Buffer.from(await response.arrayBuffer()));
     return;
   }
-  if (path === "/api/pro/status" || path === "/api/pro/activate" || path === "/api/pro/dev-pass" || path === "/api/webhooks/lemonsqueezy" || path === "/api/tts") {
+  if (path === "/api/pro/status" || path === "/api/pro/dev-pass" || path === "/api/tts") {
     const chunks = [];
     for await (const chunk of req) chunks.push(chunk);
     const request = new Request(`http://${req.headers.host}${req.url}`, { method: req.method, headers: req.headers, body: ["GET", "HEAD"].includes(req.method) ? undefined : Buffer.concat(chunks) });
     const response = path === "/api/pro/status"
       ? await handleProStatus(request, env)
-      : path === "/api/pro/activate"
-        ? await handleActivateLicense(request, env)
-        : path === "/api/pro/dev-pass"
-          ? await handleDevPass(request, env)
-          : path === "/api/webhooks/lemonsqueezy"
-            ? await handleLemonWebhook(request, env)
-            : await handleTts(request, env);
+      : path === "/api/pro/dev-pass"
+        ? await handleDevPass(request, env)
+        : await handleTts(request, env);
     res.writeHead(response.status, Object.fromEntries(response.headers));
     res.end(Buffer.from(await response.arrayBuffer()));
     return;

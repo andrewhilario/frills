@@ -62,14 +62,12 @@ export function createTtsPlayer({ onLevel = () => {}, onNotice = () => {}, onUsa
   const fetchProStatus = async (settings, force = false) => {
     const sim = String(getSimCountry() || "").trim().toUpperCase();
     const code = String(settings.code || "").trim(); // a Frills Plus overlay link
-    const token = String(settings.passToken || "").trim();
-    const key = `${sim}|${code}|${token}`;
+    const key = `${sim}|${code}`;
     if (!force && statusCache && statusKey === key) return statusCache;
 
     const headers = {};
     if (sim) headers["x-frills-country"] = sim;
     if (code) headers["x-overlay"] = code;
-    else if (token) headers["x-pass"] = token;
     const data = await fetch("/api/pro/status", { headers })
       .then((r) => (r.ok ? r.json() : null))
       .catch(() => null);
@@ -86,7 +84,7 @@ export function createTtsPlayer({ onLevel = () => {}, onNotice = () => {}, onUsa
     if (!info.aiReady) return { allow: false, code: "ai_not_configured" };
     if (!info.eligible) return { allow: false, code: "region_unavailable" };
     if (info.country !== "DEV") {
-      // The server says who this is (an overlay link's code, a signed-in browser, or an older pass key) and what they may do: nothing here guesses.
+      // The server says who this is (an overlay link's code, or a signed-in browser) and what they may do: nothing here guesses.
       if (!info.pass) return { allow: false, code: "no_pass" };
       if (!info.pass.valid) return { allow: false, code: "invalid_pass" };
       if (info.pass.remaining <= 0) return { allow: false, code: "quota_exceeded" };
@@ -260,7 +258,6 @@ export function createTtsPlayer({ onLevel = () => {}, onNotice = () => {}, onUsa
         try {
           const headers = { "content-type": "application/json" };
           if (settings.code) headers["x-overlay"] = settings.code;
-          else if (settings.passToken) headers["x-pass"] = settings.passToken;
           const sim = String(getSimCountry() || "").trim().toUpperCase();
           if (sim) headers["x-frills-country"] = sim;
           const res = await fetch("/api/tts", {
@@ -271,7 +268,6 @@ export function createTtsPlayer({ onLevel = () => {}, onNotice = () => {}, onUsa
               text: item.text,
               voice: settings.voice || "nova",
               rate: (Number(settings.rate) || 100) / 100,
-              pass: settings.code ? "" : settings.passToken || "",
               overlay: settings.code || "",
             }),
           });

@@ -761,8 +761,7 @@
 .pro-paywall__title { margin: 0; font-size: 0.96rem; font-weight: 800; }
 .pro-paywall__body { margin: 0; font-size: 0.88rem; line-height: 1.45; }
 .pro-paywall__actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.pro-paywall__form { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
-.pro-paywall__form input { flex: 1 1 200px; min-width: 0; }
+.pro-paywall__actions > a { text-decoration: none; }
 /* The Frills Plus link panel on the talking pet's page: what the link is, and the buttons that make, replace or turn it off. Site tokens only. */
 .plus-link { display: grid; gap: var(--space-sm); margin-top: var(--space-sm); padding: var(--space-md); background: var(--color-paper); border: 2px solid var(--color-rule-2); border-radius: var(--radius-card); }
 .plus-link > * { margin: 0; min-width: 0; }

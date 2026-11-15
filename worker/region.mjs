@@ -1,10 +1,8 @@
-// Regional availability, Pro Pass storage/verification, and dev bypasses for paid Frills features (AI Talking Pet TTS).
+// Regional availability and the status answer for paid Frills Plus features (AI Talking Pet voices). Who has Plus is decided by an account (accounts.mjs, plus-gate.mjs); there is no key.
 // Enforced server-side inside the Worker using Cloudflare's `request.cf.country`. Regular static pages remain globally free.
 
 import { resolveCredential } from "./plus-credential.mjs";
 import { plusActive } from "./accounts.mjs";
-
-export const PASS_WINDOW_MS = 30 * 86400 * 1000;
 
 export const DEFAULT_PRO_COUNTRIES = new Set([
   // North America & Oceania
@@ -27,15 +25,6 @@ export const json = (status, body, extra = {}) =>
       ...extra,
     },
   });
-
-export const sha256 = async (text) =>
-  [...new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text)))].map((b) => b.toString(16).padStart(2, "0")).join("");
-
-const randHex = (bytes) => {
-  const arr = new Uint8Array(bytes);
-  crypto.getRandomValues(arr);
-  return [...arr].map((b) => b.toString(16).padStart(2, "0")).join("");
-};
 
 /** Returns the visitor's 2-letter uppercase country code from Cloudflare, or "DEV" on localhost/test harness. */
 export function regionOf(request, env) {
@@ -67,106 +56,43 @@ export function allowedCountries(env) {
   return new Set(raw.split(",").map((c) => c.trim().toUpperCase()).filter((c) => /^[A-Z]{2}$/.test(c)));
 }
 
-/** Looks up a hashed Pro Pass token in D1 and optionally resets its 30-day usage counter when elapsed. */
-export async function lookupProPass(db, passToken, { now = Date.now(), resetExpired = false } = {}) {
-  const token = String(passToken ?? "").trim();
-  if (!db || !token) return null;
-  const hash = await sha256(token);
-  const row = await db
-    .prepare("SELECT code, status, country, allow_roam, tts_used, tts_limit, period_start FROM pro_passes WHERE pass_hash = ?")
-    .bind(hash)
-    .first();
-  if (!row) return null;
-  if (resetExpired && row.status === "active" && now - row.period_start >= PASS_WINDOW_MS) {
-    await db.prepare("UPDATE pro_passes SET tts_used = 0, period_start = ? WHERE code = ?").bind(now, row.code).run();
-    row.tts_used = 0;
-    row.period_start = now;
-  }
-  return row;
-}
-
-/** Creates a new Pro Pass row in D1 and returns its one-time bearer token alongside safe metadata. */
-export async function issueProPass(db, { country = "US", limit = 1500, allowRoam = false, now = Date.now() } = {}) {
-  if (!db) throw new Error("db_required");
-  const cleanCountry = /^[A-Za-z]{2}$/.test(String(country).trim()) ? String(country).trim().toUpperCase() : "US";
-  const cleanLimit = Math.max(1, Math.min(100000, Math.round(Number(limit) || 1500)));
-  const roamInt = allowRoam ? 1 : 0;
-  const code = randHex(8); // 16 hex chars
-  const token = `frills_pro_${randHex(16)}`;
-  const hash = await sha256(token);
-
-  await db
-    .prepare("INSERT INTO pro_passes (code, pass_hash, status, country, allow_roam, tts_used, tts_limit, period_start, created_at) VALUES (?, ?, 'active', ?, ?, 0, ?, ?, ?)")
-    .bind(code, hash, cleanCountry, roamInt, cleanLimit, now, now)
-    .run();
-
-  return { code, token, country: cleanCountry, allowRoam: Boolean(roamInt), used: 0, limit: cleanLimit, periodStart: now };
-}
-
 /**
  * Checks whether the current request is allowed to purchase or use paid features.
- * Allows local dev ("DEV"), owner bypass (`x-frills-dev` matching `PRO_DEV_KEY`/`ADMIN_KEY`),
- * an active pass with `allow_roam = 1`, or a country in the allowed set.
+ * Allows local dev ("DEV"), the owner's override (a `x-frills-dev` header matching `PRO_DEV_KEY`/`ADMIN_KEY`, which a browser page cannot send), or a country in the allowed set.
  */
-export function checkProRegion(request, env, { allowRoam = false, passToken = "" } = {}) {
+export function checkProRegion(request, env) {
   const country = regionOf(request, env);
   if (country === "DEV") return { eligible: true, country, reason: "local_dev" };
 
-  const devHeader = request.headers.get("x-frills-dev") || passToken;
+  const devHeader = request.headers.get("x-frills-dev");
   const devSecret = String(env?.PRO_DEV_KEY ?? "").trim();
   const adminSecret = String(env?.ADMIN_KEY ?? "").trim();
   if ((devSecret && devHeader === devSecret) || (adminSecret && request.headers.get("x-frills-dev") === adminSecret)) {
     return { eligible: true, country, reason: "dev_override" };
   }
 
-  if (allowRoam) return { eligible: true, country, reason: "roam_allowed" };
-
   const eligible = allowedCountries(env).has(country);
   return { eligible, country, reason: eligible ? "allowed_country" : "region_unavailable" };
 }
 
-/** GET /api/pro/status — checks region eligibility, AI provider readiness, and optional Pro Pass quota. */
+/** GET /api/pro/status — region eligibility, AI provider readiness, and (for an overlay link's code or a signed-in browser) what Frills Plus has left this month. */
 export async function handleProStatus(request, env, { now = Date.now() } = {}) {
   if (request.method !== "GET") return json(405, { ok: false, error: "method_not_allowed" }, { allow: "GET" });
   const url = new URL(request.url);
   const overlayCode = String(request.headers.get("x-overlay") || url.searchParams.get("overlay") || "").trim();
-  const passToken = String(request.headers.get("x-pass") || url.searchParams.get("pass") || "").trim();
-  const passRow = !overlayCode && passToken && env?.DB ? await lookupProPass(env.DB, passToken, { now, resetExpired: false }) : null;
 
-  const check = checkProRegion(request, env, { allowRoam: passRow?.allow_roam === 1, passToken });
+  const check = checkProRegion(request, env);
   const aiReady = Boolean(env?.OPENAI_TTS_KEY || env?.GOOGLE_TTS_KEY || env?.GROQ_TTS_KEY);
   const out = { ok: true, ...check, aiReady };
 
-  const checkoutUrl = String(env?.LEMON_CHECKOUT_URL ?? "").trim();
-  if (checkoutUrl.startsWith("https://")) out.checkoutUrl = checkoutUrl;
   if (env?.DEV) out.dev = true;
-  // A Frills Plus account (an overlay link's code, or a signed-in browser): what it has bought and what is left of this month. An explicit Pro Pass key (older) is read below instead.
-  const who = !passToken || overlayCode ? await resolveCredential(request, env, { now, overlayCode }) : { kind: "none" };
+  // A Frills Plus account (an overlay link's code, or a signed-in browser): what it has bought and what is left of this month.
+  const who = await resolveCredential(request, env, { now, overlayCode });
   if (who.kind !== "none") {
     if (who.kind === "invalid" || !plusActive(who.plus, now)) out.pass = { valid: false, error: "invalid_pass" };
     else {
       const p = who.plus;
       out.pass = { valid: true, status: p.status, used: p.tts_used, limit: p.tts_limit, remaining: Math.max(0, p.tts_limit - p.tts_used), periodStart: p.period_start };
-    }
-  } else if (passToken) {
-    if (!env?.DB) {
-      out.pass = { valid: false, error: "not_ready" };
-    } else if (!passRow) {
-      out.pass = { valid: false, error: "invalid_pass" };
-    } else {
-      const expired = passRow.status === "active" && now - passRow.period_start >= PASS_WINDOW_MS;
-      const used = expired ? 0 : passRow.tts_used;
-      out.pass = {
-        valid: passRow.status === "active",
-        code: passRow.code,
-        status: passRow.status,
-        country: passRow.country,
-        allowRoam: passRow.allow_roam === 1,
-        used,
-        limit: passRow.tts_limit,
-        remaining: Math.max(0, passRow.tts_limit - used),
-        periodStart: expired ? now : passRow.period_start,
-      };
     }
   }
   return json(200, out);

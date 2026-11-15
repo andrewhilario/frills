@@ -26,7 +26,6 @@ import { SlotAlerts, termuxNotifier } from "./alerts.mjs";
 import { OWNER, ownerGate } from "./owner.mjs";
 import { handleProStatus } from "../worker/region.mjs";
 import { handleDevPass, handleTts } from "../worker/tts.mjs";
-import { handleActivateLicense, handleLemonWebhook } from "../worker/billing.mjs";
 
 const VERSION = "0.6.0";
 /** What this program can do, so a page can tell an old one ("chat" only) from one that sends alerts. */
@@ -138,7 +137,7 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
     LEMON_STORE_ID: process.env.LEMON_STORE_ID || "",
     LEMON_PRODUCT_ID: process.env.LEMON_PRODUCT_ID || "",
     LEMON_WEBHOOK_SECRET: process.env.LEMON_WEBHOOK_SECRET || "",
-    LEMON_TEST_MODE: process.env.LEMON_TEST_MODE || "1",
+    LEMON_TEST_MODE: process.env.LEMON_TEST_MODE || "", // (off unless asked for: a test-mode payment is for a test setup only)
     PRO_MONTHLY_LIMIT: process.env.PRO_MONTHLY_LIMIT || "",
   };
   let dbInit = null;
@@ -212,7 +211,7 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
     } else if (url.pathname === "/tiktok/ping" || (relay && url.pathname === "/health")) {
       res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", ...cors });
       res.end(JSON.stringify(relay && url.pathname === "/health" ? numbers(owner, proven) : relay ? { ok: true, name: "frills-relay", version: VERSION, features: FEATURES, slots: hub.stats() } : { ok: true, name: "frills-helper", version: VERSION, features: FEATURES }));
-    } else if (!relay && (url.pathname === "/api/pro/status" || url.pathname === "/api/pro/activate" || url.pathname === "/api/pro/dev-pass" || url.pathname === "/api/webhooks/lemonsqueezy" || url.pathname === "/api/tts")) {
+    } else if (!relay && (url.pathname === "/api/pro/status" || url.pathname === "/api/pro/dev-pass" || url.pathname === "/api/tts")) {
       try {
         await ensureDb();
         const chunks = [];
@@ -221,13 +220,9 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
         const response = await (
           url.pathname === "/api/pro/status"
             ? handleProStatus(request, proEnv)
-            : url.pathname === "/api/pro/activate"
-              ? handleActivateLicense(request, proEnv)
-              : url.pathname === "/api/pro/dev-pass"
-                ? handleDevPass(request, proEnv)
-                : url.pathname === "/api/webhooks/lemonsqueezy"
-                  ? handleLemonWebhook(request, proEnv)
-                  : handleTts(request, proEnv)
+            : url.pathname === "/api/pro/dev-pass"
+              ? handleDevPass(request, proEnv)
+              : handleTts(request, proEnv)
         );
         res.writeHead(response.status, Object.fromEntries(response.headers));
         res.end(Buffer.from(await response.arrayBuffer()));

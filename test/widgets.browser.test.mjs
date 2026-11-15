@@ -324,7 +324,7 @@ test("editor: the milestone choices are there, the test button shows the celebra
   assert.deepEqual(page.problems, [], page.problems.join(" | "));
 });
 
-test("tts editor & overlay: helper serves /api/pro/status, switching pets swaps sprites, custom preview speaks, paywall simulator works, and link builds", { skip }, async () => {
+test("tts editor & overlay: helper serves /api/pro/status, switching pets swaps sprites, custom preview speaks, paywall simulator and the way to Frills Plus work, and link builds", { skip }, async () => {
   const prevDb = process.env.FEEDBACK_DB;
   process.env.FEEDBACK_DB = ":memory:";
   try {
@@ -337,14 +337,15 @@ test("tts editor & overlay: helper serves /api/pro/status, switching pets swaps 
     await page.evaluate(`(() => { const s = document.getElementById("sim-country"); s.value = "PH"; s.dispatchEvent(new Event("change")); })()`);
     await until(async () => (await text("#pro-paywall-title")).includes("Not available in PH"), 3000);
 
-    // Simulate Tier-1 country without pass -> paywall requests Pro Pass
+    // Simulate a Tier-1 country with nothing brought -> the paywall offers Frills Plus, and there is no key box any more
     await page.evaluate(`(() => { const s = document.getElementById("sim-country"); s.value = "US"; s.dispatchEvent(new Event("change")); })()`);
-    await until(async () => (await text("#pro-paywall-title")).includes("Frills Pro Pass required"), 3000);
+    await until(async () => (await text("#pro-paywall-title")).includes("Frills Plus gives you AI voices"), 3000);
+    assert.equal(await page.evaluate(`document.getElementById("ls-form") || document.getElementById("ls-key") || document.getElementById("c-passToken") || document.getElementById("clear-pass")`), null, "the key box and the pass-key setting are gone");
 
-    // Mint 5-credit local pass -> fills c-passToken and clears paywall
+    // The test credits go to a signed-in test account: this plain helper has no accounts, so it says to sign in on npm run serve
     await click("#mint-pass");
-    await until(async () => (await text("#pro-status")).includes("5/5"), 4000);
-    assert.equal(await page.evaluate(`document.getElementById("pro-paywall").hidden`), true);
+    await until(async () => (await text("#pro-status")).includes("Sign in on /account/ first"), 4000);
+    page.problems.splice(0, page.problems.length, ...page.problems.filter((m) => !m.includes("/api/pro/dev-pass"))); // (the browser logs that expected 401 itself)
 
     await type("#say-input", "Hello from local stream test!");
     await page.evaluate(`document.querySelector("#say-form button").click()`);

@@ -24,7 +24,7 @@ export async function plusGate(request, env, { now = Date.now(), overlayCode = "
   if (who.kind === "none") return { present: false };
   if (who.kind === "invalid") return refuse(401, "invalid_pass");
   if (!plusActive(who.plus, now)) return refuse(401, "invalid_pass");
-  const region = checkProRegion(request, env, { allowRoam: false, passToken: "" });
+  const region = checkProRegion(request, env);
   if (!region.eligible) return refuse(403, "region_unavailable", { country: region.country });
   if (who.plus.tts_used >= who.plus.tts_limit) return refuse(402, "quota_exceeded", { limit: who.plus.tts_limit });
   return { present: true, ok: true, kind: who.kind, accountId: who.accountId, plus: who.plus };
