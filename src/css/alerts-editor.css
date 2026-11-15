@@ -47,6 +47,9 @@
 .spx__optional { font-weight: 500; color: var(--color-ink-2); font-size: 0.7em; }
 .spx__status { margin: 0; overflow-wrap: anywhere; }
 .spx__status[data-state="error"], .spx__note[data-state="error"] { color: var(--color-error); font-weight: 600; }
+.spx__ask { display: grid; gap: var(--space-xs); padding: var(--space-sm) var(--space-md); border: 2px solid var(--color-ink); border-radius: var(--radius-card); background: var(--color-accent-tint); }
+.spx__ask > * { margin: 0; min-width: 0; }
+.spx__ask-title { font-weight: 800; }
 .spx__row { display: flex; flex-wrap: wrap; gap: var(--space-sm); align-items: center; }
 .spx__now { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-md); align-items: center; padding: var(--space-sm); border-radius: var(--radius-card); background: var(--color-paper-2); }
 .spx__cover { width: 4rem; height: 4rem; border-radius: var(--radius-sm); object-fit: cover; background: var(--color-paper-3); }

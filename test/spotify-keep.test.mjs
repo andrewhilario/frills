@@ -105,6 +105,22 @@ test("one person's second !sr within 15 seconds is not passed on, and anyone els
   assert.equal(calls.length, 3);
 });
 
+test("a request the list on the stream turned away is not passed on, and does not use up the person's 15 seconds", async () => {
+  const { f, calls } = forward();
+  assert.equal(await f.handle(chat("!sr one"), false), "not on the list");
+  assert.equal(calls.length, 0, "nothing reached Spotify");
+  assert.equal(await f.handle(chat("!sr two"), true), "sent", "their next one, that the list took, goes straight through");
+  assert.equal(await f.handle(chat("!sr three")), "too soon", "and with no answer given the old rule still holds: 15 seconds");
+  assert.equal(calls.length, 1);
+});
+
+test("a !next is passed on whether or not the list took anything: it also skips Spotify's own song", async () => {
+  const { f, calls } = forward();
+  assert.equal(await f.handle(chat("!next", { user: "pond_cafe", host: true }), false), "sent");
+  assert.equal(calls[0].url.endsWith("/next"), true);
+  assert.equal(await f.handle(chat("!next", { user: "viewer9" }), true), "not allowed", "who may skip is still decided as before");
+});
+
 test("the same chat message is passed on once, however many times it is delivered", async () => {
   const { f, calls } = forward();
   assert.equal(await f.handle(chat("!sr one", { id: "m1" })), "sent");

@@ -53,5 +53,10 @@ if (demo) {
   say("Add ?channel=yourname to this link.");
 } else {
   const fonts = fontsReady(generalFaces(settings), 1000); // the connection starts at once; only drawing waits for the font
-  connectEvents({ channel, events: [], onChat: (message) => { fonts.then(() => queue.handle(message, channel)); forward?.handle(message); }, say });
+  connectEvents({ channel, events: [], onChat: (message) => {
+      fonts.then(() => {
+        const result = queue.handle(message, channel);
+        forward?.handle(message, result.kind === "request"); // (Spotify's queue gets a request only if the list took it; a !next goes either way: it also skips Spotify's own song when the list is empty)
+      });
+    }, say });
 }

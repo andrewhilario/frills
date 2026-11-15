@@ -410,3 +410,84 @@ test("song requests: the step says whether the song requests overlay is open wit
   assert.match(await page.evaluate('document.querySelector(".spx__relink").textContent'), /copied your link[\s\S]*before[\s\S]*connected Spotify[\s\S]*copy it again/, "the link step says to copy it again");
   assert.deepEqual(problems(), []);
 });
+
+// ── the one question after connecting ─────────────────────────────────────────────────────────────────
+
+const askShown = () => page.evaluate('getComputedStyle(document.getElementById("spx-ask")).display !== "none"');
+const asked = () => page.evaluate('localStorage.getItem("frills:spotify:queue-asked")');
+const settingsCalls = async () => (await worker("settings")).map((c) => JSON.parse(c.body));
+
+test("song requests: right after connecting it asks once whether viewers' songs should also go to the Spotify queue, says what that needs, and changes nothing until answered", { skip }, async () => {
+  await open("/songs/", { server: {} });
+  await connected();
+  assert.equal(await askShown(), true);
+  const words = await text("spx-ask");
+  assert.match(words, /Spotify Premium/);
+  assert.match(words, /Anyone in your chat can add songs/);
+  assert.match(words, /Yes, add them to my Spotify queue/);
+  assert.match(words, /No, only show them on my stream/);
+  assert.equal(await page.evaluate('document.getElementById("c-spQueue").checked'), false, "off until the person says yes");
+  assert.deepEqual(await settingsCalls(), [], "and nothing was changed on the server");
+  assert.deepEqual(problems(), [], problems().join(" | "));
+});
+
+test("song requests: answering No keeps the queue off, is remembered, and is not asked again", { skip }, async () => {
+  await open("/songs/", { server: {} });
+  await connected();
+  await page.evaluate('document.getElementById("spx-ask-no").click()');
+  await page.waitFor('getComputedStyle(document.getElementById("spx-ask")).display === "none"');
+  assert.equal(await asked(), "1");
+  assert.deepEqual(await settingsCalls(), [], "No changes nothing: it was already off");
+  assert.equal(await page.evaluate('document.getElementById("c-spQueue").checked'), false);
+  await open("/songs/", { server: {} }, { fresh: false });
+  await connected();
+  assert.equal(await askShown(), false, "not asked again after a reload");
+});
+
+test("song requests: answering Yes switches the queue on in Frills, says so, and is not asked again", { skip }, async () => {
+  await open("/songs/", { server: {} });
+  await connected();
+  await page.evaluate('document.getElementById("spx-ask-yes").click()');
+  await page.waitFor('getComputedStyle(document.getElementById("spx-ask")).display === "none"');
+  assert.deepEqual(await settingsCalls(), [{ queue: true }]);
+  assert.equal(await page.evaluate('document.getElementById("c-spQueue").checked'), true);
+  assert.match(await text("spx-queue-note"), /^On\./);
+  assert.equal(await asked(), "1");
+});
+
+test("song requests: if Frills will not switch it on, the question stays, says why, and the queue stays off", { skip }, async () => {
+  await open("/songs/", { server: {}, settingsReply: { status: 403, body: { ok: false, error: "wrong_key" } } });
+  await connected();
+  await page.evaluate('document.getElementById("spx-ask-yes").click()');
+  await page.waitFor('document.getElementById("spx-ask-note").dataset.state === "error"');
+  assert.match(await text("spx-ask-note"), /not the one that connected Spotify/);
+  assert.equal(await askShown(), true, "still there to try again");
+  assert.equal(await page.evaluate('document.getElementById("c-spQueue").checked'), false);
+  assert.equal(await asked(), null, "not counted as answered");
+});
+
+test("song requests: someone whose queue is already on is not asked, and flipping the switch yourself counts as the answer", { skip }, async () => {
+  await open("/songs/", { server: { queue: true } });
+  await connected();
+  assert.equal(await askShown(), false, "already on: they have chosen");
+  await open("/songs/", { server: {} });
+  await connected();
+  assert.equal(await askShown(), true);
+  await page.evaluate('document.getElementById("c-spQueue").click()');
+  await page.waitFor('getComputedStyle(document.getElementById("spx-ask")).display === "none"');
+  assert.equal(await asked(), "1");
+});
+
+test("song requests: disconnecting forgets the answer, so connecting again asks again; and the question is not shown when not connected", { skip }, async () => {
+  await open("/songs/", { server: {} });
+  await connected();
+  await page.evaluate('document.getElementById("spx-ask-no").click()');
+  await page.waitFor('getComputedStyle(document.getElementById("spx-ask")).display === "none"');
+  await page.evaluate('document.getElementById("spx-logout").click()');
+  await page.waitFor('document.getElementById("spx-status").textContent.includes("Not connected")');
+  assert.ok(!(await asked()), "the answer is forgotten");
+  assert.equal(await askShown(), false, "no question while logged out");
+  await open("/songs/", { server: null }, { fresh: false });
+  await page.waitFor('document.getElementById("spx-status").textContent.includes("Not connected")');
+  assert.equal(await askShown(), false);
+});

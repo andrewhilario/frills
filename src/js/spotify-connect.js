@@ -15,6 +15,7 @@ import { SONGS, onScreenWords, parseCommand } from "./songs.js";
 
 export const SHARING = "frills:spotify:sharing"; // "1" while Frills keeps this browser's Spotify login: the overlay link then carries the code
 const KEEP = "frills:spotify:keep"; // in this tab, from pressing Log in until the login has been handed to Frills
+const ASKED = "frills:spotify:queue-asked"; // "1" once the person has said yes or no to adding viewers' songs to their Spotify queue (asked again after they disconnect)
 const STEPS = "frills:spotify:steps"; // the steps of making an own Spotify app that the person ticked as done (a list of step numbers)
 const get = (key) => { try { return localStorage.getItem(key); } catch { return null; } };
 const put = (key, value) => { try { localStorage.setItem(key, value); } catch { /* storage can be blocked; the choice lasts until the page closes */ } };
@@ -142,12 +143,36 @@ export function mountSpotify(root, { hear, refresh = () => {} } = {}) {
     const done = await server.settings({ queue: on });
     if (!done.ok) { say($("queue-note"), done.message, true); queue.write(!on); return; }
     state.queue = on;
+    put(ASKED, "1"); // (they have chosen: no need to ask)
+    $("ask").hidden = true;
     say($("queue-note"), on ? QUEUE_ON : QUEUE_OFF);
     paintOverlay();
   });
   share.row.append($("share-note")); // each switch says what it did right under itself
   queue.row.append($("queue-note"));
   $("switches").append(share.row, queue.row);
+
+  // ── the one question after connecting: should viewers' songs also go into the Spotify queue? It is off until the person says yes (it needs Premium, and strangers in chat can add songs), and it is asked once.
+  const askNeeded = () => state.mode === "connected" && !state.queue && get(ASKED) !== "1";
+  async function answer(yes) {
+    $("ask-yes").disabled = true;
+    $("ask-no").disabled = true;
+    if (yes) {
+      const done = await server.settings({ queue: true });
+      if (!done.ok) { say($("ask-note"), done.message, true); $("ask-yes").disabled = false; $("ask-no").disabled = false; return; }
+      state.queue = true;
+      queue.write(true);
+      say($("queue-note"), QUEUE_ON);
+      paintOverlay();
+    }
+    put(ASKED, "1");
+    say($("ask-note"), "");
+    $("ask").hidden = true;
+    $("ask-yes").disabled = false;
+    $("ask-no").disabled = false;
+  }
+  $("ask-yes").addEventListener("click", () => answer(true));
+  $("ask-no").addEventListener("click", () => answer(false));
 
   // ── what happened, and trying it with a pretend viewer ─────────────────────────────────────────────────────────────────
   const log = $("log");
@@ -202,12 +227,14 @@ export function mountSpotify(root, { hear, refresh = () => {} } = {}) {
     if (mode === "expired") say($("status"), "Your Spotify login ran out. Press Log in with Spotify again.", true);
     if (mode === "unavailable") say($("status"), state.message, true);
     paintSteps();
+    if (mode !== "connected") $("ask").hidden = true;
     if (mode === "connected") {
       say($("status"), `Connected to Spotify as ${state.name || "your account"}. Frills keeps your login, so you can close this page.`);
       share.write(state.share);
       queue.write(state.queue);
       say($("share-note"), state.share ? SHARE_ON : SHARE_OFF);
       say($("queue-note"), state.queue ? QUEUE_ON : QUEUE_OFF);
+      $("ask").hidden = !askNeeded();
       entries(state.log);
       paintOverlay();
       if (!reader) reader = watchSpotify(identity.code, paintSong);
@@ -286,6 +313,7 @@ export function mountSpotify(root, { hear, refresh = () => {} } = {}) {
     const done = await server.disconnect();
     if (!done.ok) { $("logout").disabled = false; say($("status"), done.message, true); return; }
     client.logout();
+    put(ASKED, ""); // (connecting again asks again)
     await load();
   });
 

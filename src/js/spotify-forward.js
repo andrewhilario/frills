@@ -30,8 +30,11 @@ export class SpotifyForward {
   /** Says the overlay is open (the editor shows it). Resolves to whether Frills heard. */
   hello() { return this.post("hello", {}); }
 
-  /** One chat message ({ id, user, name, text, mod, host, login }). Resolves to "sent" or, when it was not passed on, why not. */
-  async handle(message) {
+  /**
+   * One chat message ({ id, user, name, text, mod, host, login }). Resolves to "sent" or, when it was not passed on, why not. `accepted` says whether the list on the stream took the request: a request
+   * the list turned away (it is full, the person is at their limit, the song is already waiting) is not passed to Spotify either, so the two never disagree. A !next is not held to it.
+   */
+  async handle(message, accepted = true) {
     const command = parseCommand(message?.text, this.settings);
     if (!command) return "not a command";
     if (message.id) {
@@ -46,6 +49,7 @@ export class SpotifyForward {
       return (await this.post("next", { name })) ? "sent" : "failed";
     }
     if (command.kind !== "request") return "not for Spotify"; // !wrongsong is for the on-screen queue; Spotify's queue cannot take one back
+    if (!accepted) return "not on the list"; // (before the 15 seconds are used up, so a turned-away request does not count against the person)
     const key = message.user || name;
     if (this.now() - (this.lastBy.get(key) ?? -Infinity) < this.cooldownMs) return "too soon";
     this.lastBy.set(key, this.now());

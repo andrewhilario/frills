@@ -114,3 +114,23 @@ test("with no Spotify code in the link, or in practice mode, nothing is passed o
   assert.deepEqual((await sent()).filter((c) => c.method === "POST"), [], "the practice requests are made up on the page and never reach Spotify");
   assert.deepEqual(await hellos(), [], "and the practice does not say hello either");
 });
+
+test("a request the list on the stream turns away (it is full, or the song is already waiting) is not passed on to Spotify, and a !next is passed on with an empty list", { skip }, async () => {
+  const full = await overlay(`channel=pond_cafe&platform=tiktok&spotify=${CODE}&limit=3`);
+  ["one", "two", "three", "four"].forEach((song, i) => full.emit("chat", tiktok("f" + i, "!sr " + song, "user" + i)));
+  await until(async () => (await sent()).length === 3);
+  await sleep(500);
+  assert.deepEqual((await sent()).map((c) => c.body.query), ["one", "two", "three"], "the fourth found the list full, and Spotify did not hear of it either");
+
+  const same = await overlay(`channel=pond_cafe&platform=tiktok&spotify=${CODE}`);
+  same.emit("chat", tiktok("d1", "!sr levitating", "ann"));
+  await until(async () => (await sent()).length === 1);
+  same.emit("chat", tiktok("d2", "!sr levitating", "bob"));
+  await sleep(600);
+  assert.equal((await sent()).length, 1, "the same song from someone else: already waiting on the list, so not queued on Spotify twice");
+
+  const empty = await overlay(`channel=pond_cafe&platform=tiktok&spotify=${CODE}`);
+  empty.emit("chat", tiktok("n1", "!next", "pond_cafe"));
+  await until(async () => (await sent()).length === 1);
+  assert.equal((await sent())[0].url, `/api/spotify/${CODE}/next`, "nothing on the list, but Spotify's own song can still be skipped");
+});
