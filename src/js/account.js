@@ -135,7 +135,7 @@ if ($("acct-form")) {
     $("acct-credits").hidden = !credits;
     if (credits) {
       const used = Math.min(me.plus.used, me.plus.limit);
-      $("acct-credits-text").textContent = `AI voice lines used this month: ${used.toLocaleString()} of ${me.plus.limit.toLocaleString()}`;
+      $("acct-credits-text").textContent = `AI voice used this month: ${used.toLocaleString()} of ${me.plus.limit.toLocaleString()} characters`;
       const meter = $("acct-meter");
       meter.setAttribute("aria-valuemax", String(me.plus.limit));
       meter.setAttribute("aria-valuenow", String(used));

@@ -67,7 +67,7 @@ test("region lock allows Tier-1 countries, localhost DEV, PRO_COUNTRIES override
 test("handleTts: wrong origin, no account, a locked region, credits spent one by one and used up", async () => {
   const env = { DB: localDatabase(":memory:"), OPENAI_TTS_KEY: "sk-openai-mock", REQUIRE_PRO_PASS: "1" };
   const me = await signedIn(env);
-  give(env, me.id, { used: 0, limit: 2 });
+  give(env, me.id, { used: 0, limit: 15 }); // (characters)
   const fakeFetch = async (url, init) => {
     assert.equal(url, "https://api.openai.com/v1/audio/speech");
     assert.equal(init.headers.authorization, "Bearer sk-openai-mock");
@@ -88,13 +88,16 @@ test("handleTts: wrong origin, no account, a locked region, credits spent one by
   assert.equal(ok.status, 200);
   assert.equal(ok.headers.get("content-type"), "audio/mpeg");
   assert.deepEqual(new Uint8Array(await ok.arrayBuffer()), new Uint8Array([1, 2, 3, 4]));
-  assert.deepEqual([ok.headers.get("x-tts-used"), ok.headers.get("x-tts-limit"), ok.headers.get("x-tts-remaining")], ["1", "2", "1"]);
-  assert.equal(creditsUsed(env, me.id), 1);
+  assert.deepEqual([ok.headers.get("x-tts-used"), ok.headers.get("x-tts-limit"), ok.headers.get("x-tts-remaining")], ["11", "15", "4"], "\"Hello pond!\" is 11 characters");
+  assert.equal(creditsUsed(env, me.id), 11);
 
-  assert.equal((await call(speak(asMe, "CA"))).status, 200);
+  assert.equal((await call(speak(asMe, "CA"))).status, 200, "\"hi\" is 2 more");
+  assert.equal(creditsUsed(env, me.id), 13);
+  assert.equal((await call(speak(asMe, "US", '{"text":"a longer line than two characters"}'))).status, 200, "a line longer than what is left is still spoken");
+  assert.equal(creditsUsed(env, me.id), 15, "and the month then reads all used, never more");
   const spent = await call(speak(asMe, "US"));
   assert.deepEqual([spent.status, (await spent.json()).error], [402, "quota_exceeded"]);
-  assert.equal(creditsUsed(env, me.id), 2);
+  assert.equal(creditsUsed(env, me.id), 15);
 });
 
 test("the older ways in are gone: a key sent as x-pass or in the body, and the owner's dev key as a pass, bring nothing; /api/pro/activate and /api/admin/passes are not there", async () => {
@@ -156,17 +159,17 @@ test("Groq Orpheus synthesis, the local-only test credits for a signed-in accoun
   assert.deepEqual([anonymous.status, (await anonymous.json()).error], [401, "sign_in_first"]);
 
   const me = await signedIn(env, "streamer@example.com", LOCAL);
-  const minted = await handleDevPass(devPass({ cookie: me.cookie }, JSON.stringify({ limit: 2 })), env, { now: T0 + 5000 });
+  const minted = await handleDevPass(devPass({ cookie: me.cookie }, JSON.stringify({ limit: 30 })), env, { now: T0 + 5000 });
   assert.equal(minted.status, 201);
-  assert.deepEqual(await minted.json(), { ok: true, used: 0, limit: 2 });
-  assert.deepEqual({ ...db.raw.prepare("SELECT status, tts_used, tts_limit FROM plus WHERE account_id = ?").get(me.id) }, { status: "active", tts_used: 0, tts_limit: 2 });
+  assert.deepEqual(await minted.json(), { ok: true, used: 0, limit: 30 });
+  assert.deepEqual({ ...db.raw.prepare("SELECT status, tts_used, tts_limit FROM plus WHERE account_id = ?").get(me.id) }, { status: "active", tts_used: 0, tts_limit: 30 });
 
   // A simulated country triggers the real region rule even on localhost when env.DEV is on
   const statusAs = async (country) => (await (await handleProStatus(new Request(`${LOCAL}/api/pro/status`, { headers: { "x-frills-country": country, cookie: me.cookie } }), env, { now: T0 + 5000 })).json());
   const ph = await statusAs("PH");
   assert.deepEqual([ph.country, ph.eligible, ph.dev], ["PH", false, true]);
   const us = await statusAs("US");
-  assert.deepEqual([us.eligible, us.pass.valid, us.pass.remaining], [true, true, 2]);
+  assert.deepEqual([us.eligible, us.pass.valid, us.pass.remaining], [true, true, 30]);
 
   const usNoAccount = await handleTts(new Request(`${LOCAL}/api/tts`, { method: "POST", headers: { origin: LOCAL, "x-frills-country": "US" }, body: '{"text":"hi"}' }), env, { now: T0 + 5000 });
   assert.equal(usNoAccount.status, 401, "a simulated US visitor with nothing brought is a free visitor");
@@ -186,8 +189,9 @@ test("Groq Orpheus synthesis, the local-only test credits for a signed-in accoun
   const spoke = await sayAs("Deep male voice test");
   assert.equal(spoke.status, 200);
   assert.equal(spoke.headers.get("content-type"), "audio/wav");
-  assert.deepEqual([spoke.headers.get("x-tts-used"), spoke.headers.get("x-tts-remaining")], ["1", "1"]);
+  assert.deepEqual([spoke.headers.get("x-tts-used"), spoke.headers.get("x-tts-remaining")], ["20", "10"], "\"Deep male voice test\" is 20 characters");
   assert.equal((await sayAs("One more")).status, 200);
+  assert.equal((await sayAs("One too many")).status, 200, "12 more with 2 left: still spoken, the month is then all used");
   const used = await sayAs("One too many");
   assert.deepEqual([used.status, (await used.json()).error], [402, "quota_exceeded"]);
 

@@ -138,7 +138,6 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
     LEMON_PRODUCT_ID: process.env.LEMON_PRODUCT_ID || "",
     LEMON_WEBHOOK_SECRET: process.env.LEMON_WEBHOOK_SECRET || "",
     LEMON_TEST_MODE: process.env.LEMON_TEST_MODE || "", // (off unless asked for: a test-mode payment is for a test setup only)
-    PRO_MONTHLY_LIMIT: process.env.PRO_MONTHLY_LIMIT || "",
   };
   let dbInit = null;
   const ensureDb = async () => {

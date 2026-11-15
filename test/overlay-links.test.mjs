@@ -124,15 +124,15 @@ const ready = () => fresh({ OPENAI_TTS_KEY: "sk-test", REQUIRE_PRO_PASS: "1" });
 
 test("a live code with Plus speaks, and the credit comes out of the account's own month", async () => {
   const env = ready();
-  give(env, ALICE, { used: 10, limit: 20 });
+  give(env, ALICE, { used: 10, limit: 100 });
   const code = await makeOverlayLink(env.DB, ALICE);
-  const res = await tts(env, { code, country: "US" });
+  const res = await tts(env, { code, country: "US" }); // ("hello pond" is 10 characters)
   assert.equal(res.status, 200);
-  assert.deepEqual([res.headers.get("x-tts-used"), res.headers.get("x-tts-limit"), res.headers.get("x-tts-remaining")], ["11", "20", "9"]);
-  assert.equal(plusRow(env).tts_used, 11);
+  assert.deepEqual([res.headers.get("x-tts-used"), res.headers.get("x-tts-limit"), res.headers.get("x-tts-remaining")], ["20", "100", "80"]);
+  assert.equal(plusRow(env).tts_used, 20);
   assert.equal(plusRow(env, BOB), undefined, "nobody else's");
   assert.equal((await tts(env, { code, country: "US", viaBody: true })).status, 200, "the code may also come in the request body");
-  assert.equal(plusRow(env).tts_used, 12);
+  assert.equal(plusRow(env).tts_used, 30);
 });
 
 test("no code, a made-up code, an old code, a turned-off code, and a code for an account without Plus are all refused, and spend nothing", async () => {

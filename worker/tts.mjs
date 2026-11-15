@@ -2,7 +2,7 @@
 // Calls OpenAI Speech, Google Cloud TTS, or Groq Orpheus from the Worker so keys stay server-side and CSP stays strict.
 
 import { json, regionOf } from "./region.mjs";
-import { plusGate, spendCredit } from "./plus-gate.mjs";
+import { giveBackCharacters, plusGate, spendCharacters } from "./plus-gate.mjs";
 import { resolveCredential } from "./plus-credential.mjs";
 
 export const ALLOWED_VOICES = new Set(["alloy", "nova", "shimmer", "echo", "onyx", "fable"]);
@@ -128,15 +128,23 @@ export async function handleTts(request, env, { fetchFn = globalThis.fetch, now 
     return json(401, { ok: false, error: "no_pass" }); // nothing was brought: a free visitor
   }
 
-  const audio = await synthesizeSpeech(parsed, env, fetchFn);
-  if (!audio.ok) return json(audio.status, { ok: false, error: audio.error, ...(audio.detail ? { detail: audio.detail } : {}) });
-
+  // The month's allowance is counted in characters (what the voice companies charge for) and taken BEFORE the voice is made, in one step, so a burst of requests cannot all slip past the check; if
+  // the voice then cannot be made, the characters go back. A line longer than what is left is still spoken (at most one line goes over); with nothing left the answer is 402.
   const extraHeaders = {};
+  let taken = null;
   if (accountPlus && env?.DB) {
-    const left = await spendCredit(env.DB, accountPlus);
-    extraHeaders["x-tts-used"] = String(left.used);
-    extraHeaders["x-tts-limit"] = String(left.limit);
-    extraHeaders["x-tts-remaining"] = String(left.remaining);
+    taken = await spendCharacters(env.DB, accountPlus, [...parsed.text].length);
+    if (!taken.ok) return json(402, { ok: false, error: "quota_exceeded", limit: taken.limit });
+    extraHeaders["x-tts-spent"] = String(taken.spent);
+    extraHeaders["x-tts-used"] = String(taken.used);
+    extraHeaders["x-tts-limit"] = String(taken.limit);
+    extraHeaders["x-tts-remaining"] = String(taken.remaining);
+  }
+
+  const audio = await synthesizeSpeech(parsed, env, fetchFn).catch(() => ({ ok: false, status: 502, error: "provider_error" }));
+  if (!audio.ok) {
+    if (taken) await giveBackCharacters(env.DB, accountPlus, taken.spent);
+    return json(audio.status, { ok: false, error: audio.error, ...(audio.detail ? { detail: audio.detail } : {}) });
   }
 
   return new Response(audio.bytes, {
@@ -151,7 +159,7 @@ export async function handleTts(request, env, { fetchFn = globalThis.fetch, now 
 }
 
 /**
- * POST /api/pro/dev-pass — a local-development helper only (never on Cloudflare): gives the signed-in test account a small Frills Plus (a few credits) so the credit count and the
+ * POST /api/pro/dev-pass — a local-development helper only (never on Cloudflare): gives the signed-in test account a small Frills Plus (a few hundred characters) so the count and the
  * "used up" message can be tried without a payment. Sign in on /account/ first.
  */
 export async function handleDevPass(request, env, { now = Date.now() } = {}) {
@@ -163,7 +171,7 @@ export async function handleDevPass(request, env, { now = Date.now() } = {}) {
   const who = await resolveCredential(request, env, { now });
   if (who.kind !== "session") return json(401, { ok: false, error: "sign_in_first" });
   const body = await request.json().catch(() => ({}));
-  const limit = Math.max(1, Math.min(500, Math.round(Number(body?.limit) || 5)));
+  const limit = Math.max(1, Math.min(100000, Math.round(Number(body?.limit) || 300))); // characters
   await env.DB.prepare(
     "INSERT INTO plus (account_id, provider_ref, order_ref, status, renews_at, tts_used, tts_limit, period_start, updated_at) VALUES (?, ?, '', 'active', ?, 0, ?, ?, ?) " +
     "ON CONFLICT(account_id) DO UPDATE SET provider_ref = excluded.provider_ref, order_ref = '', status = 'active', renews_at = excluded.renews_at, tts_used = 0, tts_limit = excluded.tts_limit, period_start = excluded.period_start, updated_at = excluded.updated_at",

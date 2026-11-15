@@ -132,8 +132,8 @@ CREATE TABLE IF NOT EXISTS plus (
   order_ref TEXT NOT NULL DEFAULT '',    -- the payment provider's order id (a refund names the order)
   status TEXT NOT NULL DEFAULT 'active',  -- active, canceled (paid until renews_at), paused, unpaid, expired, refunded
   renews_at INTEGER,               -- paid until (milliseconds): the end of the current month, or the end date of a cancelled one; null if unknown
-  tts_used INTEGER NOT NULL DEFAULT 0,
-  tts_limit INTEGER NOT NULL DEFAULT 1500,
+  tts_used INTEGER NOT NULL DEFAULT 0,   -- characters of AI voice used this month (the column keeps its first name)
+  tts_limit INTEGER NOT NULL DEFAULT 150000, -- characters of AI voice a month; a payment notice sets it explicitly
   period_start INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );

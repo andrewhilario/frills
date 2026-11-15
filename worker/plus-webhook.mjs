@@ -41,7 +41,7 @@ export async function verifyLemonSignature(rawBody, signatureHex, secret) {
 
 const ACCOUNT_ID = /^[0-9a-f]{16}$/;
 const MAX_BODY = 200_000;
-const DEFAULT_LIMIT = 1500;
+const DEFAULT_LIMIT = 150_000; // characters of AI voice a month: a short chat line is about 50, so over 2,000 lines, and at most about $3.30 of voice cost at the dearest provider (see PLAN-FRILLS-PLUS.md)
 
 const json = (status, body) =>
   new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" } });
@@ -53,7 +53,7 @@ const ignored = (reason) => ({ result: "ignored", reason });
 const STATUS = { active: "active", on_trial: "active", cancelled: "canceled", paused: "paused", unpaid: "unpaid", expired: "expired" };
 const BY_EVENT = { subscription_cancelled: "canceled", subscription_expired: "expired", subscription_paused: "paused", subscription_resumed: "active", subscription_unpaused: "active" };
 
-const limitOf = (env) => Math.max(1, Math.min(100000, Math.round(Number(env?.PLUS_MONTHLY_LIMIT ?? env?.PRO_MONTHLY_LIMIT) || DEFAULT_LIMIT)));
+const limitOf = (env) => Math.max(1, Math.min(10_000_000, Math.round(Number(env?.PLUS_MONTHLY_CHARS) || DEFAULT_LIMIT)));
 const byRef = (db, ref) => (ref ? db.prepare("SELECT * FROM plus WHERE provider_ref = ?").bind(ref).first() : null);
 
 async function apply(db, env, ev, at, now) {

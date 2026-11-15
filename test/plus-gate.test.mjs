@@ -7,7 +7,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { COOKIE, handleAccount } from "../worker/account-routes.mjs";
 import { resolveCredential } from "../worker/plus-credential.mjs";
-import { plusGate, spendCredit } from "../worker/plus-gate.mjs";
+import { plusGate, spendCharacters } from "../worker/plus-gate.mjs";
 import { makeOverlayLink, endOverlayLink } from "../worker/overlay-links.mjs";
 import { handleProStatus } from "../worker/region.mjs";
 import { handleTts } from "../worker/tts.mjs";
@@ -110,9 +110,9 @@ test("gate: nobody can use another account's Plus, by code or by cookie", async 
 test("credits are one pool for the account, whichever way it asks, and spending reports what is left", async () => {
   const { env, me, ways } = await world({ used: 8, limit: 10 });
   const first = await ask(env, ways.overlay);
-  assert.deepEqual(await spendCredit(env.DB, first.plus), { used: 9, limit: 10, remaining: 1 });
+  assert.deepEqual(await spendCharacters(env.DB, first.plus, 1), { ok: true, used: 9, limit: 10, remaining: 1, spent: 1 });
   const second = await ask(env, ways.session);
-  assert.deepEqual(await spendCredit(env.DB, second.plus), { used: 10, limit: 10, remaining: 0 });
+  assert.deepEqual(await spendCharacters(env.DB, second.plus, 1), { ok: true, used: 10, limit: 10, remaining: 0, spent: 1 });
   assert.equal(used(env, me.id), 10);
   for (const how of Object.values(ways)) assert.deepEqual(refusal(await ask(env, how)), [402, "quota_exceeded"]);
 });
@@ -135,16 +135,16 @@ const speak = async (env, how, extra = {}) => {
 };
 
 test("the voice route: both ways of asking get a voice and share the account's credits; a free visitor and an account without Plus get none", async () => {
-  const { env, me, ways } = await world({ used: 0, limit: 5 });
+  const { env, me, ways } = await world({ used: 0, limit: 100 }); // (the line is "hello pond": 10 characters)
   const byCode = await speak(env, ways.overlay);
   const byCookie = await speak(env, ways.session);
   assert.deepEqual([byCode.status, byCookie.status], [200, 200]);
-  assert.deepEqual([byCode.headers.get("x-tts-remaining"), byCookie.headers.get("x-tts-remaining")], ["4", "3"], "one pool");
-  assert.equal(used(env, me.id), 2);
+  assert.deepEqual([byCode.headers.get("x-tts-remaining"), byCookie.headers.get("x-tts-remaining")], ["90", "80"], "one pool, counted in characters");
+  assert.equal(used(env, me.id), 20);
   assert.deepEqual([(await speak(env, {})).status, (await speak(env, {})).error], [401, "no_pass"], "a free visitor");
   const other = await signedIn(env, "free@example.com");
   assert.deepEqual([(await speak(env, { cookie: other.cookie })).status, (await speak(env, { cookie: other.cookie })).error], [401, "invalid_pass"], "signed in, no Plus");
-  assert.equal(used(env, me.id), 2, "nothing refused spent anything");
+  assert.equal(used(env, me.id), 20, "nothing refused spent anything");
 });
 
 test("the status route tells the editor what a signed-in account has (and an overlay what its code has), and nothing about a free visitor", async () => {

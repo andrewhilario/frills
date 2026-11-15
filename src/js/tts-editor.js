@@ -10,7 +10,7 @@ const NOTICE_COPY = {
   no_pass: "AI voices are part of Frills Plus — speaking with the free browser voice instead.",
   invalid_pass: "This Frills Plus link or account is not active — using the free browser voice.",
   region_unavailable: "Frills Plus AI voices are not sold in this region yet — using the free browser voice.",
-  quota_exceeded: "This month's Frills Plus AI credits are used up — using the free browser voice.",
+  quota_exceeded: "This month's Frills Plus AI voice is used up — using the free browser voice.",
   ai_not_configured: "Server AI key (OpenAI / Google / Groq) not set — using free built-in browser voice.",
   groq_terms_required: "Groq requires accepting Orpheus terms once in Groq Playground (canopylabs/orpheus-v1-english) — using browser voice for now.",
   invalid_api_key: "AI provider rejected your API key (check for typos or quotes around the key) — using browser voice.",
@@ -75,14 +75,14 @@ startWidgetEditor({
         setStatus(
           remaining > 0 ? "ok" : "warn",
           remaining > 0
-            ? `Frills Plus is on — ${remaining} of ${limit} AI messages left this month (${used} used).`
-            : `Frills Plus credits used up (${used}/${limit}) — next lines use the free browser voice.`,
+            ? `Frills Plus is on — ${remaining.toLocaleString()} of ${limit.toLocaleString()} AI voice characters left this month.`
+            : `Frills Plus AI voice used up (${used.toLocaleString()} of ${limit.toLocaleString()} characters) — next lines use the free browser voice.`,
         );
         if (remaining <= 0) {
           setPaywall(
             true,
-            "Monthly AI credits used up",
-            `You have used ${used} of ${limit} AI credits this month. They come back when your Frills Plus renews; until then the free browser voice speaks.`,
+            "Monthly AI voice used up",
+            `You have used ${used.toLocaleString()} of ${limit.toLocaleString()} AI voice characters this month. They come back when your Frills Plus renews; until then the free browser voice speaks.`,
           );
         }
       },
@@ -101,7 +101,7 @@ startWidgetEditor({
         }
         if (code === "quota_exceeded") {
           setStatus("lock", NOTICE_COPY[code]);
-          setPaywall(true, "Monthly AI credits used up", "This month's AI credits are used up. They come back when your Frills Plus renews; the free browser voice keeps working.");
+          setPaywall(true, "Monthly AI voice used up", "This month's AI voice is used up. They come back when your Frills Plus renews; the free browser voice keeps working.");
           return;
         }
         if (code === "region_unavailable") {
@@ -159,15 +159,15 @@ startWidgetEditor({
             setStatus("lock", `Region ${info.country}: Frills Plus is not active.`);
             setPaywall(true, "Frills Plus is not active", "Sign in to check your Frills Plus, or make a new Plus link if this link was replaced.");
           } else if (info.pass.remaining <= 0) {
-            setStatus("lock", `Region ${info.country}: Frills Plus credits used up (${info.pass.used}/${info.pass.limit}).`);
-            setPaywall(true, "Monthly AI credits used up", `Used ${info.pass.used} of ${info.pass.limit} credits.`);
+            setStatus("lock", `Region ${info.country}: Frills Plus AI voice used up (${info.pass.used.toLocaleString()} of ${info.pass.limit.toLocaleString()} characters).`);
+            setPaywall(true, "Monthly AI voice used up", `Used ${info.pass.used.toLocaleString()} of ${info.pass.limit.toLocaleString()} characters.`);
           } else {
             setPaywall(false);
             setStatus(
               info.aiReady ? "ok" : "warn",
               info.aiReady
-                ? `Frills Plus is on in ${info.country} — ${info.pass.remaining}/${info.pass.limit} AI credits left.`
-                : `Frills Plus is on (${info.pass.remaining}/${info.pass.limit}), waiting for the server's AI key.`,
+                ? `Frills Plus is on in ${info.country} — ${info.pass.remaining.toLocaleString()} of ${info.pass.limit.toLocaleString()} AI voice characters left.`
+                : `Frills Plus is on (${info.pass.remaining.toLocaleString()} characters left), waiting for the server's AI key.`,
             );
           }
           return;
@@ -205,7 +205,7 @@ startWidgetEditor({
         let words;
         if (!me.signedIn) words = "Sign in to use Frills Plus AI voices on your stream. The free browser voices need no account.";
         else if (!plus) words = "You do not have Frills Plus, so your stream uses the free browser voice.";
-        else if (mine) words = "Your Plus link is on. The overlay link below carries it, so your overlay can use your AI voice lines.";
+        else if (mine) words = "Your Plus link is on. The overlay link below carries it, so your overlay can use your AI voice.";
         else if (me.overlayLink) words = "A Plus link was made on another computer or browser. Make a new one to use it here: the old link stops working.";
         else words = "Make your Plus link, then copy the overlay link below into your streaming app.";
         el("plus-link-state").textContent = words;
@@ -270,13 +270,13 @@ startWidgetEditor({
           method: "POST",
           headers: { "content-type": "application/json" },
           credentials: "same-origin",
-          body: JSON.stringify({ limit: 5 }),
+          body: JSON.stringify({ limit: 300 }),
         });
         const data = await res.json().catch(() => null);
-        if (res.status === 401) { setStatus("warn", "Sign in on /account/ first (run npm run serve), then try again: the 5 credits go to the account you are signed in with."); return; }
-        if (!res.ok || !data?.ok) { setStatus("warn", `Could not give test credits (${data?.error || res.status}). This works on npm run serve only.`); return; }
+        if (res.status === 401) { setStatus("warn", "Sign in on /account/ first (run npm run serve), then try again: the 300 characters go to the account you are signed in with."); return; }
+        if (!res.ok || !data?.ok) { setStatus("warn", `Could not give test characters (${data?.error || res.status}). This works on npm run serve only.`); return; }
         if (!simCountry && simSelect) {
-          // switch the simulator from the local bypass to the US so the credit count and the limits run realistically
+          // switch the simulator from the local bypass to the US so the count and the limits run realistically
           simCountry = "US";
           simSelect.value = "US";
         }

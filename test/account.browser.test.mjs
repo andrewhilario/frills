@@ -243,8 +243,8 @@ test("the Frills Plus card shows the status badge, the credits and Manage or can
   await page.goto(`${served}/account/`, { settle: 400 });
   await signedInView();
   assert.deepEqual([await text("#acct-badge"), await page.evaluate(`document.getElementById("acct-badge").dataset.tone`)], ["On", "on"]);
-  assert.match(await text("#acct-credits-text"), /AI voice lines used this month: 0 of 1,500/);
-  assert.equal(await page.evaluate(`document.getElementById("acct-meter").getAttribute("aria-valuemax")`), "1500");
+  assert.match(await text("#acct-credits-text"), /AI voice used this month: 0 of 150,000 characters/);
+  assert.equal(await page.evaluate(`document.getElementById("acct-meter").getAttribute("aria-valuemax")`), "150000");
   assert.equal(await visible("acct-manage"), true);
   assert.equal(await visible("acct-buy"), false);
   assert.match(await text("#acct-manage-hint"), /change your card, see your receipts and cancel/);

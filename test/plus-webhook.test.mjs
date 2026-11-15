@@ -55,15 +55,19 @@ test("a new subscription starts Plus for the account in the checkout address: ac
   const res = await buy(env, { subscription: "1001", order: "2001", renewsInDays: 30 });
   assert.deepEqual([res.status, res.body.result, res.body.status], [200, "applied", "active"]);
   const r = row(env);
-  assert.deepEqual([r.status, r.provider_ref, r.order_ref, r.tts_used, r.tts_limit, r.period_start], ["active", "1001", "2001", 0, 1500, T0]);
+  assert.deepEqual([r.status, r.provider_ref, r.order_ref, r.tts_used, r.tts_limit, r.period_start], ["active", "1001", "2001", 0, 150000, T0]);
   assert.equal(r.renews_at, T0 + 30 * DAY);
   assert.equal(plusActive(r, T0 + DAY), true);
   assert.equal(row(env, BOB), null, "nobody else got it");
   assert.equal(env.DB.raw.prepare("SELECT COUNT(*) AS n FROM plus").get().n, 1);
 });
 
-test("the monthly credits can be set", async () => {
-  assert.equal(row((await (async () => { const e = fresh({ PLUS_MONTHLY_LIMIT: "300" }); await buy(e); return e; })())).tts_limit, 300);
+test("the monthly allowance (in characters of AI voice) can be set, and the old setting names mean nothing now", async () => {
+  const limitWith = async (extra) => { const e = fresh(extra); await buy(e); return row(e).tts_limit; };
+  assert.equal(await limitWith({ PLUS_MONTHLY_CHARS: "300" }), 300);
+  assert.equal(await limitWith({ PLUS_MONTHLY_LIMIT: "300", PRO_MONTHLY_LIMIT: "300" }), 150000, "an old line-count setting must not become a tiny character allowance");
+  assert.equal(await limitWith({ PLUS_MONTHLY_CHARS: "not a number" }), 150000);
+  assert.equal(await limitWith({ PLUS_MONTHLY_CHARS: "999999999999" }), 10000000, "and a typo cannot hand out the moon");
 });
 
 test("a payment is linked by the account id, not the email on the payment page", async () => {
