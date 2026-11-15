@@ -42,6 +42,10 @@ startWidgetEditor({
     const mintBtn = document.getElementById("mint-pass");
     const checkPassBtn = document.getElementById("check-pass");
     let lastEligible = true;
+    // Frills Plus is on sale only on a site built with the account pages. Without them (and off a local test server) nothing here talks about paying, signing in or an AI voice: the free voice just speaks.
+    const accountsOn = document.getElementById("plus-link")?.dataset.accounts === "on";
+    let devSite = false;
+    const quiet = () => !accountsOn && !devSite;
 
     const setStatus = (tone, message) => {
       if (!statusEl) return;
@@ -59,7 +63,6 @@ startWidgetEditor({
       }
       // Buying happens on the account page, where the payment is tied to the person's account; the site must be built with the account pages for that link to exist.
       if (accountLink) {
-        const accountsOn = document.getElementById("plus-link")?.dataset.accounts === "on";
         if (accountsOn) accountLink.setAttribute("href", "/account/"); // (set here, so a page built without accounts has no link to a missing page)
         accountLink.hidden = !visible || !canBuy || !accountsOn;
       }
@@ -84,7 +87,7 @@ startWidgetEditor({
         }
       },
       onNotice: (code, detail = "") => {
-        if (!code) return;
+        if (!code || quiet()) return;
         if (code === "no_pass" || code === "invalid_pass") {
           setStatus("lock", NOTICE_COPY[code]);
           setPaywall(
@@ -126,6 +129,8 @@ startWidgetEditor({
         if (!info) return;
 
         if (testerEl && info.dev) testerEl.hidden = false;
+        devSite = Boolean(info.dev);
+        if (quiet()) return;
         lastEligible = Boolean(info.eligible);
 
         if (info.country === "DEV") {

@@ -1,7 +1,7 @@
 <!--
 {
   "title": "Privacy: what Frills keeps and what it does not | Frills",
-  "description": "Frills has no accounts. What stays in your browser, what is in your link, what its small database keeps (feedback, uploaded files), and who sees what.",
+  "description": "What Frills keeps and what it does not: what stays in your browser, what is in your link, what its small database keeps, and who sees what.",
   "path": "/privacy/",
   "updated": "2026-11-05",
   "published": "2026-10-08",
@@ -21,7 +21,7 @@
     </ol>
     <header class="article__head">
       <h1 class="display">Privacy</h1>
-      <p class="lede">Frills has no accounts. It does keep a few things you choose to send it, such as images and sounds you upload for alerts. Here is exactly what.</p>
+      <p class="lede">{{plusPrivacyLede}}</p>
     </header>
 
     <div class="article__body">
@@ -39,15 +39,15 @@
       <h2 class="subtitle">Fonts and pictures</h2>
       <p>Fonts are served from Frills itself. Emote pictures come from Twitch’s image server. {{privacyPictures}}</p>
 
-      {{{privacyAlerts}}}{{{privacyStored}}}
+      {{{privacyAlerts}}}{{{privacyStored}}}{{{plusPrivacyPlusSection}}}
 
       <h2 class="subtitle">Hosting, cookies and counting</h2>
-      <p>Frills is hosted on Cloudflare, which, like any host, sees ordinary web request data such as your address and the pages you open. Frills itself sets no cookies.</p>
+      <p>Frills is hosted on Cloudflare, which, like any host, sees ordinary web request data such as your address and the pages you open. {{plusPrivacyCookies}}</p>
       <p>Frills does count, anonymously, so that we can see what is used and what is not. It counts how many visits there are, which page each started on and, in broad groups, where it came from (TikTok, Reddit, Discord, YouTube, a search engine, a link in a profile or an ad, or direct); how many times an overlay link is copied, from which editor; and how many times each overlay page opens, on a real account or on practice events. A count is only a name and one or two short labels from a fixed list. It never holds your address, a cookie or anything you typed.</p>
       <p>For an overlay opened on a real account we also keep a scrambled code of the account name, made with a secret that is not in the page and that cannot be turned back into a name. It lets us count how many different overlays open in a week and how many of them come back, and nothing else. Cloudflare keeps the counts for three months. If your browser sends Do Not Track or Global Privacy Control, the pages count nothing, and neither does an overlay opened with it.</p>
 
       <h2 class="subtitle">Who we are not</h2>
-      <p>Frills isn’t affiliated with, endorsed by or sponsored by Twitch, TikTok or OBS. Those names belong to their owners.</p>{{{feedbackParagraph}}}
+      <p>{{plusNotAffiliated}}</p>{{{feedbackParagraph}}}
       <p class="label">Last updated {{builtOn}}</p>
     </div>
   </article>

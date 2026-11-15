@@ -12,6 +12,7 @@ import { gzipSync } from "node:zlib";
 import { site, checkSite } from "./src/site.mjs";
 import { CONTROLS, PRESETS, PRESET_NAMES } from "./src/js/settings.js";
 import { faq } from "./src/faq.mjs";
+import { plusWords } from "./src/plus-words.mjs";
 import { overlaysFaq } from "./src/overlays-faq.mjs";
 import { tokenHex } from "./scripts/tokens.mjs";
 
@@ -134,6 +135,7 @@ const copy = {
   matchaLede: relayOn ? "real TikTok chat or Twitch chat" : "real TikTok chat (with the Frills helper) or Twitch chat",
 };
 copy.tiktokGuide = render(partials[relayOn ? "guide-tiktok-relay" : "guide-tiktok-helper"], { helperGet }, partials, "guide-tiktok");
+const words = plusWords({ on: site.plusAccounts === true }); // (what the pages say changes once accounts exist: see src/plus-words.mjs)
 const shared = {
   ...copy,
   themeColor: tokenHex("paper"),
@@ -141,6 +143,7 @@ const shared = {
   waitlist: site.waitlistUrl,
   helperGet,
   relay: site.relayUrl,
+  ...Object.fromEntries(Object.entries(words).map(([k, v]) => ["plus" + k[0].toUpperCase() + k.slice(1), v])), // plusNotAffiliated, plusPrivacyLede, plusIdeasIntro, ...
   plusAccounts: site.plusAccounts ? "on" : "", // ("on" when the Frills Plus account pages are built: a page that links to them checks this)
   siteAddress: site.url,
   spotifyClientId: site.spotifyClientId ?? "",
@@ -149,8 +152,8 @@ const shared = {
   privacyAlerts: relayOn ? `\n      <h2 class="subtitle">Alerts, last gifts and goals</h2>\n      <p>These work like chat: follows, gifts and shares pass through the free Frills relay to your overlay and nobody keeps them. The list of gifts, the follower count and the like ranking live only in your overlay page\u2019s memory. If you turn on \u201cremember\u201d, the count is kept in your own browser or streaming app and nowhere else.</p>` : "",
   // Everything the site's database keeps, in one list. Each item says what is kept, for how long, and who can see it.
   privacyStored: `\n      <h2 class="subtitle">What Frills keeps on its server</h2>
-      <p>Frills has no accounts, but it does use a small database on Cloudflare for the few things below. Nothing else is kept, and none of it is sold or used for advertising.</p>
-      <ul>${site.feedbackForm ? `
+      <p>${words.privacyStoredIntro}</p>
+      <ul>${words.privacyAccountItems}${site.feedbackForm ? `
         <li><strong>Feedback you send.</strong> The message, the kind you pick, the streaming app you pick, your contact if you type one, and the date. It does not save your address with the message. Only we read it, and we use it to improve Frills. Ask us to delete a message by sending another one that says which.</li>` : ""}
         <li><strong>Images, GIFs and sounds you upload for alerts.</strong> The file itself, its type, its size and the time, plus a scrambled copy (a hash) of the delete code you are shown once. We do not store your name or your address with it. A file stays until you delete it with that code or we remove it. Anyone who has your overlay link, or the file\u2019s own address, can open it, so do not upload anything private; the files are not listed anywhere. After a deletion a copy can stay at Cloudflare for up to an hour. Pictures and GIFs are limited to 1 MB, sounds to 300 KB, and to common picture and sound types, and you must have the right to use what you upload.</li>${site.twitchClientId ? `
         <li><strong>New Twitch followers, if you use Twitch follow alerts.</strong> Your Twitch login stays in your browser and is never sent to Frills. Each new follower\u2019s name and Twitch name are kept for one day, under a random code in your overlay link, so that your overlay can show them. The page that listens also tells Frills now and then that it is still running.</li>` : ""}${site.spotifyClientId ? `
@@ -194,8 +197,8 @@ function renderPage(page, stats) {
   const canonical = site.url + meta.path;
   const vars0 = { ...shared, stats };
   const where0 = relative(root, page.file);
-  const faqItems = faq({ kb: stats.kb, waitlistUrl: site.waitlistUrl, helperUrl: site.helperUrl, relayUrl: site.relayUrl });
-  const overlayItems = overlaysFaq({ kb: stats.kb, relayUrl: site.relayUrl });
+  const faqItems = faq({ kb: stats.kb, waitlistUrl: site.waitlistUrl, helperUrl: site.helperUrl, relayUrl: site.relayUrl, plus: site.plusAccounts === true });
+  const overlayItems = overlaysFaq({ kb: stats.kb, relayUrl: site.relayUrl, plus: site.plusAccounts === true });
   const vars = {
     ...shared,
     stats,

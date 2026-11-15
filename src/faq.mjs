@@ -1,7 +1,7 @@
 // The questions. Written once here, used for the page and for the structured data, so they never disagree.
 // `a` is HTML (links allowed); `text` is what search engines get.
 
-export function faq({ kb, waitlistUrl, helperUrl, relayUrl }) {
+export function faq({ kb, waitlistUrl, helperUrl, relayUrl, plus = false }) {
   // Where to get the TikTok helper: a link once there is a download, a way to hear about it until then, nothing invented in between.
   const getHelper = helperUrl
     ? ` <a href="${helperUrl}" rel="noopener">Get the helper</a>.`
@@ -11,7 +11,9 @@ export function faq({ kb, waitlistUrl, helperUrl, relayUrl }) {
   const items = [
     {
       q: "Is Frills really free?",
-      a: "Yes. Every look and every setting is free, with no limits and no account. If we ever add a paid plan, it will be for extras that cost money to run, like syncing your looks between computers, and we will say so up front.",
+      a: plus
+        ? "Yes. Every look and every setting is free, with no limits and no account, and what is free stays free. Frills Plus is a paid extra for things that cost money to run, like AI voices for the talking pet, and we say so up front. The <a href=\"/plus/\">Frills Plus page</a> says what it is and how to cancel."
+        : "Yes. Every look and every setting is free, with no limits and no account. If we ever add a paid plan, it will be for extras that cost money to run, like syncing your looks between computers, and we will say so up front.",
     },
     {
       q: "Does it work with TikTok LIVE?",
@@ -29,7 +31,9 @@ export function faq({ kb, waitlistUrl, helperUrl, relayUrl }) {
     },
     {
       q: "Do I need an account?",
-      a: "No. Your settings live in your browser and in the link you copy. Frills keeps a few things in a small database, but only ones you choose to send it: feedback, and any image, GIF or sound you upload for alerts. The <a href=\"/privacy/\">privacy page</a> lists all of it.",
+      a: plus
+        ? "No. Your settings live in your browser and in the link you copy, and nothing free needs an account. An account exists only for Frills Plus: you sign in with a link we email you, with no password. Frills keeps a few other things in a small database, but only ones you choose to send it: feedback, and any image, GIF or sound you upload for alerts. The <a href=\"/privacy/\">privacy page</a> lists all of it."
+        : "No. Your settings live in your browser and in the link you copy. Frills keeps a few things in a small database, but only ones you choose to send it: feedback, and any image, GIF or sound you upload for alerts. The <a href=\"/privacy/\">privacy page</a> lists all of it.",
     },
     {
       q: "How does it read my chat?",
@@ -49,7 +53,7 @@ export function faq({ kb, waitlistUrl, helperUrl, relayUrl }) {
     },
     {
       q: "Is it safe, and is it allowed?",
-      a: `Frills only reads public chat and never asks for your password. It keeps no chat and has no accounts; what it does store is short and listed on the <a href=\"/privacy/\">privacy page</a> (feedback you send, files you upload for alerts, and new Twitch followers’ names for one day if you use that feature). The one optional Twitch login, for follow alerts, happens on Twitch’s own page. ${relayUrl ? "On TikTok it doesn’t log in to your account either." : "The TikTok helper doesn’t log in to your TikTok account either."} TikTok offers no official way for overlays to read chat, so every overlay tool uses an unofficial one, and TikTok could change or block it. Frills isn’t affiliated with Twitch or TikTok.`,
+      a: `Frills only reads public chat and never asks for your password. It keeps no chat and ${plus ? "needs no account (an account exists only for Frills Plus)" : "has no accounts"}; what it does store is short and listed on the <a href=\"/privacy/\">privacy page</a> (feedback you send, files you upload for alerts, and new Twitch followers’ names for one day if you use that feature). The one optional Twitch login, for follow alerts, happens on Twitch’s own page. ${relayUrl ? "On TikTok it doesn’t log in to your account either." : "The TikTok helper doesn’t log in to your TikTok account either."} TikTok offers no official way for overlays to read chat, so every overlay tool uses an unofficial one, and TikTok could change or block it. Frills isn’t affiliated with Twitch or TikTok.`,
     },
     {
       q: "Does Frills have alerts, a last gifts list, goals and top likers?",

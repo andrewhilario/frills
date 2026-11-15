@@ -2,7 +2,7 @@
 // the page and for the structured data, like the main FAQ. `a` is HTML (links allowed); `text` is what search engines get.
 // Every answer says only what has been built and tried; what is only planned says "coming soon".
 
-export function overlaysFaq({ kb = 19, relayUrl = "" } = {}) {
+export function overlaysFaq({ kb = 19, relayUrl = "", plus = false } = {}) {
   const items = [
     {
       q: "Which overlays are there?",
@@ -66,7 +66,7 @@ export function overlaysFaq({ kb = 19, relayUrl = "" } = {}) {
     },
     {
       q: "What does Frills keep about me and my viewers?",
-      a: "No account and no chat. The relay passes chat, gifts and likes to your overlay and does not keep them. What Frills stores is short: feedback you send, any image or sound you upload for alerts, the new Twitch followers' names for one day if you use that feature, and the song playing if you share Spotify. The <a href=\"/privacy/\">privacy page</a> lists all of it.",
+      a: (plus ? "No chat, and no account unless you make one for Frills Plus. " : "No account and no chat. ") + "The relay passes chat, gifts and likes to your overlay and does not keep them. What Frills stores is short: feedback you send, any image or sound you upload for alerts, the new Twitch followers' names for one day if you use that feature, and the song playing if you share Spotify. The <a href=\"/privacy/\">privacy page</a> lists all of it.",
     },
   ];
   return items.map((item) => ({ ...item, text: item.a.replace(/<[^>]+>/g, "") }));
