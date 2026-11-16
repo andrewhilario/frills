@@ -54,7 +54,7 @@ export function overlaysFaq({ kb = 19, relayUrl = "" } = {}) {
     },
     {
       q: "How do the goals and the top likers count?",
-      a: "They count what they see from the moment they connect. The follower goal can start from the account’s real follower count when TikTok tells the relay, while gift and like goals start from zero. Top likers adds up each person’s taps and ranks them live. If the page reloads the goals and the ranking start again, unless you turn on \"remember\" in their editor, which keeps the count in your own browser or streaming app and nowhere else.",
+      a: "They count what they see from the moment they connect. The follower goal sets itself: it starts from the account’s real follower count when TikTok tells the relay, and the goal is the next round number above it, while gift and like goals start from zero with the numbers you type. Top likers adds up each person’s taps and ranks them live. If the page reloads the goals and the ranking start again, unless you turn on \"remember\" in their editor, which keeps the count in your own browser or streaming app and nowhere else.",
     },
     {
       q: "What happens if the relay restarts or is busy?",

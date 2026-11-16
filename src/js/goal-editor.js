@@ -1,6 +1,6 @@
 // The Goals editor page (followers, gifts or likes).
 
-import { GOAL, GOAL_TYPES, GoalState, goalAmount } from "./goal.js";
+import { GOAL, GOAL_TYPES, GoalState, goalAmount, usesLiveCount } from "./goal.js";
 import { createGoalView } from "./widgets-view.js";
 import { startWidgetEditor } from "./widget-editor.js";
 import { createSounds } from "./sounds.js";
@@ -52,7 +52,7 @@ startWidgetEditor({
         if (moved) { labelTests(type); ctx.restart(); } // it now waits for a different kind of event
       },
       onEvent: (event) => { const n = goalAmount(type, event); if (n) state.add(n, event.name); },
-      onInfo: (info) => { if (info.followers && type === "follow" && state.settings.fromLive) state.setLive(info.followers); },
+      onInfo: (info) => { if (info.followers && usesLiveCount(state.settings)) state.setLive(info.followers); },
       // (the button is the click that lets the browser play sound)
       tests: {
         one: async () => { await sounds.unlock(); state.add(GOAL_TYPES[type].small, practiceName()); },

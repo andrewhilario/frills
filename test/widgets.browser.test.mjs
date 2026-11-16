@@ -151,6 +151,18 @@ test("overlay: the goal starts from the account's real follower count, and a gif
   await until(async () => (await count()) === "300 / 1,000 diamonds");
 });
 
+test("overlay: a follower goal with no numbers in its link sets itself from the real count: the next round number, and the next one after it is reached", { skip }, async () => {
+  const { base, made } = await withHelper({ followers: 5500 });
+  await page.goto(`${base}/overlay/goal/?channel=pond_auto&platform=tiktok`, { settle: 800 });
+  await until(async () => (await count()) === "5,500 / 6,000");
+  await until(() => made.length === 1);
+  made[0].emit("follow", follow("a1", "Ann"));
+  await until(async () => (await count()) === "5,501 / 6,000");
+  for (let i = 0; i < 499; i += 1) made[0].emit("follow", follow("b" + i, "Fan" + i));
+  await until(async () => (await count()) === "6,000 / 6,000", 8000);
+  await until(async () => (await count()) === "6,000 / 7,000", 8000); // celebrated, then the next round number: nothing typed
+});
+
 test("editor: when TikTok says the room is LIVE it reads at once, even if nobody says or does anything", { skip }, async () => {
   const { base } = await withHelper({ status: 2 });
   await page.goto(base + "/gifts/?channel=pond_cafe", { settle: 800 });
@@ -176,9 +188,10 @@ test("editor: the gifts test buttons list gifts, and changing the words and the 
   assert.ok(url.searchParams.get("template").startsWith("{name} gave"));
 });
 
-test("editor: the goal test buttons move the bar, reaching celebrates, and the goal and start can be changed", { skip }, async () => {
+test("editor: with the goal typed (automatic goal off), the test buttons move the bar, reaching celebrates, and the goal and start can be changed", { skip }, async () => {
   const { base } = await withHelper();
   await page.goto(base + "/goal/", { settle: 800 });
+  await click("#c-autoGoal"); // (a goal that sets itself has no boxes to type in: this test is the typed goal)
   await type("#c-target", "20");
   await type("#c-start", "5");
   assert.equal(await count(), "5 / 20");

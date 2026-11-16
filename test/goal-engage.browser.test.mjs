@@ -74,3 +74,35 @@ test("goal editor: the options are there, the test buttons make a name bubble, a
   await page.evaluate("localStorage.clear()");
   assert.deepEqual(page.problems, [], page.problems.join(" | "));
 });
+
+test("goal editor: a follower goal sets itself, so the goal, start and step boxes are hidden and the link has no numbers; switching it off brings them back and puts them in the link", { skip }, async () => {
+  await page.viewport(1280, 900);
+  await page.goto(`${base}/goal/`, { settle: 500 });
+  await page.evaluate("localStorage.clear()");
+  await page.goto(`${base}/goal/`, { settle: 900 });
+  const rowShown = (id) => page.evaluate(`(() => { const row = document.getElementById("c-${id}")?.closest(".ctl"); return Boolean(row) && getComputedStyle(row).display !== "none"; })()`);
+  const setChannel = () => page.evaluate(`(() => { const i = document.getElementById("source-channel"); i.value = "pond.pal"; i.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+  const link = () => page.evaluate('new URL(document.getElementById("link").value).search');
+  assert.equal(await rowShown("autoGoal"), true, "the switch is there, and on");
+  assert.equal(await page.evaluate('document.getElementById("c-autoGoal").checked'), true);
+  for (const id of ["start", "target", "step", "fromLive"]) assert.equal(await rowShown(id), false, `${id} is hidden while the goal sets itself`);
+  assert.match(await text(".preview .goal__numbers"), /0 \/ 10|10 to go/, "the preview counts toward the first round number");
+  await setChannel();
+  await page.waitFor('document.getElementById("link").value.includes("pond.pal")', { timeout: 4000 });
+  const auto = await link();
+  assert.doesNotMatch(auto, /target=|step=|start=|fromLive=|autoGoal=/, "no numbers in the link of a goal that sets itself: " + auto);
+
+  await page.evaluate('document.getElementById("c-autoGoal").click()');
+  await page.waitFor('getComputedStyle(document.getElementById("c-target").closest(".ctl")).display !== "none"', { timeout: 3000 });
+  for (const id of ["start", "target", "step", "fromLive"]) assert.equal(await rowShown(id), true, `${id} is back`);
+  await page.evaluate(`(() => { const i = document.getElementById("c-target"); i.value = "250"; i.dispatchEvent(new Event("input", { bubbles: true })); })()`);
+  await page.waitFor('document.getElementById("link").value.includes("target=250")', { timeout: 3000 });
+  const typed = new URLSearchParams(await link());
+  assert.deepEqual([typed.get("autoGoal"), typed.get("target")], ["0", "250"], "the typed goal goes in the link, with the switch off");
+
+  await page.evaluate('document.getElementById("c-type").value = "gift"; document.getElementById("c-type").dispatchEvent(new Event("change", { bubbles: true }))');
+  await page.waitFor('document.getElementById("c-autoGoal").closest(".ctl").style.display === "none"', { timeout: 3000 });
+  assert.equal(await rowShown("autoGoal"), false, "a gift goal has no automatic goal");
+  await page.evaluate("localStorage.clear()");
+  assert.deepEqual(page.problems, [], page.problems.join(" | "));
+});

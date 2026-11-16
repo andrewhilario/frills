@@ -45,7 +45,7 @@ test("each overlay's options have good defaults, and nothing unknown or bad gets
 });
 
 test("a link carries only what was changed, reads back the same, and a look sets the base", () => {
-  const changed = GOAL.sanitize({ label: "Road to 1K", start: 812, target: 1000, step: 0, showPercent: true, accent: "#112233" });
+  const changed = GOAL.sanitize({ label: "Road to 1K", start: 812, target: 1000, step: 0, autoGoal: false, showPercent: true, accent: "#112233" });
   const url = new URL(GOAL.url("https://x.test/overlay/goal/", { channel: "pond.pal", settings: changed }));
   assert.equal(url.pathname, "/overlay/goal/");
   assert.equal(url.searchParams.get("channel"), "pond.pal");
@@ -122,7 +122,7 @@ test("the practice alerts can be kept to the kinds asked for", async () => {
 
 function goalRig(over = {}, extra = {}) {
   const events = [];
-  const settings = { ...GOAL.defaults, start: 90, target: 100, step: 25, ...over };
+  const settings = { ...GOAL.defaults, autoGoal: false, start: 90, target: 100, step: 25, ...over };
   const state = new GoalState(settings, { ...extra, onChange: (s) => events.push(`${s.value}/${s.goal}`), onReach: () => events.push("reached") });
   return { state, events, settings };
 }

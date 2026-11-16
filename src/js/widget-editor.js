@@ -30,18 +30,25 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
   // ── the look and the options ────────────────────────────────────────────────────────────────────────────────────
   const swatch = (p) => (luminance(p.accent) < 0.08 ? p.bg : p.accent);
   const writers = {};
+  const rows = {};
   let lookChips;
+  /** A setting may say when it applies (`showWhen(settings)`): the goal's own numbers do not when the goal sets itself. */
+  function refreshShown() {
+    for (const control of widget.controls) if (control.showWhen && rows[control.key]) rows[control.key].style.display = control.showWhen(settings) ? "" : "none";
+  }
   const paint = () => api.apply(settings);
   function change(key, value) {
     settings[key] = value;
     if (key === "font") fontsReady(generalFaces(settings), 600).then(paint);
     else paint();
     lookChips.set(currentLook({ ...settings }));
+    refreshShown();
     refreshLink();
     save();
   }
   function syncControls() {
     for (const control of widget.controls) writers[control.key]?.(settings[control.key]);
+    refreshShown();
     lookChips.set(currentLook({ ...settings }));
   }
   // The season's looks come first while it lasts (Halloween, Christmas), then the usual ones.
@@ -66,8 +73,10 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
       ? mountMediaPicker({ consentBox: $("media-ok"), kind: control.media, label: control.label, hint: control.hint, value: settings[control.key], onSet: (value) => change(control.key, value) })
       : buildControl(control, settings[control.key], (value) => change(control.key, value));
     writers[control.key] = write;
+    rows[control.key] = row;
     $(control.section === "look" ? "look-controls" : "opt-controls").append(row);
   }
+  refreshShown();
   $("reset").addEventListener("click", () => {
     settings = { ...widget.defaults };
     syncControls();
