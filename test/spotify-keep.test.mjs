@@ -159,9 +159,10 @@ test("the editor's client, the overlay's forwarder and the Worker agree on every
 
   assert.deepEqual(await editor.status().then((s) => [s.ok, s.connected]), [true, false]);
   const kept = await editor.keep({ clientId: "c".repeat(32), refresh: "r".repeat(40), access: "a".repeat(40), expires: now + 3600_000 });
-  assert.deepEqual([kept.ok, kept.name, kept.share, kept.queue], [true, "Tester", true, false]);
+  assert.deepEqual([kept.ok, kept.name, kept.share, kept.queue], [true, "Tester", true, true]);
   assert.deepEqual(await editor.status().then((s) => [s.connected, s.state, s.name]), [true, "ok", "Tester"]);
 
+  assert.equal((await editor.settings({ queue: false })).queue, false);
   asked.length = 0;
   await overlay.handle(chat("!sr levitating dua lipa"));
   assert.deepEqual(asked, [], "the queue switch is off: the overlay's request reached the Worker and Spotify was not asked");

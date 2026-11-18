@@ -78,13 +78,14 @@ test("a link means what it says: the settings read back from it are the vibe's l
   }
 });
 
-test("Twitch gets only the overlays that work there, and its alerts link says the follow login is separate", () => {
-  assert.deepEqual(overlaysFor("twitch").map((o) => o.id), ["chat", "alerts"]);
-  assert.equal(overlaysFor("tiktok").length, 5);
+test("Twitch gets only the overlays that work there, and its alerts/labels links say the follow login is separate", () => {
+  assert.deepEqual(overlaysFor("twitch").map((o) => o.id), ["chat", "alerts", "gifters", "labels"]);
+  assert.equal(overlaysFor("tiktok").length, 12);
   const links = buildLinks(ORIGIN, answers({ platform: "twitch", channel: "pondpal" }));
-  assert.deepEqual(links.map((l) => l.id), ["chat", "alerts"], "gifts, goals and likers are TikTok's");
+  assert.deepEqual(links.map((l) => l.id), ["chat", "alerts", "gifters", "labels"], "chat, alerts, gifters and rotating highlights work on Twitch");
   assert.ok(links.every((l) => params(l.url).get("platform") === "twitch"));
   assert.match(links[1].note, /follow alerts need one extra login/i);
+  assert.match(links[3].note, /last follower needs one extra login/i);
   assert.equal(buildLinks(ORIGIN, answers()).find((l) => l.id === "goal").note.includes("real follower count"), true);
 });
 
@@ -99,7 +100,7 @@ test("only the chosen overlays are made; without a name there is no link yet but
 
 test("the editor link opens the right editor with the same look and name; a Matcha chat goes to the Matcha editor", () => {
   const links = buildLinks(ORIGIN, answers());
-  assert.deepEqual(links.map((l) => new URL(l.editUrl).pathname), ["/editor/", "/alerts/", "/gifts/", "/goal/", "/likers/"]);
+  assert.deepEqual(links.map((l) => new URL(l.editUrl).pathname), ["/editor/", "/alerts/", "/gifters/", "/labels/", "/gifts/", "/jar/", "/goal/", "/likers/", "/songs/", "/timer/", "/tts/", "/counter/"]);
   for (const l of links) assert.equal(new URL(l.editUrl).search, new URL(l.url).search, `${l.id}: the editor gets the very same options`);
   const green = buildLinks(ORIGIN, answers({ vibe: "green" }));
   assert.equal(new URL(green[0].editUrl).pathname, "/matcha/");
@@ -127,22 +128,25 @@ test("odd answers are tolerated: an unknown shape or alignment falls back, and t
   assert.ok(ALIGNS.map(([id]) => id).join() === "left,center,right");
 });
 
-test("Both: one chat reads the two accounts, the alerts are one for each platform, and the rest stay TikTok's", () => {
+test("Both: one chat reads the two accounts, alerts/gifters/labels are one for each platform, and the rest stay TikTok's", () => {
   const both = (over = {}) => answers({ platform: "both", channel: "pond.pal", twitch: "pondpal", ...over });
-  assert.equal(overlaysFor("both").length, 5, "every overlay is on offer");
+  assert.equal(overlaysFor("both").length, 12, "every overlay is on offer");
   const links = buildLinks(ORIGIN, both());
-  assert.deepEqual(links.map((l) => l.id), ["chat", "alerts-tiktok", "alerts-twitch", "gifts", "goal", "likers"]);
-  assert.deepEqual(links.map((l) => l.name), ["Chat", "Alerts (TikTok)", "Alerts (Twitch)", "Last gifts", "Goals", "Top likers"], "two alert cards are told apart by name");
-  const [chat, tiktokAlerts, twitchAlerts, ...rest] = links;
+  assert.deepEqual(links.map((l) => l.id), ["chat", "alerts-tiktok", "alerts-twitch", "gifters-tiktok", "gifters-twitch", "labels-tiktok", "labels-twitch", "gifts", "jar", "goal", "likers", "songs", "timer", "tts", "counter"]);
+  assert.deepEqual(links.map((l) => l.name), ["Chat", "Alerts (TikTok)", "Alerts (Twitch)", "Top gifters (TikTok)", "Top gifters (Twitch)", "Rotating highlights (TikTok)", "Rotating highlights (Twitch)", "Last gifts", "Gift jar", "Goals", "Top likers", "Song requests", "Subathon timer", "Talking pet TTS", "Viewer and like counter"], "dual cards are told apart by name");
+  const [chat, tiktokAlerts, twitchAlerts, tiktokGifters, twitchGifters, tiktokLabels, twitchLabels, ...rest] = links;
   const c = params(chat.url);
   assert.deepEqual([c.get("tiktok"), c.get("twitch"), c.has("channel"), c.has("platform")], ["pond.pal", "pondpal", false, false], "the chat link names both accounts");
   assert.deepEqual(sourcesOf(c), [{ platform: "tiktok", channel: "pond.pal" }, { platform: "twitch", channel: "pondpal" }], "and reads back as both");
   assert.deepEqual([params(tiktokAlerts.url).get("channel"), params(tiktokAlerts.url).get("platform")], ["pond.pal", "tiktok"]);
   assert.deepEqual([params(twitchAlerts.url).get("channel"), params(twitchAlerts.url).get("platform")], ["pondpal", "twitch"]);
+  assert.deepEqual([params(twitchGifters.url).get("channel"), params(twitchGifters.url).get("platform")], ["pondpal", "twitch"]);
+  assert.deepEqual([params(twitchLabels.url).get("channel"), params(twitchLabels.url).get("platform")], ["pondpal", "twitch"]);
   assert.match(twitchAlerts.note, /follow alerts need one extra login/i);
-  for (const l of rest) assert.deepEqual([params(l.url).get("channel"), params(l.url).get("platform")], ["pond.pal", "tiktok"], `${l.id} is TikTok's`);
+  assert.match(twitchLabels.note, /last follower needs one extra login/i);
+  for (const l of [tiktokGifters, tiktokLabels, ...rest]) assert.deepEqual([params(l.url).get("channel"), params(l.url).get("platform")], ["pond.pal", "tiktok"], `${l.id} is TikTok's`);
   assert.match(chat.note, /small icon/);
-  assert.deepEqual(links.map((l) => l.needs), [["tiktok", "twitch"], ["tiktok"], ["twitch"], ["tiktok"], ["tiktok"], ["tiktok"]]);
+  assert.deepEqual(links.map((l) => l.needs), [["tiktok", "twitch"], ["tiktok"], ["twitch"], ["tiktok"], ["twitch"], ["tiktok"], ["twitch"], ["tiktok"], ["tiktok"], ["tiktok"], ["tiktok"], ["tiktok"], ["tiktok"], ["tiktok"], ["tiktok"]]);
   for (const l of links) assert.equal(new URL(l.editUrl).search, new URL(l.url).search, `${l.id}: the editor gets the very same options`);
   assert.equal(new URL(links[0].editUrl).pathname, "/editor/");
   assert.equal(new URL(buildLinks(ORIGIN, both({ vibe: "green" }))[0].editUrl).pathname, "/matcha/", "a Matcha chat goes to the Matcha page, which opens in Both too");
@@ -153,11 +157,11 @@ test("Both: one chat reads the two accounts, the alerts are one for each platfor
 test("Both: a link only exists once the accounts it needs are named, and the picture of the chat shows both without using them", () => {
   const both = (over = {}) => answers({ platform: "both", channel: "pond.pal", twitch: "pondpal", ...over });
   const onlyTikTok = buildLinks(ORIGIN, both({ twitch: "" }));
-  assert.deepEqual(onlyTikTok.map((l) => [l.id, l.url !== ""]), [["chat", false], ["alerts-tiktok", true], ["alerts-twitch", false], ["gifts", true], ["goal", true], ["likers", true]], "each link waits only for the names it needs");
+  assert.deepEqual(onlyTikTok.map((l) => [l.id, l.url !== ""]), [["chat", false], ["alerts-tiktok", true], ["alerts-twitch", false], ["gifters-tiktok", true], ["gifters-twitch", false], ["labels-tiktok", true], ["labels-twitch", false], ["gifts", true], ["jar", true], ["goal", true], ["likers", true], ["songs", true], ["timer", true], ["tts", true], ["counter", true]], "each link waits only for the names it needs");
   const onlyTwitch = buildLinks(ORIGIN, both({ channel: "" }));
-  assert.deepEqual(onlyTwitch.map((l) => [l.id, l.url !== ""]), [["chat", false], ["alerts-tiktok", false], ["alerts-twitch", true], ["gifts", false], ["goal", false], ["likers", false]]);
+  assert.deepEqual(onlyTwitch.map((l) => [l.id, l.url !== ""]), [["chat", false], ["alerts-tiktok", false], ["alerts-twitch", true], ["gifters-tiktok", false], ["gifters-twitch", true], ["labels-tiktok", false], ["labels-twitch", true], ["gifts", false], ["jar", false], ["goal", false], ["likers", false], ["songs", false], ["timer", false], ["tts", false], ["counter", false]]);
   assert.ok(buildLinks(ORIGIN, both({ channel: "", twitch: "" })).every((l) => l.url === ""));
-  assert.equal(linksText(onlyTikTok).split("\n").length, 4, "'copy all' lists only the links that exist");
+  assert.equal(linksText(onlyTikTok).split("\n").length, 11, "'copy all' lists only the links that exist");
   assert.match(linksText(onlyTikTok), /^Alerts \(TikTok\): /m);
   // the picture of the chat is practice for two chats, so it shows the icons; no real name goes into any picture
   const chatPicture = buildLinks(ORIGIN, both())[0].preview;

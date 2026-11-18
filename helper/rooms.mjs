@@ -78,11 +78,12 @@ export class Room {
   }
 
   /**
-   * TikTok says how many are watching every few seconds. A change is passed on to the pages, at most once every 3 seconds (a big LIVE changes it all the time),
+   * TikTok says how many are watching right now every few seconds. A change is passed on to the pages, at most once every 3 seconds (a big LIVE changes it all the time),
    * and the newest number always gets there: a number that arrives too soon waits and is sent when the 3 seconds are up.
+   * tiktok-live-connector 2.5 sends current viewers in `total` (whereas `totalUser` is cumulative room visits and must not be read as current viewers).
    */
   seeViewers(d) {
-    const n = Math.round(Number(d?.viewerCount ?? d?.viewer_count ?? d?.totalUser));
+    const n = Math.round(Number(d?.viewerCount ?? d?.viewer_count ?? d?.total));
     if (!Number.isFinite(n) || n < 0 || n >= 1e9 || n === this.viewers) return;
     this.viewers = n;
     if (this.viewerTimer) return;
@@ -98,14 +99,17 @@ export class Room {
   readInfo(conn) {
     let followers = 0;
     let status = 0;
+    let currentViewers = 0;
     try {
       const room = (conn.roomInfo?.data ?? conn.roomInfo) ?? {};
       followers = Math.round(Number(room.owner?.follow_info?.follower_count));
       status = Number(room.status);
+      currentViewers = Math.round(Number(room.user_count));
     } catch { /* no details: pages keep the number the streamer typed */ }
     this.base = Number.isFinite(followers) && followers > 0 && followers < 1e10 ? followers : 0;
     this.live = status === 2;
     if (this.live) this.liveEndedAt = 0;
+    if (this.live && !this.viewers && Number.isFinite(currentViewers) && currentViewers > 0 && currentViewers < 1e9) this.viewers = currentViewers;
     this.followed = 0;
     if (this.base > 0 || this.live) this.broadcast("info", this.info());
   }

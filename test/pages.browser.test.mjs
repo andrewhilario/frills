@@ -26,7 +26,7 @@ before(async () => {
 });
 after(() => server?.kill());
 
-const PAGES = ["/", "/editor/", "/feedback/", "/alerts/", "/gifts/", "/goal/", "/likers/", "/overlays/", "/guides/alerts/", "/overlay/?demo=1", "/overlay/alerts/?demo=1", "/matcha/", "/guides/obs/", "/guides/test/", "/guides/tiktok/", "/privacy/"];
+const PAGES = ["/", "/editor/", "/feedback/", "/alerts/", "/gifts/", "/jar/", "/goal/", "/likers/", "/overlays/", "/guides/alerts/", "/overlay/?demo=1", "/overlay/alerts/?demo=1", "/matcha/", "/guides/obs/", "/guides/test/", "/guides/tiktok/", "/privacy/"];
 
 // The fonts are already waited for by goto(); what is left to wait for is only the page's own scripts drawing their first frame.
 const SETTLE = 300;

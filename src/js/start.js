@@ -59,8 +59,8 @@ const QUESTIONS = [
     body: () => picks(
       [
         { id: "tiktok", name: "TikTok LIVE", text: "Chat, alerts, gifts, goals and likers." },
-        { id: "twitch", name: "Twitch", text: "Chat and alerts (subs, gifted subs, cheers, raids)." },
-        { id: "both", name: "Both at once", text: "One chat with TikTok and Twitch together, alerts for each, and TikTok's gifts, goals and likers. In beta." },
+        { id: "twitch", name: "Twitch", text: "Chat, alerts, top gifters and rotating highlights." },
+        { id: "both", name: "Both at once", text: "One chat together, alerts, gifters and highlights for each, plus TikTok gifts, goals and likers. In beta." },
       ],
       answers.platform, (id) => { answers.platform = id; }, (i) => titled(i.name, i.text), { label: "Where you stream" },
     ),
@@ -111,7 +111,7 @@ const QUESTIONS = [
         const box = el("input", { type: "checkbox", checked: answers.overlays.includes(o.id) });
         box.addEventListener("change", () => { answers.overlays = box.checked ? [...new Set([...answers.overlays, o.id])] : answers.overlays.filter((id) => id !== o.id); });
         const both = answers.platform === "both";
-        const blurb = !both ? o.blurb : o.id === "alerts" ? `${o.blurb} One for TikTok and one for Twitch.` : o.id === "chat" ? "Your TikTok and Twitch chat together, in one set of speech bubbles." : `${o.blurb} TikTok only.`;
+        const blurb = !both ? o.blurb : o.id === "chat" ? "Your TikTok and Twitch chat together, in one set of speech bubbles." : o.twitch ? `${o.blurb} One for TikTok and one for Twitch.` : `${o.blurb} TikTok only.`;
         list.append(el("label", { className: "pick pick--check" }, box, el("span", { className: "pick__body" }, ...titled(o.name, blurb))));
       }
       return list;

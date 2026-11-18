@@ -72,8 +72,10 @@ test("the overlays FAQ answers what people ask about alerts, Twitch, uploads, so
 test("the overlays FAQ keeps its promises: Twitch support as it is, uploads described honestly, and the privacy page linked", () => {
   const items = overlaysFaq({});
   const answer = (q) => items.find((i) => i.q === q).a;
-  assert.match(answer("Do the overlays work with Twitch?"), /chat overlay and the alerts do/);
+  assert.match(answer("Do the overlays work with Twitch?"), /chat overlay.*alerts.*top gifters.*rotating highlights/);
   assert.match(answer("Do the overlays work with Twitch?"), /Last gifts, goals and top likers are for TikTok LIVE only/);
+  assert.match(answer("Which overlays are there?"), /top gifters/);
+  assert.match(answer("Which overlays are there?"), /rotating highlights/);
   assert.match(answer("Can I use my own images, GIFs and sounds in alerts?"), /1 MB.*300 KB/);
   assert.match(answer("Can I use my own images, GIFs and sounds in alerts?"), /delete code/);
   assert.ok(answer("Can I use my own images, GIFs and sounds in alerts?").includes('href="/privacy/"'));
@@ -81,6 +83,8 @@ test("the overlays FAQ keeps its promises: Twitch support as it is, uploads desc
   assert.ok(answer("How do follow alerts work on Twitch, and why do they need a login?").includes('href="/twitch/"'));
   assert.doesNotMatch(items.map((i) => i.text).join(" "), /no database|stores nothing|nothing is stored/i, "it never claims there is no database");
   assert.match(answer("Which overlays are there?"), /song requests/);
+  assert.match(answer("Which overlays are there?"), /subathon timer/);
+  assert.match(answer("Which overlays are there?"), /talking pet TTS/);
   assert.doesNotMatch(answer("Which overlays are there?"), /coming soon/i, "song requests are in beta now, nothing in that list is only planned");
   const songs = answer("How do song requests and the Spotify player work?");
   assert.match(songs, /Spotify Premium/);

@@ -38,7 +38,7 @@ layer.apply(settings);
 layer.render();
 // With a Spotify code in the link, Frills keeps the streamer's Spotify login: this page, open in the streaming app, passes each !sr and !next on
 // (the Worker adds the song to the streamer's Spotify queue, if the streamer switched that on in the editor). The editor's own preview does not.
-const forward = !demo && channel && validCode(settings.spotify) ? new SpotifyForward({ code: settings.spotify, channel, settings }) : null;
+const forward = !demo && channel && validCode(settings.spotify) ? new SpotifyForward({ code: settings.spotify, channel, settings, cooldownMs: 2500 }) : null;
 setInterval(() => { if (!layer.playing) queue.tick(); }, 1000); // with Spotify playing, the song moves on by itself
 // Tell Frills this overlay is open (now, and every minute), so the editor can show the streamer that viewers' requests have a way to reach Spotify.
 if (forward) { forward.hello(); setInterval(() => forward.hello(), 60000); }
@@ -53,5 +53,15 @@ if (demo) {
   say("Add ?channel=yourname to this link.");
 } else {
   const fonts = fontsReady(generalFaces(settings), 1000); // the connection starts at once; only drawing waits for the font
-  connectEvents({ channel, events: [], onChat: (message) => { fonts.then(() => queue.handle(message, channel)); forward?.handle(message); }, say });
+  connectEvents({
+    channel,
+    events: [],
+    onChat: (message) => {
+      fonts.then(() => {
+        const out = queue.handle(message, channel);
+        if (out.kind === "request" || out.kind === "next" || out.why === "nothing playing") forward?.handle(message);
+      });
+    },
+    say,
+  });
 }

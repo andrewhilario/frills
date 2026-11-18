@@ -231,7 +231,7 @@ test("a count is kept per account in the browser's storage, and bad or missing s
 
 // ── top likers ──────────────────────────────────────────────────────────────────────────────────────────────────────────
 
-import { LIKERS, LikeBoard, MIN_MILESTONE, likersKey, loadLikers, saveLikers } from "../src/js/likers.js";
+import { LIKERS, LIKER_LAYOUTS, LikeBoard, MIN_MILESTONE, likersKey, loadLikers, saveLikers } from "../src/js/likers.js";
 import { demoLikers, fakeLike } from "../src/js/fake-alerts.js";
 
 const like = (user, count, extra = {}) => ({ kind: "like", id: "", user, name: user.toUpperCase(), avatar: "", count, total: 0, ...extra });
@@ -450,6 +450,21 @@ test("the milestone settings are checked: the smallest is 1,000, an unknown 'who
   for (const key of ["celebrate", "milestone", "celebrateWho", "celebrateText", "celebrateTime", "celebrateSound"]) assert.equal(link.searchParams.has(key), false, `${key} is not in a link unless changed`);
   const changed = new URL(LIKERS.url("https://x.test/o/", { channel: "a", settings: { ...LIKERS.defaults, celebrate: false, milestone: 5000, celebrateWho: "any" } }));
   assert.deepEqual([changed.searchParams.get("celebrate"), changed.searchParams.get("milestone"), changed.searchParams.get("celebrateWho")], ["0", "5000", "any"]);
+});
+
+test("top likers offers 10 leaderboard designs, validates layout safely, and round-trips via URL", () => {
+  assert.ok(LIKER_LAYOUTS.length >= 10, "offers 10 leaderboard designs");
+  assert.equal(LIKERS.defaults.layout, "classic");
+  assert.equal(LIKERS.sanitize({ layout: "not-a-design" }).layout, "classic");
+  const defaultLink = new URL(LIKERS.url("https://x.test/o/", { channel: "a", settings: { ...LIKERS.defaults } }));
+  assert.equal(defaultLink.searchParams.has("layout"), false, "classic default omitted from URL");
+  for (const [id] of LIKER_LAYOUTS.filter(([k]) => k !== "classic")) {
+    const custom = LIKERS.sanitize({ ...LIKERS.defaults, layout: id });
+    assert.equal(custom.layout, id);
+    const link = new URL(LIKERS.url("https://x.test/o/", { channel: "a", settings: custom }));
+    assert.equal(link.searchParams.get("layout"), id);
+    assert.equal(LIKERS.sanitize(LIKERS.fromParams(link.searchParams)).layout, id);
+  }
 });
 
 test("the practice likers start the first one just short of a milestone, and at least 1,000 whatever is asked", () => {

@@ -1,11 +1,11 @@
 <section class="about" aria-labelledby="about-title">
       <h2 class="step-card__title" id="about-title">About this overlay</h2>
       <p>Talking Pet TTS pairs a peeking Frills mascot with a customizable speech bubble that pops up whenever a gift or viewer message plays aloud. It cleans out links, enforces per-viewer cooldowns, and drops gracefully to free browser voices if Frills Plus is not on.</p>
-      <h3>How to test on someone’s live stream locally</h3>
+      <h3>How to use it</h3>
       <ol>
-        <li>Run the Frills helper locally (<code>npm run tiktok</code>) and open this page from the printed address.</li>
-        <li>Pick your pet (Frog, Cat, Bunny, or Hamster) and click <strong>Gift thank-you</strong> or type a custom line above.</li>
-        <li>Type any live streamer’s TikTok username in Step 3 to hear their live gifts and chat read out in real time.</li>
+        <li>Pick your pet (Frog, Cat, Bunny, or Hamster), choose a voice style, and press <strong>Gift thank-you</strong> or type a test line above to hear it speak.</li>
+        <li>Choose when the pet speaks: gifts only, a chat command such as <strong>!say</strong>, both gifts and command, or every chat message.</li>
+        <li>Type your TikTok username in Step 3.</li>
         <li>Copy your overlay link into OBS or TikTok LIVE Studio as a Browser source.</li>
       </ol>
       <h3>Good to know</h3>
@@ -15,4 +15,10 @@
         <li>See all free overlays on the <a href="/overlays/">overlays page</a>.</li>
       </ul>
       {{>add-to-app}}
+      <h3>How do viewers make the talking pet speak on TikTok LIVE?</h3>
+      <p>Viewers either send a gift that meets your minimum diamond setting or type <strong>!say</strong> followed by their message in your TikTok LIVE chat. The pet hops along with the voice audio while showing the message in a speech bubble.</p>
+      <h3>Is Talking Pet TTS free to use?</h3>
+      <p>Yes. The built-in browser voice mode is completely free with no account, no character cap and no API keys required.</p>
+      <h3>How do I stop chat spam in TTS?</h3>
+      <p>Every message automatically strips links and repeated punctuation, caps spoken length, and enforces a per-viewer cooldown timer that you control in Step 2.</p>
     </section>

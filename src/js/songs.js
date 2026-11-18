@@ -45,7 +45,7 @@ export const SONGS = defineWidget({
     { section: "layout", ...toggle("coverBlur", "Cover blur", "A blurred copy of the cover as the card\u2019s background.") },
     { section: "layout", ...toggle("progress", "Show a progress bar", "Fills over the song\u2019s length from the catalog, so it needs the song to be found. Not shown in the strip.") },
     { section: "layout", ...toggle("scrollTitle", "Slide a long title instead of cutting it") },
-    { section: "rules", ...text("command", "The word viewers type after !", 16, "Viewers type !sr song name. Letters and numbers only. !songrequest always works too.") },
+    { section: "rules", ...text("command", "The word viewers type after !", 16, "Viewers type !sr song name. Letters and numbers only. !songrequest, !request and !song always work too.") },
     { section: "rules", ...number("limit", "Most requests waiting", 3, 50) },
     { section: "rules", ...number("perUser", "Most per person waiting", 1, 5) },
     { section: "rules", ...toggle("modsSkip", "Moderators can use !next too", "You can always use !next from your own TikTok account. Needs the relay to be up to date.") },
@@ -75,7 +75,7 @@ export function parseCommand(line, settings) {
   if (!m) return null;
   const word = m[1].toLowerCase();
   const rest = clean(m[2], 120);
-  if (word === commandWord(settings) || word === "songrequest") {
+  if (word === commandWord(settings) || word === "songrequest" || word === "request" || word === "song") {
     const query = clean(rest.replace(/^[-:,]\s*/, ""), 80);
     return query.length >= 2 ? { kind: "request", query } : null;
   }

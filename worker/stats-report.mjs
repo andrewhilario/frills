@@ -259,8 +259,8 @@ export async function fetchGsc(env, { now = Date.now(), fetchImpl = globalThis.f
   const [totals28dRows, totals7dRows, queries, pages, countries] = await Promise.all([
     askDim(start28d, [], 1),
     askDim(start7d, [], 1),
-    askDim(start28d, ["query"], 10),
-    askDim(start28d, ["page"], 10),
+    askDim(start28d, ["query"], 25),
+    askDim(start28d, ["page"], 25),
     askDim(start28d, ["country"], 10),
   ]);
 

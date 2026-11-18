@@ -94,11 +94,11 @@ export function defineWidget({ controls, defaults }) {
     return params;
   };
   /** The address a streamer pastes into their streaming app. */
-  const url = (overlayBase, { channel = "", settings = base } = {}) => {
+  const url = (overlayBase, { channel = "", platform = "tiktok", settings = base } = {}) => {
     const params = new URLSearchParams();
     if (channel) {
       params.set("channel", channel);
-      params.set("platform", "tiktok");
+      params.set("platform", platform === "twitch" ? "twitch" : "tiktok");
     }
     return overlayBase + "?" + toParams(settings, params);
   };

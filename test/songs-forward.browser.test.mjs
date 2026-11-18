@@ -94,11 +94,12 @@ test("with a Spotify code in the link, the overlay says hello when it opens, wit
   assert.ok(!("x-key" in hi.headers), "only the code, never the key");
 });
 
-test("a viewer's !next is not passed on, nor is chat that is not a command", { skip }, async () => {
+test("a viewer's !next is not passed on, nor is chat that is not a command, nor a duplicate song rejected by the on-screen queue", { skip }, async () => {
   const conn = await overlay(`channel=pond_cafe&platform=tiktok&spotify=${CODE}`);
   conn.emit("chat", tiktok("m1", "!next", "pal"));
   conn.emit("chat", tiktok("m2", "hello everyone", "pal"));
   conn.emit("chat", tiktok("m3", "!sr one more song", "pal3"));
+  conn.emit("chat", tiktok("m4", "!sr one more song", "pal4"));
   await until(async () => (await sent()).length === 1);
   await sleep(300);
   assert.deepEqual((await sent()).map((c) => c.url), [`/api/spotify/${CODE}/request`]);

@@ -4,9 +4,10 @@ import { TTS, TtsQueue, ttsSpeechFor } from "./tts.js";
 import { createTtsPlayer } from "./tts-audio.js";
 import { createTtsView } from "./widgets-view.js";
 import { channelFromParams, connectEvents } from "./widget-overlay.js";
+import { fontsReady, generalFaces } from "./look.js";
 
 const params = new URLSearchParams(location.search);
-const settings = TTS.fromParams(params);
+const settings = TTS.sanitize(TTS.fromParams(params));
 const host = document.getElementById("tts");
 const note = document.getElementById("note");
 const view = createTtsView(host);
@@ -32,23 +33,32 @@ const say = (message) => {
 };
 
 if (params.get("demo") === "1") {
-  const sampleGift = ttsSpeechFor({ kind: "gift", name: "Pond Pal", gift: "Doughnut", diamonds: 30, count: 1, total: 30 }, settings);
-  const sampleChat = ttsSpeechFor({ name: "Mochi Bun", text: `${settings.command || "!say"} Happy to catch the stream tonight!` }, { ...settings, trigger: "cmd" });
-  if (sampleGift) queue.enqueue(sampleGift, { bypassCooldown: true });
-  if (sampleChat) queue.enqueue(sampleChat, { bypassCooldown: true });
+  fontsReady(generalFaces(settings), 1000).then(() => {
+    const sampleGift = ttsSpeechFor({ kind: "gift", name: "Pond Pal", gift: "Doughnut", diamonds: 30, count: 1, total: 30 }, settings);
+    const sampleChat = ttsSpeechFor({ name: "Mochi Bun", text: `${settings.command || "!say"} Happy to catch the stream tonight!` }, { ...settings, trigger: "cmd" });
+    if (sampleGift) queue.enqueue(sampleGift, { bypassCooldown: true });
+    if (sampleChat) queue.enqueue(sampleChat, { bypassCooldown: true });
+  });
 } else {
   const channel = channelFromParams(params);
-  if (channel) {
+  if (!channel) {
+    say("Add ?channel=yourname to this link.");
+  } else {
+    const fonts = fontsReady(generalFaces(settings), 1000);
     connectEvents({
       channel,
       events: ["gift"],
       onAlert(event) {
-        const item = ttsSpeechFor(event, settings);
-        if (item) queue.enqueue(item);
+        fonts.then(() => {
+          const item = ttsSpeechFor(event, settings);
+          if (item) queue.enqueue(item);
+        });
       },
       onChat(msg) {
-        const item = ttsSpeechFor(msg, settings);
-        if (item) queue.enqueue(item);
+        fonts.then(() => {
+          const item = ttsSpeechFor(msg, settings);
+          if (item) queue.enqueue(item);
+        });
       },
       say,
     });

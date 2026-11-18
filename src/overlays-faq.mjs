@@ -6,11 +6,11 @@ export function overlaysFaq({ kb = 19, relayUrl = "", plus = false } = {}) {
   const items = [
     {
       q: "Which overlays are there?",
-      a: "The <a href=\"/editor/\">chat overlay</a>, <a href=\"/alerts/\">alerts</a>, <a href=\"/gifts/\">last gifts</a>, <a href=\"/goal/\">goals</a> (followers, gifts or likes) and <a href=\"/likers/\">top likers</a>, and <a href=\"/songs/\">song requests</a> (with an optional Spotify player). Each has its own editor, its own look and its own link. All of them are free, with no Frills account. The overlays other than chat are in beta.",
+      a: "The <a href=\"/editor/\">chat overlay</a>, <a href=\"/alerts/\">alerts</a>, <a href=\"/gifts/\">last gifts</a>, <a href=\"/jar/\">gift jar</a>, <a href=\"/goal/\">goals</a> (followers, gifts or likes), <a href=\"/likers/\">top likers</a>, <a href=\"/gifters/\">top gifters</a>, <a href=\"/labels/\">rotating highlights</a>, <a href=\"/counter/\">viewer and like counter</a>, <a href=\"/timer/\">subathon timer</a>, <a href=\"/tts/\">talking pet TTS</a>, and <a href=\"/songs/\">song requests</a> (with an optional Spotify player). Each has its own editor, its own look and its own link. All of them are free, with no Frills account. The overlays other than chat are in beta.",
     },
     {
       q: "Do the overlays work with Twitch?",
-      a: "The chat overlay and the alerts do. On Twitch the alerts show new subs and resubs, gifted subs, bits and raids, and follows too, once you log in to Twitch on one private page (see the questions below). Last gifts, goals and top likers are for TikTok LIVE only for now, because they are built on TikTok gifts and likes. Twitch has no likes, and its gifts are subs and bits, which those overlays do not show yet.",
+      a: "The chat overlay, <a href=\"/alerts/\">alerts</a>, <a href=\"/gifters/\">top gifters</a> (sub gifters, bit senders or combined), and <a href=\"/labels/\">rotating highlights</a> (last follower, last sub, last bits, top sub gifter and top bit sender) work on Twitch. New subs, gifted subs, bits and raids come straight from Twitch chat with no login; Twitch follows require logging in on one private page or inside Step 3 (see below). Last gifts, goals and top likers are for TikTok LIVE only for now, along with the <a href=\"/jar/\">gift jar</a>.",
     },
     {
       q: "How do I add an overlay to my stream?",

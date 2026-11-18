@@ -67,7 +67,35 @@ export function mountSpotify(root, { hear, refresh = () => {} } = {}) {
     if (state.mode === "connected") finished.add("9");
     for (const box of boxes) box.checked = by.has(box.dataset.done);
     for (const li of root.querySelectorAll("[data-step]")) li.dataset.finished = String(finished.has(li.dataset.step));
-    $("progress").textContent = state.mode === "connected" ? "(all done)" : `(${finished.size} of 9 done)`;
+    const doneCount = state.mode === "connected" ? 9 : finished.size;
+    $("progress").textContent = state.mode === "connected" ? "(all done)" : `(${doneCount} of 9 done)`;
+    const fill = $("bar-fill");
+    if (fill) fill.style.width = `${Math.round((doneCount / 9) * 100)}%`;
+  }
+
+  // ── Full-page setup mode & step filter so streamers never have to squint in the sidebar ────────────────────────────────
+  const workspace = document.getElementById("main");
+  const setFullView = (on) => {
+    if (!workspace) return;
+    if (on) workspace.dataset.spotifyView = "full";
+    else delete workspace.dataset.spotifyView;
+    if ($("topbar")) $("topbar").hidden = !on;
+    if ($("full-btn")) $("full-btn").textContent = on ? "Sidebar view" : "Full-page view";
+    if ($("expand")) $("expand").textContent = on ? "Back to sidebar" : "Open full-page setup";
+    if (on) {
+      $("own").open = true;
+      root.scrollIntoView?.({ block: "start", behavior: "smooth" });
+    }
+  };
+  $("full-btn")?.addEventListener("click", () => setFullView(workspace?.dataset.spotifyView !== "full"));
+  $("expand")?.addEventListener("click", () => setFullView(workspace?.dataset.spotifyView !== "full"));
+  $("back-editor")?.addEventListener("click", () => setFullView(false));
+  $("jump-link")?.addEventListener("click", () => setFullView(false));
+  $("hide-done")?.addEventListener("change", (e) => {
+    root.dataset.hideDone = e.target.checked ? "true" : "false";
+  });
+  if (new URLSearchParams(location.search).get("spotifySetup") === "1") {
+    setFullView(true);
   }
   /** Spotify turned the login away: say which app it was, point at the step to check, and open what is needed. */
   function denied() {
@@ -138,7 +166,7 @@ export function mountSpotify(root, { hear, refresh = () => {} } = {}) {
     state.share = on;
     say($("share-note"), on ? SHARE_ON : SHARE_OFF);
   });
-  const queue = buildControl({ key: "spQueue", type: "toggle", label: "Add songs my viewers ask for to my Spotify queue" }, false, async (on) => {
+  const queue = buildControl({ key: "spQueue", type: "toggle", label: "Add songs my viewers ask for to my Spotify queue" }, true, async (on) => {
     const done = await server.settings({ queue: on });
     if (!done.ok) { say($("queue-note"), done.message, true); queue.write(!on); return; }
     state.queue = on;
@@ -232,16 +260,41 @@ export function mountSpotify(root, { hear, refresh = () => {} } = {}) {
   /** Is the song requests overlay open with Spotify in its link? Frills notes when it last said hello; this says it in words, and what to check when it is not. */
   function paintOverlay() {
     const note = $("overlay-note");
-    if (state.mode !== "connected") { note.textContent = ""; return; }
+    const copyRow = $("copy-row");
+    if (state.mode !== "connected") {
+      note.textContent = "";
+      if (copyRow) copyRow.hidden = true;
+      return;
+    }
     const age = state.overlayAt && state.now ? state.now - state.overlayAt : Infinity;
     if (age < SEEN_FRESH_MS) {
       note.dataset.state = "ok";
       note.textContent = state.queue ? "Your song requests overlay is open in your streaming app. Viewers’ !sr can reach your Spotify queue." : "Your song requests overlay is open in your streaming app. Switch on adding to your Spotify queue (above) to let viewers’ !sr reach it.";
+      if (copyRow) copyRow.hidden = true;
     } else {
       note.dataset.state = "error";
       note.textContent = "Frills cannot see your song requests overlay with Spotify in its link, so viewers’ !sr cannot reach your Spotify. Check: (1) the overlay is open in your streaming app and visible there (if it has been open for a long time, refresh the browser source once); (2) its link was copied after you connected Spotify: copy your link again in step 5 and paste it into the app in place of the old one.";
+      if (copyRow) copyRow.hidden = false;
     }
   }
+
+  $("copy-link")?.addEventListener("click", async () => {
+    const linkInput = document.getElementById("link");
+    const stepCopy = document.getElementById("copy-link");
+    const btn = $("copy-link");
+    if (!linkInput?.value) {
+      const ch = document.getElementById("source-channel");
+      ch?.scrollIntoView({ behavior: "smooth", block: "center" });
+      ch?.focus();
+      return;
+    }
+    stepCopy?.click();
+    if (btn) {
+      const prev = btn.textContent;
+      btn.textContent = "Copied! Paste into your app";
+      setTimeout(() => { btn.textContent = prev; }, 2000);
+    }
+  });
 
   async function load() {
     state = normalize(await server.status());

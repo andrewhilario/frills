@@ -94,3 +94,25 @@
 .spx__faq dt { margin-top: var(--space-xs); font-weight: 700; }
 .spx__faq dd { margin: 0; padding-left: var(--space-sm); border-left: 3px solid var(--color-accent); }
 .spx #spx-on:not([hidden]) { display: grid; gap: var(--space-sm); }
+.spx__banner { display: grid; gap: var(--space-xs); padding: var(--space-sm) var(--space-md); border-radius: var(--radius-sm); border: 2px solid var(--color-ink); background: var(--color-paper-2); font-size: var(--text-sm); }
+.spx__banner p { margin: 0; }
+.spx__filter { min-height: 2rem; font-size: var(--text-sm); }
+.spx__bar { height: 0.55rem; border-radius: 99px; background: var(--color-paper-3); overflow: hidden; border: 1px solid var(--color-rule-2); }
+.spx__bar i { display: block; width: 0%; height: 100%; background: var(--color-success); transition: width 220ms ease-out; }
+.spx[data-hide-done="true"] .spx__steps li[data-finished="true"] { display: none; }
+.spx__topbar { position: sticky; top: var(--appbar-height); z-index: 10; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-sm); padding: var(--space-sm) var(--space-md); border-radius: var(--radius-sm); border: 2px solid var(--color-ink); background: var(--color-accent); }
+.spx__topbar-title { font-weight: 800; font-size: var(--text-base); }
+.workspace[data-spotify-view="full"] .preview,
+.workspace[data-spotify-view="full"] .panel > .step-card:not(#spotify-step):not([aria-labelledby="s5"]),
+.workspace[data-spotify-view="full"] .panel > .panel__intro,
+.workspace[data-spotify-view="full"] .panel > .watch,
+.workspace[data-spotify-view="full"] .panel > .about,
+.workspace[data-spotify-view="full"] .panel > .preview-tools { display: none; }
+.workspace[data-spotify-view="full"] .panel { flex: 1 1 100%; max-width: 72rem; width: 100%; margin-inline: auto; padding-inline: var(--page-gutter); }
+@media (min-width: 56rem) {
+  .workspace[data-spotify-view="full"] .spx__steps { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-md); align-items: start; }
+  .workspace[data-spotify-view="full"] .spx__steps li[data-step="4"],
+  .workspace[data-spotify-view="full"] .spx__steps li[data-step="6"],
+  .workspace[data-spotify-view="full"] .spx__steps li[data-step="7"] { grid-column: 1 / -1; }
+  .workspace[data-spotify-view="full"] .spx__steps li { padding: var(--space-md) var(--space-lg) var(--space-md) 3.8rem; font-size: var(--text-base); }
+}

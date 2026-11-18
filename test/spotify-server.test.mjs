@@ -52,12 +52,12 @@ const login = (env, spotify, over = {}, options = {}) => call(env, spotify, "POS
 const nowPlaying = (env, spotify, now) => handleNowPlaying(new Request(`${SITE}/api/nowplaying/${CODE}`), env, { now, fetchImpl: spotify.fetch });
 const row = (env) => env.DB.raw.prepare("SELECT * FROM spotify_logins WHERE code = ?").get(CODE);
 const body = async (response) => response.json();
-/** A connected streamer: logged in, with the Spotify queue switched on when asked. */
-async function connected({ queue = false, ...over } = {}) {
+/** A connected streamer: logged in, with the Spotify queue switched on by default (or off when asked). */
+async function connected({ queue = true, ...over } = {}) {
   const env = fresh();
   const spotify = fakeSpotify(over);
   assert.equal((await login(env, spotify)).status, 200);
-  if (queue) assert.equal((await call(env, spotify, "PUT", "settings", { body: { queue: true } })).status, 200);
+  if (!queue) assert.equal((await call(env, spotify, "PUT", "settings", { body: { queue: false } })).status, 200);
   spotify.calls.length = 0;
   return { env, spotify };
 }
@@ -89,7 +89,7 @@ test("logging in: the login is proved with Spotify, kept encrypted, and never sh
   const spotify = fakeSpotify();
   const done = await login(env, spotify);
   assert.equal(done.status, 200);
-  assert.deepEqual(await done.json(), { ok: true, name: "Tester", share: true, queue: false });
+  assert.deepEqual(await done.json(), { ok: true, name: "Tester", share: true, queue: true });
   assert.equal(spotify.calls.map((c) => c.path).join(), "/v1/me", "it was proved by asking who it is");
   assert.equal(spotify.calls[0].auth, `Bearer ${ACCESS}`);
   const stored = row(env);
@@ -98,7 +98,7 @@ test("logging in: the login is proved with Spotify, kept encrypted, and never sh
   for (const part of [REFRESH, ACCESS, CLIENT]) assert.ok(!dump.includes(part), "no part of the login is readable in the database: encrypted, not just encoded");
   assert.ok(stored.key_hash && !stored.key_hash.includes(KEY), "only a hash of the key is stored");
   const state = await body(await call(env, spotify, "GET", "status"));
-  assert.deepEqual([state.connected, state.state, state.name, state.share, state.queue], [true, "ok", "Tester", true, false]);
+  assert.deepEqual([state.connected, state.state, state.name, state.share, state.queue], [true, "ok", "Tester", true, true]);
   assert.ok(!JSON.stringify(state).includes("token"), "the answer carries no login");
 });
 
@@ -128,10 +128,10 @@ test("only the key that made a code may change it, and only from the site itself
   assert.equal((await login(env, spotify, {}, { key: "" })).status, 401, "no key");
   assert.equal((await call(env, spotify, "GET", "status", { key: "z".repeat(32) })).status, 403, "another key cannot read the log");
   assert.equal((await call(env, spotify, "GET", "status", { key: "" })).status, 401);
-  assert.equal((await call(env, spotify, "PUT", "settings", { key: "z".repeat(32), body: { queue: true } })).status, 403);
+  assert.equal((await call(env, spotify, "PUT", "settings", { key: "z".repeat(32), body: { queue: false } })).status, 403);
   assert.equal((await call(env, spotify, "DELETE", "login", { key: "z".repeat(32) })).status, 403);
   assert.equal((await call(env, spotify, "DELETE", "login", { origin: "https://evil.example" })).status, 403);
-  assert.equal(row(env).queue, 0, "none of that changed anything");
+  assert.equal(row(env).queue, 1, "none of that changed anything");
   assert.equal((await call(env, spotify, "POST", "login", { code: "short", body: {} })).status, 404);
   assert.equal((await call(env, spotify, "GET", "bogus")).status, 404);
   assert.equal((await call(env, spotify, "PATCH", "login")).status, 405);
@@ -209,7 +209,7 @@ test("with sharing off nothing is shown or kept, and turning it on again shows i
   const { env, spotify } = await connected();
   await nowPlaying(env, spotify, T0 + 1000);
   const off = await call(env, spotify, "PUT", "settings", { body: { share: false } });
-  assert.deepEqual(await off.json(), { ok: true, share: false, queue: false });
+  assert.deepEqual(await off.json(), { ok: true, share: false, queue: true });
   assert.equal(env.DB.raw.prepare("SELECT COUNT(*) AS n FROM nowplaying").get().n, 0, "the shown song was deleted");
   spotify.calls.length = 0;
   assert.equal((await nowPlaying(env, spotify, T0 + 9000)).status, 404);
@@ -278,7 +278,7 @@ test("when Spotify asks us to slow down, it is left alone for a while and the st
 // ── viewers' songs ──────────────────────────────────────────────────────────────────────────────────────────────────
 
 test("an !sr passed on by the overlay is ignored while the Spotify queue switch is off", async () => {
-  const { env, spotify } = await connected();
+  const { env, spotify } = await connected({ queue: false });
   const answer = await body(await ask(env, spotify, "levitating dua lipa"));
   assert.deepEqual(answer, { ok: true, ignored: "queue_off" });
   assert.equal(spotify.calls.length, 0, "Spotify was not asked");
@@ -339,7 +339,7 @@ test("the overlay's link cannot flood the queue: one add every 2 seconds, 200 an
 });
 
 test("a !next from the overlay skips only when the switch is on, and says so", async () => {
-  const { env, spotify } = await connected();
+  const { env, spotify } = await connected({ queue: false });
   const off = await body(await call(env, spotify, "POST", "next", { key: "", body: { name: "Mod" } }));
   assert.equal(off.ignored, "queue_off");
   assert.equal(spotify.calls.length, 0);
@@ -355,7 +355,7 @@ test("a !next from the overlay skips only when the switch is on, and says so", a
 });
 
 test("the editor's try-it box has the key: it only practices while the switch is off, and the overlay cannot ask for a practice", async () => {
-  const { env, spotify } = await connected();
+  const { env, spotify } = await connected({ queue: false });
   const practice = await body(await call(env, spotify, "POST", "request", { body: { query: "levitating", name: "Pretend viewer", test: true } }));
   assert.equal(practice.practice, true);
   assert.match(practice.entry.text, /\(Practice: not added to your queue\.\)/);

@@ -163,3 +163,74 @@ export function fakeCounterSource({ onViewers, onLike }, getPace = () => [600, 1
   timer = setTimeout(loop, 500);
   return { stop() { stopped = true; clearTimeout(timer); } };
 }
+
+// ── practice gifters & rotating labels ──────────────────────────────────────────────────────────────────────────────
+
+/** Starting entries for the Top Gifters demo overlay, close to a celebration milestone when reasonable. */
+export function demoGifters(platform = "tiktok", twitchMode = "subgift", every = 1000) {
+  if (platform === "twitch") {
+    const subsNear = twitchMode === "subgift" && every <= 100 ? Math.max(1, every - 1) : 12;
+    const bitsNear = twitchMode === "bits" ? Math.max(50, every - 50) : 1400;
+    return [
+      { user: "Pond Pal", name: "Pond Pal", avatar: "", subgifts: subsNear, bits: bitsNear },
+      { user: "Mochi Bun", name: "Mochi Bun", avatar: "", subgifts: 7, bits: 850 },
+      { user: "frogfan", name: "frogfan 🐸", avatar: "", subgifts: 5, bits: 500 },
+      { user: "Mattcha", name: "Mattcha", avatar: "", subgifts: 3, bits: 250 },
+      { user: "Little Lily", name: "Little Lily", avatar: "", subgifts: 1, bits: 100 },
+    ];
+  }
+  const base = Math.max(100, every);
+  return [["Pond Pal", base - 25], ["Mochi Bun", 0.68], ["frogfan 🐸", 0.45], ["Mattcha", 0.3], ["Little Lily", 0.16]]
+    .map(([name, share]) => ({ user: name, name, avatar: "", diamonds: share < 1 ? Math.round(base * share) : share }));
+}
+
+/** Periodically sends practice gift events (`gift` on TikTok, `subgift`/`bits` on Twitch). */
+export function fakeGifterSource(push, platform = "tiktok", getPace = () => [900, 1800], twitchMode = "subgift") {
+  let stopped = false;
+  let timer = 0;
+  const loop = () => {
+    if (stopped) return;
+    if (platform === "twitch") {
+      const kind = twitchMode === "bits" ? "bits" : twitchMode === "subgift" ? "subgift" : Math.random() < 0.55 ? "bits" : "subgift";
+      push(fakeAlert(kind, { size: 1 + Math.floor(Math.random() * 2) }));
+    } else {
+      push(fakeAlert("gift", { size: Math.random() < 0.7 ? 1 : 2 }));
+    }
+    const [lo, hi] = getPace();
+    timer = setTimeout(loop, lo + Math.random() * (hi - lo));
+  };
+  timer = setTimeout(loop, 400);
+  return { stop() { stopped = true; clearTimeout(timer); } };
+}
+
+/** Practice events seeded on load for /overlay/labels/?demo=1 so all enabled cards can rotate immediately. */
+export function demoLabelEvents(platform = "tiktok") {
+  if (platform === "twitch") {
+    return [
+      fakeAlert("subgift", { name: "Mochi Bun", size: 2 }),
+      fakeAlert("bits", { name: "Mattcha", size: 2 }),
+      fakeAlert("sub", { name: "Little Lily", resub: true }),
+      fakeAlert("follow", { name: "Pond Pal" }),
+    ];
+  }
+  return [
+    fakeAlert("gift", { name: "Mochi Bun", size: 2 }),
+    fakeAlert("follow", { name: "Pond Pal" }),
+  ];
+}
+
+/** Sends occasional practice events matching Rotating Highlights on TikTok or Twitch. */
+export function fakeLabelSource(push, platform = "tiktok", getPace = () => [2200, 4200]) {
+  const kinds = platform === "twitch" ? ["follow", "sub", "bits", "subgift"] : ["gift", "follow"];
+  let stopped = false;
+  let timer = 0;
+  const loop = () => {
+    if (stopped) return;
+    const kind = pick(kinds);
+    push(fakeAlert(kind, { resub: kind === "sub" && Math.random() < 0.45 }));
+    const [lo, hi] = getPace();
+    timer = setTimeout(loop, lo + Math.random() * (hi - lo));
+  };
+  timer = setTimeout(loop, 1400);
+  return { stop() { stopped = true; clearTimeout(timer); } };
+}

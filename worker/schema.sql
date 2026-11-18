@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS spotify_logins (
   state TEXT NOT NULL DEFAULT 'ok', -- ok, or expired when Spotify no longer accepts the login
   name TEXT NOT NULL DEFAULT '',    -- the Spotify account's display name, for "Connected as ..."
   share INTEGER NOT NULL DEFAULT 1, -- 1: the song playing is shown on the stream
-  queue INTEGER NOT NULL DEFAULT 0, -- 1: songs viewers ask for (!sr) are added to the streamer's Spotify queue
+  queue INTEGER NOT NULL DEFAULT 1, -- 1: songs viewers ask for (!sr) are added to the streamer's Spotify queue
   recent TEXT NOT NULL DEFAULT '[]', -- songs added lately, so one is not added twice in a row: [[uri, at], ...] (JSON)
   log TEXT NOT NULL DEFAULT '[]',    -- what happened lately, newest first, for the streamer to read: [{ at, state, text }, ...] (JSON)
   last_act INTEGER NOT NULL DEFAULT 0,   -- when a song was last added or skipped (ms since 1970)

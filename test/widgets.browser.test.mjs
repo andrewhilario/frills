@@ -194,13 +194,13 @@ test("overlays page: the live and beta ones link to their editors, and the comin
   const { base } = await withHelper();
   await page.goto(base + "/overlays/", { settle: 600 });
   const links = await page.evaluate(`[...document.querySelectorAll(".tool:not(.tool--soon) a.btn")].map((a) => a.getAttribute("href"))`);
-  assert.deepEqual(links, ["/editor/", "/alerts/", "/gifts/", "/goal/", "/likers/", "/counter/", "/timer/", "/tts/", "/editor/", "/songs/", "/songs/#spotify-step"], "the chat editor's Both is TikTok and Twitch chat together; the last two are song requests and its Spotify step");
+  assert.deepEqual(links, ["/editor/", "/alerts/", "/gifts/", "/jar/", "/goal/", "/likers/", "/gifters/", "/labels/", "/counter/", "/timer/", "/tts/", "/editor/", "/songs/", "/songs/#spotify-step"], "includes Gift jar, Top gifters, Rotating highlights, and Spotify step");
   const beta = await page.evaluate(`[...document.querySelectorAll(".tool:has(.tool__badge--beta) .subtitle")].map((t) => t.textContent)`);
-  assert.deepEqual(beta, ["Alerts", "Last gifts", "Goals", "Top likers", "Viewer and like counter", "Subathon timer", "Talking pet TTS", "TikTok and Twitch chat together", "Song requests", "Spotify player"], "it is marked Beta, like the others that are new");
+  assert.deepEqual(beta, ["Alerts", "Last gifts", "Gift jar", "Goals", "Top likers", "Top gifters", "Rotating highlights", "Viewer and like counter", "Subathon timer", "Talking pet TTS", "TikTok and Twitch chat together", "Song requests", "Spotify player"], "it is marked Beta, like the others that are new");
   const soon = await page.evaluate(`[...document.querySelectorAll("#coming-soon + ul .tool--soon")].map((t) => [t.querySelector(".subtitle").textContent, t.querySelectorAll("a").length])`);
-  assert.deepEqual(soon.map((s) => s[0]), ["Free sound library", "Like and subscriber alerts", "Actions", "Starting soon, Be right back and Stream ending screens", "Your own layout", "Pets that move", "Top gifters"]);
+  assert.deepEqual(soon.map((s) => s[0]), ["Free sound library", "Like and subscriber alerts", "Actions", "Starting soon, Be right back and Stream ending screens", "Your own layout", "Pets that move"]);
   assert.ok(soon.every((s) => s[1] === 0), "a coming-soon card links nowhere");
-  assert.equal(await page.evaluate(`document.querySelectorAll("#coming-soon + ul .tool__badge--soon").length`), 7);
+  assert.equal(await page.evaluate(`document.querySelectorAll("#coming-soon + ul .tool__badge--soon").length`), 6);
   const ideas = await page.evaluate(`[...document.querySelectorAll("#plus-ideas ~ ul .tool")].map((t) => [t.querySelector(".subtitle").textContent, t.querySelectorAll("a").length, t.querySelectorAll("button[data-plus]").length])`);
   assert.deepEqual(ideas.map((i) => i[0]), ["Change it while you are live", "A bigger sound and sticker kit", "One link for a whole scene", "Collector art packs"], "the paid-plan ideas are their own list, not coming-soon items");
   assert.ok(ideas.every((i) => i[1] === 0 && i[2] === 1), "each idea has its one button and links nowhere");
@@ -238,10 +238,26 @@ test("editor: the likers test buttons fill and re-order the ranking, and the lin
   await click('[data-test="clear"]');
   await until(async () => (await ranking()).length === 0, 3000);
   await type("#source-channel", "pond.pal");
+  await page.evaluate(`(() => { const s = document.getElementById("c-layout"); s.value = "glass"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+  assert.equal(await page.evaluate(`document.querySelector(".likers").dataset.layout`), "glass");
   const url = new URL(await page.evaluate(`document.getElementById("link").value`));
   assert.equal(url.pathname, "/overlay/likers/");
   assert.equal(url.searchParams.get("max"), "5");
+  assert.equal(url.searchParams.get("layout"), "glass");
   assert.ok(before);
+});
+
+test("overlay: top likers spotlight and compact designs apply cleanly with non-overlapping stacked rows", { skip }, async () => {
+  const { base, made } = await withHelper();
+  await page.goto(`${base}/overlay/likers/?channel=pond_cafe&platform=tiktok&layout=spotlight&max=3`, { settle: 800 });
+  await until(() => made.length === 1);
+  assert.equal(await page.evaluate(`document.querySelector(".likers").dataset.layout`), "spotlight");
+  made[0].emit("like", like("1", "Ann", 50));
+  made[0].emit("like", like("2", "Ben", 20));
+  await until(async () => (await ranking()).length === 2, 4000);
+  const boxes = await page.evaluate(`[...document.querySelectorAll(".liker:not(.liker--out)")].sort((a, b) => Number(a.dataset.rank) - Number(b.dataset.rank)).map((r) => r.getBoundingClientRect()).map((b) => ({ top: Math.round(b.top), bottom: Math.round(b.bottom) }))`);
+  assert.ok(boxes[1].top >= boxes[0].bottom, `Rank 2 top (${boxes[1].top}) must clear tall Spotlight Rank 1 bottom (${boxes[0].bottom})`);
+  assert.deepEqual(page.problems, [], page.problems.join(" | "));
 });
 
 // ── a like milestone ────────────────────────────────────────────────────────────────────────────────────────────────────

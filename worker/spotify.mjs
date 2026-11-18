@@ -214,7 +214,7 @@ async function login({ env, code, now, fetchImpl, request, keyHash }) {
   }
   const expires = Number(body.expires) || 0;
   const secret = await seal(env, code, { clientId, refresh, access: given && expires - now > 60000 ? given : "", expires: given ? expires : 0 });
-  await env.DB.prepare("INSERT INTO spotify_logins (code, key_hash, secret, state, created_at, used_at) VALUES (?, ?, ?, 'ok', ?, ?) ON CONFLICT(code) DO UPDATE SET secret = excluded.secret, state = 'ok', hold_until = 0, used_at = excluded.used_at")
+  await env.DB.prepare("INSERT INTO spotify_logins (code, key_hash, secret, state, queue, created_at, used_at) VALUES (?, ?, ?, 'ok', 1, ?, ?) ON CONFLICT(code) DO UPDATE SET secret = excluded.secret, state = 'ok', hold_until = 0, used_at = excluded.used_at")
     .bind(code, keyHash, secret, now, now).run();
   // prove the login works before saying yes (and learn whose it is): a person who is not on the app's allowlist is told now, not later
   const me = await spotify(env, await grab(env, code), "GET", "/me", { now, fetchImpl });
