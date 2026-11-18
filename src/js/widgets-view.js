@@ -245,6 +245,7 @@ const PARTY_WAITING = 3; // celebrations that can wait their turn; when more pil
  */
 function createLeaderboardView(host, { defaultUnit = "likes", formatRow = (p) => Number(p.count).toLocaleString("en-US") } = {}) {
   const root = el("div", { className: "likers" });
+  root.dataset.unit = defaultUnit;
   host.append(root);
   const title = el("p", { className: "likers__title" });
   const rows = el("div", { className: "likers__rows" });
@@ -330,10 +331,10 @@ function createLeaderboardView(host, { defaultUnit = "likes", formatRow = (p) =>
       }
       node.append(av);
     }
-    node.append(el("span", { className: "liker__name", textContent: person.name }));
     const count = el("span", { className: "liker__count" });
     count.hidden = !settings.showCounts;
-    node.append(count);
+    const info = el("div", { className: "liker__info" }, el("span", { className: "liker__name", textContent: person.name }), count);
+    node.append(info);
     rows.append(node);
     return { node, rank, count, shown: "", fresh: true };
   }

@@ -260,6 +260,39 @@ test("overlay: top likers spotlight and compact designs apply cleanly with non-o
   assert.deepEqual(page.problems, [], page.problems.join(" | "));
 });
 
+test("overlay: top likers stacked minimal puts the number of likes neatly under the name", { skip }, async () => {
+  const { base, made } = await withHelper();
+  await page.goto(`${base}/overlay/likers/?channel=pond_cafe&platform=tiktok&layout=stacked&max=3`, { settle: 800 });
+  await until(() => made.length === 1);
+  assert.equal(await page.evaluate(`document.querySelector(".likers").dataset.layout`), "stacked");
+  made[0].emit("like", like("1", "Ann", 120));
+  made[0].emit("like", like("2", "Ben", 45));
+  await until(async () => (await ranking()).length === 2, 4000);
+  const check = await page.evaluate(`(() => {
+    const rows = [...document.querySelectorAll(".liker:not(.liker--out)")].sort((a, b) => Number(a.dataset.rank) - Number(b.dataset.rank));
+    const r1 = rows[0];
+    const name = r1.querySelector(".liker__name").getBoundingClientRect();
+    const count = r1.querySelector(".liker__count").getBoundingClientRect();
+    const cs = getComputedStyle(r1);
+    return {
+      bg: cs.backgroundColor,
+      border: cs.borderTopWidth,
+      nameBottom: Math.round(name.bottom),
+      nameLeft: Math.round(name.left),
+      countTop: Math.round(count.top),
+      countLeft: Math.round(count.left),
+      r1Bottom: Math.round(r1.getBoundingClientRect().bottom),
+      r2Top: Math.round(rows[1].getBoundingClientRect().top),
+    };
+  })()`);
+  assert.equal(check.bg, "rgba(0, 0, 0, 0)", "stacked minimal has transparent background");
+  assert.equal(check.border, "0px", "stacked minimal has no card border");
+  assert.ok(check.countTop >= check.nameBottom - 2, `likes count (${check.countTop}) sits under name (${check.nameBottom})`);
+  assert.ok(Math.abs(check.countLeft - check.nameLeft) <= 3, `count aligns with name left edge (${check.countLeft} vs ${check.nameLeft})`);
+  assert.ok(check.r2Top >= check.r1Bottom, `row 2 (${check.r2Top}) clears taller stacked row 1 (${check.r1Bottom})`);
+  assert.deepEqual(page.problems, [], page.problems.join(" | "));
+});
+
 // ── a like milestone ────────────────────────────────────────────────────────────────────────────────────────────────────
 
 const party = () => page.evaluate(`(() => {

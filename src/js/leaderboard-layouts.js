@@ -10,4 +10,5 @@ export const LEADERBOARD_LAYOUTS = [
   ["shell", "Shell: retro terminal console"],
   ["kawaii", "Kawaii: double pastel border"],
   ["minimal", "Minimal: floating text only"],
+  ["stacked", "Stacked minimal: count under name"],
 ];
