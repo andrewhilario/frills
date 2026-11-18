@@ -272,6 +272,8 @@ test("overlay: top likers stacked minimal puts the number of likes neatly under 
     const rows = [...document.querySelectorAll(".liker:not(.liker--out)")].sort((a, b) => Number(a.dataset.rank) - Number(b.dataset.rank));
     const r1 = rows[0];
     const name = r1.querySelector(".liker__name").getBoundingClientRect();
+    const icon = r1.querySelector(".liker__icon").getBoundingClientRect();
+    const hasSvg = Boolean(r1.querySelector(".liker__icon svg"));
     const count = r1.querySelector(".liker__count").getBoundingClientRect();
     const cs = getComputedStyle(r1);
     return {
@@ -279,6 +281,9 @@ test("overlay: top likers stacked minimal puts the number of likes neatly under 
       border: cs.borderTopWidth,
       nameBottom: Math.round(name.bottom),
       nameLeft: Math.round(name.left),
+      iconVisible: icon.width > 4 && icon.height > 4 && hasSvg,
+      iconLeft: Math.round(icon.left),
+      iconTop: Math.round(icon.top),
       countTop: Math.round(count.top),
       countLeft: Math.round(count.left),
       r1Bottom: Math.round(r1.getBoundingClientRect().bottom),
@@ -287,8 +292,9 @@ test("overlay: top likers stacked minimal puts the number of likes neatly under 
   })()`);
   assert.equal(check.bg, "rgba(0, 0, 0, 0)", "stacked minimal has transparent background");
   assert.equal(check.border, "0px", "stacked minimal has no card border");
-  assert.ok(check.countTop >= check.nameBottom - 2, `likes count (${check.countTop}) sits under name (${check.nameBottom})`);
-  assert.ok(Math.abs(check.countLeft - check.nameLeft) <= 3, `count aligns with name left edge (${check.countLeft} vs ${check.nameLeft})`);
+  assert.equal(check.iconVisible, true, "stacked minimal shows heart icon beside the count");
+  assert.ok(check.iconTop >= check.nameBottom - 2 && check.countTop >= check.nameBottom - 2, `icon (${check.iconTop}) and count (${check.countTop}) sit under name (${check.nameBottom})`);
+  assert.ok(Math.abs(check.iconLeft - check.nameLeft) <= 3 && check.countLeft > check.iconLeft, `heart icon starts under name (${check.iconLeft} vs ${check.nameLeft}) before count (${check.countLeft})`);
   assert.ok(check.r2Top >= check.r1Bottom, `row 2 (${check.r2Top}) clears taller stacked row 1 (${check.r1Bottom})`);
   assert.deepEqual(page.problems, [], page.problems.join(" | "));
 });

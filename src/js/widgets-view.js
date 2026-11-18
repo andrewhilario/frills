@@ -332,11 +332,15 @@ function createLeaderboardView(host, { defaultUnit = "likes", formatRow = (p) =>
       node.append(av);
     }
     const count = el("span", { className: "liker__count" });
-    count.hidden = !settings.showCounts;
-    const info = el("div", { className: "liker__info" }, el("span", { className: "liker__name", textContent: person.name }), count);
+    const icon = el("span", { className: "liker__icon" });
+    icon.setAttribute("aria-hidden", "true");
+    icon.append(counterIcon(defaultUnit === "likes" ? "heart" : "gem"));
+    const stats = el("span", { className: "liker__stats" }, icon, count);
+    stats.hidden = !settings.showCounts;
+    const info = el("div", { className: "liker__info" }, el("span", { className: "liker__name", textContent: person.name }), stats);
     node.append(info);
     rows.append(node);
-    return { node, rank, count, shown: "", fresh: true };
+    return { node, rank, count, stats, shown: "", fresh: true };
   }
 
   return {
@@ -347,7 +351,7 @@ function createLeaderboardView(host, { defaultUnit = "likes", formatRow = (p) =>
       root.dataset.medals = String(next.medals);
       title.hidden = !next.title;
       title.textContent = next.titleText;
-      for (const n of nodes.values()) n.count.hidden = !next.showCounts;
+      for (const n of nodes.values()) n.stats.hidden = !next.showCounts;
       layout();
     },
     render(top) {
@@ -583,6 +587,7 @@ export function createSongsView(host) {
 const ICON_PATHS = {
   eye: ["M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"],
   heart: ["M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7Z"],
+  gem: ["M6 3h12l4 6-10 12L2 9Z"],
 };
 
 /** A small drawn picture (an eye, a heart): our own shapes, not anything a viewer wrote. */

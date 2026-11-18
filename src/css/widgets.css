@@ -146,6 +146,10 @@
 .liker__av--pic { color: transparent; }
 .liker__info { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 0.55em; }
 .liker__name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.liker__stats { flex: none; display: inline-flex; align-items: center; gap: 0.28em; }
+.liker__stats[hidden] { display: none; }
+.liker__icon { display: none; flex: none; align-items: center; justify-content: center; width: 0.9em; height: 0.9em; }
+.liker__icon svg { width: 100%; height: 100%; fill: currentColor; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; }
 .liker__count { flex: none; font-variant-numeric: tabular-nums; color: var(--a-pop, #f48); font-weight: 800; }
 .liker__count[hidden] { display: none; }
 .liker__count--bump { animation: seen-bump 400ms ease-out; }
@@ -860,14 +864,16 @@
 }
 .likers[data-layout="stacked"] .liker { align-items: center; }
 .likers[data-layout="stacked"] .liker__info {
-  flex-direction: column; align-items: flex-start; justify-content: center; gap: 0.12em;
+  flex-direction: column; align-items: flex-start; justify-content: center; gap: 0.14em;
 }
 .likers[data-layout="stacked"] .liker__name { flex: none; max-width: 100%; line-height: 1.15; }
-.likers[data-layout="stacked"] .liker__count {
-  font-size: 0.72em; line-height: 1.1; color: #ffe066; font-weight: 700; opacity: 0.92;
+.likers[data-layout="stacked"] .liker__stats { font-size: 0.74em; line-height: 1.1; }
+.likers[data-layout="stacked"] .liker__icon {
+  display: inline-flex; color: #ff5f86; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.85));
 }
-.likers[data-layout="stacked"][data-unit="likes"] .liker__count::after {
-  content: " likes"; font-weight: 600; opacity: 0.84;
+.likers[data-layout="stacked"][data-unit="diamonds"] .liker__icon { color: #67d8ff; }
+.likers[data-layout="stacked"] .liker__count {
+  color: #ffe066; font-weight: 700; opacity: 0.95;
 }
 .likers[data-layout="stacked"][data-align="center"] .liker__info {
   flex: 0 1 auto; align-items: center; text-align: center;
@@ -875,6 +881,7 @@
 .likers[data-layout="stacked"][data-align="right"] .liker__info {
   flex-direction: column; align-items: flex-end; text-align: right;
 }
+.likers[data-layout="stacked"][data-align="right"] .liker__stats { flex-direction: row-reverse; }
 
 @media (prefers-reduced-motion: reduce) {
   .tts__pet { transform: none; transition: none; }
