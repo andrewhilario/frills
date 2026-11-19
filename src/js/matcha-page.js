@@ -11,6 +11,7 @@ import { mountSource } from "./source.js";
 import { sourcesOf } from "./both.js";
 import { DEFAULTS as ALERT_DEFAULTS, LOOKS as ALERT_LOOKS, alertsUrl } from "./alerts-settings.js";
 import { appendPlusCode } from "./plus-relay.js";
+import { mountCloudSave } from "./cloud-save.js";
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -90,6 +91,7 @@ function refresh() {
   alertsCopy.disabled = !alertName;
   alertsHint.textContent = alertName ? "Paste it into a Browser source in your streaming app: 1080 wide by 1920 high for a vertical LIVE." : "Type your TikTok name above and the alerts link appears here.";
   hint.textContent = !ready ? (both ? "Type your TikTok name and your Twitch channel above and your link appears here." : "Type your TikTok name or Twitch channel above and your link appears here.") : (source.platform === "tiktok" || both) && !source.usesRelay ? "This link only works on this PC, while the Frills helper is running." : "";
+  cloud?.sync();
   save();
 }
 
@@ -191,6 +193,7 @@ alertsLink.addEventListener("focus", () => alertsLink.select());
 const copyBtn = $("copy-link");
 copyButton(copyBtn, () => link.value);
 link.addEventListener("focus", () => link.select());
+const cloud = mountCloudSave({ kind: "matcha", storeKey: STORE, anchor: link.closest(".linkfield") ?? hint, getUrl: () => link.value, defaultName: "Matcha chat" });
 source.onChange(refresh);
 
 fontsReady(matchaFaces(settings), 600).then(refresh);

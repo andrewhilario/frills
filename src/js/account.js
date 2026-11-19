@@ -3,6 +3,18 @@
 
 import { clearPlusCode, clearRelayTicketCache, savePlusCode, savedPlusCode } from "./plus-relay.js";
 
+const bindCopy = (btn, getText, label) => {
+  let reset = 0;
+  btn.addEventListener("click", async () => {
+    const text = getText();
+    if (!text) return;
+    try { await navigator.clipboard.writeText(text); } catch { return; }
+    btn.textContent = "Copied";
+    clearTimeout(reset);
+    reset = setTimeout(() => { btn.textContent = label; }, 1600);
+  });
+};
+
 const $ = (id) => document.getElementById(id);
 const post = (action, body = {}) =>
   fetch(`/api/account/${action}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), credentials: "same-origin" }).then(async (res) => ({ ok: res.ok, status: res.status, body: await res.json().catch(() => ({})) }));
@@ -171,6 +183,106 @@ if ($("acct-form")) {
         $("acct-code-make").textContent = mine || me.overlayLink ? "Make a new code" : "Activate on this browser";
         $("acct-code-off").hidden = !(mine || me.overlayLink);
       }
+    }
+    loadCloudOverlays(Boolean(me.plus?.active));
+  };
+
+  // Saved live-updating cloud overlays (/o/<id>) managed on /account/
+  const loadCloudOverlays = async (plusOn) => {
+    const section = $("acct-cloud");
+    const list = $("acct-cloud-list");
+    const count = $("acct-cloud-count");
+    const note = $("acct-cloud-status");
+    if (!section || !list) return;
+    try {
+      const res = await fetch("/api/cloud-overlays", { credentials: "same-origin", cache: "no-store" });
+      if (!res.ok) { section.hidden = true; return; }
+      const data = await res.json();
+      const items = Array.isArray(data?.overlays) ? data.overlays : [];
+      section.hidden = !plusOn && !items.length;
+      if (section.hidden) return;
+      if (count) {
+        count.hidden = false;
+        count.textContent = `${items.length} / ${data.limit ?? 50}`;
+      }
+      list.replaceChildren();
+      if (!items.length) {
+        const empty = document.createElement("li");
+        empty.className = "form__hint";
+        empty.textContent = "No live cloud overlays saved yet. Open any editor above, type your channel name, and press Create live link.";
+        list.append(empty);
+        return;
+      }
+      for (const item of items) {
+        const li = document.createElement("li");
+        li.className = "acct-cloud__item";
+
+        const top = document.createElement("div");
+        top.className = "acct-cloud__top";
+        const name = document.createElement("span");
+        name.className = "acct-cloud__name";
+        name.textContent = item.name;
+        const kind = document.createElement("span");
+        kind.className = "acct-badge";
+        kind.textContent = item.label || item.kind;
+        const ver = document.createElement("span");
+        ver.className = "acct-cloud__meta";
+        ver.textContent = `v${item.version}`;
+        top.append(name, kind, ver);
+
+        const urlText = document.createElement("code");
+        urlText.className = "acct-cloud__url";
+        urlText.textContent = item.liveUrl;
+
+        const actions = document.createElement("div");
+        actions.className = "acct-row";
+        const copy = document.createElement("button");
+        copy.type = "button";
+        copy.className = "btn btn--sm";
+        copy.textContent = "Copy live link";
+        bindCopy(copy, () => item.liveUrl, "Copy live link");
+
+        const edit = document.createElement("a");
+        edit.className = "btn btn--outline btn--sm";
+        edit.href = item.editUrl;
+        edit.textContent = "Edit";
+
+        const del = document.createElement("button");
+        del.type = "button";
+        del.className = "btn btn--outline btn--sm acct-cloud__del";
+        del.textContent = "Delete";
+        del.addEventListener("click", async () => {
+          if (del.dataset.armed !== "1") {
+            del.dataset.armed = "1";
+            del.textContent = "Confirm delete";
+            return;
+          }
+          del.disabled = true;
+          note.dataset.state = "";
+          note.textContent = "Deleting…";
+          try {
+            const delRes = await fetch(`/api/cloud-overlays/${item.id}`, { method: "DELETE", credentials: "same-origin" });
+            if (delRes.ok) {
+              note.textContent = `Deleted “${item.name}”.`;
+              loadCloudOverlays(plusOn);
+            } else {
+              note.dataset.state = "error";
+              note.textContent = "Could not delete that overlay. Please try again.";
+              del.disabled = false;
+            }
+          } catch {
+            note.dataset.state = "error";
+            note.textContent = "Could not reach Frills. Please try again.";
+            del.disabled = false;
+          }
+        });
+
+        actions.append(copy, edit, del);
+        li.append(top, urlText, actions);
+        list.append(li);
+      }
+    } catch {
+      section.hidden = true;
     }
   };
 

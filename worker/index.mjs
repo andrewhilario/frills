@@ -15,6 +15,7 @@ import { sweep } from "./accounts.mjs";
 import { handlePlusWebhook } from "./plus-webhook.mjs";
 import { handlePolarWebhook } from "./polar.mjs";
 import { handlePlusRelayTicket } from "./plus-relay.mjs";
+import { cloudHostIdFromPath, handleCloudOverlays } from "./cloud-overlays.mjs";
 import { checkProRegion, handleProStatus } from "./region.mjs";
 import { handleDevPass, handleTts } from "./tts.mjs";
 import { countOverlay, handleEvent } from "./stats.mjs";
@@ -37,6 +38,20 @@ export default {
     if (pathname === "/api/pro/status") return handleProStatus(request, env);
     if (pathname === "/api/pro/dev-pass") return handleDevPass(request, env);
     if (pathname === "/api/plus/relay-ticket") return handlePlusRelayTicket(request, env);
+    if (pathname === "/api/cloud-overlays" || pathname.startsWith("/api/cloud-overlays/") || pathname.startsWith("/api/o/")) {
+      return handleCloudOverlays(request, env);
+    }
+    if (pathname === "/o" || pathname.startsWith("/o/")) {
+      if (!cloudHostIdFromPath(pathname)) {
+        const notFound = await env.ASSETS.fetch(new Request(new URL("/404.html", request.url), { method: "GET" }));
+        return new Response(request.method === "HEAD" ? null : notFound.body, { status: 404, headers: { ...Object.fromEntries(notFound.headers), "cache-control": "no-store" } });
+      }
+      const res = await env.ASSETS.fetch(new Request(new URL("/o/index.html", request.url), { method: "GET" }));
+      const headers = new Headers(res.headers);
+      headers.set("cache-control", "no-store");
+      headers.set("x-robots-tag", "noindex, nofollow");
+      return new Response(request.method === "HEAD" ? null : res.body, { status: res.status, statusText: res.statusText, headers });
+    }
     if (pathname === "/api/webhooks/lemonsqueezy") return handlePlusWebhook(request, env);
     if (pathname === "/api/webhooks/polar") return handlePolarWebhook(request, env);
     if (pathname === "/api/tts") return handleTts(request, env);

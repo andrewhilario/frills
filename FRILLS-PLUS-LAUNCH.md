@@ -55,6 +55,19 @@ CREATE TABLE IF NOT EXISTS overlay_links (
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS overlay_links_account ON overlay_links (account_id, kind);
+
+CREATE TABLE IF NOT EXISTS cloud_overlays (
+  id TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  name TEXT NOT NULL,
+  path TEXT NOT NULL,
+  query TEXT NOT NULL,
+  version INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS cloud_overlays_account ON cloud_overlays (account_id, updated_at);
 ```
 
 *(If an older `plus` table already existed without `order_ref`, run `ALTER TABLE plus ADD COLUMN order_ref TEXT NOT NULL DEFAULT '';`.)*

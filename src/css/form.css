@@ -54,6 +54,13 @@
 .acct-sub { display: grid; gap: var(--space-xs); margin-top: var(--space-sm); padding-top: var(--space-md); border-top: 2px dashed var(--color-rule-2); }
 .acct-sub > * { margin: 0; min-width: 0; }
 .acct-sub__title { font-size: var(--text-base); font-weight: 750; }
+.acct-cloud__list { display: grid; gap: var(--space-sm); margin: 0; padding: 0; list-style: none; }
+.acct-cloud__item { display: grid; gap: var(--space-xs); padding: var(--space-sm) var(--space-md); border-radius: var(--radius-input); background: var(--color-paper-2); border: 1.5px solid var(--color-rule-2); }
+.acct-cloud__top { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs); }
+.acct-cloud__name { font-weight: 750; font-size: var(--text-base); }
+.acct-cloud__meta { font-family: var(--font-label); font-size: var(--text-xs); color: var(--color-ink-2); }
+.acct-cloud__url { font-family: var(--font-label); font-size: var(--text-xs); color: var(--color-ink-2); overflow-wrap: anywhere; }
+.acct-cloud__del[data-armed="1"] { color: var(--color-error); border-color: var(--color-error); }
 
 /* Frills Plus plan summary card on /plus/ */
 .plus-card { display: grid; gap: var(--space-md); max-width: 40rem; margin: 0 0 var(--space-xl); padding: var(--space-lg); background: var(--color-paper); border: 2px solid var(--color-ink); border-radius: var(--radius-card); box-shadow: var(--shadow-soft); }

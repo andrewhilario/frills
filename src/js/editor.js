@@ -8,6 +8,7 @@ import { fontsReady, generalFaces, paintGeneral } from "./look.js";
 import { buildControl, chips, copyButton } from "./ui.js";
 import { mountSource } from "./source.js";
 import { appendPlusCode } from "./plus-relay.js";
+import { mountCloudSave } from "./cloud-save.js";
 import { sourcesOf } from "./both.js";
 import { luminance } from "./color.js";
 
@@ -117,6 +118,7 @@ const linkInput = $("link");
 const copyBtn = $("copy-link");
 const linkHint = $("link-hint");
 copyButton(copyBtn, () => linkInput.value);
+const cloud = mountCloudSave({ kind: "chat", storeKey: STORE, anchor: linkInput.closest(".linkfield"), getUrl: () => linkInput.value, defaultName: "Main chat" });
 
 function refreshLink() {
   const both = source.platform === "both";
@@ -126,11 +128,13 @@ function refreshLink() {
     linkInput.value = "";
     copyBtn.disabled = true;
     linkHint.textContent = both ? "Your link appears here once you have typed your TikTok name and your Twitch channel in step 2." : "Your link appears here once you have typed your TikTok name or Twitch channel in step 2.";
+    cloud.sync();
     return;
   }
   const rawUrl = overlayUrl(`${location.origin}/overlay/`, { channel, settings, platform: source.platform, both: names });
   linkInput.value = source.platform === "tiktok" || both ? appendPlusCode(rawUrl) : rawUrl;
   copyBtn.disabled = false;
+  cloud.sync();
   // Through the site’s relay a link works anywhere. A link made with the helper points at the helper on this PC, so it only works here.
   linkHint.replaceChildren((source.platform === "tiktok" || source.platform === "both") && !source.usesRelay ? "Paste it into a Browser source in your streaming app on this PC. It only works while the Frills helper is running. " : "Paste it into a Browser source in your streaming app. ");
   const guide = document.createElement("a");

@@ -146,3 +146,17 @@ CREATE TABLE IF NOT EXISTS overlay_links (
   created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS overlay_links_account ON overlay_links (account_id, kind);
+
+-- Frills Plus live-updating cloud overlays (/o/<id>): permanent OBS URLs whose saved query settings update live without re-pasting links. Run this part once.
+CREATE TABLE IF NOT EXISTS cloud_overlays (
+  id TEXT PRIMARY KEY,           -- 12-char URL-safe random token
+  account_id TEXT NOT NULL,
+  kind TEXT NOT NULL,            -- chat, matcha, alerts, gifts, jar, goal, likers, gifters, labels, counter, timer, songs, tts
+  name TEXT NOT NULL,            -- user-given preset label (1..60 chars)
+  path TEXT NOT NULL,            -- validated server-side overlay path (e.g. /overlay/, /overlay/alerts/)
+  query TEXT NOT NULL,           -- validated query string without leading "?"
+  version INTEGER NOT NULL DEFAULT 1, -- increments on every save so OBS refreshes live automatically
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS cloud_overlays_account ON cloud_overlays (account_id, updated_at);

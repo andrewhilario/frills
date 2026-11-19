@@ -28,7 +28,7 @@ const assetOf = (html, kind) => (new RegExp(`${kind === "css" ? 'href="(/assets/
 test("the pages we expect are all there", () => {
   const urls = pages.map((p) => p.url).sort();
   const base = ["/","/404.html","/admin/", "/admin/stats/","/alerts/","/changelog/","/check/","/counter/","/editor/","/feedback/","/gifters/","/gifts/","/goal/","/guides/alerts/","/guides/both/","/guides/live-studio/","/guides/not-showing/","/guides/obs/","/guides/setup/","/guides/sizes/","/guides/songs/","/guides/test/","/guides/tiktok/","/jar/","/labels/","/likers/","/looks/","/looks/bunny-cloud/","/looks/frog-pond/","/looks/hamster-burrow/","/looks/neko-cafe/","/matcha/","/matcha/alerts/","/overlay/","/overlay/alerts/","/overlay/counter/","/overlay/gifters/","/overlay/gifts/","/overlay/goal/","/overlay/jar/","/overlay/labels/","/overlay/likers/","/overlay/songs/","/overlay/timer/","/overlay/tts/","/overlays/","/overlays/faq/","/privacy/","/songs/","/spotify/","/spotify/callback/","/start/","/timer/","/tts/","/twitch/","/twitch/callback/"];
-  const expected = site.plusAccounts ? [...base, "/account/", "/account/verify/", "/plus/"].sort() : base;
+  const expected = site.plusAccounts ? [...base, "/account/", "/account/verify/", "/o/", "/plus/"].sort() : base;
   assert.deepEqual(urls, expected);
 });
 

@@ -20,6 +20,7 @@ import { handleAccount } from "../worker/account-routes.mjs";
 import { handlePlusWebhook } from "../worker/plus-webhook.mjs";
 import { handlePolarWebhook } from "../worker/polar.mjs";
 import { handlePlusRelayTicket } from "../worker/plus-relay.mjs";
+import { cloudHostIdFromPath, handleCloudOverlays } from "../worker/cloud-overlays.mjs";
 import { handleProStatus } from "../worker/region.mjs";
 import { handleDevPass, handleTts } from "../worker/tts.mjs";
 
@@ -111,6 +112,19 @@ createServer(async (req, res) => {
     const response = await handler(new Request(`http://${req.headers.host}${req.url}`, { method: req.method, headers: req.headers, body: ["GET", "HEAD"].includes(req.method) ? undefined : Buffer.concat(chunks) }), env);
     res.writeHead(response.status, Object.fromEntries(response.headers));
     res.end(Buffer.from(await response.arrayBuffer()));
+    return;
+  }
+  if (path === "/api/cloud-overlays" || path.startsWith("/api/cloud-overlays/") || path.startsWith("/api/o/")) {
+    const chunks = [];
+    for await (const chunk of req) chunks.push(chunk);
+    const response = await handleCloudOverlays(new Request(`http://${req.headers.host}${req.url}`, { method: req.method, headers: req.headers, body: ["GET", "HEAD"].includes(req.method) ? undefined : Buffer.concat(chunks) }), env);
+    res.writeHead(response.status, Object.fromEntries(response.headers));
+    res.end(Buffer.from(await response.arrayBuffer()));
+    return;
+  }
+  if (cloudHostIdFromPath(path)) {
+    req.url = "/o/index.html";
+    serveFiles(req, res);
     return;
   }
   if (path === "/api/pro/status" || path === "/api/pro/dev-pass" || path === "/api/plus/relay-ticket" || path === "/api/tts") {

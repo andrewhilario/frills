@@ -10,6 +10,7 @@ import { luminance } from "./color.js";
 import { mountMediaPicker } from "./alerts-media.js";
 import { acceptInfo } from "./info.js";
 import { appendPlusCode } from "./plus-relay.js";
+import { mountCloudSave } from "./cloud-save.js";
 
 const $ = (id) => document.getElementById(id);
 const CANVASES = { vertical: [1080, 1920], landscape: [1920, 1080], square: [1080, 1080] };
@@ -134,6 +135,8 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
   const linkInput = $("link");
   const copyBtn = $("copy-link");
   copyButton(copyBtn, () => linkInput.value);
+  const cloudKind = String(overlayPath ?? "").replace(/^\/overlay\/|\/+$/g, "");
+  const cloud = cloudKind ? mountCloudSave({ kind: cloudKind, storeKey, anchor: linkInput.closest(".linkfield"), getUrl: () => linkInput.value, defaultName: `My ${cloudKind} overlay` }) : { sync() {} };
   function refreshLink() {
     const channel = source.cleanChannel();
     const platform = source.platform;
@@ -143,6 +146,7 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
       $("link-hint").textContent = platforms.length > 1
         ? "Your link appears here once you have typed your name in step 3."
         : "Your link appears here once you have typed your TikTok name in step 3.";
+      cloud.sync();
       return;
     }
     let nextUrl = widget.url(`${location.origin}${overlayPath}`, { channel, platform, settings });
@@ -156,6 +160,7 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
     if (platform === "tiktok") nextUrl = appendPlusCode(nextUrl);
     linkInput.value = nextUrl;
     copyBtn.disabled = false;
+    cloud.sync();
     $("link-hint").textContent = "Paste it into a Browser source in your streaming app. For a vertical LIVE use 1080 wide by 1920 high.";
   }
   linkInput.addEventListener("focus", () => linkInput.select());

@@ -134,6 +134,7 @@ export async function deleteAccount(db, accountId) {
   await db.prepare("DELETE FROM sessions WHERE account_id = ?").bind(String(accountId)).run();
   await db.prepare("DELETE FROM plus WHERE account_id = ?").bind(String(accountId)).run();
   await db.prepare("DELETE FROM overlay_links WHERE account_id = ?").bind(String(accountId)).run();
+  try { await db.prepare("DELETE FROM cloud_overlays WHERE account_id = ?").bind(String(accountId)).run(); } catch { /* older DBs before cloud_overlays migration */ }
   await db.prepare("DELETE FROM login_links WHERE email = ?").bind(account.email).run();
   await db.prepare("DELETE FROM accounts WHERE id = ?").bind(String(accountId)).run();
   return true;

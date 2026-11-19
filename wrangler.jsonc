@@ -12,7 +12,7 @@
     "directory": "./dist",
     "binding": "ASSETS",
     "not_found_handling": "404-page",
-    "run_worker_first": ["/api/*", "/overlay", "/overlay/*", "/plus", "/plus/*", "/account", "/account/*"]
+    "run_worker_first": ["/api/*", "/overlay", "/overlay/*", "/o", "/o/*", "/plus", "/plus/*", "/account", "/account/*"]
   },
   // Anonymous counts (src/js/stats-events.js, worker/stats.mjs) go to this Workers Analytics Engine dataset; Cloudflare keeps them for three months. The account has to have
   // switched Analytics Engine on once (valwidgets.live's counter already needed that). Without the binding the counter checks each event and drops it (it answers

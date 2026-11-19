@@ -13,6 +13,7 @@ import { fontsReady, generalFaces } from "./look.js";
 import { luminance } from "./color.js";
 import { mountFollowBox } from "./twitch-follow-box.js";
 import { appendPlusCode } from "./plus-relay.js";
+import { mountCloudSave } from "./cloud-save.js";
 
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
@@ -199,6 +200,7 @@ const linkInput = $("link");
 const copyBtn = $("copy-link");
 const linkHint = $("link-hint");
 copyButton(copyBtn, () => linkInput.value);
+const cloud = mountCloudSave({ kind: "alerts", storeKey: STORE, anchor: linkInput.closest(".linkfield"), getUrl: () => linkInput.value, defaultName: "Stream alerts" });
 
 function refreshLink() {
   const channel = source.cleanChannel();
@@ -206,11 +208,13 @@ function refreshLink() {
     linkInput.value = "";
     copyBtn.disabled = true;
     linkHint.textContent = "Your link appears here once you have typed your name in step 4.";
+    cloud.sync();
     return;
   }
   const rawUrl = alertsUrl(`${location.origin}/overlay/alerts/`, { channel, settings, platform, follows: followBox.codeFor(platform) });
   linkInput.value = platform === "tiktok" ? appendPlusCode(rawUrl) : rawUrl;
   copyBtn.disabled = false;
+  cloud.sync();
   linkHint.replaceChildren("Paste it into a Browser source in your streaming app, next to your chat. For a vertical LIVE use 1080 wide by 1920 high. ");
   const guide = document.createElement("a");
   guide.href = "/guides/alerts/";
