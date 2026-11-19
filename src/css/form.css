@@ -51,3 +51,17 @@
 .acct-danger__body > * { margin: 0; min-width: 0; }
 .acct-danger__go:not(:disabled) { color: var(--color-error); }
 .acct-danger input { width: 100%; }
+.acct-sub { display: grid; gap: var(--space-xs); margin-top: var(--space-sm); padding-top: var(--space-md); border-top: 2px dashed var(--color-rule-2); }
+.acct-sub > * { margin: 0; min-width: 0; }
+.acct-sub__title { font-size: var(--text-base); font-weight: 750; }
+
+/* Frills Plus plan summary card on /plus/ */
+.plus-card { display: grid; gap: var(--space-md); max-width: 40rem; margin: 0 0 var(--space-xl); padding: var(--space-lg); background: var(--color-paper); border: 2px solid var(--color-ink); border-radius: var(--radius-card); box-shadow: var(--shadow-soft); }
+.plus-card > * { margin: 0; min-width: 0; }
+.plus-card__top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-xs) var(--space-md); }
+.plus-card__price { display: flex; align-items: baseline; gap: var(--space-2xs); font-size: var(--text-xl); font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.plus-card__per { font-size: var(--text-sm); font-weight: 600; color: var(--color-ink-2); letter-spacing: 0; }
+.plus-card__meta { font-size: var(--text-sm); color: var(--color-ink-2); }
+.plus-card__list { display: grid; gap: var(--space-xs); margin: 0; padding-left: 1.25rem; }
+.plus-card__list li { margin: 0; }
+.plus-card__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); padding-top: var(--space-2xs); }

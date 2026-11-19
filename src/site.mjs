@@ -19,6 +19,8 @@ export const site = {
   helperUrl: pick("HELPER_URL", "helperUrl"),
   // The shared relay that lets TikTok chat work without installing anything (a capped free beta). Empty means there is none.
   relayUrl: pick("RELAY_URL", "relayUrl").replace(/\/+$/, ""),
+  // Dedicated DigitalOcean relay for Frills Plus subscribers (ticket-authenticated). Empty means none.
+  plusRelayUrl: pick("PLUS_RELAY_URL", "plusRelayUrl").replace(/\/+$/, ""),
   // The code Google Search Console asks for to prove the site is yours (a public tag, not a secret). Empty means no tag.
   googleSiteVerification: pick("GOOGLE_SITE_VERIFICATION", "googleSiteVerification"),
   // The Client ID of the Spotify app used by the private /spotify/ test page. It is public by design (the login uses no secret). Empty means no Spotify.
@@ -42,7 +44,7 @@ export function checkSite() {
   if (site.googleSiteVerification && !/^[A-Za-z0-9_-]{20,100}$/.test(site.googleSiteVerification)) problems.push("googleSiteVerification must be just the code from Google Search Console (letters, numbers, - and _)");
   if (site.spotifyClientId && !/^[a-f0-9]{32}$/.test(site.spotifyClientId)) problems.push("spotifyClientId must be the 32-character Client ID from the Spotify dashboard");
   if (site.twitchClientId && !/^[a-z0-9]{20,40}$/.test(site.twitchClientId)) problems.push("twitchClientId must be the Client ID from the Twitch developer console (lowercase letters and numbers)");
-  for (const [name, value] of [["feedbackUrl", site.feedbackForm ? "" : site.feedbackUrl], ["waitlistUrl", site.waitlistUrl], ["helperUrl", site.helperUrl], ["relayUrl", site.relayUrl]]) {
+  for (const [name, value] of [["feedbackUrl", site.feedbackForm ? "" : site.feedbackUrl], ["waitlistUrl", site.waitlistUrl], ["helperUrl", site.helperUrl], ["relayUrl", site.relayUrl], ["plusRelayUrl", site.plusRelayUrl]]) {
     if (value && !/^https:\/\//.test(value)) problems.push(`${name} must start with https://`);
   }
   return problems;

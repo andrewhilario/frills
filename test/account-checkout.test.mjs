@@ -103,3 +103,29 @@ test("someone who already has Plus is not sent to pay again; one whose Plus was 
   put("canceled");
   assert.equal((await call(env, "checkout", { cookie, now: T0 + 5000 })).status, 200);
 });
+
+test("checkout respects Tier-1 region gating on Cloudflare and allows owner IPs listed in PRO_ALLOW_IPS", async () => {
+  const env = fresh({ LEMON_CHECKOUT_URL: STORE, PRO_ALLOW_IPS: "198.51.100.42" });
+  const cookie = await signedIn(env);
+  const reqWithCf = (action, method, country, ip) => {
+    const r = new Request(`${SITE}/api/account/${action}`, {
+      method,
+      headers: { origin: SITE, cookie, "content-type": "application/json", "cf-connecting-ip": ip },
+      body: method === "GET" ? undefined : "{}",
+    });
+    Object.defineProperty(r, "cf", { value: { country }, configurable: true });
+    return r;
+  };
+
+  // Non-Tier-1 visitor whose IP is not allowlisted cannot start checkout
+  const blockedMe = await (await handleAccount(reqWithCf("me", "GET", "PH", "198.51.100.99"), env, { now: T0 + 5000 })).json();
+  assert.equal(blockedMe.checkout, false);
+  const blockedPay = await handleAccount(reqWithCf("checkout", "POST", "PH", "198.51.100.99"), env, { now: T0 + 5000 });
+  assert.deepEqual([blockedPay.status, (await blockedPay.json()).error], [403, "region_unavailable"]);
+
+  // Owner in PH whose IP is in PRO_ALLOW_IPS can see checkout and open Lemon Squeezy
+  const allowedMe = await (await handleAccount(reqWithCf("me", "GET", "PH", "198.51.100.42"), env, { now: T0 + 5000 })).json();
+  assert.equal(allowedMe.checkout, true);
+  const allowedPay = await handleAccount(reqWithCf("checkout", "POST", "PH", "198.51.100.42"), env, { now: T0 + 5000 });
+  assert.equal(allowedPay.status, 200);
+});

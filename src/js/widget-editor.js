@@ -9,6 +9,7 @@ import { fontsReady, generalFaces } from "./look.js";
 import { luminance } from "./color.js";
 import { mountMediaPicker } from "./alerts-media.js";
 import { acceptInfo } from "./info.js";
+import { appendPlusCode } from "./plus-relay.js";
 
 const $ = (id) => document.getElementById(id);
 const CANVASES = { vertical: [1080, 1920], landscape: [1920, 1080], square: [1080, 1080] };
@@ -152,6 +153,7 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
       }
       nextUrl = parsed.toString();
     }
+    if (platform === "tiktok") nextUrl = appendPlusCode(nextUrl);
     linkInput.value = nextUrl;
     copyBtn.disabled = false;
     $("link-hint").textContent = "Paste it into a Browser source in your streaming app. For a vertical LIVE use 1080 wide by 1920 high.";

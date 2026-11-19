@@ -17,7 +17,9 @@ import { LIMITS, createLoginLink, deleteAccount, endAllSessions, endSession, get
 import { getMailer, signInMessage } from "./mailer.mjs";
 import { checkoutLink, checkoutReady } from "./checkout.mjs";
 import { portalLink, portalReady } from "./portal.mjs";
+import { createPolarCheckout, createPolarPortal, polarCheckoutReady, polarIsSandbox, polarPortalReady } from "./polar.mjs";
 import { endOverlayLink, hasOverlayLink, makeOverlayLink } from "./overlay-links.mjs";
+import { checkProRegion } from "./region.mjs";
 
 export const COOKIE = "frills_session";
 const MAX_BODY = 512;
@@ -42,6 +44,22 @@ const readBody = async (request) => {
   try { const body = JSON.parse(text); return body && typeof body === "object" ? { body } : {}; } catch { return {}; }
 };
 
+const regionAllowed = (request, env) => {
+  const hasCfCountry = typeof request.cf?.country === "string" && /^[A-Za-z]{2}$/.test(request.cf.country.trim());
+  const hasDevSim = Boolean(env?.DEV && (request.headers.get("x-frills-country") || new URL(request.url).searchParams.get("country")));
+  if (!hasCfCountry && !hasDevSim) return true;
+  return checkProRegion(request, env).eligible;
+};
+
+/** While POLAR_SANDBOX=1 on real Cloudflare traffic, lock Sandbox checkout to owner IPs / dev overrides so public visitors cannot check out with test cards. */
+const sandboxCheckoutBlocked = (request, env) => {
+  if (!polarIsSandbox(env) || env?.DEV) return false;
+  const hasCfCountry = typeof request.cf?.country === "string" && /^[A-Za-z]{2}$/.test(request.cf.country.trim());
+  if (!hasCfCountry) return false;
+  const { reason } = checkProRegion(request, env);
+  return reason !== "allowed_ip" && reason !== "dev_override" && reason !== "local_dev";
+};
+
 export async function handleAccount(request, env, { now = Date.now(), mailer = null, fetchFn = globalThis.fetch } = {}) {
   const url = new URL(request.url);
   const action = url.pathname.split("/").filter(Boolean)[2] ?? "";
@@ -60,8 +78,8 @@ export async function handleAccount(request, env, { now = Date.now(), mailer = n
         ok: true,
         signedIn: true,
         email: who.email,
-        checkout: checkoutReady(env.LEMON_CHECKOUT_URL, Boolean(env.DEV)),
-        portal: portalReady(env),
+        checkout: (polarCheckoutReady(env) || checkoutReady(env.LEMON_CHECKOUT_URL, Boolean(env.DEV))) && regionAllowed(request, env) && !sandboxCheckoutBlocked(request, env),
+        portal: polarPortalReady(env) || portalReady(env),
         overlayLink: await hasOverlayLink(db, who.accountId),
         plus: plus ? { status: plus.status, active: plusActive(plus, now), renewsAt: plus.renews_at, used: plus.tts_used, limit: plus.tts_limit } : null,
       });
@@ -79,6 +97,22 @@ export async function handleAccount(request, env, { now = Date.now(), mailer = n
       if (!who) return json(401, { ok: false, error: "sign_in_first" });
       const plus = await getPlus(db, who.accountId);
       if (plusActive(plus, now)) return json(409, { ok: false, error: "already_plus" });
+      if (!regionAllowed(request, env)) return json(403, { ok: false, error: "region_unavailable" });
+      if (sandboxCheckoutBlocked(request, env)) return json(503, { ok: false, error: "checkout_off" });
+      if (polarCheckoutReady(env)) {
+        const site = String(env.SITE_URL ?? url.origin).replace(/\/+$/, "");
+        const created = await createPolarCheckout(env, {
+          email: who.email,
+          accountId: who.accountId,
+          successUrl: `${site}/account/?welcome=1&checkout_id={CHECKOUT_ID}`,
+          returnUrl: `${site}/account/`,
+        }, fetchFn);
+        if (!created.ok) {
+          const extra = Number.isFinite(created.providerStatus) ? { "x-provider-status": String(created.providerStatus) } : {};
+          return json(created.error === "checkout_off" ? 503 : 502, { ok: false, error: created.error }, extra);
+        }
+        return json(200, { ok: true, url: created.url });
+      }
       const link = checkoutLink(env.LEMON_CHECKOUT_URL, { email: who.email, accountId: who.accountId }, { dev: Boolean(env.DEV) });
       if (!link) return json(503, { ok: false, error: "checkout_off" });
       return json(200, { ok: true, url: link });
@@ -101,8 +135,14 @@ export async function handleAccount(request, env, { now = Date.now(), mailer = n
       if (action === "portal") {
         const plus = await getPlus(db, who.accountId);
         if (!plus?.provider_ref) return json(404, { ok: false, error: "no_subscription" });
-        const link = await portalLink(env, plus.provider_ref, fetchFn);
-        if (!link.ok) return json(link.error === "portal_off" ? 503 : 502, { ok: false, error: link.error });
+        const site = String(env.SITE_URL ?? url.origin).replace(/\/+$/, "");
+        const link = polarPortalReady(env)
+          ? await createPolarPortal(env, { accountId: who.accountId, returnUrl: `${site}/account/` }, fetchFn)
+          : await portalLink(env, plus.provider_ref, fetchFn);
+        if (!link.ok) {
+          const extra = Number.isFinite(link.providerStatus) ? { "x-provider-status": String(link.providerStatus) } : {};
+          return json(link.error === "portal_off" ? 503 : 502, { ok: false, error: link.error }, extra);
+        }
         return json(200, { ok: true, url: link.url });
       }
 
@@ -126,9 +166,10 @@ export async function handleAccount(request, env, { now = Date.now(), mailer = n
     if (!body) return json(400, { ok: false, error: "bad_data" });
 
     if (action === "login") {
+      if (!regionAllowed(request, env)) return json(403, { ok: false, error: "region_unavailable" });
       const email = normalizeEmail(body.email);
       if (!email) return json(400, { ok: false, error: "bad_email" });
-      const sender = getMailer(env, mailer);
+      const sender = getMailer(env, mailer, { fetchFn });
       if (!sender) return json(503, { ok: false, error: "email_off" });
       await sweep(db, { now });
       const link = await createLoginLink(db, email, { now, ip: request.headers.get("cf-connecting-ip") ?? request.headers.get("x-forwarded-for") ?? "", salt: env.ACCOUNT_SALT ?? "" });
@@ -141,6 +182,7 @@ export async function handleAccount(request, env, { now = Date.now(), mailer = n
     }
 
     // verify
+    if (!regionAllowed(request, env)) return json(403, { ok: false, error: "region_unavailable" });
     const used = await useLoginLink(db, typeof body.token === "string" ? body.token : "", { now });
     if (!used.ok) return json(used.error === "full" ? 503 : 400, { ok: false, error: used.error });
     return json(200, { ok: true, email: used.email, created: used.created }, { "set-cookie": setCookie(env, used.sessionToken, Math.floor(LIMITS.sessionMs / 1000)) });

@@ -143,6 +143,7 @@ const shared = {
   waitlist: site.waitlistUrl,
   helperGet,
   relay: site.relayUrl,
+  plusRelay: site.plusRelayUrl,
   ...Object.fromEntries(Object.entries(words).map(([k, v]) => ["plus" + k[0].toUpperCase() + k.slice(1), v])), // plusNotAffiliated, plusPrivacyLede, plusIdeasIntro, ...
   plusAccounts: site.plusAccounts ? "on" : "", // ("on" when the Frills Plus account pages are built: a page that links to them checks this)
   siteAddress: site.url,
@@ -269,7 +270,8 @@ const TIKTOK_PICTURES = "https://*.tiktokcdn.com https://*.tiktokcdn-us.com http
 const TWITCH_CONNECT = site.twitchClientId ? " wss://eventsub.wss.twitch.tv https://api.twitch.tv https://id.twitch.tv" : "";
 const SPOTIFY_CONNECT = site.spotifyClientId ? " https://accounts.spotify.com https://api.spotify.com" : "";
 const SPOTIFY_PICTURES = site.spotifyClientId ? " https://i.scdn.co" : "";
-const csp = ["default-src 'self'", "script-src 'self'", "style-src 'self'", `img-src 'self' data: https://static-cdn.jtvnw.net https://cdn-images.dzcdn.net${SPOTIFY_PICTURES} ${TIKTOK_PICTURES}`, "font-src 'self'", `connect-src 'self' wss://irc-ws.chat.twitch.tv${site.relayUrl ? " " + site.relayUrl : ""}${TWITCH_CONNECT}${SPOTIFY_CONNECT}`, "base-uri 'self'", "form-action 'self'", "frame-ancestors 'none'", "object-src 'none'"].join("; ");
+const RELAY_CONNECT = [site.relayUrl, site.plusRelayUrl].filter(Boolean).map((u) => " " + u).join("");
+const csp = ["default-src 'self'", "script-src 'self'", "style-src 'self'", `img-src 'self' data: https://static-cdn.jtvnw.net https://cdn-images.dzcdn.net${SPOTIFY_PICTURES} ${TIKTOK_PICTURES}`, "font-src 'self'", `connect-src 'self' wss://irc-ws.chat.twitch.tv${RELAY_CONNECT}${TWITCH_CONNECT}${SPOTIFY_CONNECT}`, "base-uri 'self'", "form-action 'self'", "frame-ancestors 'none'", "object-src 'none'"].join("; ");
 writeFileSync(
   join(dist, "_headers"),
   `/*\n  Content-Security-Policy: ${csp}\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n  Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()\n\n/assets/*\n  Cache-Control: public, max-age=31536000, immutable\n\n/fonts/*\n  Cache-Control: public, max-age=31536000, immutable\n\n/overlay/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n  ! Content-Security-Policy\n  Content-Security-Policy: ${csp.replace("frame-ancestors 'none'", "frame-ancestors 'self'")}\n\n/matcha/*\n  X-Robots-Tag: noindex, nofollow\n\n/check/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n\n/admin/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n`,

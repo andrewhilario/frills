@@ -3,6 +3,7 @@
 
 import { cleanName, connectTo, statusText } from "./connect.js";
 import { relayForPage } from "./tiktok.js";
+import { plusCodeFromParams, plusRelayForPage } from "./plus-relay.js";
 import { acceptInfo } from "./info.js";
 
 /**
@@ -19,6 +20,8 @@ export function connectEvents({ channel, platform = "tiktok", events, onAlert, o
     say(status.state === "connected" || status.state === "stopped" ? "" : statusText(status));
   }, {
     relay: resolved === "tiktok" ? relayForPage() : "",
+    plusRelay: resolved === "tiktok" ? plusRelayForPage() : "",
+    plusCode: resolved === "tiktok" ? plusCodeFromParams() : "",
     keepTrying: true, // an overlay in OBS has no button to press: if the relay is not answering when it opens, it looks again by itself
     events,
     onAlert,

@@ -11,20 +11,20 @@ import { localDatabase } from "../scripts/lib/d1-sqlite.mjs";
 const root = join(import.meta.dirname, "..");
 const read = (path) => readFileSync(join(root, path), "utf8");
 
-test("only the AI voice route, the status route and the gate itself use the Plus gate", () => {
+test("only the AI voice route, the Plus relay ticket route, the status route and the gate itself use the Plus gate", () => {
   const using = readdirSync(join(root, "worker"))
     .filter((f) => f.endsWith(".mjs"))
     .filter((f) => /plusGate\b|resolveCredential\b|plus-gate|plus-credential/.test(read(join("worker", f))))
     .sort();
-  assert.deepEqual(using, ["plus-credential.mjs", "plus-gate.mjs", "region.mjs", "tts.mjs"], "a new file here means a new feature is gated: it must be a Plus feature, and this list changed on purpose");
+  assert.deepEqual(using, ["plus-credential.mjs", "plus-gate.mjs", "plus-relay.mjs", "region.mjs", "tts.mjs"], "a new file here means a new feature is gated: it must be a Plus feature, and this list changed on purpose");
 });
 
 test("no free overlay or free editor script calls a Plus route or sends a Plus code", () => {
   const free = readdirSync(join(root, "src", "js"))
-    .filter((f) => f.endsWith(".js") && !/^(tts|account)/.test(f) && f !== "widget-editor.js" /* (hands the editors a save function, nothing about accounts) */)
+    .filter((f) => f.endsWith(".js") && !/^(tts|account|plus-relay)/.test(f) && f !== "widget-editor.js" /* (hands the editors a save function, nothing about accounts) */)
     .sort();
   assert.ok(free.length > 40, "the scan sees the site's scripts");
-  const offenders = free.filter((f) => /\/api\/tts|\/api\/account|\/api\/pro\/|x-overlay|plusGate/.test(read(join("src", "js", f))));
+  const offenders = free.filter((f) => /\/api\/tts|\/api\/account|\/api\/pro\/|\/api\/plus\/|x-overlay|plusGate/.test(read(join("src", "js", f))));
   assert.deepEqual(offenders, [], "these free scripts mention a Plus route");
 });
 

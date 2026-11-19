@@ -121,8 +121,9 @@ test("the account pages carry noindex, and a site built with the feature off has
   assert.match(html, /<meta name="robots" content="noindex/);
   const sitemap = await (await fetch(`${served}/sitemap.xml`)).text();
   assert.equal(sitemap.includes("/account"), false, "not listed for search engines");
-  const off = join(root, "dist", "account");
-  assert.equal(existsSync(off), false, "the normal build (feature off) has no account pages");
+  const offDir = join(folder, "dist-off");
+  execFileSync(process.execPath, ["build.mjs"], { cwd: root, stdio: "ignore", env: { ...process.env, PLUS_ACCOUNTS: "", OUT_DIR: offDir } });
+  assert.equal(existsSync(join(offDir, "account")), false, "a build with PLUS_ACCOUNTS off has no account pages");
 });
 
 test("a signed-in person sees the Frills Plus panel, and Get Frills Plus opens the checkout with their email and account id", { skip }, async () => {

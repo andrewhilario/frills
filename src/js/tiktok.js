@@ -170,7 +170,7 @@ export async function explainRefusal(address, fetchFn = globalThis.fetch) {
  * `diagnose(address)` (optional) is asked why a stream was turned away; the text it resolves with replaces the vague first message.
  * States: connecting, connected, offline (not live yet), reconnecting, limited, helper-lost, refused, error, stopped. Returns { stop() }.
  */
-export function connectTikTok({ user, base = "", onMessage, onRemove, onClear, onStatus, onAlert, onInfo, events = [], eventSourceFactory, retryRefused = false, diagnose } = {}) {
+export function connectTikTok({ user, base = "", ticket = "", refreshTicket = null, onFallback = null, onMessage, onRemove, onClear, onStatus, onAlert, onInfo, events = [], eventSourceFactory, retryRefused = false, diagnose } = {}) {
   const name = cleanTikTokUser(user);
   const say = (state, detail, fatal = false, extra = {}) => onStatus && onStatus({ state, channel: name, detail, fatal, platform: "tiktok", ...extra });
   if (!name) {
@@ -187,16 +187,20 @@ export function connectTikTok({ user, base = "", onMessage, onRemove, onClear, o
   let tries = 0; // failed attempts in a row, which sets how long to wait before the next
   let again = 0;
   let watcher = 0;
+  let baseUrl = base;
+  let currentTicket = ticket;
   say("connecting");
   const wanted = events.filter((kind) => ALERT_KINDS.includes(kind));
   // A relay is told which page this is (see makePageId); the helper on this PC does not count pages, so it is not.
-  const address = `${base}/tiktok/stream?user=${encodeURIComponent(name)}${wanted.length ? `&events=${wanted.join(",")}` : ""}${base ? `&page=${makePageId()}` : ""}`;
+  const pageId = base ? makePageId() : "";
+  const buildAddress = () => `${baseUrl}/tiktok/stream?user=${encodeURIComponent(name)}${wanted.length ? `&events=${wanted.join(",")}` : ""}${pageId ? `&page=${pageId}` : ""}${currentTicket ? `&ticket=${encodeURIComponent(currentTicket)}` : ""}`;
   let refusals = 0; // how many times a stream was turned away, so only the answer about the latest one is shown
-  const lost = base ? "Lost the free Frills relay. This reconnects by itself." : "";
+  const lost = base ? (currentTicket ? "Lost the Frills Plus relay. Reconnecting…" : "Lost the free Frills relay. This reconnects by itself.") : "";
   const turnedDown = "The free Frills relay turned the connection down. It may be busy, or too many pages are open from your address.";
 
   /** Opens the stream and listens. Called again to come back after the relay was restarted or went away. */
   function open() {
+    const address = buildAddress();
     const mine = (eventSourceFactory ?? ((url) => new EventSource(url)))(address);
     source = mine;
     openedAt = Date.now();
@@ -228,6 +232,10 @@ export function connectTikTok({ user, base = "", onMessage, onRemove, onClear, o
       // such page), or the relay turned us down, and that is said once.
       if (mine.readyState === 2) {
         if (!heard) {
+          if (onFallback) {
+            onFallback();
+            return;
+          }
           if (retryRefused) {
             // The relay or helper was found a moment ago, so a stream it turns away is busy or full for this address (too many pages open from one
             // address, say), which passes. Waiting and trying again is better than giving up for good.
@@ -265,7 +273,24 @@ export function connectTikTok({ user, base = "", onMessage, onRemove, onClear, o
     lostSince = 0;
     const wait = now ? 0 : Math.min(30000, 2000 * 2 ** Math.min(tries, 4)) * (0.8 + Math.random() * 0.4);
     tries += 1;
-    again = setTimeout(() => { if (!stopped) open(); }, wait);
+    again = setTimeout(() => {
+      if (stopped) return;
+      if (!refreshTicket) { open(); return; }
+      Promise.resolve(refreshTicket()).then((fresh) => {
+        if (stopped) return;
+        if (fresh?.ticket) {
+          currentTicket = fresh.ticket;
+          if (fresh.url) baseUrl = fresh.url;
+          open();
+        } else if (onFallback) {
+          onFallback();
+        } else {
+          open();
+        }
+      }).catch(() => {
+        if (!stopped) (onFallback ? onFallback() : open());
+      });
+    }, wait);
   }
 
   // A stream can die without a word: a tunnel or a phone's connection that blinked can leave one hanging, and a new attempt can hang too, with no
@@ -296,13 +321,13 @@ export function connectTikTok({ user, base = "", onMessage, onRemove, onClear, o
   watcher?.unref?.(); // in a program (the tests) a waiting timer must not keep it from ending
   open();
   return {
-    stop() {
+    stop(silent = false) {
       stopped = true;
       clearTimeout(again);
       clearInterval(watcher);
       globalThis.removeEventListener?.("online", online);
       try { source?.close(); } catch { /* already closed */ }
-      say("stopped");
+      if (!silent) say("stopped");
     },
   };
 }

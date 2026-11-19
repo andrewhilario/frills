@@ -11,8 +11,11 @@ import { handleAdmin } from "./admin.mjs";
 import { handleFollows } from "./follows.mjs";
 import { handleTimer } from "./timer.mjs";
 import { handleAccount } from "./account-routes.mjs";
+import { sweep } from "./accounts.mjs";
 import { handlePlusWebhook } from "./plus-webhook.mjs";
-import { handleProStatus } from "./region.mjs";
+import { handlePolarWebhook } from "./polar.mjs";
+import { handlePlusRelayTicket } from "./plus-relay.mjs";
+import { checkProRegion, handleProStatus } from "./region.mjs";
 import { handleDevPass, handleTts } from "./tts.mjs";
 import { countOverlay, handleEvent } from "./stats.mjs";
 
@@ -33,7 +36,9 @@ export default {
     if (pathname.startsWith("/api/account/")) return handleAccount(request, env);
     if (pathname === "/api/pro/status") return handleProStatus(request, env);
     if (pathname === "/api/pro/dev-pass") return handleDevPass(request, env);
+    if (pathname === "/api/plus/relay-ticket") return handlePlusRelayTicket(request, env);
     if (pathname === "/api/webhooks/lemonsqueezy") return handlePlusWebhook(request, env);
+    if (pathname === "/api/webhooks/polar") return handlePolarWebhook(request, env);
     if (pathname === "/api/tts") return handleTts(request, env);
     if (pathname.startsWith("/api/admin/")) {
       const response = await handleAdmin(request, env);
@@ -64,11 +69,31 @@ export default {
         return response;
       }
     }
+    if (pathname === "/plus" || pathname.startsWith("/plus/") || pathname === "/account" || pathname.startsWith("/account/")) {
+      const reviewKey = String(env?.PLUS_REVIEW_KEY ?? "").trim();
+      const reviewPass = Boolean(reviewKey && (pathname === "/plus" || pathname.startsWith("/plus/")) && new URL(request.url).searchParams.get("review") === reviewKey);
+      const region = checkProRegion(request, env);
+      if (!region.eligible && !reviewPass) {
+        const notFound = await env.ASSETS.fetch(new Request(new URL("/404.html", request.url), { method: "GET" }));
+        const headers = new Headers(notFound.headers);
+        headers.set("cache-control", "no-store");
+        headers.set("vary", "CF-IPCountry");
+        return new Response(request.method === "HEAD" ? null : notFound.body, { status: 404, headers });
+      }
+      const res = await env.ASSETS.fetch(request);
+      const headers = new Headers(res.headers);
+      headers.set("cache-control", "private, no-store");
+      headers.set("vary", "CF-IPCountry");
+      return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+    }
     return env.ASSETS.fetch(request); // not ours: hand it to the static files
   },
 
-  /** The daily clean-up: kept Spotify logins idle for 14 days are deleted, with the songs they were showing. */
+  /** The daily clean-up: idle Spotify logins (14 days) plus expired sign-in links and sessions. */
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(pruneSpotify(env));
+    ctx.waitUntil(Promise.all([
+      pruneSpotify(env),
+      env?.DB ? sweep(env.DB).catch(() => {}) : Promise.resolve(),
+    ]));
   },
 };

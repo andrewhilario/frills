@@ -10,6 +10,7 @@ import { buildControl, chips, copyButton } from "./ui.js";
 import { mountSource } from "./source.js";
 import { sourcesOf } from "./both.js";
 import { DEFAULTS as ALERT_DEFAULTS, LOOKS as ALERT_LOOKS, alertsUrl } from "./alerts-settings.js";
+import { appendPlusCode } from "./plus-relay.js";
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -79,11 +80,13 @@ function refresh() {
   const ready = both ? Boolean(names.tiktok && names.twitch) : Boolean(channel);
   const on = both && settings.source !== "none"; // one chat reading TikTok and Twitch: a small icon before each name
   feed.configure({ markPlatform: on });
-  link.value = ready ? matchaOverlayUrl(`${location.origin}/overlay/`, { channel, settings, platform: source.platform, both: names }) : "";
+  const rawChat = ready ? matchaOverlayUrl(`${location.origin}/overlay/`, { channel, settings, platform: source.platform, both: names }) : "";
+  link.value = rawChat && (source.platform === "tiktok" || both) ? appendPlusCode(rawChat) : rawChat;
   copyBtn.disabled = !ready;
   const alertName = both ? names.tiktok : channel; // alerts come from one account: in "Both" it is the TikTok one
   const alertPlatform = source.platform === "twitch" ? "twitch" : "tiktok";
-  alertsLink.value = alertName ? alertsUrl(`${location.origin}/overlay/alerts/`, { channel: alertName, settings: ALERT_FROG, platform: alertPlatform }) : "";
+  const rawAlert = alertName ? alertsUrl(`${location.origin}/overlay/alerts/`, { channel: alertName, settings: ALERT_FROG, platform: alertPlatform }) : "";
+  alertsLink.value = rawAlert && alertPlatform === "tiktok" ? appendPlusCode(rawAlert) : rawAlert;
   alertsCopy.disabled = !alertName;
   alertsHint.textContent = alertName ? "Paste it into a Browser source in your streaming app: 1080 wide by 1920 high for a vertical LIVE." : "Type your TikTok name above and the alerts link appears here.";
   hint.textContent = !ready ? (both ? "Type your TikTok name and your Twitch channel above and your link appears here." : "Type your TikTok name or Twitch channel above and your link appears here.") : (source.platform === "tiktok" || both) && !source.usesRelay ? "This link only works on this PC, while the Frills helper is running." : "";

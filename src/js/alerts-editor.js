@@ -12,6 +12,7 @@ import { mountSource } from "./source.js";
 import { fontsReady, generalFaces } from "./look.js";
 import { luminance } from "./color.js";
 import { mountFollowBox } from "./twitch-follow-box.js";
+import { appendPlusCode } from "./plus-relay.js";
 
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
@@ -207,7 +208,8 @@ function refreshLink() {
     linkHint.textContent = "Your link appears here once you have typed your name in step 4.";
     return;
   }
-  linkInput.value = alertsUrl(`${location.origin}/overlay/alerts/`, { channel, settings, platform, follows: followBox.codeFor(platform) });
+  const rawUrl = alertsUrl(`${location.origin}/overlay/alerts/`, { channel, settings, platform, follows: followBox.codeFor(platform) });
+  linkInput.value = platform === "tiktok" ? appendPlusCode(rawUrl) : rawUrl;
   copyBtn.disabled = false;
   linkHint.replaceChildren("Paste it into a Browser source in your streaming app, next to your chat. For a vertical LIVE use 1080 wide by 1920 high. ");
   const guide = document.createElement("a");

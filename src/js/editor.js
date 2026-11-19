@@ -7,6 +7,7 @@ import { activeSeason } from "./season.js";
 import { fontsReady, generalFaces, paintGeneral } from "./look.js";
 import { buildControl, chips, copyButton } from "./ui.js";
 import { mountSource } from "./source.js";
+import { appendPlusCode } from "./plus-relay.js";
 import { sourcesOf } from "./both.js";
 import { luminance } from "./color.js";
 
@@ -127,7 +128,8 @@ function refreshLink() {
     linkHint.textContent = both ? "Your link appears here once you have typed your TikTok name and your Twitch channel in step 2." : "Your link appears here once you have typed your TikTok name or Twitch channel in step 2.";
     return;
   }
-  linkInput.value = overlayUrl(`${location.origin}/overlay/`, { channel, settings, platform: source.platform, both: names });
+  const rawUrl = overlayUrl(`${location.origin}/overlay/`, { channel, settings, platform: source.platform, both: names });
+  linkInput.value = source.platform === "tiktok" || both ? appendPlusCode(rawUrl) : rawUrl;
   copyBtn.disabled = false;
   // Through the site’s relay a link works anywhere. A link made with the helper points at the helper on this PC, so it only works here.
   linkHint.replaceChildren((source.platform === "tiktok" || source.platform === "both") && !source.usesRelay ? "Paste it into a Browser source in your streaming app on this PC. It only works while the Frills helper is running. " : "Paste it into a Browser source in your streaming app. ");

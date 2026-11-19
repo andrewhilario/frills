@@ -3,6 +3,7 @@
 
 import { PLATFORMS, cleanName, connectTo, statusText } from "./connect.js";
 import { findTikTokSource, relayForPage } from "./tiktok.js";
+import { plusRelayForPage, savedPlusCode } from "./plus-relay.js";
 import { fakeSource, testMessage } from "./fake.js";
 import { chips } from "./ui.js";
 import { PLATFORM_NAMES, noteFor, scoped, takingTurns } from "./both.js";
@@ -30,6 +31,7 @@ export function mountSource(host, { feeds, pace, channel = "", twitch = "", plat
   let practice = null;
   let conn = null;
   const relay = relayForPage(); // the site’s shared relay for TikTok, when it has one and this is the site itself
+  const plusRelay = plusRelayForPage();
   let helper = null; // null until checked; then whether TikTok chat can come from somewhere (the helper on this PC, or the relay)
   let found = null; // where it can come from: { kind: "helper" | "relay", base }
   let turn = 0;
@@ -172,7 +174,15 @@ export function mountSource(host, { feeds, pace, channel = "", twitch = "", plat
       }
     }, {
       relay,
+      plusRelay,
+      plusCode: savedPlusCode(),
       events,
+      onFound: (hit) => {
+        if (hit?.plus) {
+          relayNote.textContent = "TikTok chat is coming through your dedicated Frills Plus server.";
+          relayNote.hidden = false;
+        }
+      },
       // TikTok says the room is LIVE: that is reading it, even before anyone says or does anything.
       onInfo: (info) => { if (info?.live === true) seen(); onInfo?.(info); },
       // Anything arriving proves the account is LIVE and we are reading it: a follow or a like counts, not only a chat message.
@@ -222,7 +232,7 @@ export function mountSource(host, { feeds, pace, channel = "", twitch = "", plat
         return;
       }
       report();
-    }, { relay, onInfo });
+    }, { relay, plusRelay, plusCode: savedPlusCode(), onInfo });
     const a = join("tiktok", tiktok);
     const b = join("twitch", twitch);
     conn = { stop() { a.stop(); b.stop(); } };

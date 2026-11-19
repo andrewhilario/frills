@@ -5,6 +5,7 @@ import { createTtsPlayer } from "./tts-audio.js";
 import { createTtsView } from "./widgets-view.js";
 import { startWidgetEditor } from "./widget-editor.js";
 import { fakeAlert, practiceName } from "./fake-alerts.js";
+import { clearPlusCode, clearRelayTicketCache, savePlusCode, savedPlusCode } from "./plus-relay.js";
 
 const NOTICE_COPY = {
   no_pass: "AI voices are part of Frills Plus — speaking with the free browser voice instead.",
@@ -194,6 +195,9 @@ startWidgetEditor({
       const post = (action) => fetch(`/api/account/${action}`, { method: "POST", headers: { "content-type": "application/json" }, body: "{}", credentials: "same-origin" }).then(async (res) => ({ ok: res.ok, body: await res.json().catch(() => ({})) }));
       const setCode = (code) => {
         settings.code = code;
+        if (code) savePlusCode(code);
+        else clearPlusCode();
+        clearRelayTicketCache();
         ctx?.refresh?.(); // the overlay link below is rebuilt with (or without) the code
         ctx?.save?.();
         player.invalidate();
@@ -222,8 +226,10 @@ startWidgetEditor({
           el("plus-link-account").setAttribute("href", "/account/"); // (set here, so a page built without accounts has no link to a missing page)
           const me = await load();
           if (!me?.ok) return;
-          // a link code kept here that the server no longer knows (made new elsewhere, turned off, or the account is gone) is dropped
+          // a link code kept here that the server no longer knows (made new elsewhere, turned off, or the account is gone) is dropped;
+          // if the user already activated their Plus code on /account/, pull it in here automatically
           if (settings.code && !(me.signedIn && me.overlayLink)) setCode("");
+          else if (!settings.code && me.signedIn && me.overlayLink && savedPlusCode()) setCode(savedPlusCode());
           plusBox.hidden = false;
           draw(me);
         } catch { /* offline, or a static preview: the panel stays hidden */ }

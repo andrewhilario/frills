@@ -30,13 +30,13 @@ test("accounts off: the pages say what they always said, and there is no Frills 
   assert.match(privacy, /Frills has no accounts\. It does keep a few things you choose to send it/);
   assert.match(privacy, /Frills itself sets no cookies\./);
   assert.match(privacy, /isn’t affiliated with, endorsed by or sponsored by Twitch, TikTok or OBS\./);
-  assert.doesNotMatch(privacy, /Lemon Squeezy|OpenAI|Groq/);
+  assert.doesNotMatch(privacy, /Polar|Lemon Squeezy|Resend|OpenAI|Groq/);
   assert.equal(existsSync(join(off, "plus", "index.html")), false);
   assert.doesNotMatch(readFileSync(join(off, "sitemap.xml"), "utf8"), /\/plus\//);
   const home = page(off, ".");
   assert.match(home, /<span class="stat__label">accounts<\/span>/);
   assert.doesNotMatch(home, /href="\/plus\/"/);
-  for (const file of htmlFiles(off)) assert.doesNotMatch(readFileSync(file, "utf8"), /Lemon Squeezy/, file);
+  for (const file of htmlFiles(off)) assert.doesNotMatch(readFileSync(file, "utf8"), /Lemon Squeezy|\bPolar\b/, file);
   for (const file of htmlFiles(off)) assert.doesNotMatch(readFileSync(file, "utf8"), /Pro AI voices|Frills Pro|Pro Pass/, file + ": no Pro wording, and no AI voice on sale");
 });
 
@@ -69,11 +69,12 @@ test("accounts on: the privacy page lists what an account, a sign-in and a payme
     /What you bought, if you buy Frills Plus\..*Not your card/,
     /Your Plus overlay link, if you make one/,
     /Frills sets no cookies, with one exception: if you sign in to a Frills account, a cookie keeps you signed in for up to 30 days/,
-    /Payments\. Frills Plus is sold through Lemon Squeezy.*Frills never does/,
+    /Sign-in emails\. When you ask for a sign-in link, Frills passes your email address and the one-time link to Resend/,
+    /Payments\. Frills Plus is sold through Polar.*Frills never does/,
     /AI voices\. They are a Frills Plus extra\. When one is spoken, the words to be said .* go from Frills to the company that makes the voice \(OpenAI, Google or Groq.*Frills does not keep the words or the sound/,
     /The free browser voices send nothing anywhere/,
     /Deleting your account\. On the account page.*has to be cancelled first/,
-    /isn’t affiliated with, endorsed by or sponsored by Twitch, TikTok, OBS, Lemon Squeezy, OpenAI, Google or Groq/,
+    /isn’t affiliated with, endorsed by or sponsored by Twitch, TikTok, OBS, Polar, Resend, OpenAI, Google or Groq/,
   ]) assert.match(privacy, part);
 });
 
@@ -81,12 +82,14 @@ test("accounts on: the Frills Plus page says what it is, how to cancel and how r
   const html = page(on, "plus");
   const words = textOf(html);
   assert.match(words, /Frills stays free\. Frills Plus is a paid extra/);
+  assert.match(words, /\$5\.99 \/ month/);
+  assert.match(words, /150,000 AI voice characters a month/);
   assert.match(words, /Everything that is free today stays free, with no account/);
   assert.match(words, /press Manage or cancel/);
   assert.match(words, /stays on until the end of the month you already paid for/);
   assert.match(words, /within 14 days of a payment and we will refund that payment in full/);
   assert.match(words, /rights you have by law/);
-  assert.match(words, /affiliated with, endorsed by or sponsored by Twitch, TikTok, OBS, Lemon Squeezy/);
+  assert.match(words, /affiliated with, endorsed by or sponsored by Twitch, TikTok, OBS, Polar, Resend/);
   assert.match(readFileSync(join(on, "sitemap.xml"), "utf8"), /\/plus\//);
   for (const href of new Set([...html.matchAll(/href="(\/[^"#]*)"/g)].map((m) => m[1]))) {
     assert.ok(existsSync(join(on, href.replace(/^\//, ""), href.endsWith("/") ? "index.html" : "")) || existsSync(join(on, href)), `${href} exists`);
@@ -98,6 +101,7 @@ test("accounts on: the footer links to the Frills Plus page and names the new co
   for (const path of ["", "privacy", "overlays", "plus"]) {
     const html = readFileSync(join(on, path, "index.html"), "utf8");
     assert.match(html, /<li><a href="\/plus\/">Frills Plus<\/a><\/li>/, path || "home");
-    assert.match(textOf(html), /Twitch, TikTok, OBS, Lemon Squeezy, OpenAI, Google or Groq/, path || "home");
+    assert.match(html, /<li><a href="\/account\/">Account<\/a><\/li>/, path || "home");
+    assert.match(textOf(html), /Twitch, TikTok, OBS, Polar, Resend, OpenAI, Google or Groq/, path || "home");
   }
 });

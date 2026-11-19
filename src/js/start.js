@@ -7,6 +7,7 @@ import { cleanChannel } from "./twitch.js";
 import { copyButton } from "./ui.js";
 import { el } from "./feed.js";
 import { ALIGNS, SHAPES, VIBES, buildLinks, linksText, overlaysFor } from "./quickstart.js";
+import { appendPlusCode } from "./plus-relay.js";
 
 initNav();
 
@@ -183,7 +184,7 @@ function drawResult() {
   const both = answers.platform === "both";
   // in "both" the first name is TikTok's and the second is Twitch's; for one platform there is only the first
   const state = () => ({ platform: answers.platform, channel: cleanOf(accounts()[0]), twitch: both ? cleanOf("twitch") : "", overlays: answers.overlays, vibe: answers.vibe, shape: answers.shape, align: answers.align });
-  const links = () => buildLinks(origin, state());
+  const links = () => buildLinks(origin, state()).map((l) => (l.url && l.needs.includes("tiktok") ? { ...l, url: appendPlusCode(l.url) } : l));
 
   const heading = el("h2", { className: "start__ask", tabIndex: -1, textContent: "Your links are ready" });
   const vibe = VIBES.find((v) => v.id === answers.vibe);

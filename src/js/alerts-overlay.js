@@ -10,6 +10,7 @@ import { KINDS, PLATFORM_KINDS, fromParams, mediaUrl, sanitize } from "./alerts-
 import { createSounds } from "./sounds.js";
 import { cleanName, connectTo, statusText } from "./connect.js";
 import { relayForPage } from "./tiktok.js";
+import { plusCodeFromParams, plusRelayForPage } from "./plus-relay.js";
 import { fakeAlertSource } from "./fake-alerts.js";
 import { fontsReady, generalFaces } from "./look.js";
 import { FollowReader, validCode } from "./follow-bridge.js";
@@ -64,6 +65,8 @@ if (params.get("demo") === "1") {
     say(status.state === "connected" || status.state === "stopped" ? "" : statusText(status));
   }, {
     relay: relayForPage(),
+    plusRelay: plusRelayForPage(),
+    plusCode: plusCodeFromParams(params),
     keepTrying: true, // an overlay in OBS has no button to press: if the relay is not answering when it opens, it looks again by itself
     events: PLATFORM_KINDS.tiktok,
     onAlert: (alert) => fonts.then(() => push(alert)),

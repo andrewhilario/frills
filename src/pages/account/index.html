@@ -59,9 +59,20 @@
             <button class="btn" type="button" id="acct-buy" hidden>Get Frills Plus <span class="btn__arrow" aria-hidden="true">→</span></button>
             <button class="btn btn--outline" type="button" id="acct-manage" hidden>Manage or cancel</button>
           </div>
-          <p class="form__hint" id="acct-buy-hint" hidden>You pay on Lemon Squeezy’s secure checkout and Frills never sees your card. The price and what is included are shown there, before you pay.</p>
-          <p class="form__hint" id="acct-manage-hint" hidden>Opens your billing page at Lemon Squeezy, where you can change your card, see your receipts and cancel. <a href="/plus/">How cancelling and refunds work</a>.</p>
+          <p class="form__hint" id="acct-buy-hint" hidden>You pay on Polar’s secure checkout and Frills never sees your card. The price and what is included are shown there, before you pay.</p>
+          <p class="form__hint" id="acct-manage-hint" hidden>Opens your billing portal at Polar, where you can change your card, see your receipts and cancel. <a href="/plus/">How cancelling and refunds work</a>.</p>
           <p class="form__status" id="acct-buy-status" role="status" aria-live="polite"></p>
+
+          <div class="acct-sub" id="acct-code-box" hidden>
+            <h3 class="acct-sub__title">Dedicated TikTok server &amp; overlay code</h3>
+            <p class="form__hint" id="acct-code-state"></p>
+            <div class="acct-row">
+              <button class="btn btn--sm" type="button" id="acct-code-make">Activate on this browser</button>
+              <button class="btn btn--outline btn--sm" type="button" id="acct-code-off" hidden>Turn code off</button>
+            </div>
+            <p class="form__hint">Once active here, TikTok overlay links you copy from any editor or <a href="/start/">Quick start</a> route through your dedicated Frills Plus server and unlock AI voices on <a href="/tts/">Talking pet</a>. Make a new code anytime if a link leaks.</p>
+            <p class="form__status" id="acct-code-status" role="status" aria-live="polite"></p>
+          </div>
         </section>
 
         <section class="acct-card" aria-labelledby="acct-account-title">
@@ -76,7 +87,7 @@
           <details class="acct-danger" id="acct-delete">
             <summary>Delete my account and data</summary>
             <div class="acct-danger__body">
-              <p>This removes your account, your sign-in links and what we know about your Plus, for good. It does not cancel a subscription: if yours is still renewing, press <strong>Manage or cancel</strong> above and cancel it first. Your receipts stay with Lemon Squeezy.</p>
+              <p>This removes your account, your sign-in links and what we know about your Plus, for good. It does not cancel a subscription: if yours is still renewing, press <strong>Manage or cancel</strong> above and cancel it first. Your receipts stay with Polar.</p>
               <div class="form__group">
                 <label class="form__label" for="acct-delete-email">Type your email to confirm</label>
                 <input type="text" id="acct-delete-email" inputmode="email" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="254">

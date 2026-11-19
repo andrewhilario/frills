@@ -54,6 +54,14 @@ test("region lock allows Tier-1 countries, localhost DEV, PRO_COUNTRIES override
   assert.equal(bypassed.eligible, true);
   assert.equal(bypassed.reason, "dev_override");
 
+  // PRO_ALLOW_IPS allows exact edge-verified cf-connecting-ip (IPv4, normalized IPv6, or IPv6 /64 prefix); spoofed x-forwarded-for and non-/64 CIDRs are ignored
+  const allowEnv = { PRO_ALLOW_IPS: "198.51.100.42, 2001:0DB8::1, 2001:4455:907a:e000::/64, 0.0.0.0/0" };
+  assert.deepEqual(checkProRegion(reqWithCf(`${SITE}/`, { headers: { "cf-connecting-ip": "198.51.100.42" } }, "PH"), allowEnv), { eligible: true, country: "PH", reason: "allowed_ip" });
+  assert.deepEqual(checkProRegion(reqWithCf(`${SITE}/`, { headers: { "cf-connecting-ip": "2001:db8::1" } }, "PH"), allowEnv), { eligible: true, country: "PH", reason: "allowed_ip" });
+  assert.deepEqual(checkProRegion(reqWithCf(`${SITE}/`, { headers: { "cf-connecting-ip": "2001:4455:907a:e000:abcd:1234:5678:9999" } }, "PH"), allowEnv), { eligible: true, country: "PH", reason: "allowed_ip" });
+  assert.equal(checkProRegion(reqWithCf(`${SITE}/`, { headers: { "cf-connecting-ip": "2001:4455:907a:e001::1" } }, "PH"), allowEnv).eligible, false);
+  assert.equal(checkProRegion(reqWithCf(`${SITE}/`, { headers: { "cf-connecting-ip": "198.51.100.99", "x-forwarded-for": "198.51.100.42" } }, "PH"), allowEnv).eligible, false);
+
   // PRO_COUNTRIES override restricts or expands list dynamically
   assert.equal(checkProRegion(reqWithCf(`${SITE}/`, {}, "PH"), { PRO_COUNTRIES: "PH,SG" }).eligible, true);
   assert.equal(checkProRegion(reqWithCf(`${SITE}/`, {}, "US"), { PRO_COUNTRIES: "PH,SG" }).eligible, false);
@@ -214,4 +222,42 @@ test("Lemon Squeezy's signature: the right digest passes; a wrong one, a short o
   assert.equal(await verifyLemonSignature(payload, "00", secret), false);
   assert.equal(await verifyLemonSignature(payload, "not hex", secret), false);
   assert.equal(await verifyLemonSignature(payload, await hmacHex(secret, payload), ""), false);
+});
+
+test("Worker hides /plus/ and /account/ (404) from non-Tier-1 visitors while serving them to Tier-1 and PRO_ALLOW_IPS", async () => {
+  const assets = {
+    fetch: async (req) => {
+      const p = new URL(req.url).pathname;
+      if (p === "/404.html") return new Response("<h1>Not found</h1>", { status: 200, headers: { "content-type": "text/html" } });
+      return new Response(`<h1>Page ${p}</h1>`, { status: 200, headers: { "content-type": "text/html" } });
+    },
+  };
+  const env = { DB: localDatabase(":memory:"), ASSETS: assets, PRO_ALLOW_IPS: "198.51.100.42" };
+
+  // Regular PH visitor (not allowlisted) gets 404 on /plus/, /account/, /account/verify/ and 403 on login API
+  for (const path of ["/plus/", "/plus", "/account/", "/account/verify/"]) {
+    const res = await worker.fetch(reqWithCf(`${SITE}${path}`, { headers: { "cf-connecting-ip": "198.51.100.99" } }, "PH"), env, {});
+    assert.equal(res.status, 404, `${path} hidden in PH`);
+    assert.equal(res.headers.get("cache-control"), "no-store");
+    assert.match(await res.text(), /Not found/);
+  }
+  const blockedLogin = await worker.fetch(
+    reqWithCf(`${SITE}/api/account/login`, { method: "POST", headers: { origin: SITE, "content-type": "application/json", "cf-connecting-ip": "198.51.100.99" }, body: '{"email":"a@example.com"}' }, "PH"),
+    env,
+    {},
+  );
+  assert.deepEqual([blockedLogin.status, (await blockedLogin.json()).error], [403, "region_unavailable"]);
+
+  // Owner IP in PH (PRO_ALLOW_IPS) sees /plus/ and /account/ with private no-store headers
+  for (const path of ["/plus/", "/account/"]) {
+    const res = await worker.fetch(reqWithCf(`${SITE}${path}`, { headers: { "cf-connecting-ip": "198.51.100.42" } }, "PH"), env, {});
+    assert.equal(res.status, 200, `${path} visible to owner IP in PH`);
+    assert.equal(res.headers.get("cache-control"), "private, no-store");
+    assert.match(await res.text(), new RegExp(`Page ${path}`));
+  }
+
+  // Tier-1 visitor (US) sees /plus/ and /account/ normally
+  const usPlus = await worker.fetch(reqWithCf(`${SITE}/plus/`, { headers: { "cf-connecting-ip": "203.0.113.10" } }, "US"), env, {});
+  assert.equal(usPlus.status, 200);
+  assert.match(await usPlus.text(), /Page \/plus\//);
 });

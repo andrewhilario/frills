@@ -56,9 +56,64 @@ export function allowedCountries(env) {
   return new Set(raw.split(",").map((c) => c.trim().toUpperCase()).filter((c) => /^[A-Z]{2}$/.test(c)));
 }
 
+const IPV4 = /^(?:\d{1,3}\.){3}\d{1,3}$/;
+
+/** Expands a standard IPv6 address into 8 lowercase 4-hex-digit groups, or returns null if invalid. */
+function expandIpv6(raw) {
+  const ip = String(raw ?? "").trim().toLowerCase();
+  if (!ip.includes(":") || ip.includes(".") || !/^[0-9a-f:]+$/.test(ip)) return null;
+  const halves = ip.split("::");
+  if (halves.length > 2) return null;
+  const left = halves[0] ? halves[0].split(":") : [];
+  const right = halves.length === 2 && halves[1] ? halves[1].split(":") : [];
+  if (halves.length === 1 && left.length !== 8) return null;
+  const missing = 8 - (left.length + right.length);
+  if (halves.length === 2 && missing < 1) return null;
+  const parts = [...left, ...Array(Math.max(0, missing)).fill("0"), ...right];
+  if (parts.length !== 8 || parts.some((p) => !/^[0-9a-f]{1,4}$/.test(p))) return null;
+  return parts.map((p) => p.padStart(4, "0"));
+}
+
+/** Parses optional comma-separated PRO_ALLOW_IPS secret (exact IPv4, exact IPv6, or IPv6 /64 prefix for owner testing). */
+export function allowedIps(env) {
+  const raw = String(env?.PRO_ALLOW_IPS ?? "").trim();
+  const exact = new Set();
+  const prefixes64 = new Set();
+  if (!raw) return { exact, prefixes64 };
+  for (const entry of raw.split(",").map((s) => s.trim().toLowerCase()).filter(Boolean)) {
+    if (IPV4.test(entry)) {
+      exact.add(entry);
+    } else if (entry.endsWith("/64")) {
+      const hextets = expandIpv6(entry.slice(0, -3));
+      if (hextets) prefixes64.add(hextets.slice(0, 4).join(":"));
+    } else {
+      const hextets = expandIpv6(entry);
+      if (hextets) exact.add(hextets.join(":"));
+    }
+  }
+  return { exact, prefixes64 };
+}
+
+/** Returns true when an edge-verified IP matches an exact entry or IPv6 /64 prefix in PRO_ALLOW_IPS. */
+export function isAllowedIp(ip, env) {
+  const clean = String(ip ?? "").trim().toLowerCase();
+  if (!clean) return false;
+  const { exact, prefixes64 } = allowedIps(env);
+  if (!exact.size && !prefixes64.size) return false;
+  if (IPV4.test(clean)) return exact.has(clean);
+  const hextets = expandIpv6(clean);
+  if (!hextets) return false;
+  return exact.has(hextets.join(":")) || prefixes64.has(hextets.slice(0, 4).join(":"));
+}
+
+/** Reads Cloudflare's edge-verified visitor IP (`cf-connecting-ip`); never trusts spoofable forwarded headers. */
+export function clientIp(request) {
+  return String(request.headers.get("cf-connecting-ip") ?? "").trim().toLowerCase();
+}
+
 /**
  * Checks whether the current request is allowed to purchase or use paid features.
- * Allows local dev ("DEV"), the owner's override (a `x-frills-dev` header matching `PRO_DEV_KEY`/`ADMIN_KEY`, which a browser page cannot send), or a country in the allowed set.
+ * Allows local dev ("DEV"), the owner's override header (`x-frills-dev`), an edge-verified IP listed in `PRO_ALLOW_IPS`, or a country in the allowed set.
  */
 export function checkProRegion(request, env) {
   const country = regionOf(request, env);
@@ -70,6 +125,9 @@ export function checkProRegion(request, env) {
   if ((devSecret && devHeader === devSecret) || (adminSecret && request.headers.get("x-frills-dev") === adminSecret)) {
     return { eligible: true, country, reason: "dev_override" };
   }
+
+  const ip = clientIp(request);
+  if (isAllowedIp(ip, env)) return { eligible: true, country, reason: "allowed_ip" };
 
   const eligible = allowedCountries(env).has(country);
   return { eligible, country, reason: eligible ? "allowed_country" : "region_unavailable" };

@@ -1,6 +1,8 @@
 // The account pages: ask for a sign-in link, finish signing in from the link, see who is signed in, sign out. Both pages use this file; each part runs
 // only if its page elements are there. The cookie that keeps a person signed in is set by the server and cannot be read from here (HttpOnly).
 
+import { clearPlusCode, clearRelayTicketCache, savePlusCode, savedPlusCode } from "./plus-relay.js";
+
 const $ = (id) => document.getElementById(id);
 const post = (action, body = {}) =>
   fetch(`/api/account/${action}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), credentials: "same-origin" }).then(async (res) => ({ ok: res.ok, status: res.status, body: await res.json().catch(() => ({})) }));
@@ -13,11 +15,12 @@ const WORDS = {
   not_ready: "Accounts are not working right now. Please try again later.",
   full: "Accounts are full right now. Please try again later.",
   checkout_off: "Frills Plus is not on sale yet. Please check back soon.",
+  region_unavailable: "Frills Plus is not available in your region yet.",
   already_plus: "Frills Plus is already on for this account.",
   sign_in_first: "Please sign in first.",
   portal_off: "The billing page is not available yet. Please check back soon.",
   no_subscription: "There is no subscription on this account.",
-  provider_error: "Lemon Squeezy did not answer. Please try again in a minute.",
+  provider_error: "The payment provider did not answer. Please try again in a minute.",
   confirm_mismatch: "That is not the email of this account. Please type it exactly.",
   cancel_first: "Your subscription is still renewing. Press Manage or cancel and cancel it first, then delete your account.",
 };
@@ -94,6 +97,8 @@ if ($("acct-form")) {
     $("acct-out").disabled = true;
     try {
       await post("logout");
+      clearPlusCode();
+      clearRelayTicketCache();
       show("acct-form");
       email.focus();
     } catch {
@@ -147,9 +152,29 @@ if ($("acct-form")) {
     const manage = Boolean(me.portal) && Boolean(me.plus);
     $("acct-manage").hidden = !manage;
     $("acct-manage-hint").hidden = !manage;
+
+    const codeBox = $("acct-code-box");
+    if (codeBox) {
+      const plusOn = Boolean(me.plus?.active);
+      if (!plusOn || !me.overlayLink) {
+        if (savedPlusCode() && (!plusOn || !me.overlayLink)) { clearPlusCode(); clearRelayTicketCache(); }
+      }
+      codeBox.hidden = !plusOn;
+      if (plusOn) {
+        const local = Boolean(savedPlusCode());
+        const mine = local && Boolean(me.overlayLink);
+        $("acct-code-state").textContent = mine
+          ? "Active on this browser: copied TikTok overlay links include your Plus server code."
+          : me.overlayLink
+            ? "A Plus code is active on another browser. Press Make a new code to use it here (the older code stops working)."
+            : "Not active on this browser yet. Press Activate to route your copied TikTok overlay links through the dedicated Frills Plus server.";
+        $("acct-code-make").textContent = mine || me.overlayLink ? "Make a new code" : "Activate on this browser";
+        $("acct-code-off").hidden = !(mine || me.overlayLink);
+      }
+    }
   };
 
-  // Coming back from paying (the product's confirmation page is /account/?welcome=1): the payment notice from Lemon Squeezy can take a few seconds, so ask again until Plus is on.
+  // Coming back from paying (the product's confirmation page is /account/?welcome=1): the payment notice from Polar can take a few seconds, so ask again until Plus is on.
   const confirmPayment = async () => {
     const note = $("acct-buy-status");
     note.dataset.state = "";
@@ -162,7 +187,7 @@ if ($("acct-form")) {
       } catch { /* try again */ }
     }
     note.dataset.state = "error";
-    note.textContent = "We have not heard about your payment yet. It can take a few minutes: reload this page in a little while. If Plus is still off after that, check your email for the Lemon Squeezy receipt and get in touch.";
+    note.textContent = "We have not heard about your payment yet. It can take a few minutes: reload this page in a little while. If Plus is still off after that, check your email for your receipt and get in touch.";
   };
 
   $("acct-buy").addEventListener("click", async () => {
@@ -201,11 +226,59 @@ if ($("acct-form")) {
     button.disabled = false;
   });
 
+  $("acct-code-make")?.addEventListener("click", async () => {
+    const button = $("acct-code-make");
+    const note = $("acct-code-status");
+    button.disabled = true;
+    note.dataset.state = "";
+    note.textContent = "Activating…";
+    try {
+      const res = await post("overlay-link");
+      if (res.ok && res.body.code) {
+        savePlusCode(res.body.code);
+        clearRelayTicketCache();
+        note.textContent = "Ready. Any TikTok overlay link you copy from an editor or Quick start now uses your dedicated Frills Plus server.";
+        const me = await (await fetch("/api/account/me", { credentials: "same-origin" })).json();
+        if (me?.signedIn) showPlus(me);
+      } else {
+        note.dataset.state = "error";
+        note.textContent = WORDS[res.body.error] ?? "Sorry, that did not work. Please try again.";
+      }
+    } catch {
+      note.dataset.state = "error";
+      note.textContent = "Sorry, that did not work. Check your connection and try again.";
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  $("acct-code-off")?.addEventListener("click", async () => {
+    const button = $("acct-code-off");
+    const note = $("acct-code-status");
+    button.disabled = true;
+    note.dataset.state = "";
+    try {
+      await post("overlay-link-off");
+      clearPlusCode();
+      clearRelayTicketCache();
+      note.textContent = "Your Plus code is off. Existing overlays fall back to the free server and free browser voices.";
+      const me = await (await fetch("/api/account/me", { credentials: "same-origin" })).json();
+      if (me?.signedIn) showPlus(me);
+    } catch {
+      note.dataset.state = "error";
+      note.textContent = "Sorry, that did not work. Please try again.";
+    } finally {
+      button.disabled = false;
+    }
+  });
+
   $("acct-out-all").addEventListener("click", async () => {
     const button = $("acct-out-all");
     button.disabled = true;
     try {
       await post("logout-all");
+      clearPlusCode();
+      clearRelayTicketCache();
       show("acct-form");
       say("You were signed out on every device.");
       email.focus();
@@ -227,6 +300,8 @@ if ($("acct-form")) {
     try {
       const res = await post("delete", { email: typed });
       if (res.ok && res.body.ok === true) {
+        clearPlusCode();
+        clearRelayTicketCache();
         $("acct-delete-email").value = "";
         $("acct-delete").open = false;
         note.textContent = "";

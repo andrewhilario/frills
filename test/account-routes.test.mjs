@@ -4,7 +4,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { COOKIE, handleAccount } from "../worker/account-routes.mjs";
-import { getMailer, signInMessage } from "../worker/mailer.mjs";
+import { DEFAULT_FROM, RESEND_URL, getMailer, resolveFrom, signInMessage } from "../worker/mailer.mjs";
 import { LIMITS } from "../worker/accounts.mjs";
 import worker from "../worker/index.mjs";
 import { localDatabase } from "../scripts/lib/d1-sqlite.mjs";
@@ -165,4 +165,59 @@ test("the real Worker routes the account address", async () => {
   const env = { ...fresh({ DEV: true }), ASSETS: { fetch: async () => new Response("asset") } };
   const res = await worker.fetch(new Request(`${SITE}/api/account/me`), env, { waitUntil() {} });
   assert.deepEqual(await res.json(), { ok: true, signedIn: false });
+});
+
+test("Resend mailer posts text and escaped HTML to Resend with Bearer auth, validates MAIL_FROM, and reports failures cleanly", async () => {
+  assert.equal(resolveFrom(""), DEFAULT_FROM);
+  assert.equal(resolveFrom("Frills <login@valwidgets.live>"), "Frills <login@valwidgets.live>");
+  assert.equal(resolveFrom("bad\r\nBcc:evil@x.com"), DEFAULT_FROM);
+  assert.equal(resolveFrom("no-at-sign"), DEFAULT_FROM);
+
+  const calls = [];
+  const fakeFetch = async (url, init) => {
+    calls.push({ url, init, body: JSON.parse(init.body) });
+    return new Response(JSON.stringify({ id: "email_123" }), { status: 200, headers: { "content-type": "application/json" } });
+  };
+
+  const env = fresh({ RESEND_API_KEY: "re_test_secret_key", MAIL_FROM: "Frills <signin@valwidgets.live>" });
+  const res = await handleAccount(
+    new Request(`${SITE}/api/account/login`, {
+      method: "POST",
+      headers: { origin: SITE, "content-type": "application/json", "cf-connecting-ip": "203.0.113.9" },
+      body: JSON.stringify({ email: "creator@example.com" }),
+    }),
+    env,
+    { now: T0, fetchFn: fakeFetch },
+  );
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { ok: true, minutes: 15 });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, RESEND_URL);
+  assert.equal(calls[0].init.method, "POST");
+  assert.equal(calls[0].init.headers.authorization, "Bearer re_test_secret_key");
+  assert.equal(calls[0].body.from, "Frills <signin@valwidgets.live>");
+  assert.deepEqual(calls[0].body.to, ["creator@example.com"]);
+  assert.equal(calls[0].body.subject, "Your Frills sign-in link");
+  assert.match(calls[0].body.text, /https:\/\/frills\.example\/account\/verify\/#[A-Za-z0-9_-]{43}/);
+  assert.match(calls[0].body.html, /href="https:\/\/frills\.example\/account\/verify\/#[A-Za-z0-9_-]{43}"/);
+
+  // Non-2xx and network failures surface as 502 mail_failed without leaking secrets
+  const failRes = await handleAccount(
+    new Request(`${SITE}/api/account/login`, {
+      method: "POST",
+      headers: { origin: SITE, "content-type": "application/json", "cf-connecting-ip": "203.0.113.10" },
+      body: JSON.stringify({ email: "creator2@example.com" }),
+    }),
+    env,
+    { now: T0 + 1000, fetchFn: async () => new Response("rate limit", { status: 429 }) },
+  );
+  assert.equal(failRes.status, 502);
+  assert.deepEqual(await failRes.json(), { ok: false, error: "mail_failed" });
+
+  // Local DEV server prefers outbox over RESEND_API_KEY unless RESEND_LIVE is explicitly set
+  const devEnv = fresh({ DEV: true, RESEND_API_KEY: "re_should_not_fire" });
+  const devMailer = getMailer(devEnv, null, { fetchFn: () => { throw new Error("should not call fetch"); } });
+  const devSent = await devMailer.send(signInMessage("dev@example.com", "http://localhost:3020/account/verify/#" + "a".repeat(43)));
+  assert.deepEqual(devSent, { ok: true });
+  assert.equal(devEnv.OUTBOX.length, 1);
 });

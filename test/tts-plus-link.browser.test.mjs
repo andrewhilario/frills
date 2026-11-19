@@ -20,7 +20,7 @@ try { findChrome(); } catch { skip = "No Chrome or Edge on this computer"; }
 const SECRET = "whsec-plus-link";
 const folder = mkdtempSync(join(tmpdir(), "frills-pluslink-"));
 const variant = join(folder, "dist-on");
-const port = 6600 + Math.floor(Math.random() * 300);
+const port = 7200 + Math.floor(Math.random() * 300);
 const served = `http://localhost:${port}`;
 let server;
 let page;
