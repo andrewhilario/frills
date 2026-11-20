@@ -376,6 +376,71 @@ export function createLikersView(host) {
   };
 }
 
+/**
+ * The rotating Top Gifters and Likers. It is the Top Likers list (same rows, same medals, same look), shown inside a wrapper that fades or slides out and in
+ * when the ranking changes. Returns { apply(settings), show({ kind, title, top }), clear() }.
+ */
+export function createBoardsView(host) {
+  const wrap = el("div", { className: "boards" });
+  host.append(wrap);
+  const inner = createLikersView(wrap);
+  let settings = null;
+  let shown = ""; // the ranking drawn now
+  let shownTitle = ""; // and the title it was drawn with (the look is applied again only when one of them changes: applying redraws the season's pictures)
+  let pending = null; // the ranking to draw when the swap is half way (events that come meanwhile update this)
+  let swapping = false;
+  let timer = 0;
+
+  const draw = (view) => {
+    if (shown !== view.kind || shownTitle !== view.title) inner.apply({ ...settings, titleText: view.title });
+    shown = view.kind;
+    shownTitle = view.title;
+    inner.render(view.top);
+  };
+
+  function swap() {
+    swapping = true;
+    wrap.classList.add("boards--out");
+    timer = setTimeout(() => {
+      inner.clear();
+      draw(pending);
+      wrap.classList.add("boards--prep");
+      wrap.classList.remove("boards--out");
+      void wrap.offsetWidth; // the new one starts from the side it comes in from, and then settles
+      wrap.classList.remove("boards--prep");
+      swapping = false;
+    }, 380);
+  }
+
+  return {
+    apply(next) {
+      settings = next;
+      wrap.dataset.swap = next.swap;
+      inner.apply({ ...next, titleText: shownTitle || next.titleGifters });
+    },
+    show(view) {
+      if (!settings) return;
+      pending = view;
+      if (swapping) return; // the next draw of this swap will use the newest
+      if (!shown || shown === view.kind || reducedMotion()) {
+        if (shown && shown !== view.kind) inner.clear(); // (no motion asked for: change at once)
+        draw(view);
+        return;
+      }
+      swap();
+    },
+    clear() {
+      clearTimeout(timer);
+      swapping = false;
+      wrap.classList.remove("boards--out", "boards--prep");
+      inner.clear();
+      shown = "";
+      shownTitle = "";
+      pending = null;
+    },
+  };
+}
+
 /** Whether the first song gets its own card: when asked for, and always when the overlay shows only that song. */
 const standsOut = (s) => s.showNow || s.show === "now";
 
