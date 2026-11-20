@@ -45,46 +45,6 @@
     <noscript><p class="note">Frills needs JavaScript to run the voice editor. Turn it on for this page and reload.</p></noscript>
     {{{intro}}}
 
-    <div class="pro-status" id="pro-status" role="status" hidden></div>
-
-    <section class="plus-link" id="plus-link" data-accounts="{{plusAccounts}}" aria-labelledby="plus-link-title" hidden>
-      <h2 class="plus-link__title" id="plus-link-title">Your Frills Plus link</h2>
-      <p id="plus-link-state"></p>
-      <div class="plus-link__row">
-        <button class="btn btn--sm" type="button" id="plus-link-make" hidden>Make my Plus link</button>
-        <button class="btn btn--soft btn--sm" type="button" id="plus-link-off" hidden>Turn my link off</button>
-        <a class="btn btn--outline btn--sm" id="plus-link-account" hidden>Open my account</a>
-      </div>
-      <p class="form__hint" id="plus-link-hint" hidden>Anyone who has your overlay link can use your AI voice, so do not share it. If it leaks, make a new link: the old one stops working at once.</p>
-      <p class="form__status" id="plus-link-status" role="status" aria-live="polite"></p>
-    </section>
-
-    <aside class="pro-paywall" id="pro-paywall" hidden>
-      <p class="pro-paywall__title" id="pro-paywall-title">Frills Plus gives you AI voices</p>
-      <p class="pro-paywall__body" id="pro-paywall-body"></p>
-      <div class="pro-paywall__actions">
-        <a class="btn btn--sm" id="pro-account" hidden>Sign in or get Frills Plus</a>
-      </div>
-    </aside>
-
-    <section class="pro-tester" id="pro-tester" aria-label="Local paywall and region simulator" hidden>
-      <div class="pro-tester__row">
-        <label class="ctl__label" for="sim-country">Simulate visitor region (dev only)</label>
-        <select id="sim-country">
-          <option value="">Local dev bypass</option>
-          <option value="US">US — Tier-1 eligible (paywall active)</option>
-          <option value="DE">DE — EU eligible (paywall active)</option>
-          <option value="GB">GB — UK eligible (paywall active)</option>
-          <option value="PH">PH — Region locked</option>
-          <option value="BR">BR — Region locked</option>
-        </select>
-      </div>
-      <div class="pro-tester__row">
-        <button class="btn btn--soft btn--sm" type="button" id="mint-pass">Give my signed-in test account 300 characters</button>
-        <button class="btn btn--soft btn--sm" type="button" id="check-pass">Refresh status</button>
-      </div>
-    </section>
-
     <section class="step-card" aria-labelledby="s1">
       <div class="step-card__head">
         <span class="step-card__num" aria-hidden="true">1</span>
@@ -132,6 +92,46 @@
           <button class="btn" type="button" id="copy-link" disabled>Copy link</button>
         </div>
         <p class="linkfield__hint" id="link-hint" role="status"></p>
+      </div>
+    </section>
+
+    <section class="plus-link" id="plus-link" data-accounts="{{plusAccounts}}" aria-labelledby="plus-link-title" hidden>
+      <h2 class="plus-link__title" id="plus-link-title">Your Frills Plus link</h2>
+      <p id="plus-link-state"></p>
+      <div class="plus-link__row">
+        <button class="btn btn--sm" type="button" id="plus-link-make" hidden>Make my Plus link</button>
+        <button class="btn btn--soft btn--sm" type="button" id="plus-link-off" hidden>Turn my link off</button>
+        <a class="btn btn--outline btn--sm" id="plus-link-account" hidden>Open my account</a>
+      </div>
+      <p class="form__hint" id="plus-link-hint" hidden>Anyone who has your overlay link can use your AI voice, so do not share it. If it leaks, make a new link: the old one stops working at once.</p>
+      <p class="form__status" id="plus-link-status" role="status" aria-live="polite"></p>
+    </section>
+
+    <aside class="pro-paywall" id="pro-paywall" hidden>
+      <p class="pro-paywall__title" id="pro-paywall-title">Frills Plus gives you AI voices</p>
+      <p class="pro-paywall__body" id="pro-paywall-body"></p>
+      <div class="pro-paywall__actions">
+        <a class="btn btn--sm" id="pro-account" hidden>Sign in or get Frills Plus</a>
+      </div>
+    </aside>
+
+    <div class="pro-status" id="pro-status" role="status" hidden></div>
+
+    <section class="pro-tester" id="pro-tester" aria-label="Local paywall and region simulator" hidden>
+      <div class="pro-tester__row">
+        <label class="ctl__label" for="sim-country">Simulate visitor region (dev only)</label>
+        <select id="sim-country">
+          <option value="">Local dev bypass</option>
+          <option value="US">US — Tier-1 eligible (paywall active)</option>
+          <option value="DE">DE — EU eligible (paywall active)</option>
+          <option value="GB">GB — UK eligible (paywall active)</option>
+          <option value="PH">PH — Region locked</option>
+          <option value="BR">BR — Region locked</option>
+        </select>
+      </div>
+      <div class="pro-tester__row">
+        <button class="btn btn--soft btn--sm" type="button" id="mint-pass">Give my signed-in test account 300 characters</button>
+        <button class="btn btn--soft btn--sm" type="button" id="check-pass">Refresh status</button>
       </div>
     </section>
 

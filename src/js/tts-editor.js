@@ -10,7 +10,7 @@ import { clearPlusCode, clearRelayTicketCache, savePlusCode, savedPlusCode } fro
 const NOTICE_COPY = {
   no_pass: "AI voices are part of Frills Plus — speaking with the free browser voice instead.",
   invalid_pass: "This Frills Plus link or account is not active — using the free browser voice.",
-  region_unavailable: "Frills Plus AI voices are not sold in this region yet — using the free browser voice.",
+  region_unavailable: "Cloud AI voices are not sold in this region yet — using the free browser voice.",
   quota_exceeded: "This month's Frills Plus AI voice is used up — using the free browser voice.",
   ai_not_configured: "Server AI key (OpenAI / Google / Groq) not set — using free built-in browser voice.",
   groq_terms_required: "Groq requires accepting Orpheus terms once in Groq Playground (canopylabs/orpheus-v1-english) — using browser voice for now.",
@@ -37,6 +37,9 @@ startWidgetEditor({
     let simCountry = "";
     const view = createTtsView(host);
     view.apply(settings);
+    // Show a silent starter bubble on load so look changes in Step 1 are immediately visible in the preview
+    view.start({ kind: "gift", author: "Pond Pal", badge: "Doughnut", text: "Pond Pal sent Doughnut!", message: "Doughnut" });
+    view.level(0);
 
     const statusEl = document.getElementById("pro-status");
     const paywallEl = document.getElementById("pro-paywall");
@@ -126,6 +129,31 @@ startWidgetEditor({
       onIdle: () => view.idle(),
     });
 
+    let loadedAccount = false;
+    const syncRegionUi = (eligible) => {
+      const plusBoxEl = document.getElementById("plus-link");
+      if (plusBoxEl) plusBoxEl.hidden = !eligible || !loadedAccount;
+      const engineCtl = document.querySelector('[aria-label="Voice mode"]')?.closest(".ctl");
+      if (engineCtl) engineCtl.hidden = !eligible;
+      // In non-eligible regions (e.g. PH), remove/hide any "Frills Plus" wording in control hints and about text
+      for (const el of document.querySelectorAll(".ctl__hint")) {
+        if (!el.dataset.origText && el.textContent.includes("Frills Plus")) {
+          el.dataset.origText = el.textContent;
+        }
+        if (el.dataset.origText) {
+          el.textContent = eligible
+            ? el.dataset.origText
+            : el.dataset.origText.replace(/The AI voices are part of Frills Plus\. Without Plus, each/i, "Each").replace(/Frills Plus[^.]*\./gi, "").trim();
+        }
+      }
+      for (const li of document.querySelectorAll(".about li")) {
+        if (li.textContent.includes("Frills Plus") || li.dataset.plusAbout === "1") {
+          li.dataset.plusAbout = "1";
+          li.hidden = !eligible;
+        }
+      }
+    };
+
     const refreshProStatus = async () => {
       try {
         const headers = {};
@@ -138,6 +166,7 @@ startWidgetEditor({
         devSite = Boolean(info.dev);
         if (quiet()) return;
         lastEligible = Boolean(info.eligible);
+        syncRegionUi(lastEligible);
 
         if (info.country === "DEV") {
           setPaywall(false, "", "", true);
@@ -151,11 +180,18 @@ startWidgetEditor({
         }
 
         if (!info.eligible) {
-          setStatus("lock", `Region locked (${info.country}): Frills Plus AI voices are off here; free browser voices stay available.`);
+          if (!info.dev) {
+            // Real visitor in a non-eligible region (e.g. PH): show zero Plus banners or paywalls
+            setStatus("", "");
+            setPaywall(false);
+            return;
+          }
+          setStatus("lock", `Region locked (${info.country}): cloud AI voices are off here; free browser voices stay available.`);
           setPaywall(
             true,
             `Not available in ${info.country} yet`,
-            "Frills Plus AI voices are limited to the US, Canada, UK, EU, Australia and New Zealand for now. The free browser voices work everywhere.",
+            "Cloud AI voices are limited to the US, Canada, UK, EU, Australia and New Zealand for now. The free browser voices work everywhere.",
+            false,
           );
           return;
         }
@@ -235,7 +271,8 @@ startWidgetEditor({
           // if the user already activated their Plus code on /account/, pull it in here automatically
           if (settings.code && !(me.signedIn && me.overlayLink)) setCode("");
           else if (!settings.code && me.signedIn && me.overlayLink && savedPlusCode()) setCode(savedPlusCode());
-          plusBox.hidden = false;
+          loadedAccount = true;
+          plusBox.hidden = !lastEligible;
           draw(me);
         } catch { /* offline, or a static preview: the panel stays hidden */ }
       })();
