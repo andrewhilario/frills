@@ -157,7 +157,7 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
       }
       nextUrl = parsed.toString();
     }
-    if (platform === "tiktok") nextUrl = appendPlusCode(nextUrl);
+    if (platform === "tiktok" || cloudKind === "tts") nextUrl = appendPlusCode(nextUrl);
     linkInput.value = nextUrl;
     copyBtn.disabled = false;
     cloud.sync();

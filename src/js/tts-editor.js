@@ -25,8 +25,11 @@ startWidgetEditor({
   widget: TTS,
   storeKey: "frills:tts:v1",
   overlayPath: "/overlay/tts/",
-  events: ["gift"],
-  idleHint: "Type someone’s TikTok username (or @name) and press Connect to test live gifts & chat.",
+  platforms: ["tiktok", "twitch"],
+  events: (p) => (p === "twitch" ? ["sub", "subgift", "bits", "raid"] : ["gift"]),
+  idleHint: (p) => (p === "twitch"
+    ? "Type your Twitch channel and press Connect to test live chat, bits & subs — or use the test buttons above."
+    : "Type someone’s TikTok username (or @name) and press Connect to test live gifts & chat."),
   create(host, initial, ctx) {
     let settings = initial;
     let simCountry = "";
@@ -357,9 +360,11 @@ startWidgetEditor({
       },
       tests: {
         gift() {
-          const alert = fakeAlert("gift", { size: 2 });
           const min = Number(settings.minDiamonds) || 0;
-          if ((alert.total || 0) < min) {
+          const alert = ctx.platform() === "twitch"
+            ? { ...fakeAlert("bits"), count: Math.max(100, min) }
+            : fakeAlert("gift", { size: 2 });
+          if (ctx.platform() !== "twitch" && (alert.total || 0) < min) {
             alert.diamonds = min;
             alert.total = min;
           }
@@ -367,7 +372,9 @@ startWidgetEditor({
           if (item) queue.enqueue(item, { bypassCooldown: true });
         },
         bigGift() {
-          const alert = fakeAlert("gift", { size: 3 });
+          const alert = ctx.platform() === "twitch"
+            ? fakeAlert("subgift", { size: 3 })
+            : fakeAlert("gift", { size: 3 });
           const item = ttsSpeechFor(alert, { ...settings, trigger: "both", announceGift: true });
           if (item) queue.enqueue(item, { bypassCooldown: true });
         },

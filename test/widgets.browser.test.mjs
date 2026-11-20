@@ -412,9 +412,17 @@ test("tts editor & overlay: helper serves /api/pro/status, switching pets swaps 
     const url = new URL(await page.evaluate(`document.getElementById("link").value`));
     assert.equal(url.pathname, "/overlay/tts/");
     assert.equal(url.searchParams.get("pet"), "neko");
+    assert.equal(url.searchParams.get("platform"), "tiktok");
+
+    // Switch to Twitch -> link updates to platform=twitch
+    await page.evaluate(`[...document.querySelectorAll("#source .chip")].find((b) => b.textContent.trim() === "Twitch")?.click()`);
+    await type("#source-channel", "pondpal_tv");
+    const twitchUrl = new URL(await page.evaluate(`document.getElementById("link").value`));
+    assert.equal(twitchUrl.searchParams.get("platform"), "twitch");
+    assert.equal(twitchUrl.searchParams.get("channel"), "pondpal_tv");
     assert.deepEqual(page.problems, [], page.problems.join(" | "));
 
-    await page.goto(`${base}/overlay/tts/?demo=1&pet=bunny`, { settle: 600 });
+    await page.goto(`${base}/overlay/tts/?demo=1&pet=bunny&platform=twitch`, { settle: 600 });
     await until(async () => (await text(".tts__text")).length > 0, 3000);
     const bunnySrc = await page.evaluate(`document.querySelector(".tts__sprite--a")?.getAttribute("src")`);
     assert.equal(bunnySrc, "/decor/bunny/peeker-a.webp");

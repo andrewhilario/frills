@@ -46,10 +46,10 @@ export const TTS = defineWidget({
     { section: "voice", ...range("volume", "Volume", 10, 100, 5, "%") },
     { section: "pet", ...chipsOf("pet", "Talking pet", PET_OPTIONS) },
     { section: "pet", ...toggle("showBubble", "Show speech bubble on stream", "Turn off for voice-only mode.") },
-    { section: "rules", ...chipsOf("trigger", "When it speaks", [["gift", "Gifts only"], ["cmd", "Chat command"], ["both", "Gifts + command"], ["all_chat", "Every chat message"]]) },
+    { section: "rules", ...chipsOf("trigger", "When it speaks", [["gift", "Gifts, subs & bits only"], ["cmd", "Chat command"], ["both", "Alerts + command"], ["all_chat", "Every chat message"]]) },
     { section: "rules", ...text("command", "Chat command", 20, "Viewers type this first, e.g. !say hello.") },
-    { section: "rules", ...number("minDiamonds", "Smallest gift to read (diamonds)", 0, 50000, { hint: "0 reads every gift including 1-coin Roses." }) },
-    { section: "rules", ...toggle("announceGift", "Read out gift thank-yous") },
+    { section: "rules", ...number("minDiamonds", "Smallest gift or cheer to read (diamonds / bits)", 0, 50000, { hint: "0 reads every TikTok gift (including 1-coin Roses) and every Twitch cheer." }) },
+    { section: "rules", ...toggle("announceGift", "Read out gift, sub & cheer thank-yous") },
     { section: "rules", ...toggle("readUser", "Say viewer name before message") },
     { section: "rules", ...number("cooldownSec", "Per-viewer cooldown (seconds)", 0, 120) },
     { section: "rules", ...range("maxChars", "Max spoken characters", 40, 220, 10, "") },
@@ -100,6 +100,34 @@ export function ttsSpeechFor(input, settings) {
       ? count > 1 ? `${author} sent ${count} ${gift}!` : `${author} sent ${gift}!`
       : count > 1 ? `${count} ${gift}!` : `${gift}!`;
     const userKey = cleanName(input.user || author).toLowerCase() || "gift";
+    return { kind: "gift", userKey, author, badge, text: line.slice(0, 220), message: badge };
+  }
+
+  if (input.kind === "bits" || input.kind === "sub" || input.kind === "subgift" || input.kind === "raid") {
+    if (!cfg.announceGift) return null;
+    if (cfg.trigger !== "gift" && cfg.trigger !== "both") return null;
+    const count = Math.max(1, Math.round(Number(input.count)) || 1);
+    if (input.kind === "bits" && count < (Number(cfg.minDiamonds) || 0)) return null;
+
+    const author = cleanName(input.name || input.user || "Someone") || "Someone";
+    const userKey = cleanName(input.user || author).toLowerCase() || input.kind;
+    let badge;
+    let line;
+    if (input.kind === "bits") {
+      badge = `${count} bits`;
+      line = cfg.readUser ? `${author} cheered ${count} bits!` : `${count} bits!`;
+    } else if (input.kind === "sub") {
+      badge = "sub";
+      line = cfg.readUser ? `${author} just subscribed!` : "New subscriber!";
+    } else if (input.kind === "subgift") {
+      badge = count > 1 ? `${count}x gifted subs` : "gifted sub";
+      line = cfg.readUser
+        ? count > 1 ? `${author} gifted ${count} subs!` : `${author} gifted a sub!`
+        : count > 1 ? `${count} gifted subs!` : "Gifted sub!";
+    } else {
+      badge = `raid · ${count}`;
+      line = cfg.readUser ? `${author} raided with ${count} viewers!` : `Raid of ${count} viewers!`;
+    }
     return { kind: "gift", userKey, author, badge, text: line.slice(0, 220), message: badge };
   }
 

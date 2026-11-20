@@ -28,6 +28,24 @@ test("ttsSpeechFor filters gifts by trigger, diamond threshold, and readUser set
   assert.equal(ttsSpeechFor({ kind: "gift", name: "Maya", gift: "Lion", diamonds: 29999, count: 1 }, { ...base, trigger: "cmd" }), null);
   assert.equal(ttsSpeechFor({ kind: "gift", name: "Maya", gift: "Lion", diamonds: 29999, count: 1 }, { ...base, announceGift: false }), null);
   assert.equal(ttsSpeechFor({ kind: "follow", name: "Maya" }, base), null);
+
+  // Twitch alerts (bits, sub, subgift, raid)
+  assert.equal(ttsSpeechFor({ kind: "bits", name: "Maya", count: 3 }, base), null, "bits below minDiamonds threshold are skipped");
+  const bits = ttsSpeechFor({ kind: "bits", name: "Maya", count: 500 }, base);
+  assert.equal(bits.badge, "500 bits");
+  assert.equal(bits.text, "Maya cheered 500 bits!");
+
+  const sub = ttsSpeechFor({ kind: "sub", name: "Maya" }, base);
+  assert.equal(sub.badge, "sub");
+  assert.equal(sub.text, "Maya just subscribed!");
+
+  const subgift = ttsSpeechFor({ kind: "subgift", name: "Maya", count: 5 }, base);
+  assert.equal(subgift.badge, "5x gifted subs");
+  assert.equal(subgift.text, "Maya gifted 5 subs!");
+
+  const raid = ttsSpeechFor({ kind: "raid", name: "Maya", count: 42 }, base);
+  assert.equal(raid.badge, "raid · 42");
+  assert.equal(raid.text, "Maya raided with 42 viewers!");
 });
 
 test("ttsSpeechFor handles !say prefix cleanly and respects all_chat vs gift-only modes", () => {
