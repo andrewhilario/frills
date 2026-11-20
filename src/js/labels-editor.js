@@ -1,10 +1,10 @@
-// The Rotating Highlights editor page: configure sliding/rotational cards for Last Gift, Last Follower, Top Gifter (TikTok)
+// The Rotating Highlights editor page: configure sliding/rotational cards for Last Gift, Last Follower, Top Gifter, Top Liker (TikTok)
 // and Last Follower, Last Sub, Last Bits, Top Sub Gifter, Top Bit Sender (Twitch), including optional in-editor Twitch Follow login.
 
 import { LABELS, LabelBoard } from "./labels.js";
 import { createLabelsView } from "./widgets-view.js";
 import { startWidgetEditor } from "./widget-editor.js";
-import { demoLabelEvents, fakeAlert } from "./fake-alerts.js";
+import { demoLabelEvents, fakeAlert, fakeLike } from "./fake-alerts.js";
 import { mountFollowBox } from "./twitch-follow-box.js";
 
 let board = null;
@@ -15,7 +15,7 @@ const editor = startWidgetEditor({
   storeKey: "frills:labels:v1",
   overlayPath: "/overlay/labels/",
   platforms: ["tiktok", "twitch"],
-  events: (p) => (p === "twitch" ? ["sub", "subgift", "bits"] : ["gift", "follow"]),
+  events: (p) => (p === "twitch" ? ["sub", "subgift", "bits"] : ["gift", "follow", "like"]),
   extraUrlParams: ({ platform }) => {
     const follows = followBox?.codeFor(platform);
     return follows ? { follows } : {};
@@ -49,6 +49,7 @@ const editor = startWidgetEditor({
       tests: {
         gift: () => board.add(fakeAlert("gift")),
         follow: () => board.add(fakeAlert("follow")),
+        likes: () => board.add(fakeLike({ count: 25 })),
         sub: () => board.add(fakeAlert("sub", { resub: Math.random() < 0.45 })),
         subgift: () => board.add(fakeAlert("subgift")),
         bits: () => board.add(fakeAlert("bits")),

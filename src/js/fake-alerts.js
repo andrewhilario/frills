@@ -216,18 +216,19 @@ export function demoLabelEvents(platform = "tiktok") {
   return [
     fakeAlert("gift", { name: "Mochi Bun", size: 2 }),
     fakeAlert("follow", { name: "Pond Pal" }),
+    fakeLike({ name: "frogfan 🐸", count: 340 }),
   ];
 }
 
 /** Sends occasional practice events matching Rotating Highlights on TikTok or Twitch. */
 export function fakeLabelSource(push, platform = "tiktok", getPace = () => [2200, 4200]) {
-  const kinds = platform === "twitch" ? ["follow", "sub", "bits", "subgift"] : ["gift", "follow"];
+  const kinds = platform === "twitch" ? ["follow", "sub", "bits", "subgift"] : ["gift", "follow", "like"];
   let stopped = false;
   let timer = 0;
   const loop = () => {
     if (stopped) return;
     const kind = pick(kinds);
-    push(fakeAlert(kind, { resub: kind === "sub" && Math.random() < 0.45 }));
+    push(kind === "like" ? fakeLike() : fakeAlert(kind, { resub: kind === "sub" && Math.random() < 0.45 }));
     const [lo, hi] = getPace();
     timer = setTimeout(loop, lo + Math.random() * (hi - lo));
   };

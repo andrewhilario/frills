@@ -39,7 +39,7 @@ test("Labels settings validate bounds and serialize only overrides cleanly", () 
   assert.equal(url.searchParams.get("layout"), "polaroid");
   assert.equal(url.searchParams.get("showBits"), "0");
   assert.deepEqual(LABELS.sanitize(LABELS.fromParams(url.searchParams)), s);
-  assert.deepEqual(enabledSlotIds("tiktok", LABELS.defaults), ["lastGift", "lastFollower", "topGifter"]);
+  assert.deepEqual(enabledSlotIds("tiktok", LABELS.defaults), ["lastGift", "lastFollower", "topGifter", "topLiker"]);
   assert.deepEqual(enabledSlotIds("twitch", s), ["lastFollower", "lastSub", "topSubGifter", "topBitSender"]);
 });
 
@@ -107,4 +107,69 @@ test("Twitch LabelBoard tracks last follower, last sub, last bits, top sub gifte
   assert.deepEqual(restored.cards().map((c) => c.headline), ["FollowOne", "SubOne", "BitKing", "GiftQueen", "BitKing"]);
   board.stop();
   restored.stop();
+});
+
+test("TikTok LabelBoard shows the top liker: ranked by taps, first slide it adds appears without jumping, and likes never restart the rotation", () => {
+  const timers = clock();
+  const snaps = [];
+  const board = new LabelBoard({ ...LABELS.defaults, rotateSec: 5 }, { platform: "tiktok", timers, onChange: (snap) => snaps.push(snap) });
+  assert.deepEqual(enabledSlotIds("tiktok", LABELS.defaults), ["lastGift", "lastFollower", "topGifter", "topLiker"]);
+  assert.deepEqual(enabledSlotIds("twitch", LABELS.defaults).includes("topLiker"), false, "Twitch has no likes");
+
+  board.add({ kind: "follow", user: "bob", name: "Bob" });
+  board.add({ kind: "follow", user: "bob", name: "Bob" });
+  assert.equal(board.cards().some((c) => c.id === "topLiker"), false, "no card until somebody has liked");
+  assert.equal(board.add({ kind: "like", user: "", name: "?", count: 5 }), false);
+  assert.equal(board.add({ kind: "like", user: "ann", name: "Ann", count: 0 }), false);
+
+  board.add({ kind: "like", user: "ann", name: "Ann", avatar: "", count: 12 });
+  assert.equal(board.snapshot().card.id, "lastFollower", "a like does not move the slide on show");
+  assert.equal(board.cards().find((c) => c.id === "topLiker").headline, "Ann");
+  assert.equal(board.cards().find((c) => c.id === "topLiker").detail, "12 likes");
+  assert.equal(board.cards().find((c) => c.id === "topLiker").label, "Top liker");
+
+  board.add({ kind: "like", user: "cat", name: "Cat", count: 40 });
+  board.add({ kind: "like", user: "ann", name: "Ann", count: 20 }); // Ann now 32
+  assert.equal(board.cards().find((c) => c.id === "topLiker").headline, "Cat");
+  board.add({ kind: "like", user: "ann", name: "Ann", count: 20 }); // Ann now 52
+  assert.deepEqual([board.cards().find((c) => c.id === "topLiker").headline, board.cards().find((c) => c.id === "topLiker").detail], ["Ann", "52 likes"]);
+
+  // A like arrives every second; the rotation still moves on every 5 seconds, because likes do not restart its timer.
+  const seen = [board.snapshot().card.id];
+  for (let i = 0; i < 4; i++) { timers.tick(1000); board.add({ kind: "like", user: "dan", name: "Dan", count: 1 }); }
+  timers.tick(1000);
+  seen.push(board.snapshot().card.id);
+  assert.deepEqual(seen, ["lastFollower", "topLiker"]);
+
+  // When the top liker's slide is on show, a new leader updates its words in place (the same slide, no new revision).
+  const revision = board.snapshot().revision;
+  board.add({ kind: "like", user: "dan", name: "Dan", count: 500 });
+  const now = board.snapshot();
+  assert.deepEqual([now.card.id, now.card.headline, now.revision], ["topLiker", "Dan", revision]);
+  assert.equal(snaps.at(-1).card.headline, "Dan", "and the page was told");
+  board.stop();
+});
+
+test("the top liker can be turned off, renamed, cleared, and remembered with the other highlights", () => {
+  const timers = clock();
+  const off = new LabelBoard({ ...LABELS.defaults, showTopLiker: false }, { platform: "tiktok", timers });
+  off.add({ kind: "like", user: "ann", name: "Ann", count: 12 });
+  assert.equal(off.cards().some((c) => c.id === "topLiker"), false);
+  off.stop();
+
+  const board = new LabelBoard({ ...LABELS.defaults, labelTopLiker: "Heart king" }, { platform: "tiktok", timers });
+  board.add({ kind: "like", user: "ann", name: "Ann", count: 12 });
+  assert.equal(board.cards().find((c) => c.id === "topLiker").label, "Heart king");
+
+  const store = new Map();
+  const storage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v) };
+  saveLabels(storage, "tiktok", "pondpal", board);
+  const later = new LabelBoard(LABELS.defaults, { platform: "tiktok", timers, initial: loadLabels(storage, "tiktok", "pondpal") });
+  assert.deepEqual([later.cards().find((c) => c.id === "topLiker").headline, later.cards().find((c) => c.id === "topLiker").detail], ["Ann", "12 likes"]);
+  store.set(labelsKey("tiktok", "broken"), JSON.stringify({ tiktokLikers: [{ user: "a", name: "A", count: "lots" }, { user: "b", name: "B", count: -4 }] }));
+  assert.deepEqual(loadLabels(storage, "tiktok", "broken").tiktokLikers, [], "damaged entries are dropped");
+
+  board.clear();
+  assert.equal(board.cards().some((c) => c.id === "topLiker"), false);
+  board.stop(); later.stop();
 });

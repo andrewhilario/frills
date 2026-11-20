@@ -1,9 +1,10 @@
-// Rotating Stream Highlights / Labels: pure settings, state tracker for Last Gift, Last Follower, Top Gifter (TikTok),
+// Rotating Stream Highlights / Labels: pure settings, state tracker for Last Gift, Last Follower, Top Gifter, Top Liker (TikTok),
 // plus Last Follower, Last Sub, Last Bits, Top Sub Gifter and Top Bit Sender (Twitch), with timed card rotation and
 // optional localStorage persistence. Tested without a browser page.
 
 import { defineWidget, chipsOf, range, selectOf, text, toggle } from "./widget-settings.js";
 import { GifterBoard } from "./gifters.js";
+import { LikeBoard } from "./likers.js";
 
 const nfmt = (n) => Math.round(n || 0).toLocaleString("en-US");
 const plural = (n, one, many) => `${nfmt(n)} ${n === 1 ? one : many}`;
@@ -38,6 +39,8 @@ export const LABELS = defineWidget({
     labelFollow: "Last follower",
     showTopGifter: true,
     labelTopGifter: "Top gifter",
+    showTopLiker: true,
+    labelTopLiker: "Top liker",
     showSub: true,
     labelSub: "Last sub",
     showBits: true,
@@ -61,6 +64,8 @@ export const LABELS = defineWidget({
     { section: "labels", ...text("labelFollow", "Last follower label", 28) },
     { section: "labels", onlyPlatform: "tiktok", ...toggle("showTopGifter", "Include top gifter") },
     { section: "labels", onlyPlatform: "tiktok", ...text("labelTopGifter", "Top gifter label", 28) },
+    { section: "labels", onlyPlatform: "tiktok", ...toggle("showTopLiker", "Include top liker", "Whoever has tapped the most likes since the overlay connected.") },
+    { section: "labels", onlyPlatform: "tiktok", ...text("labelTopLiker", "Top liker label", 28) },
     { section: "labels", onlyPlatform: "twitch", ...toggle("showSub", "Include last sub") },
     { section: "labels", onlyPlatform: "twitch", ...text("labelSub", "Last sub label", 28) },
     { section: "labels", onlyPlatform: "twitch", ...toggle("showBits", "Include last bits") },
@@ -73,6 +78,8 @@ export const LABELS = defineWidget({
 });
 
 const NO_MILESTONE = { max: 1, celebrate: false, minDiamonds: 1, twitchMode: "subgift" };
+/** The likes board only has to know who is first: no list, no celebration (that is the Top Likers overlay). */
+const TOP_ONE = { max: 1, minLikes: 1, celebrate: false, milestone: 1000, celebrateWho: "top" };
 
 /** Orders enabled highlight slots per streaming platform. */
 export function enabledSlotIds(platform, settings) {
@@ -89,6 +96,7 @@ export function enabledSlotIds(platform, settings) {
     settings.showGift && "lastGift",
     settings.showFollow && "lastFollower",
     settings.showTopGifter && "topGifter",
+    settings.showTopLiker && "topLiker",
   ].filter(Boolean);
 }
 
@@ -112,6 +120,7 @@ export class LabelBoard {
     this.lastBits = initial?.lastBits ?? null;
 
     this.diamondBoard = new GifterBoard(NO_MILESTONE, { platform: "tiktok", entries: initial?.tiktokGifters ?? [] });
+    this.likeBoard = new LikeBoard(TOP_ONE, { entries: initial?.tiktokLikers ?? [] });
     this.subBoard = new GifterBoard({ ...NO_MILESTONE, twitchMode: "subgift" }, { platform: "twitch", entries: initial?.twitchSubGifters ?? [] });
     this.bitsBoard = new GifterBoard({ ...NO_MILESTONE, twitchMode: "bits" }, { platform: "twitch", entries: initial?.twitchBitSenders ?? [] });
 
@@ -152,6 +161,17 @@ export class LabelBoard {
           label: s.labelTopGifter || "Top gifter",
           headline: top.name,
           detail: top.label,
+          avatar: top.avatar || "",
+          picture: "",
+          initialName: top.name,
+        });
+      } else if (id === "topLiker" && this.likeBoard.top[0]) {
+        const top = this.likeBoard.top[0];
+        out.push({
+          id,
+          label: s.labelTopLiker || "Top liker",
+          headline: top.name,
+          detail: plural(top.count, "like", "likes"),
           avatar: top.avatar || "",
           picture: "",
           initialName: top.name,
@@ -297,6 +317,15 @@ export class LabelBoard {
       this.lastGift = { name, gift, count, diamonds, total, picture: event.picture || "", avatar: event.avatar || "" };
       this.diamondBoard.add({ ...event, total });
       jumpTo = this.settings.showGift ? "lastGift" : (this.settings.showTopGifter ? "topGifter" : "");
+    } else if (event.kind === "like" && this.platform === "tiktok") {
+      const before = this.cards().length;
+      if (!this.likeBoard.add(event)) return false;
+      if (this.cards().length === before) {
+        // Likes come about once a second. They must not restart the rotation timer or change the slide: the top liker's own slide just
+        // updates its words, in place, when it is the one on show.
+        if (this.snapshot().card?.id === "topLiker") this.emit();
+        return true;
+      }
     } else if (event.kind === "follow") {
       const name = event.name || event.user;
       if (!name) return false;
@@ -338,6 +367,7 @@ export class LabelBoard {
     this.lastSub = null;
     this.lastBits = null;
     this.diamondBoard.clear();
+    this.likeBoard.clear();
     this.subBoard.clear();
     this.bitsBoard.clear();
     this.index = 0;
@@ -353,6 +383,7 @@ export class LabelBoard {
       lastSub: this.lastSub,
       lastBits: this.lastBits,
       tiktokGifters: this.diamondBoard.entries,
+      tiktokLikers: this.likeBoard.entries,
       twitchSubGifters: this.subBoard.entries,
       twitchBitSenders: this.bitsBoard.entries,
     };
@@ -372,6 +403,7 @@ export function loadLabels(storage, platform, channel) {
       lastSub: saved.lastSub && typeof saved.lastSub.name === "string" ? saved.lastSub : null,
       lastBits: saved.lastBits && typeof saved.lastBits.name === "string" ? saved.lastBits : null,
       tiktokGifters: list(saved.tiktokGifters),
+      tiktokLikers: list(saved.tiktokLikers).filter((e) => Number.isFinite(e.count) && e.count > 0),
       twitchSubGifters: list(saved.twitchSubGifters),
       twitchBitSenders: list(saved.twitchBitSenders),
     };

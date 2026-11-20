@@ -122,3 +122,47 @@ test("overlay & editor: Rotating Highlights receives live TikTok gifts/follows, 
   assert.equal(url.searchParams.get("layout"), "macos");
   assert.deepEqual(page.problems, [], page.problems.join(" | "));
 });
+
+test("overlay: Rotating Highlights shows the top liker from live TikTok likes, in its own slide, and the rotation keeps going while likes arrive", { skip }, async () => {
+  const { base, made } = await withHelper();
+  await page.goto(`${base}/overlay/labels/?channel=pond_cafe&platform=tiktok&rotateSec=3&showGift=0&showTopGifter=0`, { settle: 700 });
+  await until(() => made.length === 1);
+  await sleep(150);
+  made[0].emit("follow", follow("f1", "NewFriend"));
+  await until(async () => (await labelState())?.slot === "lastFollower");
+  const like = (id, name, count) => ({ common: { msgId: id }, user: person(name.toLowerCase(), name), likeCount: count });
+  made[0].emit("like", like("l1", "Ann", 5));
+  made[0].emit("like", like("l2", "Ben", 20));
+  // a like arrives every half second, as on a busy LIVE, and the slides still change by themselves
+  let n = 0;
+  const busy = setInterval(() => made[0].emit("like", like("b" + ++n, "Cat", 1)), 500);
+  try {
+    await until(async () => (await labelState())?.slot === "topLiker", 6000);
+    const card = await labelState();
+    assert.equal(card.label, "Top liker");
+    assert.equal(card.headline, "Ben", "20 likes beats 5, and Cat's single taps are still adding up");
+    await until(async () => (await labelState())?.slot === "lastFollower", 6000); // and it came round again
+  } finally {
+    clearInterval(busy);
+  }
+  assert.deepEqual(page.problems, [], page.problems.join(" | "));
+});
+
+test("editor: Rotating Highlights has the top liker switch, label and test button for TikTok, and the test button makes the slide", { skip }, async () => {
+  const { base } = await withHelper();
+  await page.goto(`${base}/labels/`, { settle: 500 });
+  await page.evaluate("localStorage.clear()");
+  await page.goto(`${base}/labels/`, { settle: 900 });
+  const labels = await page.evaluate(`[...document.querySelectorAll(".panel .ctl__label")].map((l) => l.textContent.trim())`);
+  for (const wanted of ["Include top gifter", "Include top liker", "Top liker label"]) assert.ok(labels.includes(wanted), `${wanted} is missing`);
+  assert.equal(await page.evaluate(`getComputedStyle(document.querySelector('[data-test="likes"]')).display !== "none"`), true, "the test button is there on TikTok");
+  await click('[data-test="clear"]');
+  await click('[data-test="likes"]');
+  await click('[data-test="next"]');
+  await until(async () => (await labelState())?.slot === "topLiker", 3000);
+  assert.equal((await labelState()).label, "Top liker");
+  await type("#c-labelTopLiker", "Heart king");
+  await until(async () => (await labelState())?.label === "Heart king", 3000);
+  await page.evaluate("localStorage.clear()");
+  assert.deepEqual(page.problems, [], page.problems.join(" | "));
+});

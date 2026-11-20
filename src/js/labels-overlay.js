@@ -1,4 +1,4 @@
-// The Rotating Highlights overlay: what a streaming app opens. Cycles smoothly through Last Gift, Last Follower, Top Gifter
+// The Rotating Highlights overlay: what a streaming app opens. Cycles smoothly through Last Gift, Last Follower, Top Gifter, Top Liker
 // (TikTok LIVE) or Last Follower, Last Sub, Last Bits, Top Sub Gifter, and Top Bit Sender (Twitch).
 //   /overlay/labels/?channel=yourname&platform=tiktok&rotateSec=6
 //   /overlay/labels/?channel=yourchannel&platform=twitch&follows=CODE
@@ -58,7 +58,7 @@ if (demo) {
     connectEvents({
       channel,
       platform,
-      events: platform === "twitch" ? ["sub", "subgift", "bits"] : ["gift", "follow"],
+      events: platform === "twitch" ? ["sub", "subgift", "bits"] : ["gift", "follow", "like"],
       onAlert: (event) => fonts.then(() => board.add(event)),
       say,
     });
