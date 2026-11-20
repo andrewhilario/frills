@@ -61,7 +61,7 @@ test("leaderboard overlay: the titles, the people shown and the numbers can be c
   await sleep(1500);
   assert.equal(await text(".likers__title"), "Big spenders");
   assert.equal(await page.evaluate(`document.querySelectorAll(".liker:not(.liker--out)").length`), 3, "three people at most");
-  assert.equal(await page.evaluate(`[...document.querySelectorAll(".liker__count")].every((c) => c.hidden)`), true, "no numbers");
+  assert.equal(await page.evaluate(`[...document.querySelectorAll(".liker__count")].every((c) => c.offsetParent === null)`), true, "no numbers");
   await page.goto(`${base}/overlay/leaderboard/`, { settle: 400 });
   assert.match(await text("#note"), /Add \?channel=yourname/);
 });

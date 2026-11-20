@@ -26,6 +26,8 @@ test("the commands: !sr with a song, !next, !skip, !wrongsong, and anything else
   assert.deepEqual(parseCommand("!sr Blinding Lights", s), { kind: "request", query: "Blinding Lights" });
   assert.deepEqual(parseCommand("  !SR   levitating   dua lipa ", s), { kind: "request", query: "levitating dua lipa" });
   assert.deepEqual(parseCommand("!songrequest espresso", s), { kind: "request", query: "espresso" });
+  assert.deepEqual(parseCommand("!request espresso", s), { kind: "request", query: "espresso" });
+  assert.deepEqual(parseCommand("!song espresso", s), { kind: "request", query: "espresso" });
   assert.deepEqual(parseCommand("！sr full width mark", s), { kind: "request", query: "full width mark" });
   assert.equal(parseCommand("!sr", s), null, "no song named");
   assert.equal(parseCommand("!sr a", s), null, "too short to be a song");

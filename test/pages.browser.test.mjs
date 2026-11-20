@@ -8,6 +8,7 @@ import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { findChrome, inParallel, waitForServer } from "../scripts/lib/chrome.mjs";
+import { site } from "../src/site.mjs";
 
 const root = join(import.meta.dirname, "..");
 if (!existsSync(join(root, "dist", "index.html"))) throw new Error("dist/ is empty. Run `npm run build` first (`npm test` does that for you).");
@@ -26,7 +27,9 @@ before(async () => {
 });
 after(() => server?.kill());
 
-const PAGES = ["/", "/editor/", "/feedback/", "/alerts/", "/gifts/", "/goal/", "/likers/", "/overlays/", "/guides/alerts/", "/overlay/?demo=1", "/overlay/alerts/?demo=1", "/matcha/", "/guides/obs/", "/guides/test/", "/guides/tiktok/", "/privacy/"];
+const ALL_PAGES = ["/", "/editor/", "/feedback/", "/alerts/", "/gifts/", "/jar/", "/goal/", "/likers/", "/overlays/", "/plus/", "/account/", "/guides/alerts/", "/overlay/?demo=1", "/overlay/alerts/?demo=1", "/matcha/", "/guides/obs/", "/guides/test/", "/guides/tiktok/", "/privacy/"];
+// The account pages are only built while Frills Plus accounts are switched on (site.config.json or PLUS_ACCOUNTS=1).
+const PAGES = ALL_PAGES.filter((path) => site.plusAccounts || !/^\/(plus|account)\//.test(path));
 
 // The fonts are already waited for by goto(); what is left to wait for is only the page's own scripts drawing their first frame.
 const SETTLE = 300;

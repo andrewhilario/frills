@@ -13,6 +13,7 @@ import { site, checkSite } from "./src/site.mjs";
 import { CONTROLS, PRESETS, PRESET_NAMES } from "./src/js/settings.js";
 import "./src/js/chat-sound-settings.js"; // (the message-sound settings are part of the chat editor, so they count)
 import { faq } from "./src/faq.mjs";
+import { plusWords } from "./src/plus-words.mjs";
 import { overlaysFaq } from "./src/overlays-faq.mjs";
 import { tokenHex } from "./scripts/tokens.mjs";
 
@@ -57,8 +58,8 @@ mkdirSync(dist, { recursive: true });
 if (existsSync(join(root, "public"))) cpSync(join(root, "public"), dist, { recursive: true });
 
 const common = { absWorkingDir: root, bundle: true, minify: true, metafile: true, logLevel: "warning", outdir: join(dist, "assets"), entryNames: "[name]-[hash]", target: ["chrome100", "firefox100", "safari15"] };
-const jsEntries = { home: "src/js/home.js", check: "src/js/check.js", editor: "src/js/editor.js", overlay: "src/js/overlay.js", matcha: "src/js/matcha-page.js", page: "src/js/page.js", start: "src/js/start.js", feedback: "src/js/feedback.js", chatSounds: "src/js/chat-sounds.js", alerts: "src/js/alerts-editor.js", alertsOverlay: "src/js/alerts-overlay.js", gifts: "src/js/gifts-editor.js", likers: "src/js/likers-editor.js", likersOverlay: "src/js/likers-overlay.js", boards: "src/js/boards-editor.js", boardsOverlay: "src/js/boards-overlay.js", songs: "src/js/songs-editor.js", songsOverlay: "src/js/songs-overlay.js", spotify: "src/js/spotify-page.js", twitch: "src/js/twitch-page.js", admin: "src/js/admin.js", adminStats: "src/js/admin-stats.js", ticker: "src/js/ticker.js", goal: "src/js/goal-editor.js", giftsOverlay: "src/js/gifts-overlay.js", goalOverlay: "src/js/goal-overlay.js", counter: "src/js/counter-editor.js", counterOverlay: "src/js/counter-overlay.js", timer: "src/js/timer-editor.js", timerOverlay: "src/js/timer-overlay.js", ...(withOgCard && { og: "src/js/og.js" }) };
-const cssEntries = { home: "src/css/entry/home.css", check: "src/css/entry/check.css", page: "src/css/entry/page.css", start: "src/css/entry/start.css", editor: "src/css/entry/editor.css", matcha: "src/css/entry/matcha.css", overlay: "src/css/entry/overlay.css", alerts: "src/css/entry/alerts.css", alertsOverlay: "src/css/entry/alerts-overlay.css", widget: "src/css/entry/widget.css", admin: "src/css/entry/admin.css", widgetOverlay: "src/css/entry/widget-overlay.css", ...(withOgCard && { og: "src/css/entry/og.css" }) };
+const jsEntries = { home: "src/js/home.js", check: "src/js/check.js", editor: "src/js/editor.js", overlay: "src/js/overlay.js", cloudHost: "src/js/cloud-host.js", matcha: "src/js/matcha-page.js", page: "src/js/page.js", account: "src/js/account.js", start: "src/js/start.js", feedback: "src/js/feedback.js", chatSounds: "src/js/chat-sounds.js", boards: "src/js/boards-editor.js", boardsOverlay: "src/js/boards-overlay.js", alerts: "src/js/alerts-editor.js", alertsOverlay: "src/js/alerts-overlay.js", gifts: "src/js/gifts-editor.js", jar: "src/js/jar-editor.js", jarOverlay: "src/js/jar-overlay.js", likers: "src/js/likers-editor.js", likersOverlay: "src/js/likers-overlay.js", gifters: "src/js/gifters-editor.js", giftersOverlay: "src/js/gifters-overlay.js", labels: "src/js/labels-editor.js", labelsOverlay: "src/js/labels-overlay.js", songs: "src/js/songs-editor.js", songsOverlay: "src/js/songs-overlay.js", spotify: "src/js/spotify-page.js", twitch: "src/js/twitch-page.js", admin: "src/js/admin.js", adminStats: "src/js/admin-stats.js", ticker: "src/js/ticker.js", goal: "src/js/goal-editor.js", giftsOverlay: "src/js/gifts-overlay.js", goalOverlay: "src/js/goal-overlay.js", counter: "src/js/counter-editor.js", counterOverlay: "src/js/counter-overlay.js", timer: "src/js/timer-editor.js", timerOverlay: "src/js/timer-overlay.js", tts: "src/js/tts-editor.js", ttsOverlay: "src/js/tts-overlay.js", ...(withOgCard && { og: "src/js/og.js" }) };
+const cssEntries = { home: "src/css/entry/home.css", check: "src/css/entry/check.css", page: "src/css/entry/page.css", start: "src/css/entry/start.css", editor: "src/css/entry/editor.css", matcha: "src/css/entry/matcha.css", overlay: "src/css/entry/overlay.css", cloudHost: "src/css/entry/cloud-host.css", alerts: "src/css/entry/alerts.css", alertsOverlay: "src/css/entry/alerts-overlay.css", widget: "src/css/entry/widget.css", admin: "src/css/entry/admin.css", widgetOverlay: "src/css/entry/widget-overlay.css", ...(withOgCard && { og: "src/css/entry/og.css" }) };
 const jsBuild = await esbuild({ ...common, entryPoints: jsEntries, format: "iife", legalComments: "none" });
 const cssBuild = await esbuild({ ...common, entryPoints: cssEntries, external: ["/fonts/*", "/decor/*"], legalComments: "inline" });
 
@@ -80,7 +81,7 @@ const pages = walk(join(src, "pages")).filter((f) => f.endsWith(".html")).map((f
   const m = /^<!--\s*(\{[\s\S]*?\})\s*-->\s*/.exec(text);
   if (!m) throw new Error(`${relative(root, file)} has no front matter`);
   return { file, meta: JSON.parse(m[1]), body: text.slice(m[0].length), mtime: statSync(file).mtime };
-}).filter((p) => !p.meta.devOnly || withOgCard).filter((p) => !p.meta.feature || (p.meta.feature === "feedbackForm" && site.feedbackForm));
+}).filter((p) => !p.meta.devOnly || withOgCard).filter((p) => !p.meta.feature || (Object.hasOwn(site, p.meta.feature) && site[p.meta.feature] === true)); // a page that names a feature is built only while that feature is on
 
 const looksCount = Object.keys(PRESETS).length;
 const WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
@@ -135,6 +136,7 @@ const copy = {
   matchaLede: relayOn ? "real TikTok chat or Twitch chat" : "real TikTok chat (with the Frills helper) or Twitch chat",
 };
 copy.tiktokGuide = render(partials[relayOn ? "guide-tiktok-relay" : "guide-tiktok-helper"], { helperGet }, partials, "guide-tiktok");
+const words = plusWords({ on: site.plusAccounts === true }); // (what the pages say changes once accounts exist: see src/plus-words.mjs)
 const shared = {
   ...copy,
   themeColor: tokenHex("paper"),
@@ -142,6 +144,13 @@ const shared = {
   waitlist: site.waitlistUrl,
   helperGet,
   relay: site.relayUrl,
+  plusRelay: site.plusRelayUrl,
+  ...Object.fromEntries(Object.entries(words).map(([k, v]) => ["plus" + k[0].toUpperCase() + k.slice(1), v])), // plusNotAffiliated, plusPrivacyLede, plusIdeasIntro, ...
+  plusAccounts: site.plusAccounts ? "on" : "", // ("on" when the Frills Plus account pages are built: a page that links to them checks this)
+  plusPromoCode: site.plusAccounts && site.plusPromoCode ? site.plusPromoCode : "",
+  plusPromoBanner: site.plusAccounts && site.plusPromoCode
+    ? `\n        <p class="plus-promo"><strong>Founding 20 offer:</strong> use code <code>${esc(site.plusPromoCode)}</code> at checkout for <strong>20% off forever</strong> ($4.79/month — first 20 subscribers only).</p>`
+    : "",
   siteAddress: site.url,
   spotifyClientId: site.spotifyClientId ?? "",
   twitchClientId: site.twitchClientId ?? "",
@@ -150,8 +159,8 @@ const shared = {
   privacyAlerts: relayOn ? `\n      <h2 class="subtitle">Alerts, last gifts and goals</h2>\n      <p>These work like chat: follows, gifts and shares pass through the free Frills relay to your overlay and nobody keeps them. The list of gifts, the follower count and the like ranking live only in your overlay page\u2019s memory. If you turn on \u201cremember\u201d, the count is kept in your own browser or streaming app and nowhere else.</p>` : "",
   // Everything the site's database keeps, in one list. Each item says what is kept, for how long, and who can see it.
   privacyStored: `\n      <h2 class="subtitle">What Frills keeps on its server</h2>
-      <p>Frills has no accounts, but it does use a small database on Cloudflare for the few things below. Nothing else is kept, and none of it is sold or used for advertising.</p>
-      <ul>${site.feedbackForm ? `
+      <p>${words.privacyStoredIntro}</p>
+      <ul>${words.privacyAccountItems}${site.feedbackForm ? `
         <li><strong>Feedback you send.</strong> The message, the kind you pick, the streaming app you pick, your contact if you type one, and the date. It does not save your address with the message. Only we read it, and we use it to improve Frills. Ask us to delete a message by sending another one that says which.</li>` : ""}
         <li><strong>Images, GIFs and sounds you upload for alerts.</strong> The file itself, its type, its size and the time, plus a scrambled copy (a hash) of the delete code you are shown once. We do not store your name or your address with it. A file stays until you delete it with that code or we remove it. Anyone who has your overlay link, or the file\u2019s own address, can open it, so do not upload anything private; the files are not listed anywhere. After a deletion a copy can stay at Cloudflare for up to an hour. Pictures and GIFs are limited to 1 MB, sounds to 300 KB, and to common picture and sound types, and you must have the right to use what you upload.</li>${site.twitchClientId ? `
         <li><strong>New Twitch followers, if you use Twitch follow alerts.</strong> Your Twitch login stays in your browser and is never sent to Frills. Each new follower\u2019s name and Twitch name are kept for one day, under a random code in your overlay link, so that your overlay can show them. The page that listens also tells Frills now and then that it is still running.</li>` : ""}${site.spotifyClientId ? `
@@ -173,7 +182,7 @@ const shared = {
 };
 
 const ORG = { "@type": "Organization", name: site.name, url: `${site.url}/`, logo: `${site.url}/apple-touch-icon.png` };
-const FEATURES = ["Chat overlay for TikTok LIVE and Twitch, with cute looks and little pets", "Alerts for follows, gifts and shares", "Last gifts list", "Goal bar for followers, gifts or likes", "Top likers ranking, and a rotating top gifters and likers ranking", "Song requests with a queue, and a Spotify player", "Seasonal looks and pictures", "Practice mode with made-up chat", "Free, no account"];
+const FEATURES = ["Chat overlay for TikTok LIVE and Twitch, with cute looks and little pets", "Alerts for follows, gifts and shares", "Last gifts list", "Goal bar for followers, gifts or likes", "Top likers and top gifters rankings, and a rotating top gifters and likers ranking", "Rotating stream highlights for last gifts, followers, subs and bits", "Song requests with a queue, and a Spotify player", "Seasonal looks and pictures", "Practice mode with made-up chat", "Free, no account"];
 
 function jsonLd(meta, canonical, faqItems, overlayItems = []) {
   const nodes = [];
@@ -195,8 +204,8 @@ function renderPage(page, stats) {
   const canonical = site.url + meta.path;
   const vars0 = { ...shared, stats };
   const where0 = relative(root, page.file);
-  const faqItems = faq({ kb: stats.kb, waitlistUrl: site.waitlistUrl, helperUrl: site.helperUrl, relayUrl: site.relayUrl });
-  const overlayItems = overlaysFaq({ kb: stats.kb, relayUrl: site.relayUrl });
+  const faqItems = faq({ kb: stats.kb, waitlistUrl: site.waitlistUrl, helperUrl: site.helperUrl, relayUrl: site.relayUrl, plus: site.plusAccounts === true });
+  const overlayItems = overlaysFaq({ kb: stats.kb, relayUrl: site.relayUrl, plus: site.plusAccounts === true });
   const vars = {
     ...shared,
     stats,
@@ -258,7 +267,7 @@ writeFileSync(
 );
 writeFileSync(
   join(dist, "robots.txt"),
-  `User-agent: *\nAllow: /\nDisallow: /overlay/\n\n# AI training crawlers: please stay out. Search and assistant crawlers are welcome.\n${site.trainingCrawlers.map((c) => `User-agent: ${c}`).join("\n")}\nDisallow: /\n\nSitemap: ${site.url}/sitemap.xml\n`,
+  `User-agent: *\nAllow: /\nDisallow: /overlay/\nDisallow: /o/\n\n# AI training crawlers: please stay out. Search and assistant crawlers are welcome.\n${site.trainingCrawlers.map((c) => `User-agent: ${c}`).join("\n")}\nDisallow: /\n\nSitemap: ${site.url}/sitemap.xml\n`,
 );
 
 // The page can only run its own files, talk to Twitch's chat server, and show pictures from three places: Twitch's emotes, and TikTok's
@@ -267,10 +276,11 @@ const TIKTOK_PICTURES = "https://*.tiktokcdn.com https://*.tiktokcdn-us.com http
 const TWITCH_CONNECT = site.twitchClientId ? " wss://eventsub.wss.twitch.tv https://api.twitch.tv https://id.twitch.tv" : "";
 const SPOTIFY_CONNECT = site.spotifyClientId ? " https://accounts.spotify.com https://api.spotify.com" : "";
 const SPOTIFY_PICTURES = site.spotifyClientId ? " https://i.scdn.co" : "";
-const csp = ["default-src 'self'", "script-src 'self'", "style-src 'self'", `img-src 'self' data: https://static-cdn.jtvnw.net https://cdn-images.dzcdn.net${SPOTIFY_PICTURES} ${TIKTOK_PICTURES}`, "font-src 'self'", `connect-src 'self' wss://irc-ws.chat.twitch.tv${site.relayUrl ? " " + site.relayUrl : ""}${TWITCH_CONNECT}${SPOTIFY_CONNECT}`, "base-uri 'self'", "form-action 'self'", "frame-ancestors 'none'", "object-src 'none'"].join("; ");
+const RELAY_CONNECT = [site.relayUrl, site.plusRelayUrl].filter(Boolean).map((u) => " " + u).join("");
+const csp = ["default-src 'self'", "script-src 'self'", "style-src 'self'", `img-src 'self' data: https://static-cdn.jtvnw.net https://cdn-images.dzcdn.net${SPOTIFY_PICTURES} ${TIKTOK_PICTURES}`, "font-src 'self'", `connect-src 'self' wss://irc-ws.chat.twitch.tv${RELAY_CONNECT}${TWITCH_CONNECT}${SPOTIFY_CONNECT}`, "base-uri 'self'", "form-action 'self'", "frame-ancestors 'none'", "object-src 'none'"].join("; ");
 writeFileSync(
   join(dist, "_headers"),
-  `/*\n  Content-Security-Policy: ${csp}\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n  Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()\n\n/assets/*\n  Cache-Control: public, max-age=31536000, immutable\n\n/fonts/*\n  Cache-Control: public, max-age=31536000, immutable\n\n/overlay/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n  ! Content-Security-Policy\n  Content-Security-Policy: ${csp.replace("frame-ancestors 'none'", "frame-ancestors 'self'")}\n\n/matcha/*\n  X-Robots-Tag: noindex, nofollow\n\n/check/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n\n/admin/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n`,
+  `/*\n  Content-Security-Policy: ${csp}\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n  Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()\n\n/assets/*\n  Cache-Control: public, max-age=31536000, immutable\n\n/fonts/*\n  Cache-Control: public, max-age=31536000, immutable\n\n/overlay/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n  ! Content-Security-Policy\n  Content-Security-Policy: ${csp.replace("frame-ancestors 'none'", "frame-ancestors 'self'")}\n\n/o/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n\n/matcha/*\n  X-Robots-Tag: noindex, nofollow\n\n/check/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n\n/admin/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n`,
 );
 
 // ── Report ────────────────────────────────────────────────────────────────────────────────────────────────────────────

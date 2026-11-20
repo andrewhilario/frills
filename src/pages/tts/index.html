@@ -1,0 +1,144 @@
+<!--
+{
+  "title": "Talking Pet TTS for TikTok LIVE & Twitch chat | Frills",
+  "description": "An animated pet reads TikTok LIVE gifts, Twitch bits & subs, and !say chat messages aloud with speech bubbles and free browser voices. Test locally or in OBS.",
+  "path": "/tts/",
+  "updated": "2026-11-20",
+  "published": "2026-11-11",
+  "css": "widget",
+  "js": "tts",
+  "bodyClass": "page-editor page-alerts",
+  "chrome": "appbar",
+  "footer": false,
+  "intro": "intro-tts",
+  "about": "about-tts",
+  "jsonld": ["webapp"]
+}
+-->
+<main class="workspace" id="main">
+  <section class="preview" id="preview" data-back="dark" aria-label="Live preview of Talking Pet TTS">
+    <div class="preview__bar">
+      <span class="preview__tag">Preview</span>
+      <label class="visually-hidden" for="backdrop">What sits behind the overlay</label>
+      <select id="backdrop">
+        <option value="dark">Dark game</option>
+        <option value="bright">Bright game</option>
+        <option value="busy">Busy scene</option>
+        <option value="checker">See-through</option>
+      </select>
+    </div>
+    <div class="chatstage" id="stage" aria-hidden="true"><div id="widget"></div></div>
+    <div class="preview__tests" role="group" aria-label="Test voices and events">
+      <button class="btn btn--soft btn--sm" type="button" data-test="gift">Gift thank-you</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="bigGift">Big gift</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="cmd">Say !say line</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="clear">Stop &amp; clear</button>
+      <form class="tts-saybox" id="say-form">
+        <label class="visually-hidden" for="say-input">Custom test message</label>
+        <input type="text" id="say-input" maxlength="200" placeholder="Type any line for your pet to say…">
+        <button class="btn btn--soft btn--sm" type="submit">Say line</button>
+      </form>
+    </div>
+  </section>
+
+  <div class="panel">
+    <noscript><p class="note">Frills needs JavaScript to run the voice editor. Turn it on for this page and reload.</p></noscript>
+    {{{intro}}}
+
+    <section class="step-card" aria-labelledby="s1">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">1</span>
+        <h2 class="step-card__title" id="s1">Pick a look</h2>
+        <button class="btn btn--soft btn--sm step-card__aside" type="button" id="reset">Reset</button>
+      </div>
+      <div class="chips" id="looks" role="group" aria-label="Starting looks"></div>
+      <div class="stack" id="look-controls"></div>
+    </section>
+
+    <section class="step-card" aria-labelledby="s2">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">2</span>
+        <h2 class="step-card__title" id="s2">Pet, voice &amp; triggers</h2>
+      </div>
+      <div class="ctl" id="browser-voice-row" hidden>
+        <label class="ctl__label" for="browser-voice-pick">Installed browser voices</label>
+        <select id="browser-voice-pick">
+          <option value="">Auto (match voice style)</option>
+        </select>
+        <p class="ctl__hint">Lists free voices exposed by your current browser (Microsoft Edge offers free Online Natural voices).</p>
+      </div>
+      <label class="media__consent" id="media-consent" hidden><input type="checkbox" id="media-ok"> I have the right to use any image or GIF I upload here. Files can be up to 1 MB.</label>
+      <div class="stack" id="opt-controls"></div>
+    </section>
+
+    <section class="step-card" aria-labelledby="s3">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">3</span>
+        <h2 class="step-card__title" id="s3">Connect your stream</h2>
+      </div>
+      <div id="source"></div>
+      <p class="ctl__hint" id="relay-note" role="status"></p>
+    </section>
+
+    <section class="step-card" aria-labelledby="s4">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">4</span>
+        <h2 class="step-card__title" id="s4">Add it to your stream</h2>
+      </div>
+      <div class="linkfield">
+        <label class="ctl__label" for="link">Your link</label>
+        <input type="text" id="link" readonly placeholder="Appears once you type a channel name" spellcheck="false" autocomplete="off">
+        <div class="linkfield__actions">
+          <button class="btn" type="button" id="copy-link" disabled>Copy link</button>
+        </div>
+        <p class="linkfield__hint" id="link-hint" role="status"></p>
+      </div>
+    </section>
+
+    <section class="plus-link" id="plus-link" data-accounts="{{plusAccounts}}" aria-labelledby="plus-link-title" hidden>
+      <h2 class="plus-link__title" id="plus-link-title">Your Frills Plus link</h2>
+      <p id="plus-link-state"></p>
+      <div class="plus-link__row">
+        <button class="btn btn--sm" type="button" id="plus-link-make" hidden>Make my Plus link</button>
+        <button class="btn btn--soft btn--sm" type="button" id="plus-link-off" hidden>Turn my link off</button>
+        <a class="btn btn--outline btn--sm" id="plus-link-account" hidden>Open my account</a>
+      </div>
+      <p class="form__hint" id="plus-link-hint" hidden>Anyone who has your overlay link can use your AI voice, so do not share it. If it leaks, make a new link: the old one stops working at once.</p>
+      <p class="form__status" id="plus-link-status" role="status" aria-live="polite"></p>
+    </section>
+
+    <aside class="pro-paywall" id="pro-paywall" hidden>
+      <p class="pro-paywall__title" id="pro-paywall-title">Frills Plus gives you AI voices</p>
+      <p class="pro-paywall__body" id="pro-paywall-body"></p>
+      <div class="pro-paywall__actions">
+        <a class="btn btn--sm" id="pro-account" hidden>Sign in or get Frills Plus</a>
+      </div>
+    </aside>
+
+    <div class="pro-status" id="pro-status" role="status" hidden></div>
+
+    <section class="pro-tester" id="pro-tester" aria-label="Local paywall and region simulator" hidden>
+      <div class="pro-tester__row">
+        <label class="ctl__label" for="sim-country">Simulate visitor region (dev only)</label>
+        <select id="sim-country">
+          <option value="">Local dev bypass</option>
+          <option value="US">US — Tier-1 eligible (paywall active)</option>
+          <option value="DE">DE — EU eligible (paywall active)</option>
+          <option value="GB">GB — UK eligible (paywall active)</option>
+          <option value="PH">PH — Region locked</option>
+          <option value="BR">BR — Region locked</option>
+        </select>
+      </div>
+      <div class="pro-tester__row">
+        <button class="btn btn--soft btn--sm" type="button" id="mint-pass">Give my signed-in test account 300 characters</button>
+        <button class="btn btn--soft btn--sm" type="button" id="check-pass">Refresh status</button>
+      </div>
+    </section>
+
+    {{{about}}}
+
+    <section class="preview-tools" aria-label="Preview options">
+      <div id="preview-canvas"></div>
+    </section>
+  </div>
+</main>

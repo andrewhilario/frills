@@ -115,7 +115,7 @@ test("stats page: it draws both sites, the Frills Plus check with yes and not ye
   assert.equal(texts.bars, 28);
   assert.match(texts.frills, /Site Visits \(7d\).*42/);
   assert.match(texts.frills, /Weekly Active Streamers.*2/);
-  assert.match(texts.frills, /Overlay Links Copied.*17% of visits/);
+  assert.match(texts.frills, /Copy Conversion \(7d\).*17%/);
   assert.match(texts.frills, /Links Copied by Platform/);
   assert.match(texts.frills, /Frills Plus Interest Clicks.*Remote-Control Link/);
   assert.match(texts.frills, /Overlays by Country.*(Philippines.*United States|United States.*Philippines)/, "the country table names the countries, not their codes");
@@ -124,7 +124,7 @@ test("stats page: it draws both sites, the Frills Plus check with yes and not ye
   assert.match(texts.frills, /TikTok/);
   assert.match(texts.frills, /90 demo\/preview loads/);
   assert.match(texts.tally, /Rank Page/);
-  assert.match(texts.tally, /pro_click 2/, "an event only that site has is listed by name");
+  assert.match(texts.tally, /pro_click.*2/, "an event only that site has is listed by name");
   assert.equal(await page.evaluate(`document.getElementById("login").hidden`), true);
   assert.deepEqual(page.problems.filter((p) => !p.includes("api/admin/stats")), [], page.problems.join(" | "));
 });

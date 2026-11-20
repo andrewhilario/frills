@@ -1,0 +1,34 @@
+<!--
+{
+  "title": "Sign in to Frills",
+  "description": "Finish signing in to Frills.",
+  "path": "/account/verify/",
+  "css": "page",
+  "js": "account",
+  "bodyClass": "page-guide",
+  "chrome": "nav",
+  "footer": true,
+  "noindex": true,
+  "listed": false,
+  "feature": "plusAccounts"
+}
+-->
+<main id="main">
+  <article class="article shell">
+    <header class="article__head">
+      <h1 class="display">Sign in to Frills</h1>
+    </header>
+    <div class="article__body">
+      <noscript><p class="note">Signing in needs JavaScript. Turn it on for this page and reload.</p></noscript>
+      <div id="verify-ready" hidden>
+        <p class="lede">Press the button to finish signing in on this device.</p>
+        <p><button class="btn" type="button" id="verify-go">Sign in <span class="btn__arrow" aria-hidden="true">→</span></button></p>
+      </div>
+      <div class="note note--warm" id="verify-bad" tabindex="-1" hidden>
+        <p><strong id="verify-bad-title">That link does not work.</strong> <span id="verify-bad-body">It may have been used already, or it is older than 15 minutes.</span></p>
+        <p><a class="btn btn--outline btn--sm" href="/account/">Get a new link</a></p>
+      </div>
+      <p class="form__status" id="verify-status" role="status" aria-live="polite"></p>
+    </div>
+  </article>
+</main>

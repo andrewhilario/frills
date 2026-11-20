@@ -68,6 +68,10 @@ test("a gift in the list adds its own seconds for each one; any other gift adds 
   assert.equal(secondsFor(gift("Heart", 20, 3), s), 36, "a streak counts all its diamonds: 60 diamonds");
   assert.equal(secondsFor(gift("Panda", 100), settings({ perDiamonds: 0 })), 0, "a rate of 0 means other gifts add nothing");
   assert.equal(secondsFor({ kind: "follow" }, s), 10);
+  assert.equal(secondsFor({ kind: "raid", count: 25 }, s), 10);
+  assert.equal(secondsFor({ kind: "sub" }, s), 60);
+  assert.equal(secondsFor({ kind: "subgift", count: 5 }, s), 300);
+  assert.equal(secondsFor({ kind: "bits", count: 250 }, s), 150);
   assert.equal(secondsFor({ kind: "share" }, s), 0);
   assert.equal(secondsFor({ kind: "like", count: 50 }, s), 0, "likes add nothing");
   assert.equal(secondsFor(null, s), 0);

@@ -16,7 +16,7 @@ const read = (path) => readFileSync(join(out, path), "utf8");
 const textOf = (html) => html.replace(/<script[\s\S]*?<\/script>/g, " ").replace(/<[^>]+>/g, " ");
 
 before(() => {
-  const build = spawnSync(process.execPath, ["build.mjs"], { cwd: root, env: { ...process.env, OUT_DIR: out, RELAY_URL: RELAY + "/" }, encoding: "utf8" });
+  const build = spawnSync(process.execPath, ["build.mjs"], { cwd: root, env: { ...process.env, OUT_DIR: out, RELAY_URL: RELAY + "/", PLUS_RELAY_URL: "" }, encoding: "utf8" });
   assert.equal(build.status, 0, build.stderr || build.stdout);
 });
 after(() => { rmSync(out, { recursive: true, force: true }); });
@@ -58,7 +58,7 @@ test("with a relay, no page tells anyone to install or run a helper", () => {
 test("without a relay the same pages say none of that", () => {
   const plainOut = mkdtempSync(join(tmpdir(), "frills-plain-site-"));
   try {
-    const build = spawnSync(process.execPath, ["build.mjs"], { cwd: root, env: { ...process.env, OUT_DIR: plainOut, RELAY_URL: "" }, encoding: "utf8" });
+    const build = spawnSync(process.execPath, ["build.mjs"], { cwd: root, env: { ...process.env, OUT_DIR: plainOut, RELAY_URL: "", PLUS_RELAY_URL: "" }, encoding: "utf8" });
     assert.equal(build.status, 0, build.stderr || build.stdout);
     const plain = readFileSync(join(plainOut, "index.html"), "utf8");
     assert.ok(!plain.includes("free relay"));

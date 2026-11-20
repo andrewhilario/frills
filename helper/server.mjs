@@ -24,6 +24,9 @@ import { DEMO_USER, DemoConnection } from "./demo.mjs";
 import { ALERT_AT, Signing, capacity, deviceFacts, snapshot, statusPage } from "./status.mjs";
 import { SlotAlerts, termuxNotifier } from "./alerts.mjs";
 import { OWNER, ownerGate } from "./owner.mjs";
+import { handleProStatus } from "../worker/region.mjs";
+import { handleDevPass, handleTts } from "../worker/tts.mjs";
+import { validTicketSecret, verifyRelayTicket } from "../worker/relay-ticket.mjs";
 
 const VERSION = "0.6.0";
 /** What this program can do, so a page can tell an old one ("chat" only) from one that sends alerts. */
@@ -66,6 +69,7 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
   // LIVE starts. With a look every minute after only 3 minutes, a LIVE was found up to a minute late, and up to 3 minutes late after half an hour. So it
   // looks every 20 seconds for 15 minutes, every 30 seconds until an hour, every minute until 4 hours, and every 3 minutes after that.
   const shared = relay ? { queue: true, idleStopMs: 600000, offlineWaitMs: 20000, offlineGiveUpMs: 0, offlineSlowSteps: [[900000, 30000], [3600000, 60000], [14400000, 180000]], maxRooms: relay.slots ?? 30 } : {};
+  const ticketSecret = relay ? String(relay.ticketSecret ?? "").trim() : "";
   const signing = new Signing();
   const startedAt = Date.now();
   const hub = new Hub({ factory: make, apiKey, log, onLimited: () => signing.note(), onSigned: () => signing.use(), ...shared, ...tuning });
@@ -122,8 +126,36 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
     res.end(JSON.stringify(body));
   };
   let restartAt = 0; // when the owner last asked for a restart
+  const proEnv = {
+    DEV: true,
+    DB: null,
+    OPENAI_TTS_KEY: process.env.OPENAI_TTS_KEY || "",
+    GOOGLE_TTS_KEY: process.env.GOOGLE_TTS_KEY || "",
+    GROQ_TTS_KEY: process.env.GROQ_TTS_KEY || "",
+    PRO_DEV_KEY: process.env.PRO_DEV_KEY || "",
+    PRO_COUNTRIES: process.env.PRO_COUNTRIES || "",
+    REQUIRE_PRO_PASS: process.env.REQUIRE_PRO_PASS || "",
+    LEMON_CHECKOUT_URL: process.env.LEMON_CHECKOUT_URL || "",
+    LEMON_STORE_ID: process.env.LEMON_STORE_ID || "",
+    LEMON_PRODUCT_ID: process.env.LEMON_PRODUCT_ID || "",
+    LEMON_WEBHOOK_SECRET: process.env.LEMON_WEBHOOK_SECRET || "",
+    LEMON_TEST_MODE: process.env.LEMON_TEST_MODE || "", // (off unless asked for: a test-mode payment is for a test setup only)
+  };
+  let dbInit = null;
+  const ensureDb = async () => {
+    if (proEnv.DB || dbInit) return dbInit;
+    dbInit = import("../scripts/lib/d1-sqlite.mjs")
+      .then(({ localDatabase }) => {
+        const dbPath = process.env.FEEDBACK_DB ?? (existsSync(fileURLToPath(new URL("../scripts/serve.mjs", import.meta.url)))
+          ? fileURLToPath(new URL("../.dev-feedback.sqlite", import.meta.url))
+          : ":memory:");
+        proEnv.DB = localDatabase(dbPath);
+      })
+      .catch(() => {});
+    return dbInit;
+  };
 
-  const server = http.createServer((req, res) => {
+  const server = http.createServer(async (req, res) => {
     let cors = {};
     const url = new URL(req.url, "http://localhost");
     if (relay) {
@@ -179,15 +211,45 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
       res.end(statusPage(numbers(onDevice))); // a page load can't carry the password: the page asks again with it
     } else if (url.pathname === "/tiktok/ping" || (relay && url.pathname === "/health")) {
       res.writeHead(200, { "Content-Type": "application/json", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", ...cors });
-      res.end(JSON.stringify(relay && url.pathname === "/health" ? numbers(owner, proven) : relay ? { ok: true, name: "frills-relay", version: VERSION, features: FEATURES, slots: hub.stats() } : { ok: true, name: "frills-helper", version: VERSION, features: FEATURES }));
+      res.end(JSON.stringify(relay && url.pathname === "/health" ? numbers(owner, proven) : relay ? { ok: true, name: "frills-relay", version: VERSION, features: FEATURES, ...(ticketSecret ? { plus: true, auth: true } : {}), slots: hub.stats() } : { ok: true, name: "frills-helper", version: VERSION, features: FEATURES }));
+    } else if (!relay && req.method === "GET" && url.pathname === "/api/account/me") {
+      json(res, 200, { ok: true, signedIn: false });
+    } else if (!relay && req.method === "GET" && url.pathname === "/api/cloud-overlays") {
+      json(res, 200, { ok: true, signedIn: false, plusActive: false, eligible: false, overlays: [] });
+    } else if (!relay && (url.pathname === "/api/pro/status" || url.pathname === "/api/pro/dev-pass" || url.pathname === "/api/tts")) {
+      try {
+        await ensureDb();
+        const chunks = [];
+        if (!["GET", "HEAD"].includes(req.method)) for await (const chunk of req) chunks.push(chunk);
+        const request = new Request(`http://${req.headers.host || "127.0.0.1"}${req.url}`, { method: req.method, headers: req.headers, body: chunks.length ? Buffer.concat(chunks) : undefined });
+        const response = await (
+          url.pathname === "/api/pro/status"
+            ? handleProStatus(request, proEnv)
+            : url.pathname === "/api/pro/dev-pass"
+              ? handleDevPass(request, proEnv)
+              : handleTts(request, proEnv)
+        );
+        res.writeHead(response.status, Object.fromEntries(response.headers));
+        res.end(Buffer.from(await response.arrayBuffer()));
+      } catch {
+        json(res, 500, { ok: false, error: "tts_failed" });
+      }
     } else if (url.pathname === "/tiktok/stream") {
-      stream(req, res, url, cors);
+      await stream(req, res, url, cors);
     } else {
       files(req, res);
     }
   });
 
-  function stream(req, res, url, cors) {
+  async function stream(req, res, url, cors) {
+    if (relay && ticketSecret) {
+      const checked = await verifyRelayTicket(url.searchParams.get("ticket") ?? "", ticketSecret);
+      if (!checked.ok) {
+        const error = checked.error === "expired" ? "ticket_expired" : "ticket_required";
+        res.writeHead(401, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff", ...cors });
+        return res.end(JSON.stringify({ error, message: "This dedicated Frills Plus relay requires an active Frills Plus ticket." }));
+      }
+    }
     const user = cleanTikTokUser(url.searchParams.get("user"));
     if (!user) return text(res, 400, "That is not a TikTok name.", cors);
     const who = relay ? visitor(req) : "";
@@ -280,6 +342,7 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
     },
     close() {
       hub.closeAll();
+      try { proEnv.DB?.raw?.close?.(); } catch { /* ignore */ }
       server.closeAllConnections?.();
       return new Promise((resolve) => server.close(resolve));
     },
@@ -311,9 +374,14 @@ async function mainRelay() {
   const slots = numberOr(process.env.RELAY_SLOTS, 30);
   const alertAt = Number.isFinite(Number(process.env.RELAY_ALERT_SPOTS)) && process.env.RELAY_ALERT_SPOTS !== undefined && process.env.RELAY_ALERT_SPOTS !== "" ? Math.max(0, Number(process.env.RELAY_ALERT_SPOTS)) : 10;
   const ownerKey = process.env.RELAY_OWNER_KEY;
+  const ticketSecret = (process.env.RELAY_TICKET_SECRET ?? "").trim();
+  if (ticketSecret && !validTicketSecret(ticketSecret)) {
+    console.error("RELAY_TICKET_SECRET must be at least 16 characters.");
+    process.exit(1);
+  }
   // Something starts the relay again when it stops: the keeper that `npm run relay` runs (it sets RELAY_SUPERVISED), or systemd (it sets INVOCATION_ID).
   const supervised = Boolean(process.env.RELAY_SUPERVISED || process.env.INVOCATION_ID);
-  const relay = { origins, slots, alertAt, ownerKey, maxPerIp: numberOr(process.env.RELAY_PER_IP, 60), maxAccountsPerIp: numberOr(process.env.RELAY_ACCOUNTS_PER_IP, 12), trustProxy: process.env.RELAY_TRUST_PROXY !== "0" };
+  const relay = { origins, slots, alertAt, ownerKey, ticketSecret, maxPerIp: numberOr(process.env.RELAY_PER_IP, 60), maxAccountsPerIp: numberOr(process.env.RELAY_ACCOUNTS_PER_IP, 12), trustProxy: process.env.RELAY_TRUST_PROXY !== "0" };
   const port = numberOr(process.argv.find((a) => a.startsWith("--port="))?.slice(7) ?? process.env.PORT, 8765);
   const bind = process.env.RELAY_BIND ?? "127.0.0.1"; // behind a tunnel nothing else may reach it
   const helper = createHelper({ relay, apiKey: (process.env.EULER_API_KEY ?? "").trim(), log: say });
@@ -324,7 +392,7 @@ async function mainRelay() {
     process.exit(1);
   }
   import("tiktok-live-connector").catch(() => {}); // warm it up now: the first account to connect should not wait for the library to load
-  console.log(`\nFrills relay ${VERSION} is running on ${bind}:${port}.\n  Spots: ${slots}. Allowed website addresses: ${origins.join(", ")}.\n  Status page: http://${bind}:${port}/health (open it in a browser)\n  Warns you when ${alertAt} spots or fewer are left${process.env.RELAY_ALERTS === "0" ? " (alerts are off)" : ""}.\n  Owner password (to see who is connected from your PC): ${ownerState(ownerKey)}.\n  Signing service key (EULER_API_KEY): ${process.env.EULER_API_KEY?.trim() ? "set, so the limits are your own" : "NOT set: the limits are shared with everyone, and TikTok will often be busy at night"}.\n  Pages one internet address may keep open: ${relay.maxPerIp} (RELAY_PER_IP), for at most ${relay.maxAccountsPerIp} different accounts (RELAY_ACCOUNTS_PER_IP).\n`);
+  console.log(`\nFrills relay ${VERSION} is running on ${bind}:${port}.\n  Spots: ${slots}. Allowed website addresses: ${origins.join(", ")}.\n  Status page: http://${bind}:${port}/health (open it in a browser)\n  Warns you when ${alertAt} spots or fewer are left${process.env.RELAY_ALERTS === "0" ? " (alerts are off)" : ""}.\n  Owner password (to see who is connected from your PC): ${ownerState(ownerKey)}.\n  Plus ticket lock (RELAY_TICKET_SECRET): ${ticketSecret ? "on (dedicated Frills Plus relay)" : "off (shared free relay)"}.\n  Signing service key (EULER_API_KEY): ${process.env.EULER_API_KEY?.trim() ? "set, so the limits are your own" : "NOT set: the limits are shared with everyone, and TikTok will often be busy at night"}.\n  Pages one internet address may keep open: ${relay.maxPerIp} (RELAY_PER_IP), for at most ${relay.maxAccountsPerIp} different accounts (RELAY_ACCOUNTS_PER_IP).\n`);
   console.log(`  Restart from the status page: ${ownerKey && ownerKey.length >= OWNER.minKey ? (supervised ? "on" : "off (start the relay with npm run relay, or under systemd, so that something starts it again)") : "off (it needs the owner password)"}`);
   if (process.env.RELAY_ALERTS !== "0") {
     const alerts = new SlotAlerts({ stats: () => helper.hub.stats(), signing: helper.signing, alertAt, notify: termuxNotifier({ log: say }), log: say });

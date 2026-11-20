@@ -397,15 +397,18 @@ test("song requests: the step says whether the song requests overlay is open wit
   await open("/songs/", { server: { queue: true, overlayAt: Date.now() - 20000 } });
   await connected();
   assert.equal(await page.evaluate('document.getElementById("spx-overlay-note").dataset.state'), "ok");
+  assert.equal(await page.evaluate('document.getElementById("spx-copy-row").hidden'), true);
   assert.match(await text("spx-overlay-note"), /overlay is open[\s\S]*!sr can reach your Spotify queue/);
 
   await open("/songs/", { server: { queue: true, overlayAt: 0 } });
   await connected();
   assert.equal(await page.evaluate('document.getElementById("spx-overlay-note").dataset.state'), "error");
+  assert.equal(await page.evaluate('document.getElementById("spx-copy-row").hidden'), false);
   assert.match(await text("spx-overlay-note"), /cannot see your song requests overlay[\s\S]*copied after you connected Spotify[\s\S]*copy your link again/);
 
   await open("/songs/", { server: { queue: false, overlayAt: Date.now() - 20000 } });
   await connected();
+  assert.equal(await page.evaluate('document.getElementById("spx-copy-row").hidden'), true);
   assert.match(await text("spx-overlay-note"), /overlay is open[\s\S]*Switch on adding to your Spotify queue/, "open, but the switch is off: it says so");
   assert.match(await page.evaluate('document.querySelector(".spx__relink").textContent'), /copied your link[\s\S]*before[\s\S]*connected Spotify[\s\S]*copy it again/, "the link step says to copy it again");
   assert.deepEqual(problems(), []);
@@ -490,4 +493,21 @@ test("song requests: disconnecting forgets the answer, so connecting again asks 
   await open("/songs/", { server: null }, { fresh: false });
   await page.waitFor('document.getElementById("spx-status").textContent.includes("Not connected")');
   assert.equal(await askShown(), false);
+});
+
+test("song requests: the Spotify step can expand into a full-page setup view and hide completed steps so nobody has to scroll a cramped sidebar", { skip }, async () => {
+  await open("/songs/", { server: null });
+  assert.equal(await page.evaluate('document.getElementById("main").dataset.spotifyView ?? ""'), "");
+  await page.evaluate('document.getElementById("spx-expand").click()');
+  assert.equal(await page.evaluate('document.getElementById("main").dataset.spotifyView'), "full");
+  assert.equal(await page.evaluate('document.getElementById("spx-topbar").hidden'), false);
+  assert.equal(await page.evaluate('getComputedStyle(document.getElementById("preview")).display'), "none", "the preview hides so the setup steps get the whole page");
+  await page.evaluate(`document.querySelector('[data-done="1"]').click()`);
+  await page.evaluate('document.getElementById("spx-hide-done").click()');
+  assert.equal(await page.evaluate(`getComputedStyle(document.querySelector('[data-step="1"]')).display`), "none", "completed step hides when asked");
+  assert.notEqual(await page.evaluate(`getComputedStyle(document.querySelector('[data-step="2"]')).display`), "none", "unfinished step stays visible");
+  await page.evaluate('document.getElementById("spx-back-editor").click()');
+  assert.equal(await page.evaluate('document.getElementById("main").dataset.spotifyView ?? ""'), "");
+  assert.equal(await page.evaluate('document.getElementById("spx-topbar").hidden'), true);
+  assert.deepEqual(problems(), []);
 });

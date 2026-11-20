@@ -2,15 +2,15 @@
 // the page and for the structured data, like the main FAQ. `a` is HTML (links allowed); `text` is what search engines get.
 // Every answer says only what has been built and tried; what is only planned says "coming soon".
 
-export function overlaysFaq({ kb = 19, relayUrl = "" } = {}) {
+export function overlaysFaq({ kb = 19, relayUrl = "", plus = false } = {}) {
   const items = [
     {
       q: "Which overlays are there?",
-      a: "The <a href=\"/editor/\">chat overlay</a>, <a href=\"/alerts/\">alerts</a>, <a href=\"/gifts/\">last gifts</a>, <a href=\"/goal/\">goals</a> (followers, gifts or likes) and <a href=\"/likers/\">top likers</a>, a <a href=\"/leaderboard/\">top gifters and likers</a> overlay that takes turns, and <a href=\"/songs/\">song requests</a> (with an optional Spotify player). Each has its own editor, its own look and its own link. All of them are free, with no Frills account. The overlays other than chat are in beta.",
+      a: "The <a href=\"/editor/\">chat overlay</a>, <a href=\"/alerts/\">alerts</a>, <a href=\"/gifts/\">last gifts</a>, <a href=\"/jar/\">gift jar</a>, <a href=\"/goal/\">goals</a> (followers, gifts or likes), <a href=\"/likers/\">top likers</a>, <a href=\"/gifters/\">top gifters</a>, <a href=\"/leaderboard/\">top gifters and likers</a> (one overlay that takes turns), <a href=\"/labels/\">rotating highlights</a>, <a href=\"/counter/\">viewer and like counter</a>, <a href=\"/timer/\">subathon timer</a>, <a href=\"/tts/\">talking pet TTS</a>, and <a href=\"/songs/\">song requests</a> (with an optional Spotify player). Each has its own editor, its own look and its own link. All of them are free, with no Frills account. The overlays other than chat are in beta.",
     },
     {
       q: "Do the overlays work with Twitch?",
-      a: "The chat overlay and the alerts do. On Twitch the alerts show new subs and resubs, gifted subs, bits and raids, and follows too, once you log in to Twitch on one private page (see the questions below). Last gifts, goals and top likers are for TikTok LIVE only for now, because they are built on TikTok gifts and likes. Twitch has no likes, and its gifts are subs and bits, which those overlays do not show yet.",
+      a: "The chat overlay, <a href=\"/alerts/\">alerts</a>, <a href=\"/gifters/\">top gifters</a> (sub gifters, bit senders or combined), and <a href=\"/labels/\">rotating highlights</a> (last follower, last sub, last bits, top sub gifter and top bit sender) work on Twitch. New subs, gifted subs, bits and raids come straight from Twitch chat with no login; Twitch follows require logging in on one private page or inside Step 3 (see below). Last gifts, goals and top likers are for TikTok LIVE only for now, along with the <a href=\"/jar/\">gift jar</a>.",
     },
     {
       q: "How do I add an overlay to my stream?",
@@ -66,7 +66,7 @@ export function overlaysFaq({ kb = 19, relayUrl = "" } = {}) {
     },
     {
       q: "What does Frills keep about me and my viewers?",
-      a: "No account and no chat. The relay passes chat, gifts and likes to your overlay and does not keep them. What Frills stores is short: feedback you send, any image or sound you upload for alerts, the new Twitch followers' names for one day if you use that feature, and the song playing if you share Spotify. The <a href=\"/privacy/\">privacy page</a> lists all of it.",
+      a: (plus ? "No chat, and no account unless you make one for Frills Plus. " : "No account and no chat. ") + "The relay passes chat, gifts and likes to your overlay and does not keep them. What Frills stores is short: feedback you send, any image or sound you upload for alerts, the new Twitch followers' names for one day if you use that feature, and the song playing if you share Spotify. The <a href=\"/privacy/\">privacy page</a> lists all of it.",
     },
   ];
   return items.map((item) => ({ ...item, text: item.a.replace(/<[^>]+>/g, "") }));

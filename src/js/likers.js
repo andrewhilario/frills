@@ -4,14 +4,18 @@
 // overlay celebrates them. No page and no clock, so it is tested on its own.
 
 import { defineWidget, chipsOf, number, range, selectOf, text, toggle } from "./widget-settings.js";
+import { LEADERBOARD_LAYOUTS } from "./leaderboard-layouts.js";
 import { SOUNDS } from "./alerts-settings.js";
 
 /** The smallest milestone there is: a celebration for fewer likes than this would come too often to feel special. */
 export const MIN_MILESTONE = 1000;
 
+export const LIKER_LAYOUTS = LEADERBOARD_LAYOUTS;
+
 export const LIKERS = defineWidget({
-  defaults: { max: 10, title: true, titleText: "Top likers", showCounts: true, avatar: true, medals: true, minLikes: 1, keep: false, celebrate: true, milestone: MIN_MILESTONE, celebrateWho: "top", celebrateText: "Congratulations!", celebrateTime: 7, celebrateSound: "fanfare" },
+  defaults: { layout: "classic", max: 10, title: true, titleText: "Top likers", showCounts: true, avatar: true, medals: true, minLikes: 1, keep: false, celebrate: true, milestone: MIN_MILESTONE, celebrateWho: "top", celebrateText: "Congratulations!", celebrateTime: 7, celebrateSound: "fanfare" },
   controls: [
+    { section: "list", ...selectOf("layout", "Leaderboard design", LIKER_LAYOUTS) },
     { section: "list", ...range("max", "People shown", 3, 10, 1, "") },
     { section: "list", ...toggle("title", "Show a title above the list") },
     { section: "list", ...text("titleText", "Title", 40) },

@@ -11,9 +11,14 @@ startWidgetEditor({
   widget: TIMER,
   storeKey: "frills:timer:v1",
   overlayPath: "/overlay/timer/",
-  events: ["gift", "follow", "share"],
-  idleHint: "Type your TikTok name, or frills_demo to get made-up gifts. The buttons above work without connecting.",
-  create(host, settings) {
+  platforms: ["tiktok", "twitch", "both"],
+  events: (p) => (p === "twitch" ? ["sub", "subgift", "bits", "raid"] : p === "both" ? ["gift", "follow", "share", "sub", "subgift", "bits", "raid"] : ["gift", "follow", "share"]),
+  idleHint: (p) => (p === "twitch"
+    ? "Type your Twitch channel, or use the buttons above without connecting."
+    : p === "both"
+      ? "Type your TikTok @name and Twitch channel so both TikTok gifts and Twitch subs & bits add time."
+      : "Type your TikTok name, or frills_demo to get made-up gifts. The buttons above work without connecting."),
+  create(host, settings, ctx) {
     const view = createTimerView(host);
     const identity = timerIdentity();
     settings.code = identity.code; // the code rides in the link by itself; the key never leaves this browser

@@ -9,6 +9,7 @@ import { MEDIA_ID, mediaUrl } from "./alerts-settings.js";
 import { fillTemplate } from "./alerts.js";
 import { lookVars } from "./widget-settings.js";
 import { decoPieces, hasDeco, seedOf } from "./decor.js";
+import { createJarCanvas } from "./jar-canvas.js";
 
 const reducedMotion = () => globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
@@ -192,21 +193,7 @@ export function createGoalView(host) {
       cheer.textContent = words;
       cheer.hidden = !words;
       root.classList.add("goal--party");
-      fx.replaceChildren();
-      fx.dataset.fx = "confetti";
-      if (!reducedMotion()) {
-        for (let i = 0; i < 34; i++) {
-          const p = el("i");
-          const angle = Math.random() * Math.PI * 2;
-          const far = 60 + Math.random() * 120;
-          p.style.setProperty("--x", Math.round(Math.cos(angle) * far * 1.6) + "px");
-          p.style.setProperty("--y", Math.round(Math.sin(angle) * far * 0.8) + "px");
-          p.style.setProperty("--r", Math.round(Math.random() * 400 - 200) + "deg");
-          p.style.setProperty("--d", Math.round(Math.random() * 300) + "ms");
-          p.style.setProperty("--s", (0.7 + Math.random() * 0.7).toFixed(2));
-          fx.append(p);
-        }
-      }
+      confettiBurst(fx, 34, { spreadX: 120, spreadY: 120, minDist: 60, yMul: 0.8 });
       return new Promise((resolve) => setTimeout(() => {
         cheer.hidden = true;
         root.classList.remove("goal--party");
@@ -218,6 +205,23 @@ export function createGoalView(host) {
 }
 
 const SVG = "http://www.w3.org/2000/svg";
+function confettiBurst(fx, count = 34, { spreadX = 180, spreadY = 100, minDist = 60, yMul = 0.8 } = {}) {
+  fx.replaceChildren();
+  fx.dataset.fx = "confetti";
+  if (reducedMotion()) return;
+  for (let i = 0; i < count; i++) {
+    const p = el("i");
+    const angle = Math.random() * Math.PI * 2;
+    const far = minDist + Math.random() * spreadX;
+    p.style.setProperty("--x", Math.round(Math.cos(angle) * far * 1.5) + "px");
+    p.style.setProperty("--y", Math.round(Math.sin(angle) * (minDist + Math.random() * spreadY) * yMul) + "px");
+    p.style.setProperty("--r", Math.round(Math.random() * 400 - 200) + "deg");
+    p.style.setProperty("--d", Math.round(300 + Math.random() * 350) + "ms");
+    p.style.setProperty("--s", (0.7 + Math.random() * 0.75).toFixed(2));
+    fx.append(p);
+  }
+}
+
 /** A little gold crown (drawn here so it is the same on every look), for the person being celebrated. */
 function crownIcon() {
   const svg = document.createElementNS(SVG, "svg");
@@ -236,17 +240,17 @@ function crownIcon() {
 const PARTY_WAITING = 3; // celebrations that can wait their turn; when more pile up, the rest are skipped
 
 /**
- * The Top Likers ranking. Rows slide to their new places when the order changes. Returns { apply(settings), render(top), clear(),
- * celebrate(person, { onStart }) }. `celebrate` zooms a person in (picture, name, their likes, a crown, confetti) over the list for the
- * seconds the settings say; one at a time, the next waits. It resolves to whether it was shown (false when too many are already waiting).
+ * Shared leaderboard view powering Top Likers and Top Gifters. Rows slide cleanly as rank changes.
+ * `formatRow(person)` formats the score pill; `defaultUnit` sets the celebration unit when `person.unit` is omitted.
  */
-export function createLikersView(host) {
+function createLeaderboardView(host, { defaultUnit = "likes", formatRow = (p) => Number(p.count).toLocaleString("en-US") } = {}) {
   const root = el("div", { className: "likers" });
+  root.dataset.unit = defaultUnit;
   host.append(root);
   const title = el("p", { className: "likers__title" });
   const rows = el("div", { className: "likers__rows" });
   root.append(title, rows);
-  const nodes = new Map(); // person -> { node, count }
+  const nodes = new Map(); // key -> { node, rank, count, shown }
   let settings = null;
   let last = [];
   const waiting = [];
@@ -258,20 +262,7 @@ export function createLikersView(host) {
     node.style.setProperty("--party-ms", ms + "ms");
     const fx = el("span", { className: "alert__fx likers__fx" });
     fx.setAttribute("aria-hidden", "true");
-    if (!reducedMotion()) {
-      fx.dataset.fx = "confetti";
-      for (let i = 0; i < 46; i++) {
-        const p = el("i");
-        const angle = Math.random() * Math.PI * 2;
-        const far = 150 + Math.random() * 190;
-        p.style.setProperty("--x", Math.round(Math.cos(angle) * far * 1.5) + "px");
-        p.style.setProperty("--y", Math.round(Math.sin(angle) * far) + "px");
-        p.style.setProperty("--r", Math.round(Math.random() * 400 - 200) + "deg");
-        p.style.setProperty("--d", Math.round(350 + Math.random() * 350) + "ms");
-        p.style.setProperty("--s", (0.7 + Math.random() * 0.8).toFixed(2));
-        fx.append(p);
-      }
-    }
+    confettiBurst(fx, 46, { spreadX: 190, spreadY: 190, minDist: 150, yMul: 1 });
     const pic = el("span", { className: "likers__pic", textContent: [...(person.name || "?")][0].toUpperCase() });
     pic.setAttribute("aria-hidden", "true");
     if (person.avatar) {
@@ -280,8 +271,9 @@ export function createLikersView(host) {
       img.addEventListener("error", () => img.remove());
       pic.append(img);
     }
+    const unit = person.unit || defaultUnit;
     const card = el("div", { className: "likers__trophy" }, crownIcon(), pic, el("strong", { className: "likers__who", textContent: person.name }));
-    card.append(el("span", { className: "likers__total" }, el("span", { className: "likers__num", textContent: Number(person.count).toLocaleString("en-US") }), document.createTextNode(" likes")));
+    card.append(el("span", { className: "likers__total" }, el("span", { className: "likers__num", textContent: Number(person.count).toLocaleString("en-US") }), document.createTextNode(" " + unit)));
     if (settings?.celebrateText) card.append(el("span", { className: "likers__cheer", textContent: settings.celebrateText }));
     node.append(fx, card);
     return node;
@@ -299,14 +291,29 @@ export function createLikersView(host) {
     setTimeout(() => { node.remove(); showing = false; done(true); nextParty(); }, ms);
   }
 
-  /** Puts each row at its place: a row is placed by its rank, so changing the order is just changing the numbers. */
+  /** Puts each row at its place: reads heights first, places fresh rows directly, and glides existing rows smoothly. */
   function layout() {
-    const first = rows.firstElementChild;
-    if (!first) { rows.style.height = "0"; return; }
-    const gap = parseFloat(getComputedStyle(rows).fontSize) * 0.5;
-    const step = first.offsetHeight + gap;
-    last.forEach((p, i) => { const n = nodes.get(p.key); if (n) n.node.style.transform = `translateY(${Math.round(i * step)}px)`; });
-    rows.style.height = Math.max(0, Math.round(last.length * step - gap)) + "px";
+    const gap = parseFloat(getComputedStyle(rows).fontSize || "24") * (settings?.layout === "compact" ? 0.3 : 0.5);
+    let y = 0;
+    const placements = [];
+    for (const p of last) {
+      const n = nodes.get(p.key);
+      if (!n) continue;
+      placements.push([n, Math.round(y)]);
+      y += n.node.offsetHeight + gap;
+    }
+    for (const [n, topY] of placements) {
+      if (n.fresh) {
+        n.node.style.transition = "none";
+        n.node.style.transform = `translateY(${topY}px)`;
+        void n.node.offsetHeight;
+        n.node.style.transition = "";
+        n.fresh = false;
+      } else {
+        n.node.style.transform = `translateY(${topY}px)`;
+      }
+    }
+    rows.style.height = Math.max(0, Math.round(placements.length ? y - gap : 0)) + "px";
   }
 
   function build(person) {
@@ -324,22 +331,27 @@ export function createLikersView(host) {
       }
       node.append(av);
     }
-    node.append(el("span", { className: "liker__name", textContent: person.name }));
     const count = el("span", { className: "liker__count" });
-    count.hidden = !settings.showCounts;
-    node.append(count);
+    const icon = el("span", { className: "liker__icon" });
+    icon.setAttribute("aria-hidden", "true");
+    icon.append(counterIcon(defaultUnit === "likes" ? "heart" : "gem"));
+    const stats = el("span", { className: "liker__stats" }, icon, count);
+    stats.hidden = !settings.showCounts;
+    const info = el("div", { className: "liker__info" }, el("span", { className: "liker__name", textContent: person.name }), stats);
+    node.append(info);
     rows.append(node);
-    return { node, rank, count, shown: -1 };
+    return { node, rank, count, stats, shown: "", fresh: true };
   }
 
   return {
     apply(next) {
       settings = next;
       applyLook(root, next);
+      root.dataset.layout = next.layout || "classic";
       root.dataset.medals = String(next.medals);
       title.hidden = !next.title;
       title.textContent = next.titleText;
-      for (const n of nodes.values()) n.count.hidden = !next.showCounts;
+      for (const n of nodes.values()) n.stats.hidden = !next.showCounts;
       layout();
     },
     render(top) {
@@ -355,11 +367,12 @@ export function createLikersView(host) {
       }
       for (const person of top) {
         const n = nodes.get(person.key) ?? (() => { const made = build(person); nodes.set(person.key, made); return made; })();
+        const formatted = formatRow(person);
         n.node.dataset.rank = String(person.rank);
         n.rank.textContent = String(person.rank);
-        n.count.textContent = person.count.toLocaleString("en-US");
-        if (n.shown !== -1 && n.shown !== person.count) { n.count.classList.remove("liker__count--bump"); void n.count.offsetWidth; n.count.classList.add("liker__count--bump"); }
-        n.shown = person.count;
+        n.count.textContent = formatted;
+        if (n.shown !== "" && n.shown !== formatted) { n.count.classList.remove("liker__count--bump"); void n.count.offsetWidth; n.count.classList.add("liker__count--bump"); }
+        n.shown = formatted;
       }
       layout();
     },
@@ -440,6 +453,16 @@ export function createBoardsView(host) {
     },
   };
 }
+
+/**
+ * The Top Likers ranking. Rows slide to their new places when the order changes. Returns { apply(settings), render(top), clear(),
+ * celebrate(person, { onStart }) }. `celebrate` zooms a person in (picture, name, their likes, a crown, confetti) over the list for the
+ * seconds the settings say; one at a time, the next waits. It resolves to whether it was shown (false when too many are already waiting).
+ */
+export const createLikersView = (host) => createLeaderboardView(host, { defaultUnit: "likes" });
+
+/** The Top Gifters leaderboard (TikTok gift diamonds or Twitch gifted subs & bits). Shares animation and celebration engine. */
+export const createGiftersView = (host) => createLeaderboardView(host, { defaultUnit: "diamonds", formatRow: (p) => p.label ?? Number(p.count).toLocaleString("en-US") });
 
 /** Whether the first song gets its own card: when asked for, and always when the overlay shows only that song. */
 const standsOut = (s) => s.showNow || s.show === "now";
@@ -629,6 +652,7 @@ export function createSongsView(host) {
 const ICON_PATHS = {
   eye: ["M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"],
   heart: ["M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7Z"],
+  gem: ["M6 3h12l4 6-10 12L2 9Z"],
 };
 
 /** A small drawn picture (an eye, a heart): our own shapes, not anything a viewer wrote. */
@@ -780,6 +804,390 @@ export function createTimerView(host) {
       }
       clearTimeout(hide);
       hide = setTimeout(() => { plus.hidden = true; total = 0; }, 1800);
+    },
+  };
+}
+
+// ── AI Talking Pet TTS ───────────────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Talking pet mascot + speech bubble view. Swaps between peeker-a and peeker-b while audio
+ * amplitude pulses `--tts-level` (0..1) so the pet hops along with its voice.
+ */
+export function createTtsView(host) {
+  const root = el("div", { className: "tts", "data-speaking": "0" });
+  const stage = el("div", { className: "tts__stage" });
+  const petBox = el("div", { className: "tts__pet", "aria-hidden": "true" });
+  const imgA = el("img", { className: "tts__sprite tts__sprite--a", alt: "" });
+  const imgB = el("img", { className: "tts__sprite tts__sprite--b", alt: "", hidden: true });
+  petBox.append(imgA, imgB);
+
+  const bubble = el("div", { className: "tts__bubble", hidden: true });
+  const meta = el("div", { className: "tts__meta" });
+  const author = el("span", { className: "tts__author" });
+  const badge = el("span", { className: "tts__badge" });
+  meta.append(author, badge);
+  const textEl = el("p", { className: "tts__text" });
+  bubble.append(meta, textEl);
+
+  stage.append(petBox, bubble);
+  root.append(stage);
+  host.append(root);
+
+  let settings = null;
+  let speaking = false;
+  let idleTimer = 0;
+  let lastFlip = 0;
+  let useB = false;
+
+  const syncPet = (pet, next = settings) => {
+    const off = !pet || pet === "none";
+    petBox.hidden = off;
+    if (off) return;
+    if (pet === "custom" && MEDIA_ID.test(next?.petIdle ?? "")) {
+      const idleSrc = mediaUrl(next.petIdle);
+      const talkSrc = MEDIA_ID.test(next?.petTalk ?? "") ? mediaUrl(next.petTalk) : idleSrc;
+      imgA.src = idleSrc;
+      imgB.src = talkSrc;
+    } else {
+      const fallbackPet = pet === "custom" ? "frog2" : pet;
+      const a = decoPieces(fallbackPet, 0, { peek: true, corner: false, spark: false })?.peek;
+      const b = decoPieces(fallbackPet, 1, { peek: true, corner: false, spark: false })?.peek;
+      if (a?.src) imgA.src = a.src;
+      if (b?.src || a?.src) imgB.src = b?.src || a.src;
+    }
+    if (!speaking) {
+      imgA.hidden = false;
+      imgB.hidden = true;
+    }
+  };
+
+  return {
+    apply(next) {
+      settings = next;
+      applyLook(root, next);
+      syncPet(next.pet, next);
+      root.dataset.pet = next.pet || "none";
+      if (!next.showBubble) bubble.hidden = true;
+      else if (speaking) bubble.hidden = false;
+    },
+    start(item) {
+      clearTimeout(idleTimer);
+      speaking = true;
+      root.dataset.speaking = "1";
+      root.dataset.kind = item.kind || "chat";
+      author.textContent = item.author || "";
+      badge.textContent = item.badge || "";
+      badge.hidden = !item.badge || item.badge === "chat";
+      textEl.textContent = item.kind === "gift" ? item.text : item.message || item.text;
+      bubble.hidden = settings ? !settings.showBubble : false;
+    },
+    level(v) {
+      const clamped = Math.max(0, Math.min(1, Number(v) || 0));
+      root.style.setProperty("--tts-level", clamped.toFixed(3));
+      const now = performance.now();
+      if (speaking && clamped > 0.24 && now - lastFlip > 130) {
+        useB = !useB;
+        lastFlip = now;
+        imgA.hidden = useB;
+        imgB.hidden = !useB;
+      } else if (!speaking || clamped <= 0.05) {
+        useB = false;
+        imgA.hidden = false;
+        imgB.hidden = true;
+      }
+    },
+    idle() {
+      speaking = false;
+      root.style.setProperty("--tts-level", "0");
+      useB = false;
+      imgA.hidden = false;
+      imgB.hidden = true;
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        if (speaking) return;
+        root.dataset.speaking = "0";
+        bubble.hidden = true;
+      }, 900);
+    },
+    clear() {
+      clearTimeout(idleTimer);
+      speaking = false;
+      root.dataset.speaking = "0";
+      root.style.setProperty("--tts-level", "0");
+      imgA.hidden = false;
+      imgB.hidden = true;
+      bubble.hidden = true;
+    },
+  };
+}
+
+const safePic = (url) => (/^https:\/\/[^"'\s<>]+$/i.test(url || "") || /^data:image\/svg\+xml;base64,[A-Za-z0-9+/=]+$/.test(url || "") ? url : "");
+
+/**
+ * The Rotating Highlights overlay view: displays the active card (Last gift, Last follower, Last sub, Last bits,
+ * Top gifter / sub gifter / bit sender) with smooth enter/exit transitions and indicator dots. Returns { apply(settings), render(snapshot), clear() }.
+ */
+export function createLabelsView(host) {
+  const root = el("div", { className: "labels" });
+  host.append(root);
+  const stage = el("div", { className: "labels__stage" });
+  const dots = el("div", { className: "labels__dots" });
+  dots.setAttribute("aria-hidden", "true");
+  root.append(stage, dots);
+
+  let settings = null;
+  let lastSnapshot = null;
+  let lastRevision = -1;
+  let currentCard = null;
+
+  function buildCard(card) {
+    const node = el("div", { className: "labelcard labelcard--in" });
+    node.dataset.slot = card.id || "idle";
+
+    const media = el("span", { className: "labelcard__media" });
+    media.setAttribute("aria-hidden", "true");
+    const giftPic = safePic(card.picture);
+    const hasMedia = !card.empty && Boolean(giftPic || card.initialName);
+    media.hidden = !(Boolean(settings?.avatar) && hasMedia);
+
+    if (hasMedia) {
+      if (giftPic) {
+        const img = el("img", { className: "labelcard__gift", src: giftPic, alt: "", referrerPolicy: "no-referrer" });
+        img.addEventListener("error", () => { img.remove(); media.hidden = true; }, { once: true });
+        media.append(img);
+      } else {
+        const initial = [...(card.initialName || "?")][0].toUpperCase();
+        const av = el("span", { className: "labelcard__av", textContent: initial });
+        const avPic = safePic(card.avatar);
+        if (avPic) {
+          const img = el("img", { className: "gift__avimg", src: avPic, alt: "", referrerPolicy: "no-referrer" });
+          img.addEventListener("load", () => av.classList.add("labelcard__av--pic"), { once: true });
+          img.addEventListener("error", () => img.remove(), { once: true });
+          av.append(img);
+        }
+        media.append(av);
+      }
+    }
+
+    const label = el("span", { className: "labelcard__label", textContent: card.label || "" });
+    const headline = el("strong", { className: "labelcard__headline", textContent: card.headline || "" });
+    const detail = el("span", { className: "labelcard__detail", textContent: card.detail || "" });
+    detail.hidden = !card.detail;
+
+    const body = el("span", { className: "labelcard__body" }, label, headline, detail);
+    node.append(media, body);
+    node.addEventListener("animationend", () => node.classList.remove("labelcard--in"), { once: true });
+    return { node, label, headline, detail, media, hasMedia };
+  }
+
+  function renderDots(snapshot) {
+    const show = Boolean(settings?.showDots) && snapshot.count > 1;
+    dots.hidden = !show;
+    if (!show) { dots.replaceChildren(); return; }
+    dots.replaceChildren();
+    for (let i = 0; i < snapshot.count; i += 1) {
+      const dot = el("i", { className: "labels__dot" });
+      if (i === snapshot.index) dot.setAttribute("aria-current", "true");
+      dots.append(dot);
+    }
+  }
+
+  return {
+    apply(next) {
+      settings = next;
+      applyLook(root, next);
+      root.dataset.layout = next.layout || "card";
+      root.dataset.enter = next.enter || "slide";
+      if (lastSnapshot) this.render(lastSnapshot);
+    },
+    render(snapshot) {
+      if (!settings || !snapshot) return;
+      lastSnapshot = snapshot;
+      renderDots(snapshot);
+
+      if (!snapshot.card) {
+        if (currentCard) { currentCard.node.remove(); currentCard = null; }
+        lastRevision = snapshot.revision;
+        return;
+      }
+
+      const rotated = snapshot.revision !== lastRevision;
+      lastRevision = snapshot.revision;
+
+      if (!rotated && currentCard && currentCard.node.dataset.slot === (snapshot.card.id || "idle")) {
+        currentCard.media.hidden = !(Boolean(settings?.avatar) && currentCard.hasMedia);
+        currentCard.label.textContent = snapshot.card.label || "";
+        currentCard.headline.textContent = snapshot.card.headline || "";
+        currentCard.detail.textContent = snapshot.card.detail || "";
+        currentCard.detail.hidden = !snapshot.card.detail;
+        return;
+      }
+
+      const prev = currentCard?.node;
+      if (prev) {
+        prev.classList.remove("labelcard--in");
+        prev.classList.add("labelcard--out");
+        setTimeout(() => prev.remove(), 280);
+      }
+
+      currentCard = buildCard(snapshot.card);
+      stage.append(currentCard.node);
+    },
+    clear() {
+      stage.replaceChildren();
+      dots.replaceChildren();
+      dots.hidden = true;
+      currentCard = null;
+      lastSnapshot = null;
+      lastRevision = -1;
+    },
+  };
+}
+
+/**
+ * The Gift Jar overlay view (TikTok LIVE only): 6 crystal glass container designs with live 2D rigid-body
+ * gift physics, rising bubbling liquid wave, overflowing rim cascade, and full celebration confetti.
+ */
+export function createJarView(host) {
+  const root = el("div", { className: "jar" });
+  host.append(root);
+
+  const title = el("p", { className: "jar__title" });
+  const thanks = el("p", { className: "jar__thanks", hidden: true });
+  const box = el("div", { className: "jar__box" });
+  box.dataset.items = "0";
+  const canvasCtrl = createJarCanvas(box, { reducedMotion });
+  const fullBadge = el("span", { className: "jar__fullbadge", textContent: "FULL!", hidden: true });
+  const meta = el("p", { className: "jar__meta" });
+  const partyLayer = el("div", { className: "jar__party", hidden: true });
+  partyLayer.setAttribute("aria-hidden", "true");
+  const fx = el("span", { className: "alert__fx jar__fx" });
+  const cheer = el("p", { className: "jar__cheer" });
+  partyLayer.append(fx, cheer);
+
+  box.append(fullBadge, partyLayer);
+  root.append(title, box, meta, thanks);
+
+  let settings = null;
+  let lastSnapshot = null;
+  let thanksTimer = 0;
+  let partyTimer = 0;
+  let pendingDropUid = "";
+
+  function readThemeVars(next) {
+    const cs = getComputedStyle(root);
+    const read = (prop, cssVar, fallback) => next[prop] || cs.getPropertyValue(cssVar).trim() || fallback;
+    return {
+      accent: read("accent", "--a-accent", "#34d399"),
+      pop: read("pop", "--a-pop", "#facc15"),
+      bg: read("bg", "--a-bg", "#0f172a"),
+      text: read("text", "--a-text", "#f8fafc"),
+    };
+  }
+
+  function syncMeta() {
+    if (!settings || !lastSnapshot) return;
+    const { total, target, percent, full, goalBy, items } = lastSnapshot;
+    const parts = [];
+    if (settings.showNumbers) {
+      const shown = settings.capNumbers ? Math.min(total, target) : total;
+      const unit = goalBy === "count" ? (target === 1 ? "gift" : "gifts") : "diamonds";
+      parts.push(`${shown.toLocaleString("en-US")} / ${target.toLocaleString("en-US")} ${unit}`);
+    }
+    if (settings.showPercent) parts.push(`${percent}%`);
+    meta.hidden = parts.length === 0;
+    meta.textContent = parts.join(" · ");
+    fullBadge.hidden = !full;
+    root.dataset.full = String(Boolean(full));
+    const count = settings.showDrops && Array.isArray(items) ? items.length : 0;
+    box.dataset.items = String(count);
+  }
+
+  return {
+    apply(next) {
+      settings = next;
+      applyLook(root, next);
+      const design = next.design || "boba";
+      root.dataset.design = design;
+      title.hidden = !next.title;
+      title.textContent = next.titleText || "Gift jar";
+      if (!next.showThanks) thanks.hidden = true;
+      canvasCtrl.setConfig({
+        design,
+        showLiquid: Boolean(next.showLiquid),
+        showDrops: Boolean(next.showDrops),
+        vars: readThemeVars(next),
+      });
+      if (lastSnapshot) {
+        syncMeta();
+        canvasCtrl.sync({
+          percent: lastSnapshot.percent,
+          full: lastSnapshot.full,
+          items: lastSnapshot.items || [],
+          droppedUid: "",
+        });
+      }
+    },
+    drop(item) {
+      pendingDropUid = item?.uid || "";
+      if (settings?.showThanks && item) {
+        thanks.textContent = item.count > 1 ? `${item.name} sent ${item.count}x ${item.gift}` : `${item.name} sent ${item.gift}`;
+        thanks.hidden = false;
+        clearTimeout(thanksTimer);
+        thanksTimer = setTimeout(() => { thanks.hidden = true; }, 3500);
+      }
+    },
+    render(snapshot) {
+      if (!settings || !snapshot) return;
+      lastSnapshot = snapshot;
+      syncMeta();
+      canvasCtrl.sync({
+        percent: snapshot.percent,
+        full: snapshot.full,
+        items: snapshot.items || [],
+        droppedUid: pendingDropUid,
+      });
+      pendingDropUid = "";
+    },
+    celebrate(words, ms = 6000) {
+      clearTimeout(partyTimer);
+      cheer.textContent = words || "Jar full!";
+      cheer.hidden = !words;
+      root.dataset.celebrating = "true";
+      partyLayer.hidden = false;
+      partyLayer.classList.add("jar__party--on");
+      confettiBurst(fx, 44, { spreadX: 160, spreadY: 160, minDist: 80, yMul: 0.95 });
+      return new Promise((resolve) => {
+        partyTimer = setTimeout(() => {
+          delete root.dataset.celebrating;
+          partyLayer.hidden = true;
+          partyLayer.classList.remove("jar__party--on");
+          fx.replaceChildren();
+          resolve();
+        }, ms);
+      });
+    },
+    clear() {
+      clearTimeout(thanksTimer);
+      clearTimeout(partyTimer);
+      delete root.dataset.celebrating;
+      thanks.hidden = true;
+      partyLayer.hidden = true;
+      partyLayer.classList.remove("jar__party--on");
+      fx.replaceChildren();
+      box.dataset.items = "0";
+      canvasCtrl.clear();
+      if (lastSnapshot) {
+        lastSnapshot = { ...lastSnapshot, total: 0, percent: 0, full: false, items: [] };
+        syncMeta();
+        canvasCtrl.sync({ percent: 0, full: false, items: [], droppedUid: "" });
+      }
+    },
+    destroy() {
+      clearTimeout(thanksTimer);
+      clearTimeout(partyTimer);
+      canvasCtrl.destroy?.();
     },
   };
 }

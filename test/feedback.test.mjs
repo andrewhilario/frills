@@ -103,11 +103,11 @@ test("the Worker answers /api/feedback itself and hands every other address to t
   assert.equal(await (await worker.fetch(new Request(`${SITE}/privacy/`), env)).text(), "asset /privacy/");
 });
 
-test("wrangler.jsonc sends only /api/* and the overlay pages to the Worker, so every other page stays a free static file", () => {
+test("wrangler.jsonc sends only /api/*, overlays, /o/*, /plus/*, and /account/* to the Worker, so every other page stays a free static file", () => {
   const text = readFileSync(join(import.meta.dirname, "..", "wrangler.jsonc"), "utf8").replace(/^\s*\/\/.*$/gm, "");
   const config = JSON.parse(text);
   assert.equal(config.main, "worker/index.mjs");
-  assert.deepEqual(config.assets.run_worker_first, ["/api/*", "/overlay", "/overlay/*"], "the Worker counts an overlay opening and hands the page on");
+  assert.deepEqual(config.assets.run_worker_first, ["/api/*", "/overlay", "/overlay/*", "/o", "/o/*", "/plus", "/plus/*", "/account", "/account/*"], "the Worker handles API, overlay metrics, live cloud hosts, and region-gated Plus pages");
   assert.deepEqual(config.analytics_engine_datasets, [{ binding: "EVENTS", dataset: "frills_events" }], "the counts go to their own dataset, read by the stats page");
   assert.equal(config.assets.binding, "ASSETS");
   assert.equal(config.d1_databases[0].binding, "DB", "the Worker reads the database as env.DB");

@@ -1,0 +1,19 @@
+/* Live-updating Frills Plus cloud overlay host (/o/<id>): full-viewport transparent frame that swaps live when saved in any editor. */
+
+html { color-scheme: normal; background: transparent; }
+html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; }
+#cloud-root { position: fixed; inset: 0; width: 100%; height: 100%; }
+.cloud-frame { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; display: block; background: transparent; }
+.note-live {
+  position: fixed;
+  right: 10px;
+  bottom: 8px;
+  max-width: 85vw;
+  margin: 0;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font: 600 12px/1.4 system-ui, sans-serif;
+  color: #fff;
+  background: rgba(20, 20, 30, 0.82);
+}
+.note-live[hidden] { display: none; }

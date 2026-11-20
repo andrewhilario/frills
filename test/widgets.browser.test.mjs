@@ -207,9 +207,9 @@ test("overlays page: the live and beta ones link to their editors, and the comin
   const { base } = await withHelper();
   await page.goto(base + "/overlays/", { settle: 600 });
   const links = await page.evaluate(`[...document.querySelectorAll(".tool:not(.tool--soon) a.btn")].map((a) => a.getAttribute("href"))`);
-  assert.deepEqual(links, ["/editor/", "/alerts/", "/gifts/", "/goal/", "/likers/", "/leaderboard/", "/counter/", "/timer/", "/editor/", "/songs/", "/songs/#spotify-step"], "the chat editor's Both is TikTok and Twitch chat together; the last two are song requests and its Spotify step");
+  assert.deepEqual(links, ["/editor/", "/alerts/", "/gifts/", "/jar/", "/goal/", "/likers/", "/gifters/", "/labels/", "/leaderboard/", "/counter/", "/timer/", "/tts/", "/editor/", "/songs/", "/songs/#spotify-step"], "includes Gift jar, Top gifters, Rotating highlights, and Spotify step");
   const beta = await page.evaluate(`[...document.querySelectorAll(".tool:has(.tool__badge--beta) .subtitle")].map((t) => t.textContent)`);
-  assert.deepEqual(beta, ["Alerts", "Last gifts", "Goals", "Top likers", "Top gifters and likers", "Viewer and like counter", "Subathon timer", "TikTok and Twitch chat together", "Song requests", "Spotify player"], "it is marked Beta, like the others that are new");
+  assert.deepEqual(beta, ["Alerts", "Last gifts", "Gift jar", "Goals", "Top likers", "Top gifters", "Rotating highlights", "Top gifters and likers", "Viewer and like counter", "Subathon timer", "Talking pet TTS", "TikTok and Twitch chat together", "Song requests", "Spotify player"], "it is marked Beta, like the others that are new");
   const soon = await page.evaluate(`[...document.querySelectorAll("#coming-soon + ul .tool--soon")].map((t) => [t.querySelector(".subtitle").textContent, t.querySelectorAll("a").length])`);
   assert.deepEqual(soon.map((s) => s[0]), ["Free sound library", "Like and subscriber alerts", "Actions", "Starting soon, Be right back and Stream ending screens", "Your own layout", "Pets that move"]);
   assert.ok(soon.every((s) => s[1] === 0), "a coming-soon card links nowhere");
@@ -252,10 +252,65 @@ test("editor: the likers test buttons fill and re-order the ranking, and the lin
   await click('[data-test="clear"]');
   await until(async () => (await ranking()).length === 0, 3000);
   await type("#source-channel", "pond.pal");
+  await page.evaluate(`(() => { const s = document.getElementById("c-layout"); s.value = "glass"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+  assert.equal(await page.evaluate(`document.querySelector(".likers").dataset.layout`), "glass");
   const url = new URL(await page.evaluate(`document.getElementById("link").value`));
   assert.equal(url.pathname, "/overlay/likers/");
   assert.equal(url.searchParams.get("max"), "5");
+  assert.equal(url.searchParams.get("layout"), "glass");
   assert.ok(before);
+});
+
+test("overlay: top likers spotlight and compact designs apply cleanly with non-overlapping stacked rows", { skip }, async () => {
+  const { base, made } = await withHelper();
+  await page.goto(`${base}/overlay/likers/?channel=pond_cafe&platform=tiktok&layout=spotlight&max=3`, { settle: 800 });
+  await until(() => made.length === 1);
+  assert.equal(await page.evaluate(`document.querySelector(".likers").dataset.layout`), "spotlight");
+  made[0].emit("like", like("1", "Ann", 50));
+  made[0].emit("like", like("2", "Ben", 20));
+  await until(async () => (await ranking()).length === 2, 4000);
+  const boxes = await page.evaluate(`[...document.querySelectorAll(".liker:not(.liker--out)")].sort((a, b) => Number(a.dataset.rank) - Number(b.dataset.rank)).map((r) => r.getBoundingClientRect()).map((b) => ({ top: Math.round(b.top), bottom: Math.round(b.bottom) }))`);
+  assert.ok(boxes[1].top >= boxes[0].bottom, `Rank 2 top (${boxes[1].top}) must clear tall Spotlight Rank 1 bottom (${boxes[0].bottom})`);
+  assert.deepEqual(page.problems, [], page.problems.join(" | "));
+});
+
+test("overlay: top likers stacked minimal puts the number of likes neatly under the name", { skip }, async () => {
+  const { base, made } = await withHelper();
+  await page.goto(`${base}/overlay/likers/?channel=pond_cafe&platform=tiktok&layout=stacked&max=3`, { settle: 800 });
+  await until(() => made.length === 1);
+  assert.equal(await page.evaluate(`document.querySelector(".likers").dataset.layout`), "stacked");
+  made[0].emit("like", like("1", "Ann", 120));
+  made[0].emit("like", like("2", "Ben", 45));
+  await until(async () => (await ranking()).length === 2, 4000);
+  const check = await page.evaluate(`(() => {
+    const rows = [...document.querySelectorAll(".liker:not(.liker--out)")].sort((a, b) => Number(a.dataset.rank) - Number(b.dataset.rank));
+    const r1 = rows[0];
+    const name = r1.querySelector(".liker__name").getBoundingClientRect();
+    const icon = r1.querySelector(".liker__icon").getBoundingClientRect();
+    const hasSvg = Boolean(r1.querySelector(".liker__icon svg"));
+    const count = r1.querySelector(".liker__count").getBoundingClientRect();
+    const cs = getComputedStyle(r1);
+    return {
+      bg: cs.backgroundColor,
+      border: cs.borderTopWidth,
+      nameBottom: Math.round(name.bottom),
+      nameLeft: Math.round(name.left),
+      iconVisible: icon.width > 4 && icon.height > 4 && hasSvg,
+      iconLeft: Math.round(icon.left),
+      iconTop: Math.round(icon.top),
+      countTop: Math.round(count.top),
+      countLeft: Math.round(count.left),
+      r1Bottom: Math.round(r1.getBoundingClientRect().bottom),
+      r2Top: Math.round(rows[1].getBoundingClientRect().top),
+    };
+  })()`);
+  assert.equal(check.bg, "rgba(0, 0, 0, 0)", "stacked minimal has transparent background");
+  assert.equal(check.border, "0px", "stacked minimal has no card border");
+  assert.equal(check.iconVisible, true, "stacked minimal shows heart icon beside the count");
+  assert.ok(check.iconTop >= check.nameBottom - 2 && check.countTop >= check.nameBottom - 2, `icon (${check.iconTop}) and count (${check.countTop}) sit under name (${check.nameBottom})`);
+  assert.ok(Math.abs(check.iconLeft - check.nameLeft) <= 3 && check.countLeft > check.iconLeft, `heart icon starts under name (${check.iconLeft} vs ${check.nameLeft}) before count (${check.countLeft})`);
+  assert.ok(check.r2Top >= check.r1Bottom, `row 2 (${check.r2Top}) clears taller stacked row 1 (${check.r1Bottom})`);
+  assert.deepEqual(page.problems, [], page.problems.join(" | "));
 });
 
 // ── a like milestone ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -352,4 +407,57 @@ test("leaderboard overlay: gifts and likes from a TikTok LIVE go to their own ra
   assert.deepEqual(await ranking(), ["1:Ben:1,000", "2:Ann:103"], "ranked by the diamonds each person sent");
   await page.waitFor(`document.querySelector(".likers__title")?.textContent === "Top likers" && document.querySelectorAll(".liker:not(.liker--out)").length === 1`, { timeout: 9000 });
   assert.deepEqual(await ranking(), ["1:Cat:40"], "the likes went to the likers");
+});
+
+test("tts editor & overlay: helper serves /api/pro/status, switching pets swaps sprites, custom preview speaks, paywall simulator and the way to Frills Plus work, and link builds", { skip }, async () => {
+  const prevDb = process.env.FEEDBACK_DB;
+  process.env.FEEDBACK_DB = ":memory:";
+  try {
+    const { base } = await withHelper();
+    await page.goto(base + "/tts/", { settle: 800 });
+    await until(async () => (await text("#pro-status")).includes("Local test mode"), 4000);
+    assert.equal(await page.evaluate(`document.getElementById("pro-tester").hidden`), false);
+
+    // Simulate region-locked country -> paywall explains unavailability
+    await page.evaluate(`(() => { const s = document.getElementById("sim-country"); s.value = "PH"; s.dispatchEvent(new Event("change")); })()`);
+    await until(async () => (await text("#pro-paywall-title")).includes("Not available in PH"), 3000);
+
+    // Simulate a Tier-1 country with nothing brought -> the paywall offers Frills Plus, and there is no key box any more
+    await page.evaluate(`(() => { const s = document.getElementById("sim-country"); s.value = "US"; s.dispatchEvent(new Event("change")); })()`);
+    await until(async () => (await text("#pro-paywall-title")).includes("Frills Plus gives you AI voices"), 3000);
+    assert.equal(await page.evaluate(`document.getElementById("ls-form") || document.getElementById("ls-key") || document.getElementById("c-passToken") || document.getElementById("clear-pass")`), null, "the key box and the pass-key setting are gone");
+
+    // The test credits go to a signed-in test account: this plain helper has no accounts, so it says to sign in on npm run serve
+    await click("#mint-pass");
+    await until(async () => (await text("#pro-status")).includes("Sign in on /account/ first"), 4000);
+    page.problems.splice(0, page.problems.length, ...page.problems.filter((m) => !m.includes("/api/pro/dev-pass"))); // (the browser logs that expected 401 itself)
+
+    await type("#say-input", "Hello from local stream test!");
+    await page.evaluate(`document.querySelector("#say-form button").click()`);
+    await until(async () => (await text(".tts__text")).includes("Hello from local stream test!"), 3000);
+    await page.evaluate(`[...document.querySelectorAll("#opt-controls .chip")].find((b) => b.textContent.trim() === "Cat")?.click()`);
+    const spriteSrc = await page.evaluate(`document.querySelector(".tts__sprite--a")?.getAttribute("src")`);
+    assert.equal(spriteSrc, "/decor/neko/peeker-a.webp");
+    await type("#source-channel", "pond.pal");
+    const url = new URL(await page.evaluate(`document.getElementById("link").value`));
+    assert.equal(url.pathname, "/overlay/tts/");
+    assert.equal(url.searchParams.get("pet"), "neko");
+    assert.equal(url.searchParams.get("platform"), "tiktok");
+
+    // Switch to Twitch -> link updates to platform=twitch
+    await page.evaluate(`[...document.querySelectorAll("#source .chip")].find((b) => b.textContent.trim() === "Twitch")?.click()`);
+    await type("#source-channel", "pondpal_tv");
+    const twitchUrl = new URL(await page.evaluate(`document.getElementById("link").value`));
+    assert.equal(twitchUrl.searchParams.get("platform"), "twitch");
+    assert.equal(twitchUrl.searchParams.get("channel"), "pondpal_tv");
+    assert.deepEqual(page.problems, [], page.problems.join(" | "));
+
+    await page.goto(`${base}/overlay/tts/?demo=1&pet=bunny&platform=twitch`, { settle: 600 });
+    await until(async () => (await text(".tts__text")).length > 0, 3000);
+    const bunnySrc = await page.evaluate(`document.querySelector(".tts__sprite--a")?.getAttribute("src")`);
+    assert.equal(bunnySrc, "/decor/bunny/peeker-a.webp");
+    assert.deepEqual(page.problems, [], page.problems.join(" | "));
+  } finally {
+    if (prevDb === undefined) delete process.env.FEEDBACK_DB; else process.env.FEEDBACK_DB = prevDb;
+  }
 });

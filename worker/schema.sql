@@ -97,3 +97,66 @@ CREATE TABLE IF NOT EXISTS timer_commands (
   at INTEGER NOT NULL,
   PRIMARY KEY (code, seq)
 );
+
+-- Frills Plus accounts (see worker/accounts.mjs and PLAN-FRILLS-PLUS.md): an email address, nothing else about the person. No passwords: a person signs in with a link sent to their inbox. Run this part once.
+CREATE TABLE IF NOT EXISTS accounts (
+  id TEXT PRIMARY KEY,             -- 16 random hex characters; it goes only into the person's own checkout address, so the payment can be matched to the account
+  email TEXT NOT NULL UNIQUE,      -- lower case; needed to send the sign-in link
+  created_at INTEGER NOT NULL,     -- milliseconds since 1970
+  last_login_at INTEGER NOT NULL
+);
+-- A sign-in link waiting to be used: only the token's hash is kept, it works once, and for 15 minutes.
+CREATE TABLE IF NOT EXISTS login_links (
+  token_hash TEXT PRIMARY KEY,     -- sha-256 of the token in the emailed link
+  email TEXT NOT NULL,
+  ip_hash TEXT NOT NULL,           -- sha-256 of the internet address that asked, to slow down abuse; swept after a day
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL,
+  used_at INTEGER                  -- null until it is used
+);
+CREATE INDEX IF NOT EXISTS login_links_email ON login_links (email, created_at);
+CREATE INDEX IF NOT EXISTS login_links_ip ON login_links (ip_hash, created_at);
+-- A signed-in browser: only the hash of the cookie value is kept.
+CREATE TABLE IF NOT EXISTS sessions (
+  token_hash TEXT PRIMARY KEY,
+  account_id TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL,
+  last_seen_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS sessions_account ON sessions (account_id);
+-- What an account has bought (filled in by the payment webhook, later): one row per account.
+CREATE TABLE IF NOT EXISTS plus (
+  account_id TEXT PRIMARY KEY,
+  provider_ref TEXT NOT NULL DEFAULT '', -- the payment provider's subscription id
+  order_ref TEXT NOT NULL DEFAULT '',    -- the payment provider's order id (a refund names the order)
+  status TEXT NOT NULL DEFAULT 'active',  -- active, canceled (paid until renews_at), paused, unpaid, expired, refunded
+  renews_at INTEGER,               -- paid until (milliseconds): the end of the current month, or the end date of a cancelled one; null if unknown
+  tts_used INTEGER NOT NULL DEFAULT 0,   -- characters of AI voice used this month (the column keeps its first name)
+  tts_limit INTEGER NOT NULL DEFAULT 150000, -- characters of AI voice a month; a payment notice sets it explicitly
+  period_start INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+
+-- The link a streamer puts in their streaming app for a Frills Plus overlay (the talking pet): a random code in the link stands for the account, so the payment itself never appears in a link. Only the code's hash is kept. One live link per account and kind; making a new one ends the old. Run this part once.
+CREATE TABLE IF NOT EXISTS overlay_links (
+  code_hash TEXT PRIMARY KEY,      -- sha-256 of the code in the overlay link
+  account_id TEXT NOT NULL,
+  kind TEXT NOT NULL,              -- 'tts' (the talking pet)
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS overlay_links_account ON overlay_links (account_id, kind);
+
+-- Frills Plus live-updating cloud overlays (/o/<id>): permanent OBS URLs whose saved query settings update live without re-pasting links. Run this part once.
+CREATE TABLE IF NOT EXISTS cloud_overlays (
+  id TEXT PRIMARY KEY,           -- 12-char URL-safe random token
+  account_id TEXT NOT NULL,
+  kind TEXT NOT NULL,            -- chat, matcha, alerts, gifts, jar, goal, likers, gifters, labels, counter, timer, songs, tts
+  name TEXT NOT NULL,            -- user-given preset label (1..60 chars)
+  path TEXT NOT NULL,            -- validated server-side overlay path (e.g. /overlay/, /overlay/alerts/)
+  query TEXT NOT NULL,           -- validated query string without leading "?"
+  version INTEGER NOT NULL DEFAULT 1, -- increments on every save so OBS refreshes live automatically
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS cloud_overlays_account ON cloud_overlays (account_id, updated_at);

@@ -16,7 +16,7 @@
     "relay": "node helper/keep.mjs",
     "tiktok:setup": "cd helper && npm install --ignore-scripts --no-audit --no-fund",
     "test": "node scripts/test.mjs",
-    "deploy": "node build.mjs && npx wrangler deploy",
+    "deploy": "node build.mjs && npx wrangler deploy --keep-vars",
     "test:quick": "node scripts/test.mjs --quick"
   },
   "devDependencies": {

@@ -12,6 +12,7 @@ import { fontsReady, generalFaces, matchaFaces, paintGeneral, paintMatcha } from
 import { connectTo, statusText } from "./connect.js";
 import { noteFor, scoped, sourcesOf, takingTurns } from "./both.js";
 import { relayForPage } from "./tiktok.js";
+import { plusCodeFromParams, plusRelayForPage } from "./plus-relay.js";
 import { fakeSource } from "./fake.js";
 
 const params = new URLSearchParams(location.search);
@@ -74,6 +75,8 @@ if (params.get("demo") === "1") {
     clear: later(() => feed.clear()),
     clearWhere: later((platform) => feed.clearWhere(platform)),
   };
+  const plusCode = plusCodeFromParams(params);
+  const plusRelay = plusRelayForPage();
   if (both) {
     const parts = {};
     for (const { platform, channel } of sources) {
@@ -82,13 +85,13 @@ if (params.get("demo") === "1") {
         const text = noteFor(parts, statusText);
         note.hidden = text === "";
         note.textContent = text;
-      }, { relay: relayForPage(), assumeRelay: true, keepTrying: true });
+      }, { relay: relayForPage(), plusRelay, plusCode, assumeRelay: true, keepTrying: true });
     }
   } else {
     const [{ platform, channel }] = sources;
     connectTo([held], platform, channel, (status) => {
       note.hidden = status.state === "connected" || status.state === "stopped";
       note.textContent = statusText(status);
-    }, { relay: relayForPage(), assumeRelay: true, keepTrying: true });
+    }, { relay: relayForPage(), plusRelay, plusCode, assumeRelay: true, keepTrying: true });
   }
 }

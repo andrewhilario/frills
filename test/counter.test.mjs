@@ -168,3 +168,20 @@ test("a page that opens in the middle of a LIVE is told the number at once", asy
   first.close();
   late.close();
 });
+
+test("roomUser prefers current viewers (total) over cumulative views (totalUser) and tracks decreases too", async () => {
+  await helper?.close();
+  const made = await start();
+  const page = listen("pond_cafe");
+  await page.until(() => made.length === 1);
+  await sleep(60);
+  // Cumulative views-only payload without `total` / `viewerCount` is ignored
+  made[0].emit("roomUser", { totalUser: "15890" });
+  // v2.5.0 WebcastRoomUserSeqMessage payload sends current viewers in `total`
+  made[0].emit("roomUser", { total: "42", totalUser: "15890" });
+  await page.until(() => page.infos().some((i) => i.viewers === 42), 3000);
+  assert.ok(!page.infos().some((i) => i.viewers === 15890), "never reports cumulative totalUser views as current viewers");
+  made[0].emit("roomUser", { total: "27", totalUser: "16002" });
+  await page.until(() => page.infos().some((i) => i.viewers === 27), 5000);
+  page.close();
+});

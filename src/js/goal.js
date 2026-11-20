@@ -23,12 +23,28 @@ export const GOAL_TYPES = {
   follow: { name: "Followers", label: "Follower goal", kind: "follow", small: 1, big: 10, unit: "" },
   gift: { name: "Gifts (diamonds)", label: "Gift goal", kind: "gift", small: 100, big: 1000, unit: "diamonds" },
   like: { name: "Likes", label: "Like goal", kind: "like", small: 50, big: 500, unit: "likes" },
+  sub: { name: "Subscribers (Twitch)", label: "Sub goal", kind: "sub", small: 1, big: 5, unit: "subs" },
+  bits: { name: "Bits (Twitch)", label: "Bit goal", kind: "bits", small: 100, big: 1000, unit: "bits" },
 };
 
-/** How much one relay event adds to a goal of this type (0 for an event it does not count). */
+/** How much one relay or Twitch event adds to a goal of this type (0 for an event it does not count). */
 export function goalAmount(type, event) {
   const t = GOAL_TYPES[type];
-  if (!t || event?.kind !== t.kind) return 0;
+  if (!t || !event) return 0;
+  if (type === "sub") {
+    if (event.kind === "sub") return 1;
+    if (event.kind === "subgift") {
+      const n = Math.round(Number(event.count) || 1);
+      return Number.isFinite(n) && n > 0 ? n : 1;
+    }
+    return 0;
+  }
+  if (type === "bits") {
+    if (event.kind !== "bits") return 0;
+    const n = Math.round(Number(event.count));
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  }
+  if (event.kind !== t.kind) return 0;
   if (t.kind === "follow") return 1;
   const n = Math.round(Number(t.kind === "gift" ? event.total : event.count));
   return Number.isFinite(n) && n > 0 ? n : 0;

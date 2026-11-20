@@ -20,12 +20,19 @@ function labelTests(next) {
   if (ten) ten.textContent = say(t.big);
 }
 
+const eventsForGoal = (t) => (t === "sub" ? ["sub", "subgift"] : [GOAL_TYPES[t]?.kind || "follow"]);
+
 startWidgetEditor({
   widget: GOAL,
   storeKey: "frills:goal:editor:v1",
   overlayPath: "/overlay/goal/",
-  events: () => [GOAL_TYPES[type].kind],
-  idleHint: "Type your TikTok name, or frills_demo to get made-up events. The test buttons above work without connecting.",
+  platforms: ["tiktok", "twitch", "both"],
+  events: () => eventsForGoal(type),
+  idleHint: (p) => (p === "twitch"
+    ? "Type your Twitch channel, or use the test buttons above without connecting."
+    : p === "both"
+      ? "Type your TikTok @name and Twitch channel to count events across both streams."
+      : "Type your TikTok name, or frills_demo to get made-up events. The test buttons above work without connecting."),
   create(host, settings, ctx) {
     type = settings.type;
     labelTests(type);

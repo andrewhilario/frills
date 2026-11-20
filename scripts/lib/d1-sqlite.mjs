@@ -18,7 +18,7 @@ export function localDatabase(file = ":memory:") {
         bind: (...more) => make(more),
         first: async () => statement.get(...values) ?? null,
         all: async () => ({ results: statement.all(...values) }),
-        run: async () => { statement.run(...values); return { success: true }; },
+        run: async () => { const done = statement.run(...values); return { success: true, meta: { changes: Number(done.changes) } }; }, // (like D1: how many rows a write changed)
       });
       return make([]);
     },

@@ -4,6 +4,7 @@
 
 import { connect as connectTwitch, cleanChannel } from "./twitch.js";
 import { cleanTikTokUser, connectTikTok, explainRefusal, findTikTokSource } from "./tiktok.js";
+import { isPlusCode, requestPlusRelayTicket } from "./plus-relay.js";
 
 export const PLATFORMS = ["tiktok", "twitch"];
 
@@ -12,10 +13,10 @@ export const cleanName = (platform, input) => (platform === "tiktok" ? cleanTikT
 
 /**
  * Sends one account's chat into one or more feeds. Returns the connection: stop() ends it. For TikTok it first looks for where the chat
- * can come from (the helper on this PC, else the site's relay, `relay` being its address); with neither it says so. With `assumeRelay` the relay is
- * used without asking first.
+ * can come from (when a valid Frills Plus code is present and `plusRelay` is configured, it requests a signed ticket for the dedicated
+ * DigitalOcean Plus relay with automatic fallback to the free relay; free users skip that completely and use the helper or free relay).
  */
-export function connectTo(feeds, platform, name, onStatus, { relay = "", assumeRelay = false, keepTrying = false, retryMs = LOOK_AGAIN_MS, events = [], onAlert, onInfo, onFound, onFirstMessage } = {}) {
+export function connectTo(feeds, platform, name, onStatus, { relay = "", plusRelay = "", plusCode = "", assumeRelay = false, keepTrying = false, retryMs = LOOK_AGAIN_MS, events = [], onAlert, onInfo, onFound, onFirstMessage, fetchTicket = requestPlusRelayTicket, eventSourceFactory } = {}) {
   const list = Array.isArray(feeds) ? feeds : [feeds];
   let sawChat = false;
   const handlers = {
@@ -45,7 +46,7 @@ export function connectTo(feeds, platform, name, onStatus, { relay = "", assumeR
   // An overlay in OBS has no Connect button, so a page that opened while the relay was restarting (or the internet was not up yet) must not give up: with
   // `keepTrying` it says it cannot reach it and looks again by itself, a little later each time (and at once when the network comes back), for as long as it is open.
   const lookAgainNow = () => { if (waiting && !stopped) { clearTimeout(timer); look(); } };
-  const look = () => {
+  const lookFree = () => {
     waiting = false;
     lookFor().then((found) => {
       if (stopped) return;
@@ -62,8 +63,38 @@ export function connectTo(feeds, platform, name, onStatus, { relay = "", assumeR
         onStatus?.({ state: "error", channel: login, platform: "tiktok", fatal: true, detail: relay ? "Couldn't reach TikTok chat. The free Frills relay isn't answering right now. Wait a minute and try again." : "TikTok chat needs the Frills helper running on this PC. It isn't answering here." });
         return;
       }
-      inner = connectTikTok({ user: name, base: found.base, events, onAlert, onInfo, retryRefused: true, diagnose: explainRefusal, ...handlers }); // (found a moment ago, so a refusal is only busy or full)
+      inner = connectTikTok({ user: name, base: found.base, events, onAlert, onInfo, eventSourceFactory, retryRefused: true, diagnose: explainRefusal, ...handlers }); // (found a moment ago, so a refusal is only busy or full)
     });
+  };
+  const look = () => {
+    if (isPlusCode(plusCode) && plusRelay) {
+      fetchTicket({ code: plusCode }).then((granted) => {
+        if (stopped) return;
+        if (!granted?.url || !granted?.ticket) { lookFree(); return; }
+        onFound?.({ kind: "relay", base: granted.url, features: ["chat", "alerts", "info", "roles", "status", "viewers"], plus: true });
+        inner = connectTikTok({
+          user: name,
+          base: granted.url,
+          ticket: granted.ticket,
+          refreshTicket: () => fetchTicket({ code: plusCode, force: true }),
+          onFallback: () => {
+            if (stopped) return;
+            const old = inner;
+            inner = null;
+            old?.stop(true);
+            lookFree();
+          },
+          events,
+          onAlert,
+          onInfo,
+          eventSourceFactory,
+          retryRefused: false,
+          ...handlers,
+        });
+      }).catch(() => { if (!stopped) lookFree(); });
+      return;
+    }
+    lookFree();
   };
   if (keepTrying) globalThis.addEventListener?.("online", lookAgainNow);
   look();

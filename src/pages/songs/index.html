@@ -72,8 +72,23 @@
       <div class="step-card__head">
         <span class="step-card__num" aria-hidden="true">4</span>
         <h2 class="step-card__title" id="s4">Connect Spotify <span class="spx__optional">(optional)</span></h2>
+        <button class="btn btn--soft btn--sm step-card__aside" type="button" id="spx-full-btn">Full-page view</button>
+      </div>
+      <div class="spx__topbar" id="spx-topbar" hidden>
+        <button class="btn btn--soft btn--sm" type="button" id="spx-back-editor">← Back to editor</button>
+        <span class="spx__topbar-title">Spotify Setup Guide (9 steps)</span>
+        <a class="btn btn--soft btn--sm" href="#s5" id="spx-jump-link">Step 5: Copy link</a>
       </div>
       <p class="ctl__hint">Show the song that is playing on your Spotify on your stream, and let viewers add songs to your Spotify queue with <code>!sr</code>. Once it is connected you can close this page. You do not need this for the song list: viewers can ask for songs without it.</p>
+      <div class="spx__banner" id="spx-banner">
+        <p><strong>Too cramped in the sidebar?</strong> Expand this step into a full-page setup guide, or hide steps as you tick them off.</p>
+        <div class="spx__row">
+          <button class="btn btn--sm" type="button" id="spx-expand">Open full-page setup</button>
+          <a class="btn btn--soft btn--sm" href="/guides/songs/" target="_blank" rel="noopener">Read full guide</a>
+          <label class="spx__done spx__filter"><input type="checkbox" id="spx-hide-done"> Hide completed steps</label>
+        </div>
+      </div>
+      <div class="spx__bar" aria-hidden="true"><i id="spx-bar-fill"></i></div>
       <div class="spx__need">
         <p><strong>Before you start</strong></p>
         <ul>
@@ -170,6 +185,9 @@
         <p class="ctl__hint spx__note" id="spx-share-note" role="status"></p>
         <p class="ctl__hint spx__note" id="spx-queue-note" role="status"></p>
         <p class="spx__note spx__overlay" id="spx-overlay-note" role="status"></p>
+        <div class="spx__row" id="spx-copy-row" hidden>
+          <button class="btn btn--soft" type="button" id="spx-copy-link">Copy updated link</button>
+        </div>
         <p class="ctl__hint">You can close this page now: Frills reads Spotify for you. Keep your song requests overlay open in your streaming app, because it is what passes your viewers’ <code>!sr</code> and <code>!next</code> on.</p>
       </div>
       <form class="spx__try" id="spx-try" autocomplete="off">
