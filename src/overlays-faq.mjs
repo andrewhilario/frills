@@ -6,7 +6,7 @@ export function overlaysFaq({ kb = 19, relayUrl = "" } = {}) {
   const items = [
     {
       q: "Which overlays are there?",
-      a: "The <a href=\"/editor/\">chat overlay</a>, <a href=\"/alerts/\">alerts</a>, <a href=\"/gifts/\">last gifts</a>, <a href=\"/goal/\">goals</a> (followers, gifts or likes) and <a href=\"/likers/\">top likers</a>, and <a href=\"/songs/\">song requests</a> (with an optional Spotify player). Each has its own editor, its own look and its own link. All of them are free, with no Frills account. The overlays other than chat are in beta.",
+      a: "The <a href=\"/editor/\">chat overlay</a>, <a href=\"/alerts/\">alerts</a>, <a href=\"/gifts/\">last gifts</a>, <a href=\"/goal/\">goals</a> (followers, gifts or likes) and <a href=\"/likers/\">top likers</a>, a <a href=\"/leaderboard/\">top gifters and likers</a> overlay that takes turns, and <a href=\"/songs/\">song requests</a> (with an optional Spotify player). Each has its own editor, its own look and its own link. All of them are free, with no Frills account. The overlays other than chat are in beta.",
     },
     {
       q: "Do the overlays work with Twitch?",
