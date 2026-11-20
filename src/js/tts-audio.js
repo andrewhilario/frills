@@ -241,10 +241,12 @@ export function createTtsPlayer({ onLevel = () => {}, onNotice = () => {}, onUsa
       }
     });
 
-  const speak = async (item, settings) => {
+  const speak = async (item, rawSettings) => {
     stop();
     cancelled = false;
     onNotice("");
+    const chosenVoice = item.voice && item.voice !== "same" ? item.voice : rawSettings.voice || "nova";
+    const settings = chosenVoice === rawSettings.voice ? rawSettings : { ...rawSettings, voice: chosenVoice };
     const engine = settings.engine || "auto";
     const volume = (Number(settings.volume) || 90) / 100;
 

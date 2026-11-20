@@ -775,14 +775,22 @@ export function createTtsView(host) {
   let lastFlip = 0;
   let useB = false;
 
-  const syncPet = (pet) => {
+  const syncPet = (pet, next = settings) => {
     const off = !pet || pet === "none";
     petBox.hidden = off;
     if (off) return;
-    const a = decoPieces(pet, 0, { peek: true, corner: false, spark: false })?.peek;
-    const b = decoPieces(pet, 1, { peek: true, corner: false, spark: false })?.peek;
-    if (a?.src) imgA.src = a.src;
-    if (b?.src || a?.src) imgB.src = b?.src || a.src;
+    if (pet === "custom" && MEDIA_ID.test(next?.petIdle ?? "")) {
+      const idleSrc = mediaUrl(next.petIdle);
+      const talkSrc = MEDIA_ID.test(next?.petTalk ?? "") ? mediaUrl(next.petTalk) : idleSrc;
+      imgA.src = idleSrc;
+      imgB.src = talkSrc;
+    } else {
+      const fallbackPet = pet === "custom" ? "frog2" : pet;
+      const a = decoPieces(fallbackPet, 0, { peek: true, corner: false, spark: false })?.peek;
+      const b = decoPieces(fallbackPet, 1, { peek: true, corner: false, spark: false })?.peek;
+      if (a?.src) imgA.src = a.src;
+      if (b?.src || a?.src) imgB.src = b?.src || a.src;
+    }
     if (!speaking) {
       imgA.hidden = false;
       imgB.hidden = true;
@@ -793,7 +801,7 @@ export function createTtsView(host) {
     apply(next) {
       settings = next;
       applyLook(root, next);
-      syncPet(next.pet);
+      syncPet(next.pet, next);
       root.dataset.pet = next.pet || "none";
       if (!next.showBubble) bubble.hidden = true;
       else if (speaking) bubble.hidden = false;

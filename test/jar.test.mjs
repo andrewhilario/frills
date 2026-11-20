@@ -50,6 +50,12 @@ test("jarAmount handles diamond and count modes and ignores non-gift events", ()
   assert.equal(jarAmount("count", gift("Ann", "Rose", 1, 5)), 5);
   assert.equal(jarAmount("diamonds", gift("Ben", "Galaxy", 1000, 1)), 1000);
   assert.equal(jarAmount("count", gift("Ben", "Galaxy", 1000, 1)), 1);
+  assert.equal(jarAmount("diamonds", { kind: "bits", count: 350 }), 350);
+  assert.equal(jarAmount("count", { kind: "bits", count: 350 }), 1);
+  assert.equal(jarAmount("diamonds", { kind: "sub" }), 500);
+  assert.equal(jarAmount("count", { kind: "sub" }), 1);
+  assert.equal(jarAmount("diamonds", { kind: "subgift", count: 5 }), 2500);
+  assert.equal(jarAmount("count", { kind: "subgift", count: 5 }), 5);
 });
 
 test("GiftJar drops tokens inside chamber, caps items cleanly, and triggers full-jar cycles properly", () => {

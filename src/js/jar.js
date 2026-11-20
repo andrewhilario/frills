@@ -72,16 +72,31 @@ export const JAR = defineWidget({
 
 let tokenSeq = 0;
 
-/** Computes the normalized progress delta for one incoming TikTok gift event under `goalBy`. */
+/** Computes the normalized progress delta for one incoming TikTok gift or Twitch bits/sub/subgift event under `goalBy`. */
 export function jarAmount(goalBy, event) {
-  if (!event || event.kind !== "gift") return 0;
-  if (goalBy === "count") {
-    const n = Math.round(Number(event.count) || 1);
-    return Number.isFinite(n) && n > 0 ? n : 1;
+  if (!event) return 0;
+  if (event.kind === "gift") {
+    if (goalBy === "count") {
+      const n = Math.round(Number(event.count) || 1);
+      return Number.isFinite(n) && n > 0 ? n : 1;
+    }
+    const diamonds = Number(event.total) || ((Number(event.diamonds) || 0) * (Number(event.count) || 1));
+    const n = Math.round(diamonds);
+    return Number.isFinite(n) && n > 0 ? n : 0;
   }
-  const diamonds = Number(event.total) || ((Number(event.diamonds) || 0) * (Number(event.count) || 1));
-  const n = Math.round(diamonds);
-  return Number.isFinite(n) && n > 0 ? n : 0;
+  if (event.kind === "bits") {
+    const bits = Math.round(Number(event.count) || 0);
+    if (!(bits > 0)) return 0;
+    return goalBy === "count" ? 1 : bits;
+  }
+  if (event.kind === "sub") {
+    return goalBy === "count" ? 1 : 500;
+  }
+  if (event.kind === "subgift") {
+    const subs = Math.max(1, Math.round(Number(event.count) || 1));
+    return goalBy === "count" ? subs : subs * 500;
+  }
+  return 0;
 }
 
 /**
@@ -144,12 +159,19 @@ export class GiftJar {
     const prevFull = this.wasFull;
     this.total += amount;
 
+    const giftLabel = event.kind === "bits"
+      ? `${Math.max(1, Math.round(Number(event.count) || 100))} Bits`
+      : event.kind === "subgift"
+        ? "Gifted Sub"
+        : event.kind === "sub"
+          ? "Twitch Sub"
+          : String(event.gift || "Gift");
     const item = {
       uid: `jar-${++tokenSeq}`,
       name: String(event.name || "Viewer"),
-      gift: String(event.gift || "Gift"),
+      gift: giftLabel,
       picture: String(event.picture || ""),
-      diamonds: Math.max(0, Math.round(Number(event.diamonds) || 0)),
+      diamonds: Math.max(0, Math.round(Number(event.diamonds ?? (event.kind === "bits" ? event.count : event.kind === "sub" || event.kind === "subgift" ? 500 : 0)) || 0)),
       count: Math.max(1, Math.round(Number(event.count) || 1)),
       amount,
       slot: this.items.length,

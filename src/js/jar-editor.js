@@ -13,9 +13,14 @@ startWidgetEditor({
   widget: JAR,
   storeKey: "frills:jar:editor:v1",
   overlayPath: "/overlay/jar/",
-  events: ["gift"],
-  idleHint: "Type your TikTok name, or frills_demo for made-up gifts. The test buttons above work without connecting.",
-  create(host, settings) {
+  platforms: ["tiktok", "twitch", "both"],
+  events: (p) => (p === "twitch" ? ["sub", "subgift", "bits"] : p === "both" ? ["gift", "sub", "subgift", "bits"] : ["gift"]),
+  idleHint: (p) => (p === "twitch"
+    ? "Type your Twitch channel, or press the test buttons above without connecting."
+    : p === "both"
+      ? "Type your TikTok @name and Twitch channel to fill one jar from both TikTok gifts and Twitch bits & subs."
+      : "Type your TikTok name, or frills_demo for made-up gifts. The test buttons above work without connecting."),
+  create(host, settings, ctx) {
     const view = createJarView(host);
     let current = settings;
     const jar = new GiftJar(settings, {

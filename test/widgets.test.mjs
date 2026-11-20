@@ -180,13 +180,16 @@ test("a count restored past its goal does not celebrate again and is not left st
 });
 
 test("goal types: a goal counts what its type says, and nothing else", () => {
-  assert.deepEqual(Object.keys(GOAL_TYPES), ["follow", "gift", "like"]);
+  assert.deepEqual(Object.keys(GOAL_TYPES), ["follow", "gift", "like", "sub", "bits"]);
   assert.equal(goalAmount("follow", { kind: "follow" }), 1);
   assert.equal(goalAmount("follow", { kind: "gift", total: 500 }), 0, "a gift is not a follower");
   assert.equal(goalAmount("gift", { kind: "gift", total: 500, diamonds: 100, count: 5 }), 500, "a gift adds its diamonds");
   assert.equal(goalAmount("gift", { kind: "gift", total: 0 }), 0);
   assert.equal(goalAmount("like", { kind: "like", count: 15 }), 15, "likes add their taps");
   assert.equal(goalAmount("like", { kind: "like", count: -3 }), 0);
+  assert.equal(goalAmount("sub", { kind: "sub" }), 1);
+  assert.equal(goalAmount("sub", { kind: "subgift", count: 5 }), 5);
+  assert.equal(goalAmount("bits", { kind: "bits", count: 250 }), 250);
   assert.equal(goalAmount("nope", { kind: "like", count: 3 }), 0);
 });
 

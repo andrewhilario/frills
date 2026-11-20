@@ -5,18 +5,20 @@
 
 import { TIMER, SubTimer, formatClock } from "./timer.js";
 import { createTimerView } from "./widgets-view.js";
-import { channelFromParams, connectEvents } from "./widget-overlay.js";
+import { channelFromParams, connectEvents, bothFromParams, platformFromParams } from "./widget-overlay.js";
 import { readCommands, validCode } from "./timer-bridge.js";
 import { fakeAlertSource } from "./fake-alerts.js";
 import { fontsReady, generalFaces } from "./look.js";
 
 const params = new URLSearchParams(location.search);
+const platform = platformFromParams(params);
+const both = bothFromParams(params);
 const settings = TIMER.sanitize(TIMER.fromParams(params));
 const demoPace = Number(params.get("pace")) ? Math.min(10000, Math.max(300, Number(params.get("pace")))) : 0;
 
 const note = document.getElementById("note");
 const say = (text) => { note.hidden = !text; note.textContent = text; };
-const channel = channelFromParams(params);
+const channel = channelFromParams(params, platform);
 const demo = params.get("demo") === "1";
 const code = validCode(settings.code);
 
@@ -46,13 +48,21 @@ setInterval(() => { draw(); save(); }, 250);
 if (demo) {
   fontsReady(generalFaces(settings), 1000).then(() => {
     timer.start(Date.now());
-    fakeAlertSource((event) => { timer.handle(event, Date.now()); draw(); }, demoPace ? () => [demoPace * 0.6, demoPace * 1.4] : undefined, ["gift", "follow"]);
+    const demoKinds = platform === "twitch" ? ["sub", "subgift", "bits"] : platform === "both" ? ["gift", "follow", "sub", "bits"] : ["gift", "follow"];
+    fakeAlertSource((event) => { timer.handle(event, Date.now()); draw(); }, demoPace ? () => [demoPace * 0.6, demoPace * 1.4] : undefined, demoKinds);
   });
 } else if (!channel) {
   say("Add ?channel=yourname to this link.");
 } else {
   const fonts = fontsReady(generalFaces(settings), 1000); // the connection starts at once; only drawing waits for the font
-  connectEvents({ channel, events: ["gift", "follow", "share"], onAlert: (event) => fonts.then(() => { timer.handle(event, Date.now()); draw(); save(); }), say });
+  connectEvents({
+    channel,
+    platform,
+    both,
+    events: platform === "twitch" ? ["sub", "subgift", "bits", "raid"] : platform === "both" ? ["gift", "follow", "share", "sub", "subgift", "bits", "raid"] : ["gift", "follow", "share"],
+    onAlert: (event) => fonts.then(() => { timer.handle(event, Date.now()); draw(); save(); }),
+    say,
+  });
 }
 if (!demo && code) {
   readCommands({

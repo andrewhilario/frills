@@ -3,7 +3,7 @@
 import { TTS, TtsQueue, ttsSpeechFor } from "./tts.js";
 import { createTtsPlayer } from "./tts-audio.js";
 import { createTtsView } from "./widgets-view.js";
-import { channelFromParams, connectEvents, platformFromParams } from "./widget-overlay.js";
+import { channelFromParams, connectEvents, bothFromParams, platformFromParams } from "./widget-overlay.js";
 import { fontsReady, generalFaces } from "./look.js";
 
 const params = new URLSearchParams(location.search);
@@ -43,6 +43,7 @@ if (params.get("demo") === "1") {
     if (sampleChat) queue.enqueue(sampleChat, { bypassCooldown: true });
   });
 } else {
+  const both = bothFromParams(params);
   const channel = channelFromParams(params, platform);
   if (!channel) {
     say("Add ?channel=yourname to this link.");
@@ -51,7 +52,8 @@ if (params.get("demo") === "1") {
     connectEvents({
       channel,
       platform,
-      events: platform === "twitch" ? ["sub", "subgift", "bits", "raid"] : ["gift"],
+      both,
+      events: platform === "twitch" ? ["sub", "subgift", "bits", "raid"] : platform === "both" ? ["gift", "sub", "subgift", "bits", "raid"] : ["gift"],
       onAlert(event) {
         fonts.then(() => {
           const item = ttsSpeechFor(event, settings);

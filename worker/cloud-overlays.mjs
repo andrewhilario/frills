@@ -9,6 +9,7 @@
 import { getPlus, plusActive, sessionAccount } from "./accounts.mjs";
 import { COOKIE, cookieOf } from "./account-routes.mjs";
 import { checkProRegion } from "./region.mjs";
+import { LIMITS as TIMER_LIMITS, tidy as tidyTimerCommand } from "./timer.mjs";
 
 export const OVERLAY_KINDS = Object.freeze({
   chat: { path: "/overlay/", editorPath: "/editor/", label: "Chat" },
@@ -55,13 +56,14 @@ const regionAllowed = (request, env) => {
   return checkProRegion(request, env).eligible;
 };
 
-/** Generates a 12-char URL-safe base64url identifier (~72 bits of entropy). */
-function randomId() {
-  const bytes = new Uint8Array(9);
+/** Generates a URL-safe base64url identifier of `charLen` characters (multiple of 4 recommended, e.g. 12 or 16). */
+function randomId(charLen = 12) {
+  const byteLen = Math.ceil((charLen * 3) / 4);
+  const bytes = new Uint8Array(byteLen);
   crypto.getRandomValues(bytes);
   let bin = "";
   for (const b of bytes) bin += String.fromCharCode(b);
-  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "").slice(0, charLen);
 }
 
 /** Validates and normalizes a user-chosen preset name (1..60 visible chars). */
@@ -168,12 +170,17 @@ export async function handleCloudOverlays(request, env, { now = Date.now() } = {
       });
     }
 
-    // ── Authenticated account routes: /api/cloud-overlays[/:id] ────────────────────────────────────────
+    // ── Authenticated account routes: /api/cloud-overlays[/:id[/timer]] ───────────────────────────────
     if (pathname !== "/api/cloud-overlays" && !pathname.startsWith("/api/cloud-overlays/")) {
       return json(404, { ok: false, error: "not_found" });
     }
-    const id = pathname === "/api/cloud-overlays" ? "" : pathname.slice("/api/cloud-overlays/".length).replace(/\/+$/, "");
-    if (id && !ID_RE.test(id)) return json(404, { ok: false, error: "not_found" });
+    const tail = pathname === "/api/cloud-overlays" ? "" : pathname.slice("/api/cloud-overlays/".length).replace(/\/+$/, "");
+    const parts = tail ? tail.split("/") : [];
+    const id = parts[0] ?? "";
+    const subAction = parts[1] ?? "";
+    if (id && (!ID_RE.test(id) || parts.length > 2 || (subAction && subAction !== "timer"))) {
+      return json(404, { ok: false, error: "not_found" });
+    }
 
     const eligible = regionAllowed(request, env);
     const who = await sessionAccount(db, cookieOf(request, COOKIE), { now });
@@ -247,6 +254,36 @@ export async function handleCloudOverlays(request, env, { now = Date.now() } = {
 
       const row = { id: newId, account_id: who.accountId, kind, name, path: meta.path, query, version: 1, created_at: now, updated_at: now };
       return json(201, { ok: true, overlay: formatRow(row, origin) });
+    }
+
+    if (id && subAction === "timer") {
+      if (request.method !== "POST") return json(405, { ok: false, error: "method" }, { allow: "POST" });
+      const existing = await db.prepare("SELECT * FROM cloud_overlays WHERE id = ? AND account_id = ?").bind(id, who.accountId).first();
+      if (!existing) return json(404, { ok: false, error: "not_found" });
+      if (existing.kind !== "timer") return json(400, { ok: false, error: "not_timer" });
+      const command = tidyTimerCommand(body);
+      if (!command) return json(400, { ok: false, error: "bad_command" });
+
+      const qParams = new URLSearchParams(existing.query);
+      let code = qParams.get("code") ?? "";
+      if (!/^[A-Za-z0-9_-]{16}$/.test(code)) {
+        code = randomId(16);
+        qParams.set("code", code);
+        const nextQuery = qParams.toString();
+        const nextVersion = (Number(existing.version) || 1) + 1;
+        await db.prepare("UPDATE cloud_overlays SET query = ?, version = ?, updated_at = ? WHERE id = ? AND account_id = ?").bind(nextQuery, nextVersion, now, id, who.accountId).run();
+      }
+
+      let box = await db.prepare("SELECT seq FROM timer_boxes WHERE code = ?").bind(code).first();
+      if (!box) {
+        await db.prepare("INSERT INTO timer_boxes (code, key_hash, seq, updated_at) VALUES (?, ?, 0, ?)").bind(code, `cloud:${who.accountId}`, now).run();
+        box = { seq: 0 };
+      }
+      const seq = (Number(box.seq) || 0) + 1;
+      await db.prepare("INSERT INTO timer_commands (code, seq, cmd, value, at) VALUES (?, ?, ?, ?, ?)").bind(code, seq, command.cmd, command.value, now).run();
+      await db.prepare("UPDATE timer_boxes SET seq = ?, updated_at = ? WHERE code = ?").bind(seq, now, code).run();
+      await db.prepare("DELETE FROM timer_commands WHERE code = ? AND (at < ? OR seq <= ?)").bind(code, now - TIMER_LIMITS.keepCommandsMs, seq - TIMER_LIMITS.perBox).run();
+      return json(200, { ok: true, id, code, seq, cmd: command.cmd, value: command.value });
     }
 
     if (id && request.method === "PUT") {

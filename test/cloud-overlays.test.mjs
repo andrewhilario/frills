@@ -138,6 +138,27 @@ test("cloud overlays CRUD, Plus gating, CSRF, cross-account isolation, OBS polli
   assert.equal(obsUpdated.version, 2);
   assert.equal(obsUpdated.url, "/overlay/?platform=tiktok&channel=mochi&look=night");
 
+  // 8b. Remote phone/browser Subathon Timer controls (/api/cloud-overlays/:id/timer) enqueue commands in timer_commands
+  const timerCreate = await handleCloudOverlays(new Request(`${SITE}/api/cloud-overlays`, {
+    method: "POST",
+    headers: { origin: SITE, cookie: plusA.cookie, "content-type": "application/json" },
+    body: JSON.stringify({ kind: "timer", name: "Twitch Subathon", query: "platform=twitch&channel=mochi_tv&startMinutes=120" }),
+  }), env, { now: T0 + 7500 });
+  assert.equal(timerCreate.status, 201);
+  const timerOverlay = (await timerCreate.json()).overlay;
+  const cmdRes = await handleCloudOverlays(new Request(`${SITE}/api/cloud-overlays/${timerOverlay.id}/timer`, {
+    method: "POST",
+    headers: { origin: SITE, cookie: plusA.cookie, "content-type": "application/json" },
+    body: JSON.stringify({ cmd: "add", value: 300 }),
+  }), env, { now: T0 + 7600 });
+  assert.equal(cmdRes.status, 200);
+  const cmdData = await cmdRes.json();
+  assert.equal(cmdData.ok, true);
+  assert.equal(cmdData.seq, 1);
+  assert.equal(cmdData.cmd, "add");
+  assert.equal(cmdData.value, 300);
+  assert.match(cmdData.code, /^[A-Za-z0-9_-]{16}$/);
+
   // 9. Graceful fallback: if Plus A's subscription expires, /api/o/:id STILL serves the last saved overlay so OBS never breaks, while edits are blocked
   env.DB.raw.prepare("UPDATE plus SET status = 'expired', renews_at = ? WHERE account_id = ?").run(T0, plusA.id);
   const obsAfterCancel = await (await handleCloudOverlays(new Request(`${SITE}/api/o/${overlay.id}`), env, { now: T0 + 9000 })).json();

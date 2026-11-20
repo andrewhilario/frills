@@ -1,7 +1,7 @@
 // AI Talking Pet TTS widget settings, message-to-speech formatting, and sequential queue.
 // Keeps formatting and queue pacing pure (no DOM or audio APIs here) so it tests cleanly in Node.
 
-import { defineWidget, chipsOf, number, range, selectOf, text, toggle } from "./widget-settings.js";
+import { defineWidget, chipsOf, imageOf, number, range, selectOf, text, toggle } from "./widget-settings.js";
 
 export const VOICES = [
   ["nova", "Nova (warm female)"],
@@ -12,21 +12,38 @@ export const VOICES = [
   ["fable", "Fable (British / expressive)"],
 ];
 
+export const GIFT_VOICES = [
+  ["same", "Same as main voice"],
+  ...VOICES,
+];
+
 export const PET_OPTIONS = [
   ["frog2", "Frog"],
   ["neko", "Cat"],
   ["bunny", "Bunny"],
   ["hamster", "Hamster"],
+  ["custom", "Custom PNG / GIF"],
   ["none", "No pet"],
+];
+
+export const WHO_OPTIONS = [
+  ["all", "Everyone"],
+  ["subs", "Subs, gifters, VIPs & mods"],
+  ["vips", "VIPs & mods"],
+  ["mods", "Mods only"],
 ];
 
 export const TTS = defineWidget({
   defaults: {
     engine: "auto",
     voice: "nova",
+    giftVoice: "same",
     browserVoice: "",
     pet: "frog2",
+    petIdle: "",
+    petTalk: "",
     trigger: "both",
+    who: "all",
     command: "!say",
     minDiamonds: 5,
     announceGift: true,
@@ -40,13 +57,17 @@ export const TTS = defineWidget({
   },
   controls: [
     { section: "voice", ...chipsOf("engine", "Voice mode", [["auto", "Auto (Plus AI voice, free voice if not)"], ["browser", "Browser voice (free)"], ["ai", "Plus AI voice only"]]) },
-    { section: "voice", ...selectOf("voice", "Voice style", VOICES, "The AI voices are part of Frills Plus. Without Plus, each style is matched to a free voice installed in your browser.") },
+    { section: "voice", ...selectOf("voice", "Voice style (chat)", VOICES, "The AI voices are part of Frills Plus. Without Plus, each style is matched to a free voice installed in your browser.") },
+    { section: "voice", ...selectOf("giftVoice", "Voice style (gifts, subs & bits)", GIFT_VOICES, "Pick a different voice persona for gift, sub, and cheer alerts, or keep it the same as chat.") },
     { section: "voice", ...text("browserVoice", "Browser voice filter", 64, "Auto-matches your voice style, or pick/type any installed Windows/Edge voice name.") },
     { section: "voice", ...range("rate", "Voice speed", 70, 150, 5, "%") },
     { section: "voice", ...range("volume", "Volume", 10, 100, 5, "%") },
     { section: "pet", ...chipsOf("pet", "Talking pet", PET_OPTIONS) },
+    { section: "pet", ...imageOf("petIdle", "Custom pet: idle picture or GIF", "Shown when custom pet is picked (PNG, WebP, or GIF up to 1 MB).") },
+    { section: "pet", ...imageOf("petTalk", "Custom pet: talking picture or GIF", "Optional mouth-open frame that swaps while speaking. Leave empty to bounce your idle picture.") },
     { section: "pet", ...toggle("showBubble", "Show speech bubble on stream", "Turn off for voice-only mode.") },
     { section: "rules", ...chipsOf("trigger", "When it speaks", [["gift", "Gifts, subs & bits only"], ["cmd", "Chat command"], ["both", "Alerts + command"], ["all_chat", "Every chat message"]]) },
+    { section: "rules", ...chipsOf("who", "Who can trigger chat TTS", WHO_OPTIONS) },
     { section: "rules", ...text("command", "Chat command", 20, "Viewers type this first, e.g. !say hello.") },
     { section: "rules", ...number("minDiamonds", "Smallest gift or cheer to read (diamonds / bits)", 0, 50000, { hint: "0 reads every TikTok gift (including 1-coin Roses) and every Twitch cheer." }) },
     { section: "rules", ...toggle("announceGift", "Read out gift, sub & cheer thank-yous") },
@@ -78,13 +99,25 @@ export function cleanSpeechText(raw, maxChars = 140) {
   return cleaned.slice(0, cap).trim();
 }
 
+/** Checks whether a chat message author passes the streamer's `who` role filter (`all`, `subs`, `vips`, `mods`). */
+export function roleAllowedForTts(input, who = "all") {
+  if (!who || who === "all") return true;
+  if (!input || typeof input !== "object") return false;
+  if (input.broadcaster || input.mod) return true;
+  if (who === "vips") return Boolean(input.vip);
+  if (who === "subs") return Boolean(input.vip || input.subscriber || input.gifter);
+  return false;
+}
+
 /**
- * Turns a TikTok gift alert or chat message into a speech item according to the streamer's rules.
- * Returns `{ kind, userKey, author, badge, text, message }` or `null` if it should not speak.
+ * Turns a TikTok gift alert, Twitch cheer/sub/raid, or chat message into a speech item according to the streamer's rules.
+ * Returns `{ kind, userKey, author, badge, text, message, voice }` or `null` if it should not speak.
  */
 export function ttsSpeechFor(input, settings) {
   if (!input || typeof input !== "object") return null;
   const cfg = settings || TTS.defaults;
+  const chatVoice = cfg.voice || "nova";
+  const alertVoice = cfg.giftVoice && cfg.giftVoice !== "same" ? cfg.giftVoice : chatVoice;
 
   if (input.kind === "gift") {
     if (!cfg.announceGift) return null;
@@ -100,7 +133,7 @@ export function ttsSpeechFor(input, settings) {
       ? count > 1 ? `${author} sent ${count} ${gift}!` : `${author} sent ${gift}!`
       : count > 1 ? `${count} ${gift}!` : `${gift}!`;
     const userKey = cleanName(input.user || author).toLowerCase() || "gift";
-    return { kind: "gift", userKey, author, badge, text: line.slice(0, 220), message: badge };
+    return { kind: "gift", userKey, author, badge, text: line.slice(0, 220), message: badge, voice: alertVoice };
   }
 
   if (input.kind === "bits" || input.kind === "sub" || input.kind === "subgift" || input.kind === "raid") {
@@ -128,12 +161,13 @@ export function ttsSpeechFor(input, settings) {
       badge = `raid · ${count}`;
       line = cfg.readUser ? `${author} raided with ${count} viewers!` : `Raid of ${count} viewers!`;
     }
-    return { kind: "gift", userKey, author, badge, text: line.slice(0, 220), message: badge };
+    return { kind: "gift", userKey, author, badge, text: line.slice(0, 220), message: badge, voice: alertVoice };
   }
 
   if (input.kind && input.kind !== "chat") return null;
   if (typeof input.text !== "string") return null;
   if (cfg.trigger === "gift") return null;
+  if (!roleAllowedForTts(input, cfg.who)) return null;
 
   let rawText = input.text.trim();
   if (!rawText) return null;
@@ -160,6 +194,7 @@ export function ttsSpeechFor(input, settings) {
     badge: "chat",
     text: fullText.slice(0, 220),
     message,
+    voice: chatVoice,
   };
 }
 

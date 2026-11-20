@@ -2,7 +2,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { TTS, TtsQueue, cleanSpeechText, ttsSpeechFor } from "../src/js/tts.js";
+import { TTS, TtsQueue, cleanSpeechText, roleAllowedForTts, ttsSpeechFor } from "../src/js/tts.js";
 import { pickBrowserVoice } from "../src/js/tts-audio.js";
 
 test("cleanSpeechText removes URLs, control bytes, spam punctuation, and caps length", () => {
@@ -64,6 +64,19 @@ test("ttsSpeechFor handles !say prefix cleanly and respects all_chat vs gift-onl
   assert.equal(all.text, "normal message");
 
   assert.equal(ttsSpeechFor({ name: "Kai", text: "!say ignored" }, { ...cmdCfg, trigger: "gift" }), null);
+
+  // Per-event giftVoice & Twitch role filtering (who: subs / vips / mods)
+  const giftPersona = ttsSpeechFor({ kind: "bits", name: "Kai", count: 200 }, { ...TTS.defaults, voice: "nova", giftVoice: "fable" });
+  assert.equal(giftPersona.voice, "fable");
+
+  assert.equal(roleAllowedForTts({ name: "Kai" }, "subs"), false);
+  assert.equal(roleAllowedForTts({ name: "Kai", subscriber: true }, "subs"), true);
+  assert.equal(roleAllowedForTts({ name: "Kai", vip: true }, "vips"), true);
+  assert.equal(roleAllowedForTts({ name: "Kai", subscriber: true }, "vips"), false);
+  assert.equal(roleAllowedForTts({ name: "Kai", mod: true }, "mods"), true);
+  assert.equal(roleAllowedForTts({ name: "Kai", broadcaster: true }, "mods"), true);
+  assert.equal(ttsSpeechFor({ name: "Viewer", text: "!say let me in" }, { ...cmdCfg, who: "subs" }), null);
+  assert.equal(ttsSpeechFor({ name: "SubFan", text: "!say sub hype!", subscriber: true }, { ...cmdCfg, who: "subs" }).message, "sub hype!");
 });
 
 test("TtsQueue runs utterances sequentially, enforces per-viewer cooldown, and caps backlog", async () => {

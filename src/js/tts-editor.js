@@ -25,11 +25,13 @@ startWidgetEditor({
   widget: TTS,
   storeKey: "frills:tts:v1",
   overlayPath: "/overlay/tts/",
-  platforms: ["tiktok", "twitch"],
-  events: (p) => (p === "twitch" ? ["sub", "subgift", "bits", "raid"] : ["gift"]),
+  platforms: ["tiktok", "twitch", "both"],
+  events: (p) => (p === "twitch" ? ["sub", "subgift", "bits", "raid"] : p === "both" ? ["gift", "sub", "subgift", "bits", "raid"] : ["gift"]),
   idleHint: (p) => (p === "twitch"
     ? "Type your Twitch channel and press Connect to test live chat, bits & subs — or use the test buttons above."
-    : "Type someone’s TikTok username (or @name) and press Connect to test live gifts & chat."),
+    : p === "both"
+      ? "Type your TikTok @name and Twitch channel to let one Talking Pet read both streams at once."
+      : "Type someone’s TikTok username (or @name) and press Connect to test live gifts & chat."),
   create(host, initial, ctx) {
     let settings = initial;
     let simCountry = "";
@@ -349,6 +351,10 @@ startWidgetEditor({
         view.apply(next);
         queue.setSettings(next);
         if (voicePick && voicePick.value !== (next.browserVoice || "")) voicePick.value = next.browserVoice || "";
+        const customOn = next.pet === "custom";
+        const consent = document.getElementById("media-consent");
+        if (consent) consent.hidden = !customOn;
+        for (const el of document.querySelectorAll("#opt-controls .media")) el.hidden = !customOn;
       },
       onEvent(event) {
         const item = ttsSpeechFor(event, settings);

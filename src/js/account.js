@@ -281,6 +281,49 @@ if ($("acct-form")) {
 
         actions.append(copy, edit, del);
         li.append(top, urlText, actions);
+
+        if (plusOn && item.kind === "timer") {
+          const timerRow = document.createElement("div");
+          timerRow.className = "acct-row acct-cloud__timer";
+          const controls = [
+            ["Start", "start", 0],
+            ["Pause", "pause", 0],
+            ["Resume", "resume", 0],
+            ["+1m", "add", 60],
+            ["+5m", "add", 300],
+            ["Reset", "reset", 0],
+          ];
+          for (const [label, cmd, value] of controls) {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "btn btn--soft btn--sm";
+            btn.textContent = label;
+            btn.addEventListener("click", async () => {
+              btn.disabled = true;
+              try {
+                const res = await fetch(`/api/cloud-overlays/${item.id}/timer`, {
+                  method: "POST",
+                  headers: { "content-type": "application/json" },
+                  credentials: "same-origin",
+                  body: JSON.stringify({ cmd, value }),
+                });
+                if (note) {
+                  note.dataset.state = res.ok ? "" : "error";
+                  note.textContent = res.ok
+                    ? `Sent “${label}” to “${item.name}” — your Subathon Timer in OBS updates within a few seconds.`
+                    : "Could not send timer command. Please try again.";
+                }
+              } catch {
+                if (note) { note.dataset.state = "error"; note.textContent = "Could not reach Frills."; }
+              } finally {
+                btn.disabled = false;
+              }
+            });
+            timerRow.append(btn);
+          }
+          li.append(timerRow);
+        }
+
         list.append(li);
       }
     } catch {

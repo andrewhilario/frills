@@ -223,6 +223,7 @@ export function mountSource(host, { feeds, pace, channel = "", twitch = "", plat
       setStatus(problem ? "connecting" : "connected", problem || "Reading TikTok and Twitch chat. Their messages arrive here together.");
       onState?.(problem ? "connecting" : "connected");
     };
+    const events = eventsNow();
     const join = (platform, name) => connectTo(list.map((f) => scoped(f, platform)), platform, name, (s) => {
       parts[platform] = s;
       if (s.fatal) {
@@ -232,7 +233,7 @@ export function mountSource(host, { feeds, pace, channel = "", twitch = "", plat
         return;
       }
       report();
-    }, { relay, plusRelay, plusCode: savedPlusCode(), onInfo });
+    }, { relay, plusRelay, plusCode: savedPlusCode(), events, onAlert, onInfo });
     const a = join("tiktok", tiktok);
     const b = join("twitch", twitch);
     conn = { stop() { a.stop(); b.stop(); } };

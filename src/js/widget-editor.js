@@ -25,7 +25,9 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
   const load = () => { try { return JSON.parse(localStorage.getItem(storeKey) ?? "null"); } catch { return null; } };
   const saved = load();
   let settings = widget.sanitize({ ...saved?.settings, ...widget.fromParams(params) });
-  const askedPlatform = params.get("platform");
+  const askedPlatform = params.get("tiktok") && params.get("twitch") && platforms.includes("both")
+    ? "both"
+    : params.get("platform");
   const initialPlatform = platforms.includes(askedPlatform) ? askedPlatform
     : platforms.includes(saved?.platform) ? saved.platform
     : platforms.includes(defaultPlatform) ? defaultPlatform : platforms[0];
@@ -106,13 +108,15 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
   for (const button of document.querySelectorAll("[data-test]")) button.addEventListener("click", () => api.tests[button.dataset.test]?.());
 
   // ── the account ─────────────────────────────────────────────────────────────────────────────────────────────────
-  const channelFromLink = params.get("channel") ?? "";
+  const channelFromLink = params.get("tiktok") || params.get("channel") || "";
+  const twitchFromLink = params.get("twitch") || "";
   source = mountSource($("source"), {
     // chat is not drawn here, but an overlay that reads commands from it (song requests) is given each message; connecting or
     // disconnecting never empties it (clear does nothing)
     feeds: [{ add: (m) => api.onChat?.(m), removeById() {}, removeUser() {}, clear() {} }],
     pace: () => [2000, 4000],
     channel: channelFromLink || saved?.channel || "",
+    twitch: twitchFromLink || saved?.twitch || "",
     platform: initialPlatform,
     platforms,
     autoconnect: Boolean(channelFromLink),
@@ -123,7 +127,8 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
     onInfo: (raw) => { const info = acceptInfo(raw); if (info) api.onInfo?.(info); },
     onAlert: (event) => api.onEvent(event),
     onFound: (found) => {
-      if ((source?.platform ?? initialPlatform) !== "tiktok") { $("relay-note").textContent = ""; return; }
+      const p = source?.platform ?? initialPlatform;
+      if (p !== "tiktok" && p !== "both") { $("relay-note").textContent = ""; return; }
       $("relay-note").textContent = !found ? ""
         : found.features.includes(needs) ? ""
         : needs === "roles" ? "The relay is an older version, so !next from your own account will not work yet (moderators can still use it). It needs an update."
@@ -138,26 +143,30 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
   const cloudKind = String(overlayPath ?? "").replace(/^\/overlay\/|\/+$/g, "");
   const cloud = cloudKind ? mountCloudSave({ kind: cloudKind, storeKey, anchor: linkInput.closest(".linkfield"), getUrl: () => linkInput.value, defaultName: `My ${cloudKind} overlay` }) : { sync() {} };
   function refreshLink() {
-    const channel = source.cleanChannel();
     const platform = source.platform;
+    const isBoth = platform === "both";
+    const both = isBoth ? source.cleanChannels() : null;
+    const channel = isBoth ? (both.tiktok && both.twitch ? both.tiktok : "") : source.cleanChannel();
     if (!channel) {
       linkInput.value = "";
       copyBtn.disabled = true;
-      $("link-hint").textContent = platforms.length > 1
-        ? "Your link appears here once you have typed your name in step 3."
-        : "Your link appears here once you have typed your TikTok name in step 3.";
+      $("link-hint").textContent = isBoth
+        ? "Your link appears here once you have typed both your TikTok and Twitch names in step 3."
+        : platforms.length > 1
+          ? "Your link appears here once you have typed your name in step 3."
+          : "Your link appears here once you have typed your TikTok name in step 3.";
       cloud.sync();
       return;
     }
-    let nextUrl = widget.url(`${location.origin}${overlayPath}`, { channel, platform, settings });
+    let nextUrl = widget.url(`${location.origin}${overlayPath}`, { channel, platform, both, settings });
     if (extraUrlParams) {
       const parsed = new URL(nextUrl);
-      for (const [k, v] of Object.entries(extraUrlParams({ channel, platform, settings }) ?? {})) {
+      for (const [k, v] of Object.entries(extraUrlParams({ channel, platform, both, settings }) ?? {})) {
         if (v) parsed.searchParams.set(k, String(v));
       }
       nextUrl = parsed.toString();
     }
-    if (platform === "tiktok" || cloudKind === "tts") nextUrl = appendPlusCode(nextUrl);
+    if (platform === "tiktok" || platform === "both" || cloudKind === "tts") nextUrl = appendPlusCode(nextUrl);
     linkInput.value = nextUrl;
     copyBtn.disabled = false;
     cloud.sync();
@@ -196,7 +205,7 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
   new ResizeObserver(fit).observe($("stage"));
 
   function save() {
-    try { localStorage.setItem(storeKey, JSON.stringify({ settings, channel: source.channel, platform: source.platform, canvas })); } catch { /* storage can be blocked; the editor still works */ }
+    try { localStorage.setItem(storeKey, JSON.stringify({ settings, channel: source.channel, twitch: source.twitchChannel, platform: source.platform, canvas })); } catch { /* storage can be blocked; the editor still works */ }
   }
 
   fit();

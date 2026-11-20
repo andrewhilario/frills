@@ -107,13 +107,14 @@
         </select>
         <p class="ctl__hint">Lists free voices exposed by your current browser (Microsoft Edge offers free Online Natural voices).</p>
       </div>
+      <label class="media__consent" id="media-consent" hidden><input type="checkbox" id="media-ok"> I have the right to use any image or GIF I upload here. Files can be up to 1 MB.</label>
       <div class="stack" id="opt-controls"></div>
     </section>
 
     <section class="step-card" aria-labelledby="s3">
       <div class="step-card__head">
         <span class="step-card__num" aria-hidden="true">3</span>
-        <h2 class="step-card__title" id="s3">Connect a TikTok LIVE</h2>
+        <h2 class="step-card__title" id="s3">Connect your stream</h2>
       </div>
       <div id="source"></div>
       <p class="ctl__hint" id="relay-note" role="status"></p>
@@ -126,7 +127,7 @@
       </div>
       <div class="linkfield">
         <label class="ctl__label" for="link">Your link</label>
-        <input type="text" id="link" readonly placeholder="Appears once you type a TikTok name" spellcheck="false" autocomplete="off">
+        <input type="text" id="link" readonly placeholder="Appears once you type a channel name" spellcheck="false" autocomplete="off">
         <div class="linkfield__actions">
           <button class="btn" type="button" id="copy-link" disabled>Copy link</button>
         </div>

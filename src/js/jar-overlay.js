@@ -4,18 +4,20 @@
 
 import { JAR, GiftJar, loadJar, saveJar } from "./jar.js";
 import { createJarView } from "./widgets-view.js";
-import { channelFromParams, connectEvents } from "./widget-overlay.js";
+import { channelFromParams, connectEvents, bothFromParams, platformFromParams } from "./widget-overlay.js";
 import { fakeAlertSource } from "./fake-alerts.js";
 import { createSounds } from "./sounds.js";
 import { fontsReady, generalFaces } from "./look.js";
 
 const params = new URLSearchParams(location.search);
+const platform = platformFromParams(params);
+const both = bothFromParams(params);
 const settings = JAR.sanitize(JAR.fromParams(params));
 const demoPace = Number(params.get("pace")) ? Math.min(10000, Math.max(300, Number(params.get("pace")))) : 0;
 
 const note = document.getElementById("note");
 const say = (text) => { note.hidden = !text; note.textContent = text; };
-const channel = channelFromParams(params);
+const channel = channelFromParams(params, platform);
 const demo = params.get("demo") === "1";
 
 const sounds = createSounds();
@@ -54,7 +56,8 @@ view.render(jar.snapshot);
 
 if (demo) {
   fontsReady(generalFaces(settings), 1000).then(() => {
-    fakeAlertSource((event) => jar.add(event), demoPace ? () => [demoPace * 0.65, demoPace * 1.35] : () => [900, 2100], ["gift"]);
+    const demoKinds = platform === "twitch" ? ["bits", "subgift"] : platform === "both" ? ["gift", "bits", "subgift"] : ["gift"];
+    fakeAlertSource((event) => jar.add(event), demoPace ? () => [demoPace * 0.65, demoPace * 1.35] : () => [900, 2100], demoKinds);
   });
 } else if (!channel) {
   say("Add ?channel=yourname to this link.");
@@ -62,7 +65,9 @@ if (demo) {
   const fonts = fontsReady(generalFaces(settings), 1000);
   connectEvents({
     channel,
-    events: ["gift"],
+    platform,
+    both,
+    events: platform === "twitch" ? ["sub", "subgift", "bits"] : platform === "both" ? ["gift", "sub", "subgift", "bits"] : ["gift"],
     onAlert: (event) => fonts.then(() => jar.add(event)),
     say,
   });
