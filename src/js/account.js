@@ -161,6 +161,8 @@ if ($("acct-form")) {
     }
     $("acct-buy").hidden = !canBuy(me);
     $("acct-buy-hint").hidden = !canBuy(me);
+    const promoEl = $("acct-promo");
+    if (promoEl) promoEl.hidden = !canBuy(me) || !promoEl.textContent.trim();
     const manage = Boolean(me.portal) && Boolean(me.plus);
     $("acct-manage").hidden = !manage;
     $("acct-manage-hint").hidden = !manage;

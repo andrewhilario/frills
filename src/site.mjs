@@ -13,6 +13,8 @@ export const site = {
   feedbackForm: (process.env.FEEDBACK_FORM ?? String(config.feedbackForm ?? "")) === "true" || process.env.FEEDBACK_FORM === "1",
   // Frills Plus accounts (sign in by email, see worker/accounts.mjs and PLAN-FRILLS-PLUS.md). Off until the whole flow is ready: the account pages are not built at all while it is off.
   plusAccounts: (process.env.PLUS_ACCOUNTS ?? String(config.plusAccounts ?? "")) === "true" || process.env.PLUS_ACCOUNTS === "1",
+  // Optional Polar launch promo code shown to Tier-1 visitors (e.g. "FRILLS20"). Set empty to hide all promo banners at once.
+  plusPromoCode: pick("PLUS_PROMO_CODE", "plusPromoCode"),
   feedbackUrl: pick("FEEDBACK_URL", "feedbackUrl"),
   waitlistUrl: pick("WAITLIST_URL", "waitlistUrl"),
   // Where the TikTok helper can be downloaded. Empty until it can be: the pages then say there is no download yet, and nothing links nowhere.
@@ -44,6 +46,7 @@ export function checkSite() {
   if (site.googleSiteVerification && !/^[A-Za-z0-9_-]{20,100}$/.test(site.googleSiteVerification)) problems.push("googleSiteVerification must be just the code from Google Search Console (letters, numbers, - and _)");
   if (site.spotifyClientId && !/^[a-f0-9]{32}$/.test(site.spotifyClientId)) problems.push("spotifyClientId must be the 32-character Client ID from the Spotify dashboard");
   if (site.twitchClientId && !/^[a-z0-9]{20,40}$/.test(site.twitchClientId)) problems.push("twitchClientId must be the Client ID from the Twitch developer console (lowercase letters and numbers)");
+  if (site.plusPromoCode && !/^[A-Za-z0-9_-]{3,24}$/.test(site.plusPromoCode)) problems.push("plusPromoCode must be 3 to 24 letters, numbers, - or _");
   for (const [name, value] of [["feedbackUrl", site.feedbackForm ? "" : site.feedbackUrl], ["waitlistUrl", site.waitlistUrl], ["helperUrl", site.helperUrl], ["relayUrl", site.relayUrl], ["plusRelayUrl", site.plusRelayUrl]]) {
     if (value && !/^https:\/\//.test(value)) problems.push(`${name} must start with https://`);
   }

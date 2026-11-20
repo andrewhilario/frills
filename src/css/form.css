@@ -69,6 +69,8 @@
 .plus-card__price { display: flex; align-items: baseline; gap: var(--space-2xs); font-size: var(--text-xl); font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
 .plus-card__per { font-size: var(--text-sm); font-weight: 600; color: var(--color-ink-2); letter-spacing: 0; }
 .plus-card__meta { font-size: var(--text-sm); color: var(--color-ink-2); }
+.plus-promo { margin: 0; padding: var(--space-xs) var(--space-md); border-radius: var(--radius-input); background: var(--color-accent-tint); border: 1.5px dashed var(--color-ink); font-size: var(--text-sm); line-height: 1.45; }
+.plus-promo code { padding: 1px 6px; border-radius: 6px; background: var(--color-paper); border: 1px solid var(--color-ink); font-weight: 700; }
 .plus-card__list { display: grid; gap: var(--space-xs); margin: 0; padding-left: 1.25rem; }
 .plus-card__list li { margin: 0; }
 .plus-card__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); padding-top: var(--space-2xs); }

@@ -119,6 +119,12 @@
 .cloud-box__status[data-state="ok"] { color: var(--color-success); font-weight: 700; }
 .cloud-box__status[data-state="warn"] { color: var(--color-ink); font-weight: 600; }
 .cloud-box__status[data-state="error"] { color: var(--color-error); font-weight: 600; }
+.cloud-tip { display: flex; align-items: flex-start; gap: var(--space-xs); margin-top: var(--space-sm); padding: var(--space-xs) var(--space-sm); border-radius: var(--radius-input); background: var(--color-paper-2); border: 1.5px dashed var(--color-rule-2); font-size: var(--text-xs); line-height: 1.45; color: var(--color-ink-2); }
+.cloud-tip__text { margin: 0; flex: 1 1 auto; }
+.cloud-tip__text a { font-weight: 700; }
+.cloud-tip__text code { padding: 1px 5px; border-radius: 5px; background: var(--color-accent-tint); color: var(--color-ink); font-weight: 700; }
+.cloud-tip__close { flex: none; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 999px; background: transparent; color: var(--color-ink-2); font-size: 1rem; line-height: 1; cursor: pointer; }
+@media (hover: hover) { .cloud-tip__close:hover { background: var(--color-paper-3); color: var(--color-ink); } }
 
 /* The widget and alerts editors keep their "Preview as" picker in a card under the link; the chat editor has none (its width slider is in the preview bar). */
 .preview-tools { display: grid; gap: var(--space-sm); padding: var(--space-md) var(--space-lg); border-radius: var(--radius-card); background: var(--color-paper-2); }

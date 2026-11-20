@@ -146,6 +146,10 @@ const shared = {
   plusRelay: site.plusRelayUrl,
   ...Object.fromEntries(Object.entries(words).map(([k, v]) => ["plus" + k[0].toUpperCase() + k.slice(1), v])), // plusNotAffiliated, plusPrivacyLede, plusIdeasIntro, ...
   plusAccounts: site.plusAccounts ? "on" : "", // ("on" when the Frills Plus account pages are built: a page that links to them checks this)
+  plusPromoCode: site.plusAccounts && site.plusPromoCode ? site.plusPromoCode : "",
+  plusPromoBanner: site.plusAccounts && site.plusPromoCode
+    ? `\n        <p class="plus-promo"><strong>Founding 20 offer:</strong> use code <code>${esc(site.plusPromoCode)}</code> at checkout for <strong>20% off forever</strong> ($4.79/month — first 20 subscribers only).</p>`
+    : "",
   siteAddress: site.url,
   spotifyClientId: site.spotifyClientId ?? "",
   twitchClientId: site.twitchClientId ?? "",

@@ -258,22 +258,61 @@ export function mountCloudSave({ kind, storeKey, anchor, getUrl, defaultName = "
     els = { box, select, nameInput, saveBtn, urlWrap, urlInput, copyBtn, status };
   };
 
-  // Probe account + Plus status silently; mount UI only for active Frills Plus subscribers
+  const mountTier1Tip = () => {
+    if (document.body?.dataset?.plusAccounts !== "on") return;
+    try { if (sessionStorage.getItem("frills:plus:tip:off") === "1") return; } catch {}
+    const promo = String(document.body?.dataset?.plusPromo ?? "").trim();
+    const tip = document.createElement("aside");
+    tip.className = "cloud-tip";
+    tip.setAttribute("aria-label", "Frills Plus live cloud links");
+
+    const text = document.createElement("p");
+    text.className = "cloud-tip__text";
+    text.append("Want one link that updates in OBS without re-pasting, plus a dedicated 24/7 TikTok server? ");
+    if (promo) {
+      text.append("First 20 get 20% off forever with ");
+      const code = document.createElement("code");
+      code.textContent = promo;
+      text.append(code, ". ");
+    }
+    const link = document.createElement("a");
+    link.href = "/plus/";
+    link.textContent = "See Frills Plus";
+    text.append(link, ".");
+
+    const close = document.createElement("button");
+    close.type = "button";
+    close.className = "cloud-tip__close";
+    close.setAttribute("aria-label", "Hide this tip");
+    close.textContent = "×";
+    close.addEventListener("click", () => {
+      tip.remove();
+      try { sessionStorage.setItem("frills:plus:tip:off", "1"); } catch {}
+    });
+
+    tip.append(text, close);
+    anchor.insertAdjacentElement("afterend", tip);
+  };
+
+  // Probe account + Plus status silently; show full cloud bar for active Plus, or a subtle Tier-1-only tip for eligible non-Plus visitors
   if (anchor) {
     fetch(`/api/cloud-overlays?kind=${encodeURIComponent(kind)}`, { credentials: "same-origin", cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((data) => {
-        if (!data?.ok || !data.plusActive) return;
-        overlays = Array.isArray(data.overlays) ? data.overlays : [];
-        buildBox();
-        renderOptions();
-        const linked = currentOverlay();
-        if (linked) {
-          els.nameInput.value = linked.name;
-          lastSavedQuery = linked.query;
-          setStatus(`Editing “${linked.name}” (v${linked.version}). Press Save live update after changing anything.`);
+      .then(async (r) => ({ ok: r.ok, data: await r.json().catch(() => null) }))
+      .then(({ ok, data }) => {
+        if (ok && data?.ok && data.plusActive) {
+          overlays = Array.isArray(data.overlays) ? data.overlays : [];
+          buildBox();
+          renderOptions();
+          const linked = currentOverlay();
+          if (linked) {
+            els.nameInput.value = linked.name;
+            lastSavedQuery = linked.query;
+            setStatus(`Editing “${linked.name}” (v${linked.version}). Press Save live update after changing anything.`);
+          }
+          syncUi();
+        } else if (data?.eligible === true) {
+          mountTier1Tip();
         }
-        syncUi();
       })
       .catch(() => {});
   }

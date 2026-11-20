@@ -47,8 +47,15 @@ test("cloud overlays CRUD, Plus gating, CSRF, cross-account isolation, OBS polli
   const plusA = await signedIn(env, "plus-a@example.com", true);
   const plusB = await signedIn(env, "plus-b@example.com", true);
 
-  // 1. Signed-out cannot list or create
-  assert.equal((await handleCloudOverlays(new Request(`${SITE}/api/cloud-overlays`), env, { now: T0 + 2000 })).status, 401);
+  // 1. Signed-out cannot list or create (and reports Tier-1 region eligibility for subtle in-editor tips)
+  const outRes = await handleCloudOverlays(new Request(`${SITE}/api/cloud-overlays`), env, { now: T0 + 2000 });
+  assert.equal(outRes.status, 401);
+  const phReq = new Request(`${SITE}/api/cloud-overlays`, { headers: { "cf-connecting-ip": "198.51.100.8" } });
+  Object.defineProperty(phReq, "cf", { value: { country: "PH" }, configurable: true });
+  assert.equal((await (await handleCloudOverlays(phReq, env, { now: T0 + 2000 })).json()).eligible, false);
+  const usReq = new Request(`${SITE}/api/cloud-overlays`, { headers: { "cf-connecting-ip": "198.51.100.8" } });
+  Object.defineProperty(usReq, "cf", { value: { country: "US" }, configurable: true });
+  assert.equal((await (await handleCloudOverlays(usReq, env, { now: T0 + 2000 })).json()).eligible, true);
 
   // 2. Non-Plus account gets plusActive: false on list and 403 plus_required on create
   const freeList = await (await handleCloudOverlays(new Request(`${SITE}/api/cloud-overlays`, { headers: { cookie: free.cookie } }), env, { now: T0 + 2000 })).json();

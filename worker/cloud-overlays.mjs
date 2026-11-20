@@ -175,8 +175,9 @@ export async function handleCloudOverlays(request, env, { now = Date.now() } = {
     const id = pathname === "/api/cloud-overlays" ? "" : pathname.slice("/api/cloud-overlays/".length).replace(/\/+$/, "");
     if (id && !ID_RE.test(id)) return json(404, { ok: false, error: "not_found" });
 
+    const eligible = regionAllowed(request, env);
     const who = await sessionAccount(db, cookieOf(request, COOKIE), { now });
-    if (!who) return json(401, { ok: false, error: "sign_in_first" });
+    if (!who) return json(401, { ok: false, error: "sign_in_first", eligible });
     const plus = await getPlus(db, who.accountId);
     const hasPlus = plusActive(plus, now);
     const origin = String(env.SITE_URL ?? url.origin).replace(/\/+$/, "");
@@ -189,6 +190,7 @@ export async function handleCloudOverlays(request, env, { now = Date.now() } = {
       return json(200, {
         ok: true,
         plusActive: hasPlus,
+        eligible,
         limit: MAX_CLOUD_OVERLAYS,
         overlays: (rows ?? []).map((r) => formatRow(r, origin)),
       });
