@@ -207,19 +207,18 @@ test("overlays page: the live and beta ones link to their editors, and the comin
   const { base } = await withHelper();
   await page.goto(base + "/overlays/", { settle: 600 });
   const links = await page.evaluate(`[...document.querySelectorAll(".tool:not(.tool--soon) a.btn")].map((a) => a.getAttribute("href"))`);
-  assert.deepEqual(links, ["/editor/", "/alerts/", "/gifts/", "/goal/", "/likers/", "/leaderboard/", "/counter/", "/timer/", "/editor/", "/songs/", "/songs/#spotify-step"], "the chat editor's Both is TikTok and Twitch chat together; the last two are song requests and its Spotify step");
+  assert.deepEqual(links, ["/editor/", "/alerts/", "/gifts/", "/goal/", "/likers/", "/counter/", "/timer/", "/editor/", "/songs/", "/songs/#spotify-step"], "the chat editor's Both is TikTok and Twitch chat together; the last two are song requests and its Spotify step");
   const beta = await page.evaluate(`[...document.querySelectorAll(".tool:has(.tool__badge--beta) .subtitle")].map((t) => t.textContent)`);
-  assert.deepEqual(beta, ["Alerts", "Last gifts", "Goals", "Top likers", "Top gifters and likers", "Viewer and like counter", "Subathon timer", "TikTok and Twitch chat together", "Song requests", "Spotify player"], "it is marked Beta, like the others that are new");
+  assert.deepEqual(beta, ["Alerts", "Last gifts", "Goals", "Top likers", "Viewer and like counter", "Subathon timer", "TikTok and Twitch chat together", "Song requests", "Spotify player"], "it is marked Beta, like the others that are new");
   const soon = await page.evaluate(`[...document.querySelectorAll("#coming-soon + ul .tool--soon")].map((t) => [t.querySelector(".subtitle").textContent, t.querySelectorAll("a").length])`);
-  assert.deepEqual(soon.map((s) => s[0]), ["Free sound library", "Like and subscriber alerts", "Actions", "Starting soon, Be right back and Stream ending screens", "Your own layout", "Pets that move"]);
+  assert.deepEqual(soon.map((s) => s[0]), ["Free sound library", "Like and subscriber alerts", "Actions", "Starting soon, Be right back and Stream ending screens", "Your own layout", "Pets that move", "Top gifters"]);
   assert.ok(soon.every((s) => s[1] === 0), "a coming-soon card links nowhere");
-  assert.equal(await page.evaluate(`document.querySelectorAll("#coming-soon + ul .tool__badge--soon").length`), 6);
+  assert.equal(await page.evaluate(`document.querySelectorAll("#coming-soon + ul .tool__badge--soon").length`), 7);
   const ideas = await page.evaluate(`[...document.querySelectorAll("#plus-ideas ~ ul .tool")].map((t) => [t.querySelector(".subtitle").textContent, t.querySelectorAll("a").length, t.querySelectorAll("button[data-plus]").length])`);
   assert.deepEqual(ideas.map((i) => i[0]), ["Change it while you are live", "A bigger sound and sticker kit", "One link for a whole scene", "Collector art packs"], "the paid-plan ideas are their own list, not coming-soon items");
   assert.ok(ideas.every((i) => i[1] === 0 && i[2] === 1), "each idea has its one button and links nowhere");
 });
 
-const giftOf = (id, name, gift, diamonds, repeat = 1) => ({ common: { msgId: id }, user: person(name.toLowerCase(), name), gift: { name: gift, type: 2, diamondCount: diamonds }, repeatCount: repeat });
 const like = (id, name, likeCount, totalLikeCount = 0) => ({ common: { msgId: id }, user: person(name.toLowerCase(), name), likeCount, totalLikeCount });
 const ranking = () => page.evaluate(`[...document.querySelectorAll(".liker:not(.liker--out)")].sort((a, b) => Number(a.dataset.rank) - Number(b.dataset.rank)).map((r) => r.dataset.rank + ":" + r.querySelector(".liker__name").textContent + ":" + r.querySelector(".liker__count").textContent)`);
 
@@ -336,20 +335,4 @@ test("editor: the milestone choices are there, the test button shows the celebra
   assert.equal(url.searchParams.get("milestone"), "5000");
   assert.equal(url.searchParams.has("celebrate"), false, "switched on is the usual, so it is not in the link");
   assert.deepEqual(page.problems, [], page.problems.join(" | "));
-});
-
-test("leaderboard overlay: gifts and likes from a TikTok LIVE go to their own rankings, the gifters are ranked by diamonds, and the likers take their turn", { skip }, async () => {
-  const { base, made } = await withHelper();
-  await page.goto(`${base}/overlay/leaderboard/?channel=pond_cafe&platform=tiktok&seconds=5&max=3`, { settle: 800 });
-  await until(() => made.length === 1);
-  await sleep(150);
-  assert.equal(await text(".likers__title"), "Top gifters");
-  made[0].emit("gift", giftOf("g1", "Ann", "Rose", 1, 3)); // 3 diamonds
-  made[0].emit("gift", giftOf("g2", "Ben", "Galaxy", 1000)); // 1,000
-  made[0].emit("gift", giftOf("g3", "Ann", "Panda", 100)); // Ann now 103
-  made[0].emit("like", like("l1", "Cat", 40));
-  await until(async () => (await ranking()).length === 2, 4000);
-  assert.deepEqual(await ranking(), ["1:Ben:1,000", "2:Ann:103"], "ranked by the diamonds each person sent");
-  await page.waitFor(`document.querySelector(".likers__title")?.textContent === "Top likers" && document.querySelectorAll(".liker:not(.liker--out)").length === 1`, { timeout: 9000 });
-  assert.deepEqual(await ranking(), ["1:Cat:40"], "the likes went to the likers");
 });

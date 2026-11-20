@@ -125,13 +125,6 @@
 .likers { position: absolute; inset: 0; padding: 2%; overflow: hidden; pointer-events: none; font-family: var(--a-font, sans-serif); font-size: var(--a-size, 24px); letter-spacing: var(--a-letter, 0px); }
 .likers__title { display: block; width: fit-content; margin: 0 0 0.5em; padding: 0.2em 0.8em; font-weight: 800; color: var(--a-text, #222); background: var(--a-bg, #fff); border: var(--a-border, 2px) solid var(--a-accent, #fc0); border-radius: var(--a-radius, 20px); }
 .likers__title[hidden] { display: none; }
-/* The rotating Top Gifters and Likers: the Top Likers list inside a wrapper that gives way to the next ranking. */
-.boards { position: absolute; inset: 0; transition: opacity 360ms ease, transform 360ms ease; }
-.boards--out { opacity: 0; }
-.boards--prep { opacity: 0; transition: none; }
-.boards[data-swap="slide"].boards--out { transform: translateX(-8%); }
-.boards[data-swap="slide"].boards--prep { transform: translateX(8%); }
-@media (prefers-reduced-motion: reduce) { .boards { transition: none; } }
 .likers__rows { position: relative; }
 .liker {
   position: absolute; left: 0; right: 0; top: 0; display: flex; align-items: center; gap: 0.55em; box-sizing: border-box; padding: 0.4em 0.9em 0.4em 0.4em;

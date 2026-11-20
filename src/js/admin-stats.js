@@ -58,7 +58,6 @@ const NAMES = {
   gifts: "Last Gifts",
   goal: "Stream Goals",
   likers: "Top Likers",
-  leaderboard: "Top Gifters and Likers",
   counter: "Viewer + Like Counter",
   timer: "Subathon Timer",
   songs: "Song Requests (!sr)",
