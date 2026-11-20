@@ -78,10 +78,24 @@
 
         <section class="acct-card" id="acct-cloud" aria-labelledby="acct-cloud-title" hidden>
           <div class="acct-card__head">
-            <h2 class="acct-card__title" id="acct-cloud-title">Live cloud overlays</h2>
+            <h2 class="acct-card__title" id="acct-cloud-title">Live cloud overlays &amp; remote deck</h2>
             <span class="acct-badge" id="acct-cloud-count" hidden></span>
           </div>
-          <p class="form__hint" id="acct-cloud-hint">Save a live link from any editor (<a href="/editor/">Chat</a>, <a href="/alerts/">Alerts</a>, <a href="/tts/">Talking pet</a>, or any other overlay). Paste its permanent <code>/o/…</code> link into OBS once and push look or setting edits live without touching OBS again.</p>
+          <p class="form__hint" id="acct-cloud-hint">Save a live link from any editor (<a href="/editor/">Chat</a>, <a href="/alerts/">Alerts</a>, <a href="/tts/">Talking pet</a>, <a href="/jar/">Gift jar</a>, <a href="/timer/">Subathon timer</a>, or <a href="/goal/">Goal bar</a>). Paste its permanent <code>/o/…</code> link into OBS once — switch themes across all overlays below or trigger live remote actions from your phone mid-stream.</p>
+          <div class="acct-row" id="acct-theme-bar" hidden>
+            <label class="visually-hidden" for="acct-theme-pick">Sync theme across all cloud overlays</label>
+            <select id="acct-theme-pick">
+              <option value="neko">Neko Café (Bubblegum + Cat peekers)</option>
+              <option value="bunny">Bunny Cloud (Lavender + Sleepy bunny)</option>
+              <option value="matcha">Matcha Frog (Cream + Frog pond V2)</option>
+              <option value="bubblegum">Neon Bubblegum</option>
+              <option value="frost">Frost Glass</option>
+              <option value="sticker">Sticker Cream</option>
+              <option value="night">Cozy Night</option>
+              <option value="arcade">Arcade Pixel</option>
+            </select>
+            <button class="btn btn--soft btn--sm" type="button" id="acct-theme-apply">Apply theme to all overlays</button>
+          </div>
           <ul class="acct-cloud__list" id="acct-cloud-list" role="list"></ul>
           <p class="form__status" id="acct-cloud-status" role="status" aria-live="polite"></p>
         </section>

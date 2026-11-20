@@ -130,11 +130,23 @@ startWidgetEditor({
     });
 
     let loadedAccount = false;
+    let hasActivePlus = false;
+    const syncPlusFeatureControls = () => {
+      const showPlusExtras = Boolean(hasActivePlus || (devSite && !simCountry));
+      const customChip = [...document.querySelectorAll("#opt-controls .chip")].find((b) => b.textContent.trim() === "Custom PNG / GIF");
+      if (customChip) customChip.hidden = !showPlusExtras && settings.pet !== "custom";
+      const giftVoiceRow = document.getElementById("c-giftVoice")?.closest(".ctl");
+      if (giftVoiceRow) giftVoiceRow.hidden = !showPlusExtras;
+      const whoRow = document.querySelector('[aria-label="Who can trigger chat TTS"]')?.closest(".ctl");
+      if (whoRow) whoRow.hidden = !showPlusExtras;
+    };
+
     const syncRegionUi = (eligible) => {
       const plusBoxEl = document.getElementById("plus-link");
       if (plusBoxEl) plusBoxEl.hidden = !eligible || !loadedAccount;
       const engineCtl = document.querySelector('[aria-label="Voice mode"]')?.closest(".ctl");
       if (engineCtl) engineCtl.hidden = !eligible;
+      syncPlusFeatureControls();
       // In non-eligible regions (e.g. PH), remove/hide any "Frills Plus" wording in control hints and about text
       for (const el of document.querySelectorAll(".ctl__hint")) {
         if (!el.dataset.origText && el.textContent.includes("Frills Plus")) {
@@ -246,6 +258,8 @@ startWidgetEditor({
       };
       const draw = (me) => {
         const plus = Boolean(me.signedIn && me.plus?.active);
+        hasActivePlus = plus;
+        syncPlusFeatureControls();
         const mine = Boolean(settings.code) && Boolean(me.overlayLink);
         let words;
         if (!me.signedIn) words = "Sign in to use Frills Plus AI voices on your stream. The free browser voices need no account.";

@@ -108,7 +108,7 @@ test("cloud overlays CRUD, Plus gating, CSRF, cross-account isolation, OBS polli
   assert.equal(obs1.url, "/overlay/?platform=tiktok&channel=mochi&look=frost");
 
   const obsSame = await (await handleCloudOverlays(new Request(`${SITE}/api/o/${overlay.id}?v=1`), env, { now: T0 + 5000 })).json();
-  assert.deepEqual(obsSame, { ok: true, id: overlay.id, version: 1, changed: false });
+  assert.deepEqual(obsSame, { ok: true, id: overlay.id, version: 1, changed: false, cmds: [], cmdSeq: 0 });
 
   // 7. Plus B cannot read, edit, or delete Plus A's overlay
   assert.equal((await handleCloudOverlays(new Request(`${SITE}/api/cloud-overlays/${overlay.id}`, { headers: { cookie: plusB.cookie } }), env, { now: T0 + 6000 })).status, 404);
@@ -159,11 +159,43 @@ test("cloud overlays CRUD, Plus gating, CSRF, cross-account isolation, OBS polli
   assert.equal(cmdData.value, 300);
   assert.match(cmdData.code, /^[A-Za-z0-9_-]{16}$/);
 
+  // 8c. Global Theme Sync (POST /api/cloud-overlays/theme) updates all saved overlays & bumps versions
+  const themeRes = await handleCloudOverlays(new Request(`${SITE}/api/cloud-overlays/theme`, {
+    method: "POST",
+    headers: { origin: SITE, cookie: plusA.cookie, "content-type": "application/json" },
+    body: JSON.stringify({ theme: "neko" }),
+  }), env, { now: T0 + 7700 });
+  assert.equal(themeRes.status, 200);
+  const themeData = await themeRes.json();
+  assert.equal(themeData.ok, true);
+  assert.equal(themeData.updated, 2);
+
+  // 8d. Live Phone Stream Deck commands (/api/cloud-overlays/:id/cmd) & crash-proof state checkpoint (POST /api/o/:id)
+  const deckRes = await handleCloudOverlays(new Request(`${SITE}/api/cloud-overlays/${overlay.id}/cmd`, {
+    method: "POST",
+    headers: { origin: SITE, cookie: plusA.cookie, "content-type": "application/json" },
+    body: JSON.stringify({ action: "tts:say", text: "Be right back in 2 minutes!" }),
+  }), env, { now: T0 + 7800 });
+  assert.equal(deckRes.status, 200);
+  assert.equal((await deckRes.json()).seq, 1);
+
+  const stateRes = await handleCloudOverlays(new Request(`${SITE}/api/o/${overlay.id}`, {
+    method: "POST",
+    headers: { origin: SITE, "content-type": "application/json" },
+    body: JSON.stringify({ state: { "frills:jar:mochi": "{\"total\":450,\"target\":1000}" } }),
+  }), env, { now: T0 + 7900 });
+  assert.equal(stateRes.status, 200);
+
+  const pollCmds = await (await handleCloudOverlays(new Request(`${SITE}/api/o/${overlay.id}?c=0`), env, { now: T0 + 7950 })).json();
+  assert.equal(pollCmds.cmdSeq, 1);
+  assert.equal(pollCmds.cmds[0].cmd, "tts:say:Be right back in 2 minutes!");
+  assert.equal(pollCmds.state["frills:jar:mochi"], "{\"total\":450,\"target\":1000}");
+
   // 9. Graceful fallback: if Plus A's subscription expires, /api/o/:id STILL serves the last saved overlay so OBS never breaks, while edits are blocked
   env.DB.raw.prepare("UPDATE plus SET status = 'expired', renews_at = ? WHERE account_id = ?").run(T0, plusA.id);
   const obsAfterCancel = await (await handleCloudOverlays(new Request(`${SITE}/api/o/${overlay.id}`), env, { now: T0 + 9000 })).json();
   assert.equal(obsAfterCancel.ok, true);
-  assert.equal(obsAfterCancel.url, "/overlay/?platform=tiktok&channel=mochi&look=night");
+  assert.match(obsAfterCancel.url, /^\/overlay\/\?platform=tiktok&channel=mochi&look=bubblegum&deco=neko&tag=pill$/);
   const editAfterCancel = await handleCloudOverlays(new Request(`${SITE}/api/cloud-overlays/${overlay.id}`, {
     method: "PUT",
     headers: { origin: SITE, cookie: plusA.cookie, "content-type": "application/json" },

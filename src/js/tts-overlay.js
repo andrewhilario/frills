@@ -24,6 +24,22 @@ const queue = new TtsQueue(settings, {
   onIdle: () => view.idle(),
 });
 
+window.addEventListener("frills:cloud-cmd", (e) => {
+  const raw = String(e.detail?.cmd ?? "");
+  if (raw === "tts:clear") {
+    queue.clear();
+    player.stop();
+    view.clear();
+  } else if (raw.startsWith("tts:say:")) {
+    const text = raw.slice("tts:say:".length).trim();
+    const item = ttsSpeechFor({ name: "Streamer", text, broadcaster: true }, { ...settings, trigger: "all_chat", readUser: false });
+    if (item) {
+      item.badge = "live";
+      queue.enqueue(item, { bypassCooldown: true });
+    }
+  }
+});
+
 const say = (message) => {
   if (!message) {
     note.hidden = true;

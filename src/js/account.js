@@ -207,6 +207,8 @@ if ($("acct-form")) {
         count.hidden = false;
         count.textContent = `${items.length} / ${data.limit ?? 50}`;
       }
+      const themeBar = $("acct-theme-bar");
+      if (themeBar) themeBar.hidden = !(plusOn && items.length > 0);
       list.replaceChildren();
       if (!items.length) {
         const empty = document.createElement("li");
@@ -322,6 +324,82 @@ if ($("acct-form")) {
             timerRow.append(btn);
           }
           li.append(timerRow);
+        } else if (plusOn && item.kind === "tts") {
+          const ttsRow = document.createElement("div");
+          ttsRow.className = "acct-row acct-cloud__timer";
+          const input = document.createElement("input");
+          input.type = "text";
+          input.maxLength = 160;
+          input.placeholder = "Type a live pet announcement…";
+          const speakBtn = document.createElement("button");
+          speakBtn.type = "button";
+          speakBtn.className = "btn btn--soft btn--sm";
+          speakBtn.textContent = "Speak live";
+          const clearBtn = document.createElement("button");
+          clearBtn.type = "button";
+          clearBtn.className = "btn btn--outline btn--sm";
+          clearBtn.textContent = "Stop / Clear";
+          const sendTtsCmd = async (action, text = "") => {
+            try {
+              const res = await fetch(`/api/cloud-overlays/${item.id}/cmd`, {
+                method: "POST",
+                headers: { "content-type": "application/json" },
+                credentials: "same-origin",
+                body: JSON.stringify({ action, text }),
+              });
+              if (note) {
+                note.dataset.state = res.ok ? "" : "error";
+                note.textContent = res.ok
+                  ? `Sent to “${item.name}” — your Talking Pet in OBS responds within a few seconds.`
+                  : "Could not send command.";
+              }
+              if (res.ok && action === "tts:say") input.value = "";
+            } catch {
+              if (note) { note.dataset.state = "error"; note.textContent = "Could not reach Frills."; }
+            }
+          };
+          speakBtn.addEventListener("click", () => {
+            const val = input.value.trim();
+            if (val) void sendTtsCmd("tts:say", val);
+          });
+          clearBtn.addEventListener("click", () => void sendTtsCmd("tts:clear"));
+          ttsRow.append(input, speakBtn, clearBtn);
+          li.append(ttsRow);
+        } else if (plusOn && (item.kind === "jar" || item.kind === "goal")) {
+          const deckRow = document.createElement("div");
+          deckRow.className = "acct-row acct-cloud__timer";
+          const deckBtns = item.kind === "jar"
+            ? [["+100 Drop", "jar:drop", 100], ["Fill & Celebrate", "jar:fill", 0], ["Empty Jar", "jar:clear", 0]]
+            : [["+1", "goal:add", 1], ["+10", "goal:add", 10], ["Celebrate Goal", "goal:reach", 0], ["Reset", "goal:reset", 0]];
+          for (const [label, action, value] of deckBtns) {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "btn btn--soft btn--sm";
+            btn.textContent = label;
+            btn.addEventListener("click", async () => {
+              btn.disabled = true;
+              try {
+                const res = await fetch(`/api/cloud-overlays/${item.id}/cmd`, {
+                  method: "POST",
+                  headers: { "content-type": "application/json" },
+                  credentials: "same-origin",
+                  body: JSON.stringify({ action, value }),
+                });
+                if (note) {
+                  note.dataset.state = res.ok ? "" : "error";
+                  note.textContent = res.ok
+                    ? `Sent “${label}” to “${item.name}” — OBS updates within a few seconds.`
+                    : "Could not send command.";
+                }
+              } catch {
+                if (note) { note.dataset.state = "error"; note.textContent = "Could not reach Frills."; }
+              } finally {
+                btn.disabled = false;
+              }
+            });
+            deckRow.append(btn);
+          }
+          li.append(deckRow);
         }
 
         list.append(li);
@@ -346,6 +424,34 @@ if ($("acct-form")) {
     note.dataset.state = "error";
     note.textContent = "We have not heard about your payment yet. It can take a few minutes: reload this page in a little while. If Plus is still off after that, check your email for your receipt and get in touch.";
   };
+
+  $("acct-theme-apply")?.addEventListener("click", async () => {
+    const btn = $("acct-theme-apply");
+    const pick = $("acct-theme-pick");
+    const note = $("acct-cloud-status");
+    if (!btn || !pick) return;
+    btn.disabled = true;
+    try {
+      const res = await fetch("/api/cloud-overlays/theme", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ theme: pick.value }),
+      });
+      const data = await res.json().catch(() => null);
+      if (note) {
+        note.dataset.state = res.ok ? "" : "error";
+        note.textContent = res.ok
+          ? `Applied theme to ${data?.updated ?? 0} live cloud overlay(s) — OBS updates within a few seconds.`
+          : "Could not apply theme. Please try again.";
+      }
+      if (res.ok) await loadCloudOverlays(true);
+    } catch {
+      if (note) { note.dataset.state = "error"; note.textContent = "Could not reach Frills."; }
+    } finally {
+      btn.disabled = false;
+    }
+  });
 
   $("acct-buy").addEventListener("click", async () => {
     const button = $("acct-buy");

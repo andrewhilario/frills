@@ -35,9 +35,54 @@ if (!id) {
 } else {
   let frame = null;
   let version = 0;
+  let cmdSeq = null;
   let stopped = false;
   let timer = 0;
   let fails = 0;
+  let lastSavedState = "";
+
+  const restoreState = (stateObj) => {
+    if (!stateObj || typeof stateObj !== "object") return;
+    try {
+      for (const [k, v] of Object.entries(stateObj)) {
+        if (typeof k === "string" && k.startsWith("frills:") && typeof v === "string") {
+          localStorage.setItem(k, v);
+        }
+      }
+      lastSavedState = JSON.stringify(stateObj);
+    } catch { /* storage blocked */ }
+  };
+
+  const checkpointState = () => {
+    if (stopped || !frame) return;
+    try {
+      const snap = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && /^frills:(jar|goal|timer:state|likers|gifters):/.test(k)) {
+          const val = localStorage.getItem(k);
+          if (val && val.length <= 2048) snap[k] = val;
+        }
+      }
+      const nextJson = JSON.stringify(snap);
+      if (nextJson === "{}" || nextJson === lastSavedState || nextJson.length > 4096) return;
+      lastSavedState = nextJson;
+      fetch(`/api/o/${id}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ state: snap }),
+      }).catch(() => {});
+    } catch { /* ignore */ }
+  };
+
+  const dispatchCommands = (cmds) => {
+    if (!Array.isArray(cmds) || !cmds.length || !frame?.contentWindow) return;
+    for (const item of cmds) {
+      try {
+        frame.contentWindow.dispatchEvent(new CustomEvent("frills:cloud-cmd", { detail: item }));
+      } catch { /* ignore */ }
+    }
+  };
 
   const mountTarget = (targetUrl) => {
     if (!frame) {
@@ -53,7 +98,10 @@ if (!id) {
   const poll = async () => {
     if (stopped) return;
     try {
-      const qs = version > 0 ? `?v=${version}` : "";
+      const params = new URLSearchParams();
+      if (version > 0) params.set("v", String(version));
+      if (cmdSeq !== null) params.set("c", String(cmdSeq));
+      const qs = params.toString() ? `?${params.toString()}` : "";
       const res = await fetch(`/api/o/${id}${qs}`, { cache: "no-store" });
       if (res.status === 404) {
         stopped = true;
@@ -66,6 +114,11 @@ if (!id) {
       fails = 0;
       if (data?.ok) {
         say("");
+        if (version === 0 && data.state) restoreState(data.state);
+        if (cmdSeq !== null && Array.isArray(data.cmds) && data.cmds.length) {
+          dispatchCommands(data.cmds);
+        }
+        if (Number.isFinite(Number(data.cmdSeq))) cmdSeq = Number(data.cmdSeq);
         if (data.changed !== false && Number(data.version) > 0 && Number(data.version) !== version) {
           const target = safeOverlayTarget(data.url, data.version);
           if (target) {
@@ -84,9 +137,11 @@ if (!id) {
     }
   };
 
+  const ckTimer = setInterval(checkpointState, 12000);
   window.addEventListener("pagehide", () => {
     stopped = true;
     clearTimeout(timer);
+    clearInterval(ckTimer);
   });
 
   poll();

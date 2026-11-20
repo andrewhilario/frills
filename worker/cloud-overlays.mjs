@@ -30,8 +30,64 @@ export const OVERLAY_KINDS = Object.freeze({
 export const MAX_CLOUD_OVERLAYS = 50;
 const MAX_BODY = 8192;
 const MAX_QUERY = 4096;
+const MAX_STATE = 4096;
 const MAX_NAME = 60;
 const ID_RE = /^[A-Za-z0-9_-]{12}$/;
+
+const LOOK_CLEAR_KEYS = ["look", "font", "size", "text", "accent", "pop", "bg", "bgAlpha", "shape", "borderW", "border", "radius", "shadow", "blur", "anim", "speed", "deco", "tag"];
+
+export const GLOBAL_THEMES = Object.freeze({
+  neko: {
+    name: "Neko Café",
+    chat: { look: "bubblegum", deco: "neko", tag: "pill" },
+    widget: { look: "bubblegum" },
+  },
+  bunny: {
+    name: "Bunny Cloud",
+    chat: { look: "blueberry", bg: "#211636", bgAlpha: "90", accent: "#cdb4ff", borderW: "2", radius: "22", font: "Fredoka", deco: "bunny", tag: "pill" },
+    widget: { look: "night", bg: "#211636", accent: "#cdb4ff", pop: "#ffd166", font: "Fredoka" },
+  },
+  matcha: {
+    name: "Matcha Frog",
+    chat: { look: "mint", bg: "#f5f0e1", bgAlpha: "95", text: "#33432a", accent: "#8dae5f", pop: "#c4572f", shape: "filled", font: "Fredoka", deco: "frog2", tag: "pill" },
+    widget: { look: "matcha" },
+  },
+  bubblegum: {
+    name: "Bubblegum",
+    chat: { look: "bubblegum" },
+    widget: { look: "bubblegum" },
+  },
+  frost: {
+    name: "Frost Glass",
+    chat: { look: "frost" },
+    widget: { look: "glass" },
+  },
+  sticker: {
+    name: "Sticker Cream",
+    chat: { look: "butter" },
+    widget: { look: "sticker" },
+  },
+  night: {
+    name: "Cozy Night",
+    chat: { look: "blueberry" },
+    widget: { look: "night" },
+  },
+  arcade: {
+    name: "Arcade Pixel",
+    chat: { look: "arcade" },
+    widget: { look: "arcade" },
+  },
+});
+
+export function applyThemeToQuery(kind, rawQuery, themeId) {
+  const theme = GLOBAL_THEMES[themeId];
+  if (!theme) return null;
+  const params = new URLSearchParams(String(rawQuery ?? ""));
+  for (const k of LOOK_CLEAR_KEYS) params.delete(k);
+  const patch = kind === "chat" || kind === "matcha" ? theme.chat : theme.widget;
+  for (const [k, v] of Object.entries(patch)) params.set(k, String(v));
+  return cleanOverlayQuery(params.toString());
+}
 
 const json = (status, body, extra = {}) =>
   new Response(JSON.stringify(body), {
@@ -144,17 +200,55 @@ export async function handleCloudOverlays(request, env, { now = Date.now() } = {
   const db = env.DB;
 
   try {
-    // ── Public OBS read endpoint: GET /api/o/:id ───────────────────────────────────────────────────────
+    // ── Public OBS read & state-checkpoint endpoint: GET / POST /api/o/:id ─────────────────────────────
     if (pathname.startsWith("/api/o/")) {
-      if (request.method !== "GET") return json(405, { ok: false, error: "method" }, { allow: "GET" });
       const id = pathname.slice("/api/o/".length).replace(/\/+$/, "");
       if (!ID_RE.test(id)) return json(404, { ok: false, error: "not_found" });
       const row = await db.prepare("SELECT id, kind, name, path, query, version, updated_at FROM cloud_overlays WHERE id = ?").bind(id).first();
       if (!row || !Object.hasOwn(OVERLAY_KINDS, row.kind)) return json(404, { ok: false, error: "not_found" });
+      const boxCode = `co_${id}`;
+
+      if (request.method === "POST") {
+        if (!sameOrigin(request)) return json(403, { ok: false, error: "wrong_origin" });
+        const { body: stateBody, tooBig: stateBig } = await readJson(request);
+        if (stateBig || !stateBody || typeof stateBody.state !== "object" || Array.isArray(stateBody.state)) {
+          return json(400, { ok: false, error: "bad_state" });
+        }
+        const cleanedState = {};
+        for (const [k, v] of Object.entries(stateBody.state)) {
+          if (typeof k === "string" && k.startsWith("frills:") && typeof v === "string" && v.length <= 2048) {
+            cleanedState[k] = v;
+          }
+        }
+        const serialized = JSON.stringify(cleanedState);
+        if (serialized.length > MAX_STATE) return json(413, { ok: false, error: "too_big" });
+        const existingBox = await db.prepare("SELECT seq FROM timer_boxes WHERE code = ?").bind(boxCode).first();
+        if (existingBox) {
+          await db.prepare("UPDATE timer_boxes SET key_hash = ?, updated_at = ? WHERE code = ?").bind(serialized, now, boxCode).run();
+        } else {
+          await db.prepare("INSERT INTO timer_boxes (code, key_hash, seq, updated_at) VALUES (?, ?, 0, ?)").bind(boxCode, serialized, now).run();
+        }
+        return json(200, { ok: true, id });
+      }
+
+      if (request.method !== "GET") return json(405, { ok: false, error: "method" }, { allow: "GET, POST" });
       const currentVersion = Number(row.version) || 1;
       const askedVersion = url.searchParams.get("v");
+      const askedCmd = url.searchParams.get("c");
+      const box = await db.prepare("SELECT key_hash, seq FROM timer_boxes WHERE code = ?").bind(boxCode).first();
+      const cmdSeq = Number(box?.seq) || 0;
+      let cmds = [];
+      if (askedCmd !== null && /^\d+$/.test(askedCmd) && cmdSeq > Number(askedCmd)) {
+        const cmdRows = (await db.prepare("SELECT seq, cmd, value FROM timer_commands WHERE code = ? AND seq > ? ORDER BY seq LIMIT 20").bind(boxCode, Number(askedCmd)).all()).results ?? [];
+        cmds = cmdRows.map((r) => ({ seq: Number(r.seq), cmd: r.cmd, value: Number(r.value) || 0 }));
+      }
+
       if (askedVersion !== null && /^\d+$/.test(askedVersion) && Number(askedVersion) === currentVersion) {
-        return json(200, { ok: true, id: row.id, version: currentVersion, changed: false });
+        return json(200, { ok: true, id: row.id, version: currentVersion, changed: false, cmdSeq, cmds });
+      }
+      let state = null;
+      if (box?.key_hash && box.key_hash.startsWith("{")) {
+        try { state = JSON.parse(box.key_hash); } catch { state = null; }
       }
       const meta = OVERLAY_KINDS[row.kind];
       return json(200, {
@@ -167,18 +261,22 @@ export async function handleCloudOverlays(request, env, { now = Date.now() } = {
         url: `${meta.path}?${row.query}`,
         query: row.query,
         updatedAt: Number(row.updated_at) || 0,
+        cmdSeq,
+        cmds,
+        state,
       });
     }
 
-    // ── Authenticated account routes: /api/cloud-overlays[/:id[/timer]] ───────────────────────────────
+    // ── Authenticated account routes: /api/cloud-overlays[/theme | /:id[/timer | /cmd]] ────────────────
     if (pathname !== "/api/cloud-overlays" && !pathname.startsWith("/api/cloud-overlays/")) {
       return json(404, { ok: false, error: "not_found" });
     }
     const tail = pathname === "/api/cloud-overlays" ? "" : pathname.slice("/api/cloud-overlays/".length).replace(/\/+$/, "");
-    const parts = tail ? tail.split("/") : [];
+    const isBulkTheme = tail === "theme";
+    const parts = tail && !isBulkTheme ? tail.split("/") : [];
     const id = parts[0] ?? "";
     const subAction = parts[1] ?? "";
-    if (id && (!ID_RE.test(id) || parts.length > 2 || (subAction && subAction !== "timer"))) {
+    if (!isBulkTheme && id && (!ID_RE.test(id) || parts.length > 2 || (subAction && subAction !== "timer" && subAction !== "cmd"))) {
       return json(404, { ok: false, error: "not_found" });
     }
 
@@ -234,7 +332,7 @@ export async function handleCloudOverlays(request, env, { now = Date.now() } = {
     if (tooBig) return json(413, { ok: false, error: "too_big" });
     if (!body) return json(400, { ok: false, error: "bad_data" });
 
-    if (!id && request.method === "POST") {
+    if (!id && !isBulkTheme && request.method === "POST") {
       const kind = String(body.kind ?? "").trim();
       if (!Object.hasOwn(OVERLAY_KINDS, kind)) return json(400, { ok: false, error: "bad_kind" });
       const name = cleanOverlayName(body.name) || `${OVERLAY_KINDS[kind].label} overlay`;
@@ -254,6 +352,50 @@ export async function handleCloudOverlays(request, env, { now = Date.now() } = {
 
       const row = { id: newId, account_id: who.accountId, kind, name, path: meta.path, query, version: 1, created_at: now, updated_at: now };
       return json(201, { ok: true, overlay: formatRow(row, origin) });
+    }
+
+    if (isBulkTheme) {
+      if (request.method !== "POST") return json(405, { ok: false, error: "method" }, { allow: "POST" });
+      const themeId = String(body.theme ?? "").trim();
+      if (!Object.hasOwn(GLOBAL_THEMES, themeId)) return json(400, { ok: false, error: "bad_theme" });
+      const rows = (await db.prepare("SELECT * FROM cloud_overlays WHERE account_id = ?").bind(who.accountId).all()).results ?? [];
+      let updatedCount = 0;
+      for (const row of rows) {
+        const nextQuery = applyThemeToQuery(row.kind, row.query, themeId);
+        if (!nextQuery) continue;
+        const nextVersion = (Number(row.version) || 1) + 1;
+        await db.prepare("UPDATE cloud_overlays SET query = ?, version = ?, updated_at = ? WHERE id = ? AND account_id = ?")
+          .bind(nextQuery, nextVersion, now, row.id, who.accountId).run();
+        updatedCount += 1;
+      }
+      return json(200, { ok: true, theme: themeId, updated: updatedCount });
+    }
+
+    if (id && subAction === "cmd") {
+      if (request.method !== "POST") return json(405, { ok: false, error: "method" }, { allow: "POST" });
+      const existing = await db.prepare("SELECT * FROM cloud_overlays WHERE id = ? AND account_id = ?").bind(id, who.accountId).first();
+      if (!existing) return json(404, { ok: false, error: "not_found" });
+      const rawAction = String(body.action ?? "").trim();
+      const ALLOWED_ACTIONS = ["tts:say", "tts:clear", "jar:drop", "jar:fill", "jar:clear", "goal:add", "goal:reach", "goal:reset"];
+      if (!ALLOWED_ACTIONS.includes(rawAction)) return json(400, { ok: false, error: "bad_command" });
+      const val = Math.max(-1000000, Math.min(1000000, Math.round(Number(body.value) || 0)));
+      const textPart = rawAction === "tts:say"
+        ? ":" + String(body.text ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 180)
+        : "";
+      if (rawAction === "tts:say" && textPart.length <= 1) return json(400, { ok: false, error: "bad_text" });
+
+      const boxCode = `co_${id}`;
+      let box = await db.prepare("SELECT seq FROM timer_boxes WHERE code = ?").bind(boxCode).first();
+      if (!box) {
+        await db.prepare("INSERT INTO timer_boxes (code, key_hash, seq, updated_at) VALUES (?, '{}', 0, ?)").bind(boxCode, now).run();
+        box = { seq: 0 };
+      }
+      const seq = (Number(box.seq) || 0) + 1;
+      const encodedCmd = `${rawAction}${textPart}`;
+      await db.prepare("INSERT INTO timer_commands (code, seq, cmd, value, at) VALUES (?, ?, ?, ?, ?)").bind(boxCode, seq, encodedCmd, val, now).run();
+      await db.prepare("UPDATE timer_boxes SET seq = ?, updated_at = ? WHERE code = ?").bind(seq, now, boxCode).run();
+      await db.prepare("DELETE FROM timer_commands WHERE code = ? AND (at < ? OR seq <= ?)").bind(boxCode, now - TIMER_LIMITS.keepCommandsMs, seq - TIMER_LIMITS.perBox).run();
+      return json(200, { ok: true, id, seq, action: rawAction, value: val });
     }
 
     if (id && subAction === "timer") {

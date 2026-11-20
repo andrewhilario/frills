@@ -43,6 +43,19 @@ const state = new GoalState(settings, {
 });
 view.update(state.snapshot);
 
+window.addEventListener("frills:cloud-cmd", (e) => {
+  const raw = String(e.detail?.cmd ?? "");
+  const val = Math.max(1, Math.round(Number(e.detail?.value) || 1));
+  if (raw === "goal:reset") {
+    state.reset();
+    if (settings.keep && channel) saveGoal(globalThis.localStorage, channel, state);
+  } else if (raw === "goal:reach") {
+    state.add(Math.max(1, state.goal - state.value), "Stream Deck");
+  } else if (raw === "goal:add") {
+    state.add(val, "Stream Deck");
+  }
+});
+
 if (demo) {
   fontsReady(generalFaces(settings), 1000).then(() => {
     const type = GOAL_TYPES[settings.type] ?? GOAL_TYPES.follow;

@@ -54,6 +54,21 @@ const jar = new GiftJar(settings, {
 
 view.render(jar.snapshot);
 
+window.addEventListener("frills:cloud-cmd", (e) => {
+  const raw = String(e.detail?.cmd ?? "");
+  const val = Math.max(1, Math.round(Number(e.detail?.value) || 100));
+  if (raw === "jar:clear") {
+    jar.clear();
+    view.clear();
+    if (!demo && settings.keep && channel) saveJar(globalThis.localStorage, channel, jar);
+  } else if (raw === "jar:fill") {
+    const need = Math.max(1, jar.target - jar.total);
+    jar.add({ kind: "gift", name: "Stream Deck", gift: "Full Jar", count: settings.goalBy === "count" ? need : 1, diamonds: need, total: need });
+  } else if (raw === "jar:drop") {
+    jar.add({ kind: "gift", name: "Stream Deck", gift: "Bonus Drop", count: settings.goalBy === "count" ? val : 1, diamonds: val, total: val });
+  }
+});
+
 if (demo) {
   fontsReady(generalFaces(settings), 1000).then(() => {
     const demoKinds = platform === "twitch" ? ["bits", "subgift"] : platform === "both" ? ["gift", "bits", "subgift"] : ["gift"];
