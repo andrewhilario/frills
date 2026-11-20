@@ -294,9 +294,10 @@ export function mountCloudSave({ kind, storeKey, anchor, getUrl, defaultName = "
     anchor.insertAdjacentElement("afterend", tip);
   };
 
-  // Probe account + Plus status silently; show full cloud bar for active Plus, or a subtle Tier-1-only tip for eligible non-Plus visitors
-  if (anchor) {
-    fetch(`/api/cloud-overlays?kind=${encodeURIComponent(kind)}`, { credentials: "same-origin", cache: "no-store" })
+  // Probe account + Plus status silently (probe=1 returns 200 when signed out so DevTools stays error-free);
+  // show full cloud bar for active Plus, or a subtle Tier-1-only tip for eligible non-Plus visitors.
+  if (anchor && document.body?.dataset?.plusAccounts === "on") {
+    fetch(`/api/cloud-overlays?kind=${encodeURIComponent(kind)}&probe=1`, { credentials: "same-origin", cache: "no-store" })
       .then(async (r) => ({ ok: r.ok, data: await r.json().catch(() => null) }))
       .then(({ ok, data }) => {
         if (ok && data?.ok && data.plusActive) {

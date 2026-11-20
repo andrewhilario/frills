@@ -679,6 +679,10 @@
   transition: transform 90ms ease-out;
   filter: drop-shadow(0 8px 14px rgb(0 0 0 / 0.22));
 }
+.tts__pet[hidden],
+.tts__sprite[hidden],
+.tts__bubble[hidden],
+.tts__badge[hidden] { display: none; }
 .tts[data-speaking="0"] .tts__pet { opacity: 0.92; }
 .tts__sprite {
   display: block;
@@ -692,7 +696,7 @@
   padding: 12px 16px;
   border-radius: var(--a-radius, 18px);
   background: var(--a-bg, rgb(255 255 255 / 0.92));
-  border: var(--a-border, 2px solid rgb(26 24 34 / 0.14));
+  border: var(--a-border, 2px) solid var(--a-accent, #fc0);
   box-shadow: var(--a-shadow, 0 10px 24px rgb(0 0 0 / 0.16));
   backdrop-filter: blur(10px);
   transform-origin: bottom left;
@@ -711,14 +715,14 @@
 }
 .tts__author {
   font-weight: 800;
-  color: var(--a-accent, #7e8a16);
+  color: var(--a-pop, #d93a78);
 }
 .tts__badge {
   font-size: 0.85em;
   font-weight: 700;
   padding: 2px 8px;
   border-radius: 999px;
-  background: color-mix(in oklab, var(--a-accent, #7e8a16) 18%, transparent);
+  background: color-mix(in srgb, var(--a-pop, #d93a78) 16%, transparent);
   color: var(--a-text, #1a1822);
 }
 .tts__text {

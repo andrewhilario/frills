@@ -177,7 +177,12 @@ export async function handleCloudOverlays(request, env, { now = Date.now() } = {
 
     const eligible = regionAllowed(request, env);
     const who = await sessionAccount(db, cookieOf(request, COOKIE), { now });
-    if (!who) return json(401, { ok: false, error: "sign_in_first", eligible });
+    if (!who) {
+      if (!id && request.method === "GET" && url.searchParams.get("probe") === "1") {
+        return json(200, { ok: true, signedIn: false, plusActive: false, eligible, overlays: [] });
+      }
+      return json(401, { ok: false, error: "sign_in_first", eligible });
+    }
     const plus = await getPlus(db, who.accountId);
     const hasPlus = plusActive(plus, now);
     const origin = String(env.SITE_URL ?? url.origin).replace(/\/+$/, "");
