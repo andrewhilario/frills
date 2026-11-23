@@ -246,7 +246,8 @@ export class Room {
     const began = Date.now();
     this.lastLookAt = began;
     try {
-      conn = await this.hub.opts.factory(this.user, { apiKey: this.hub.opts.apiKey });
+      const apiKey = typeof this.hub.opts.apiKey === "function" ? this.hub.opts.apiKey() : this.hub.opts.apiKey;
+      conn = await this.hub.opts.factory(this.user, { apiKey });
     } catch (err) {
       give();
       return classify(err);
