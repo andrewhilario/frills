@@ -5,8 +5,8 @@ import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
 import { EventEmitter } from "node:events";
-import { createHelper } from "../helper/server.mjs";
-import { ALERT_AT, Signing, capacity, deviceFacts, level, snapshot, statusPage } from "../helper/status.mjs";
+import { createHelper, parseEulerConfig } from "../helper/server.mjs";
+import { ALERT_AT, EULER_DEFAULT_CAP, EULER_DEFAULT_RESETS, Signing, capacity, deviceFacts, level, snapshot, statusPage } from "../helper/status.mjs";
 import { SlotAlerts, termuxNotifier } from "../helper/alerts.mjs";
 
 // ── the pure parts ──────────────────────────────────────────────────────────────────────────────────────────────────
@@ -179,9 +179,10 @@ class FakeConnection extends EventEmitter {
 let helper;
 let port;
 after(async () => { await helper?.close(); });
-const start = async (relay = {}) => {
+const SITE_RELAY_ORIGIN = "https://site.example";
+const start = async (relay = {}, over = {}) => {
   await helper?.close(); // one at a time: an earlier one left open would keep the test run from ending
-  helper = createHelper({ factory: async () => new FakeConnection(), relay: { origins: ["https://site.example"], slots: 50, ...relay }, idleStopMs: 50 });
+  helper = createHelper({ factory: async () => new FakeConnection(), relay: { origins: [SITE_RELAY_ORIGIN], slots: 50, ...relay }, idleStopMs: 50, ...over });
   port = await helper.listen(0);
 };
 const ask = (path, headers = {}) => new Promise((resolve, reject) => {
@@ -376,4 +377,140 @@ test("without a password set, a password sent changes nothing, and the page offe
   const json = JSON.parse(sent.body);
   assert.equal("roster" in json, false);
   assert.equal("ownerLogin" in json, false);
+});
+
+// ── 3-Account Euler key pool (1,500 cap + 3 resets each) ───────────────────────────────────────────────────────────
+
+test("3-account Euler key pool uses 3 resets per key at the 1,500 cap before rotating through backup 1 and backup 2", () => {
+  assert.equal(EULER_DEFAULT_CAP, 1500);
+  assert.equal(EULER_DEFAULT_RESETS, 3);
+  const events = [];
+  const pool = new Signing(() => 1000, {
+    keys: ["euler_acc_1", "euler_acc_2", "euler_acc_3"],
+    onReset: (info) => events.push(["reset", info.slot, info.resetsLeft]),
+    onRotate: (info) => events.push(["rotate", info.from, info.to]),
+  });
+  assert.equal(pool.currentKey(), "euler_acc_1");
+  let summary = pool.poolSummary();
+  assert.equal(summary.activeSlot, 1);
+  assert.equal(summary.totalRemainingRequests, 18000);
+
+  // Use Key 1 across all 3 resets (3 * 1500 = 4500 requests -> still Key 1 with 0 resets left)
+  for (let i = 0; i < 4500; i++) pool.use();
+  assert.equal(pool.currentKey(), "euler_acc_1");
+  summary = pool.poolSummary();
+  assert.equal(summary.accounts[0].resetsLeft, 0);
+  assert.equal(summary.accounts[0].totalUsed, 4500);
+
+  // 1500 more requests on Key 1's 4th cycle exhausts Key 1 and rotates to Backup Key 2
+  for (let i = 0; i < 1500; i++) pool.use();
+  assert.equal(pool.currentKey(), "euler_acc_2");
+  summary = pool.poolSummary();
+  assert.equal(summary.activeSlot, 2);
+  assert.equal(summary.accounts[0].exhausted, true);
+  assert.equal(summary.accounts[1].resetsLeft, 3);
+
+  // 6000 more requests exhausts Key 2 and rotates to Backup Key 3
+  for (let i = 0; i < 6000; i++) pool.use();
+  assert.equal(pool.currentKey(), "euler_acc_3");
+  summary = pool.poolSummary();
+  assert.equal(summary.activeSlot, 3);
+  assert.equal(summary.accounts[1].exhausted, true);
+
+  // 6000 more requests exhausts Key 3 (all 18,000 used)
+  for (let i = 0; i < 6000; i++) pool.use();
+  assert.equal(pool.currentKey(), "");
+  summary = pool.poolSummary();
+  assert.equal(summary.activeSlot, null);
+  assert.equal(summary.totalRemainingRequests, 0);
+  assert.ok(events.some((e) => e[0] === "rotate" && e[1] === 1 && e[2] === 2));
+  assert.ok(events.some((e) => e[0] === "rotate" && e[1] === 2 && e[2] === 3));
+
+  // Refilling brings all 3 keys back to 18,000 total capacity starting on Key 1
+  assert.equal(pool.refillKey("all"), true);
+  assert.equal(pool.currentKey(), "euler_acc_1");
+  assert.equal(pool.poolSummary().totalRemainingRequests, 18000);
+});
+
+test("parseEulerConfig reads EULER_API_KEYS or EULER_API_KEY/_2/_3 and createHelper exposes pool + /owner/euler", async () => {
+  const fromList = parseEulerConfig({ EULER_API_KEYS: "k1, k2, k3", EULER_KEY_CAP: "1500", EULER_KEY_RESETS: "3" });
+  assert.deepEqual(fromList.keys, ["k1", "k2", "k3"]);
+  assert.deepEqual([fromList.cap, fromList.maxResets], [1500, 3]);
+
+  const fromNamed = parseEulerConfig({ EULER_API_KEY: "a1", EULER_API_KEY_2: "a2", EULER_API_KEY_3: "a3" });
+  assert.deepEqual(fromNamed.keys, ["a1", "a2", "a3"]);
+
+  await start({ ownerKey: KEY, trustProxy: true }, { apiKeys: ["k1", "k2", "k3"], eulerCap: 2, eulerResets: 1 });
+  let h = JSON.parse((await ask("/health", PUBLIC)).body);
+  assert.equal(h.signing.pool.activeSlot, 1);
+  assert.equal(h.signing.pool.configuredCount, 3);
+  assert.equal("key" in h.signing.pool.accounts[0], false, "raw secret keys are never exposed");
+
+  // Manual rotate via /owner/euler requires owner key behind proxy
+  const denied = await new Promise((resolve, reject) => {
+    const req = http.request({ host: "127.0.0.1", port, path: "/owner/euler", method: "POST", headers: { "CF-Connecting-IP": "203.0.113.9", "Content-Type": "application/json" } }, (res) => {
+      let body = "";
+      res.on("data", (c) => { body += c; });
+      res.on("end", () => resolve({ status: res.statusCode, body: JSON.parse(body) }));
+    });
+    req.on("error", reject);
+    req.end(JSON.stringify({ action: "rotate" }));
+  });
+  assert.equal(denied.status, 401);
+
+  const rotated = await new Promise((resolve, reject) => {
+    const req = http.request({ host: "127.0.0.1", port, path: "/owner/euler", method: "POST", headers: asOwner(KEY, { "Content-Type": "application/json" }) }, (res) => {
+      let body = "";
+      res.on("data", (c) => { body += c; });
+      res.on("end", () => resolve({ status: res.statusCode, body: JSON.parse(body) }));
+    });
+    req.on("error", reject);
+    req.end(JSON.stringify({ action: "rotate" }));
+  });
+  assert.equal(rotated.status, 200);
+  assert.equal(rotated.body.pool.activeSlot, 2);
+});
+
+test("Signing.syncRemoteLimits queries Euler /accounts/me/rate_limits and auto-rotates/recovers slots", async () => {
+  const pool = new Signing(() => 2000, { keys: ["key_one", "key_two", "key_three"] });
+  const calls = [];
+  const summary = await pool.syncRemoteLimits({
+    fetchImpl: async (url, init) => {
+      calls.push({ url, key: init?.headers?.["x-api-key"] });
+      if (init?.headers?.["x-api-key"] === "key_one") {
+        return new Response(JSON.stringify({
+          code: 200,
+          day: { max: 1500, remaining: 0, reset_at: "2026-11-24T00:00:00.000Z" },
+          hour: { max: 300, remaining: 0, reset_at: "2026-11-23T12:00:00.000Z" },
+          minute: { max: 30, remaining: 30, reset_at: null },
+        }), { status: 200 });
+      }
+      return new Response(JSON.stringify({
+        code: 200,
+        day: { max: 1500, remaining: 1420, reset_at: "2026-11-24T00:00:00.000Z" },
+        hour: { max: 300, remaining: 290, reset_at: "2026-11-23T12:00:00.000Z" },
+        minute: { max: 30, remaining: 30, reset_at: null },
+      }), { status: 200 });
+    },
+  });
+  assert.equal(calls.length, 3);
+  assert.ok(calls.every((c) => c.url.endsWith("/accounts/me/rate_limits")));
+  assert.equal(summary.accounts[0].remote.ok, true);
+  assert.equal(summary.accounts[0].remote.day.remaining, 0);
+  assert.equal(summary.accounts[0].resetsLeft, 2, "0 remaining on active slot triggers consumeReset");
+  assert.equal(summary.accounts[1].used, 80, "syncs day.max - day.remaining on standby slots");
+  assert.equal(summary.accounts[1].remote.day.remaining, 1420);
+
+  // When slot 1 becomes completely exhausted and later Euler resets day.remaining > 0, it recovers automatically
+  pool.slots[0].exhausted = true;
+  pool.activeIndex = 1;
+  const recovered = await pool.syncRemoteLimits({
+    fetchImpl: async () => new Response(JSON.stringify({
+      code: 200,
+      day: { max: 1500, remaining: 1500, reset_at: "2026-11-25T00:00:00.000Z" },
+      hour: { max: 300, remaining: 300, reset_at: null },
+    }), { status: 200 }),
+  });
+  assert.equal(recovered.accounts[0].exhausted, false);
+  assert.equal(recovered.accounts[0].used, 0);
 });

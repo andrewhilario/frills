@@ -21,7 +21,7 @@ import { cleanTikTokUser } from "../src/js/tiktok.js";
 import { Hub } from "./rooms.mjs";
 import { ALERT_KINDS } from "./map.mjs";
 import { DEMO_USER, DemoConnection } from "./demo.mjs";
-import { ALERT_AT, Signing, capacity, deviceFacts, snapshot, statusPage } from "./status.mjs";
+import { ALERT_AT, EULER_DEFAULT_CAP, EULER_DEFAULT_RESETS, Signing, capacity, deviceFacts, snapshot, statusPage } from "./status.mjs";
 import { SlotAlerts, termuxNotifier } from "./alerts.mjs";
 import { OWNER, ownerGate } from "./owner.mjs";
 import { handleProStatus } from "../worker/region.mjs";
@@ -47,6 +47,24 @@ export async function realFactory(user, { apiKey } = {}) {
 }
 
 /**
+ * Reads up to 3 Euler Stream signing keys (`EULER_API_KEYS` comma-separated, or `EULER_API_KEY`, `EULER_API_KEY_2`, `EULER_API_KEY_3`),
+ * optional reset webhook URLs (`EULER_RESET_URLS` or `EULER_RESET_URL[_2|_3]`), and cap/reset settings (`EULER_KEY_CAP`, `EULER_KEY_RESETS`).
+ */
+export function parseEulerConfig(env = process.env) {
+  const fromList = String(env.EULER_API_KEYS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const fromNamed = [env.EULER_API_KEY, env.EULER_API_KEY_2, env.EULER_API_KEY_3].map((s) => String(s ?? "").trim()).filter(Boolean);
+  const keys = fromList.length ? fromList : fromNamed;
+  const urlsFromList = String(env.EULER_RESET_URLS ?? "").split(",").map((s) => s.trim());
+  const urlsFromNamed = [env.EULER_RESET_URL, env.EULER_RESET_URL_2, env.EULER_RESET_URL_3].map((s) => String(s ?? "").trim());
+  const resetUrls = urlsFromList.some(Boolean) ? urlsFromList : urlsFromNamed;
+  const cap = Math.max(1, Number(env.EULER_KEY_CAP) || EULER_DEFAULT_CAP);
+  const maxResets = env.EULER_KEY_RESETS !== undefined && env.EULER_KEY_RESETS !== "" && Number.isFinite(Number(env.EULER_KEY_RESETS))
+    ? Math.max(0, Number(env.EULER_KEY_RESETS))
+    : EULER_DEFAULT_RESETS;
+  return { keys, resetUrls, cap, maxResets };
+}
+
+/**
  * Builds the helper (nothing listens until listen() is called). `factory(user, { apiKey })` makes the connection to TikTok; tests pass a
  * pretend one. Anything else in `tuning` (waits, limits) goes to the Hub.
  *
@@ -54,25 +72,43 @@ export async function realFactory(user, { apiKey } = {}) {
  * answers pages on those other addresses (the website), has `slots` spots and a line for them, limits how many streams (and how many
  * different accounts) one visitor address can hold open, and serves no site of its own unless a folder is given.
  */
-export function createHelper({ distDir, factory = realFactory, apiKey = "", log = () => {}, demoPace, relay = null, ...tuning } = {}) {
+export function createHelper({ distDir, factory = realFactory, apiKey = "", apiKeys = null, resetUrls = [], eulerCap = EULER_DEFAULT_CAP, eulerResets = EULER_DEFAULT_RESETS, onEulerReset = null, log = () => {}, demoPace, relay = null, ...tuning } = {}) {
   // The one built-in account, frills_demo, never reaches TikTok: it makes up chat so the whole chain can be tested without a LIVE.
   const make = (user, options) => (user === DEMO_USER ? new DemoConnection({ pace: demoPace }) : factory(user, options));
-  // Each connect to TikTok costs a request to the free signing service (a few thousand a day at most), so a shared relay keeps an account
-  // for 10 minutes after its last page leaves (coming back is free). It looks for an offline account every 20 seconds for the first 3 minutes (the time
-  // when a streamer has just opened OBS and is about to go LIVE), every minute until half an hour, every 3 minutes until 3 hours, then every 10 minutes.
-  // A look at an account that is not LIVE only asks TikTok's own pages (measured with the connector we use: two requests, about 0.9 s, and none to the
-  // signing service, which is asked once, when the LIVE is found), so looking often is cheap. It never gives up while a page is listening: an overlay in
-  // OBS has no button to press, so one that was given up on stayed blank until someone reloaded it. A page that opens meanwhile makes it look at once
-  // (Room.add).
-  // The steps: streamers who use TikTok LIVE Studio were reported as sometimes not connecting. The likeliest cause, not confirmed: a
-  // streamer adds the overlay to the scene, sets the scene up for a few minutes, then presses Go LIVE, and Studio does not reload the overlay when the
-  // LIVE starts. With a look every minute after only 3 minutes, a LIVE was found up to a minute late, and up to 3 minutes late after half an hour. So it
-  // looks every 20 seconds for 15 minutes, every 30 seconds until an hour, every minute until 4 hours, and every 3 minutes after that.
+  const resolvedKeys = Array.isArray(apiKeys) && apiKeys.length
+    ? apiKeys.map((k) => String(k ?? "").trim()).filter(Boolean)
+    : typeof apiKey === "string" && apiKey.includes(",")
+      ? apiKey.split(",").map((k) => k.trim()).filter(Boolean)
+      : String(apiKey ?? "").trim()
+        ? [String(apiKey).trim()]
+        : [];
+  const triggerResetHook = (info) => {
+    log(`Euler key #${info.slot} hit cap (${eulerCap}): consumed reset ${info.resetsUsed}/${eulerResets} (${info.resetsLeft} left)`);
+    onEulerReset?.(info);
+    if (info.resetUrl && /^https?:\/\//i.test(info.resetUrl)) {
+      fetch(info.resetUrl, { method: "POST" }).catch(() => {});
+    }
+  };
   const shared = relay ? { queue: true, idleStopMs: 600000, offlineWaitMs: 20000, offlineGiveUpMs: 0, offlineSlowSteps: [[900000, 30000], [3600000, 60000], [14400000, 180000]], maxRooms: relay.slots ?? 30 } : {};
   const ticketSecret = relay ? String(relay.ticketSecret ?? "").trim() : "";
-  const signing = new Signing();
+  const signing = new Signing(Date.now, {
+    keys: resolvedKeys,
+    resetUrls,
+    cap: eulerCap,
+    maxResets: eulerResets,
+    onReset: triggerResetHook,
+    onRotate: ({ from, to }) => log(to ? `Euler key #${from} exhausted all resets — rotated to Backup Account #${to}` : `All ${resolvedKeys.length} Euler key accounts are exhausted`),
+  });
   const startedAt = Date.now();
-  const hub = new Hub({ factory: make, apiKey, log, onLimited: () => signing.note(), onSigned: () => signing.use(), ...shared, ...tuning });
+  const hub = new Hub({
+    factory: make,
+    apiKey: () => signing.currentKey(),
+    log,
+    onLimited: () => signing.limitHit(),
+    onSigned: () => signing.use(),
+    ...shared,
+    ...tuning,
+  });
   // what this program costs the device, measured now and then, for the capacity guess on the status page
   const baseRss = process.memoryUsage().rss;
   let cpuFraction = 0;
@@ -91,7 +127,7 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
     const stats = hub.stats();
     const estimate = capacity({ freeMem: os.freemem(), rss: process.memoryUsage().rss, baseRss, rooms: stats.used, cpuFraction });
     const streams = relay ? { open: openCount(), limit: maxPerIp, turnedAway: away.total, replaced: away.replaced, lastTurnedAwayS: away.lastAt ? Math.round((Date.now() - away.lastAt) / 1000) : null } : null;
-    return snapshot({ stats, startedAt, now: Date.now(), version: VERSION, features: FEATURES, signing, estimate, streams, keyed: Boolean(apiKey), alertAt: relay?.alertAt ?? ALERT_AT, device: local ? deviceFacts(cpuFraction) : null, roster: local ? hub.roster() : null, ownerLogin: gate.enabled && !owned, actions: owned ? { restart: Boolean(relay?.restart) } : null });
+    return snapshot({ stats, startedAt, now: Date.now(), version: VERSION, features: FEATURES, signing, estimate, streams, keyed: signing.hasKeys(), alertAt: relay?.alertAt ?? ALERT_AT, device: local ? deviceFacts(cpuFraction) : null, roster: local ? hub.roster() : null, ownerLogin: gate.enabled && !owned, actions: owned ? { restart: Boolean(relay?.restart) } : null });
   };
   const nothing = (req, res) => {
     res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
@@ -194,6 +230,39 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", log 
       log("a restart was asked for from the status page");
       res.on("finish", () => setTimeout(relay.restart, 250));
       return json(res, 200, { ok: true, restarting: true });
+    }
+    if (relay && url.pathname === "/owner/euler") {
+      if (req.method !== "POST") return text(res, 405, "Use POST.", { Allow: "POST" });
+      if (!onDevice) {
+        if (!gate.enabled) return json(res, 403, { ok: false, error: "no_owner_password" });
+        const who = gate.check(req.headers.authorization, visitor(req));
+        if (who === "locked") return json(res, 429, { ok: false, error: "locked" });
+        if (who !== "ok") return json(res, 401, { ok: false, error: who === "wrong" ? "wrong_key" : "key_needed" });
+      }
+      if (!signing.hasKeys()) return json(res, 409, { ok: false, error: "no_keys_configured" });
+      const chunks = [];
+      for await (const chunk of req) chunks.push(chunk);
+      let body = {};
+      try { body = JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}"); } catch { return json(res, 400, { ok: false, error: "bad_json" }); }
+      const action = body?.action;
+      const slot = body?.slot ?? null;
+      if (action === "reset") {
+        const result = signing.consumeReset(slot);
+        return json(res, result ? 200 : 400, { ok: Boolean(result), result, pool: signing.poolSummary() });
+      }
+      if (action === "rotate") {
+        const result = signing.rotateKey(slot);
+        return json(res, result ? 200 : 400, { ok: Boolean(result), result, pool: signing.poolSummary() });
+      }
+      if (action === "refill") {
+        const ok = signing.refillKey(slot ?? "all");
+        return json(res, ok ? 200 : 400, { ok, pool: signing.poolSummary() });
+      }
+      if (action === "sync") {
+        const pool = await signing.syncRemoteLimits();
+        return json(res, pool ? 200 : 502, { ok: Boolean(pool), action: "sync", pool });
+      }
+      return json(res, 400, { ok: false, error: "bad_action" });
     }
     let owner = onDevice;
     let proven = false; // the owner's password was sent and is right (being on the device is enough to see the names, not to restart it)
@@ -384,7 +453,8 @@ async function mainRelay() {
   const relay = { origins, slots, alertAt, ownerKey, ticketSecret, maxPerIp: numberOr(process.env.RELAY_PER_IP, 60), maxAccountsPerIp: numberOr(process.env.RELAY_ACCOUNTS_PER_IP, 12), trustProxy: process.env.RELAY_TRUST_PROXY !== "0" };
   const port = numberOr(process.argv.find((a) => a.startsWith("--port="))?.slice(7) ?? process.env.PORT, 8765);
   const bind = process.env.RELAY_BIND ?? "127.0.0.1"; // behind a tunnel nothing else may reach it
-  const helper = createHelper({ relay, apiKey: (process.env.EULER_API_KEY ?? "").trim(), log: say });
+  const euler = parseEulerConfig(process.env);
+  const helper = createHelper({ relay, apiKeys: euler.keys, resetUrls: euler.resetUrls, eulerCap: euler.cap, eulerResets: euler.maxResets, log: say });
   try {
     await helper.listen(port, bind);
   } catch (error) {
@@ -392,7 +462,10 @@ async function mainRelay() {
     process.exit(1);
   }
   import("tiktok-live-connector").catch(() => {}); // warm it up now: the first account to connect should not wait for the library to load
-  console.log(`\nFrills relay ${VERSION} is running on ${bind}:${port}.\n  Spots: ${slots}. Allowed website addresses: ${origins.join(", ")}.\n  Status page: http://${bind}:${port}/health (open it in a browser)\n  Warns you when ${alertAt} spots or fewer are left${process.env.RELAY_ALERTS === "0" ? " (alerts are off)" : ""}.\n  Owner password (to see who is connected from your PC): ${ownerState(ownerKey)}.\n  Plus ticket lock (RELAY_TICKET_SECRET): ${ticketSecret ? "on (dedicated Frills Plus relay)" : "off (shared free relay)"}.\n  Signing service key (EULER_API_KEY): ${process.env.EULER_API_KEY?.trim() ? "set, so the limits are your own" : "NOT set: the limits are shared with everyone, and TikTok will often be busy at night"}.\n  Pages one internet address may keep open: ${relay.maxPerIp} (RELAY_PER_IP), for at most ${relay.maxAccountsPerIp} different accounts (RELAY_ACCOUNTS_PER_IP).\n`);
+  const eulerDesc = euler.keys.length
+    ? `${euler.keys.length} account(s) configured (${euler.cap} req cap · ${euler.maxResets} resets each · ${euler.keys.length * (euler.maxResets + 1) * euler.cap} total pool capacity)`
+    : "NOT set: the limits are shared with everyone, and TikTok will often be busy at night";
+  console.log(`\nFrills relay ${VERSION} is running on ${bind}:${port}.\n  Spots: ${slots}. Allowed website addresses: ${origins.join(", ")}.\n  Status page: http://${bind}:${port}/health (open it in a browser)\n  Warns you when ${alertAt} spots or fewer are left${process.env.RELAY_ALERTS === "0" ? " (alerts are off)" : ""}.\n  Owner password (to see who is connected from your PC): ${ownerState(ownerKey)}.\n  Plus ticket lock (RELAY_TICKET_SECRET): ${ticketSecret ? "on (dedicated Frills Plus relay)" : "off (shared free relay)"}.\n  Signing service pool (EULER_API_KEYS): ${eulerDesc}.\n  Pages one internet address may keep open: ${relay.maxPerIp} (RELAY_PER_IP), for at most ${relay.maxAccountsPerIp} different accounts (RELAY_ACCOUNTS_PER_IP).\n`);
   console.log(`  Restart from the status page: ${ownerKey && ownerKey.length >= OWNER.minKey ? (supervised ? "on" : "off (start the relay with npm run relay, or under systemd, so that something starts it again)") : "off (it needs the owner password)"}`);
   if (process.env.RELAY_ALERTS !== "0") {
     const alerts = new SlotAlerts({ stats: () => helper.hub.stats(), signing: helper.signing, alertAt, notify: termuxNotifier({ log: say }), log: say });
@@ -411,6 +484,12 @@ async function mainRelay() {
     process.exit(0);
   };
   if (supervised) relay.restart = stop; // asked for from the owner's status page: it stops and is started again. Without a keeper it would just stay stopped.
+  if (helper.signing.hasKeys()) {
+    helper.signing.syncRemoteLimits().catch(() => {});
+    setInterval(() => {
+      if (helper.signing.hasKeys()) helper.signing.syncRemoteLimits().catch(() => {});
+    }, 5 * 60000).unref();
+  }
   process.on("SIGINT", stop);
   process.on("SIGTERM", stop);
 }
@@ -423,7 +502,8 @@ async function main() {
   }
   const portArg = process.argv.find((a) => a.startsWith("--port="));
   const wanted = Number(portArg?.slice(7) ?? process.env.PORT ?? 8765);
-  const helper = createHelper({ distDir, apiKey: (process.env.EULER_API_KEY ?? "").trim(), log: say });
+  const euler = parseEulerConfig(process.env);
+  const helper = createHelper({ distDir, apiKeys: euler.keys, resetUrls: euler.resetUrls, eulerCap: euler.cap, eulerResets: euler.maxResets, log: say });
   let port;
   try {
     port = await helper.listen(wanted);
