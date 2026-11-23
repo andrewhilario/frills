@@ -19,12 +19,13 @@ const note = document.getElementById("note");
 const say = (text) => { note.hidden = !text; note.textContent = text; };
 const channel = channelFromParams(params, platform);
 const demo = params.get("demo") === "1";
+const persist = !demo && Boolean(channel) && (settings.keep || params.has("_cv"));
 
 const sounds = createSounds();
 const view = createJarView(document.getElementById("jar"));
 view.apply(settings);
 
-const remembered = !demo && settings.keep && channel ? loadJar(globalThis.localStorage, channel) : null;
+const remembered = persist ? loadJar(globalThis.localStorage, channel) : null;
 let saving = 0;
 
 const jar = new GiftJar(settings, {
@@ -35,7 +36,7 @@ const jar = new GiftJar(settings, {
   onDrop: (item) => view.drop(item),
   onChange: (snapshot) => {
     view.render(snapshot);
-    if (!demo && settings.keep && channel && !saving) {
+    if (persist && !saving) {
       saving = setTimeout(() => {
         saving = 0;
         saveJar(globalThis.localStorage, channel, jar);
@@ -60,7 +61,7 @@ window.addEventListener("frills:cloud-cmd", (e) => {
   if (raw === "jar:clear") {
     jar.clear();
     view.clear();
-    if (!demo && settings.keep && channel) saveJar(globalThis.localStorage, channel, jar);
+    if (persist) saveJar(globalThis.localStorage, channel, jar);
   } else if (raw === "jar:fill") {
     const need = Math.max(1, jar.target - jar.total);
     jar.add({ kind: "gift", name: "Stream Deck", gift: "Full Jar", count: settings.goalBy === "count" ? need : 1, diamonds: need, total: need });

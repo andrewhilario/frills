@@ -46,8 +46,17 @@ export function pickBrowserVoice(voices, { voice = "nova", browserVoice = "" } =
   return ranked[idx % ranked.length] ?? gendered[0] ?? null;
 }
 
+const SAMPLE_TEXT = {
+  nova: "Ribbit! Thanks so much for the gift, Pond Pal — this stream is super cozy!",
+  shimmer: "Yay! Welcome in chat! Send a gift anytime and watch me hop along!",
+  alloy: "Hello stream! Your custom Talking Pet is ready for Twitch and TikTok alerts.",
+  echo: "Chill vibes tonight. Drop a cheer or say hello anytime with the chat command.",
+  onyx: "Boom! Five hundred bits from a legend — appreciate the huge hype tonight!",
+  fable: "Splendid stream, everyone! Ask me a question or drop a sub to say hello!",
+};
+
 /** Creates a cancellable speech player emitting smoothed 0..1 level updates, quota telemetry, and notice codes. */
-export function createTtsPlayer({ onLevel = () => {}, onNotice = () => {}, onUsage = () => {}, getSimCountry = () => "" } = {}) {
+export function createTtsPlayer({ onLevel = () => {}, onNotice = () => {}, onUsage = () => {}, onTextUpdate = () => {}, getSimCountry = () => "" } = {}) {
   let ctx = null;
   let activeSource = null;
   let activeAudio = null;
@@ -262,12 +271,42 @@ export function createTtsPlayer({ onLevel = () => {}, onNotice = () => {}, onUsa
           if (settings.code) headers["x-overlay"] = settings.code;
           const sim = String(getSimCountry() || "").trim().toUpperCase();
           if (sim) headers["x-frills-country"] = sim;
+
+          let spokenText = item.text;
+          if (item.cohost) {
+            try {
+              const coRes = await fetch("/api/cohost", {
+                method: "POST",
+                headers,
+                signal: abortCtl.signal,
+                body: JSON.stringify({
+                  eventKind: item.cohost.eventKind,
+                  author: item.cohost.author,
+                  detail: item.cohost.detail,
+                  vibe: settings.cohostVibe || "cozy",
+                  pet: settings.pet || "frog2",
+                  overlay: settings.code || "",
+                }),
+              });
+              if (cancelled) return;
+              if (coRes.ok) {
+                const coData = await coRes.json().catch(() => null);
+                if (coData?.reply) {
+                  spokenText = coData.reply;
+                  onTextUpdate(item, coData.reply);
+                }
+              }
+            } catch (e) {
+              if (e?.name === "AbortError" || cancelled) return;
+            }
+          }
+
           const res = await fetch("/api/tts", {
             method: "POST",
             headers,
             signal: abortCtl.signal,
             body: JSON.stringify({
-              text: item.text,
+              text: spokenText,
               voice: settings.voice || "nova",
               rate: (Number(settings.rate) || 100) / 100,
               overlay: settings.code || "",
@@ -303,5 +342,37 @@ export function createTtsPlayer({ onLevel = () => {}, onNotice = () => {}, onUsa
     await speakBrowser(item.text, settings);
   };
 
-  return { speak, stop, invalidate: () => { statusCache = null; } };
+  /** Plays the cached server AI voice sample (falls back to free browser preview if server keys aren't configured locally). */
+  const previewSample = async (voice = "nova", { volume = 0.9 } = {}) => {
+    stop();
+    cancelled = false;
+    const chosen = SAMPLE_TEXT[voice] ? voice : "nova";
+    try {
+      const headers = {};
+      const sim = String(getSimCountry() || "").trim().toUpperCase();
+      if (sim) headers["x-frills-country"] = sim;
+      abortCtl = new AbortController();
+      const res = await fetch(`/api/voice-sample?voice=${encodeURIComponent(chosen)}`, { headers, signal: abortCtl.signal });
+      if (cancelled) return { ok: false, error: "cancelled" };
+      if (res.ok) {
+        const mime = res.headers.get("content-type") || "audio/mpeg";
+        const buf = await res.arrayBuffer();
+        if (cancelled) return { ok: false, error: "cancelled" };
+        const played = await playBuffer(buf, volume);
+        if (!played && !cancelled) await playHtmlAudio(buf, volume, mime);
+        return { ok: true, mode: "ai" };
+      }
+      const err = await res.json().catch(() => null);
+      if (err?.error === "ai_not_configured") {
+        await speakBrowser(SAMPLE_TEXT[chosen], { voice: chosen, rate: 100, volume: Math.round(volume * 100) });
+        return { ok: true, mode: "browser_fallback" };
+      }
+      return { ok: false, error: err?.error || `http_${res.status}` };
+    } catch (e) {
+      if (e?.name === "AbortError" || cancelled) return { ok: false, error: "cancelled" };
+      return { ok: false, error: "network_error" };
+    }
+  };
+
+  return { speak, previewSample, stop, invalidate: () => { statusCache = null; } };
 }

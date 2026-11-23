@@ -4,7 +4,7 @@
 // overlay celebrates them. No page and no clock, so it is tested on its own.
 
 import { defineWidget, chipsOf, number, range, selectOf, text, toggle } from "./widget-settings.js";
-import { LEADERBOARD_LAYOUTS } from "./leaderboard-layouts.js";
+import { LEADERBOARD_LAYOUTS, periodBucket } from "./leaderboard-layouts.js";
 import { SOUNDS } from "./alerts-settings.js";
 
 /** The smallest milestone there is: a celebration for fewer likes than this would come too often to feel special. */
@@ -13,7 +13,7 @@ export const MIN_MILESTONE = 1000;
 export const LIKER_LAYOUTS = LEADERBOARD_LAYOUTS;
 
 export const LIKERS = defineWidget({
-  defaults: { layout: "classic", max: 10, title: true, titleText: "Top likers", showCounts: true, avatar: true, medals: true, minLikes: 1, keep: false, celebrate: true, milestone: MIN_MILESTONE, celebrateWho: "top", celebrateText: "Congratulations!", celebrateTime: 7, celebrateSound: "fanfare" },
+  defaults: { layout: "classic", max: 10, title: true, titleText: "Top likers", showCounts: true, avatar: true, medals: true, minLikes: 1, keep: false, period: "all", celebrate: true, milestone: MIN_MILESTONE, celebrateWho: "top", celebrateText: "Congratulations!", celebrateTime: 7, celebrateSound: "fanfare" },
   controls: [
     { section: "list", ...selectOf("layout", "Leaderboard design", LIKER_LAYOUTS) },
     { section: "list", ...range("max", "People shown", 3, 10, 1, "") },
@@ -24,6 +24,7 @@ export const LIKERS = defineWidget({
     { section: "list", ...toggle("medals", "Gold, silver and bronze for the top 3") },
     { section: "list", ...number("minLikes", "Likes needed to be listed", 1, 1000000) },
     { section: "list", ...toggle("keep", "Remember the likes if the page reloads", "Kept only in this browser or streaming app. Off starts again each time the page loads.") },
+    { section: "list", ...chipsOf("period", "Leaderboard window", [["all", "All-time (until reset)"], ["week", "This week (resets Mon)"], ["month", "This month (resets 1st)"]]) },
     { section: "list", ...toggle("celebrate", "Celebrate a like milestone", "When someone reaches a milestone, their picture, name and likes zoom in with a crown, for a few seconds.") },
     { section: "list", ...number("milestone", "Celebrate every", MIN_MILESTONE, 1000000, { hint: "Likes. A person is celebrated each time their total passes a multiple of this. The smallest is 1,000." }) },
     { section: "list", ...chipsOf("celebrateWho", "Who is celebrated", [["top", "The top liker"], ["any", "Anyone on the list"]]) },
@@ -120,16 +121,19 @@ export class LikeBoard {
   }
 }
 
-export const likersKey = (channel) => `frills:likers:${channel}`;
-export function loadLikers(storage, channel) {
+export const likersKey = (channel, period = "all", now = Date.now()) => {
+  const bucket = periodBucket(period, now);
+  return bucket ? `frills:likers:${channel}:${bucket}` : `frills:likers:${channel}`;
+};
+export function loadLikers(storage, channel, period = "all", now = Date.now()) {
   try {
-    const saved = JSON.parse(storage.getItem(likersKey(channel)) ?? "null");
+    const saved = JSON.parse(storage.getItem(likersKey(channel, period, now)) ?? "null");
     if (!Array.isArray(saved)) return [];
     return saved.filter((e) => e && typeof e.user === "string" && typeof e.name === "string" && Number.isFinite(e.count) && e.count > 0).slice(0, SAVED);
   } catch {
     return [];
   }
 }
-export function saveLikers(storage, channel, board) {
-  try { storage.setItem(likersKey(channel), JSON.stringify(board.entries)); } catch { /* storage can be blocked */ }
+export function saveLikers(storage, channel, board, period = "all", now = Date.now()) {
+  try { storage.setItem(likersKey(channel, period, now), JSON.stringify(board.entries)); } catch { /* storage can be blocked */ }
 }

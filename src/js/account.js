@@ -365,12 +365,16 @@ if ($("acct-form")) {
           clearBtn.addEventListener("click", () => void sendTtsCmd("tts:clear"));
           ttsRow.append(input, speakBtn, clearBtn);
           li.append(ttsRow);
-        } else if (plusOn && (item.kind === "jar" || item.kind === "goal")) {
+        } else if (plusOn && (item.kind === "jar" || item.kind === "goal" || item.kind === "gifters" || item.kind === "likers")) {
           const deckRow = document.createElement("div");
           deckRow.className = "acct-row acct-cloud__timer";
           const deckBtns = item.kind === "jar"
             ? [["+100 Drop", "jar:drop", 100], ["Fill & Celebrate", "jar:fill", 0], ["Empty Jar", "jar:clear", 0]]
-            : [["+1", "goal:add", 1], ["+10", "goal:add", 10], ["Celebrate Goal", "goal:reach", 0], ["Reset", "goal:reset", 0]];
+            : item.kind === "goal"
+              ? [["+1", "goal:add", 1], ["+10", "goal:add", 10], ["Celebrate Goal", "goal:reach", 0], ["Reset", "goal:reset", 0]]
+              : item.kind === "gifters"
+                ? [["Reset leaderboard", "gifters:reset", 0]]
+                : [["Reset leaderboard", "likers:reset", 0]];
           for (const [label, action, value] of deckBtns) {
             const btn = document.createElement("button");
             btn.type = "button";

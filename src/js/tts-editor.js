@@ -79,6 +79,7 @@ startWidgetEditor({
 
     const player = createTtsPlayer({
       onLevel: (lvl) => view.level(lvl),
+      onTextUpdate: (_item, reply) => view.updateText(reply),
       getSimCountry: () => simCountry,
       onUsage({ used, limit, remaining }) {
         setStatus(
@@ -133,19 +134,73 @@ startWidgetEditor({
     let hasActivePlus = false;
     const syncPlusFeatureControls = () => {
       const showPlusExtras = Boolean(hasActivePlus || (devSite && !simCountry));
-      const customChip = [...document.querySelectorAll("#opt-controls .chip")].find((b) => b.textContent.trim() === "Custom PNG / GIF");
-      if (customChip) customChip.hidden = !showPlusExtras && settings.pet !== "custom";
+      const discoverPlus = Boolean(lastEligible && (accountsOn || devSite));
+
+      let customChip = document.querySelector('#opt-controls .chip[data-pet-custom="1"]');
+      if (!customChip) {
+        customChip = [...document.querySelectorAll("#opt-controls .chip")].find((b) => b.textContent.trim().startsWith("Custom PNG / GIF")) ?? null;
+        if (customChip) customChip.dataset.petCustom = "1";
+      }
+      if (customChip) {
+        customChip.hidden = !discoverPlus && settings.pet !== "custom";
+        customChip.textContent = !showPlusExtras && discoverPlus ? "Custom PNG / GIF · Plus" : "Custom PNG / GIF";
+      }
+
+      const cohostRow = document.querySelector('[aria-label="AI Pet Co-Host replies"]')?.closest(".ctl");
+      if (cohostRow) cohostRow.hidden = !discoverPlus && settings.cohost === "off";
+      const cohostActive = (settings.cohost || "off") !== "off";
+      const vibeRow = document.querySelector('[aria-label="Co-Host personality"]')?.closest(".ctl");
+      if (vibeRow) vibeRow.hidden = !discoverPlus || !cohostActive;
+      const askRow = document.getElementById("c-askCommand")?.closest(".ctl");
+      if (askRow) askRow.hidden = !discoverPlus || settings.cohost !== "both";
+
       const giftVoiceRow = document.getElementById("c-giftVoice")?.closest(".ctl");
-      if (giftVoiceRow) giftVoiceRow.hidden = !showPlusExtras;
+      if (giftVoiceRow) giftVoiceRow.hidden = !lastEligible || !showPlusExtras;
       const whoRow = document.querySelector('[aria-label="Who can trigger chat TTS"]')?.closest(".ctl");
-      if (whoRow) whoRow.hidden = !showPlusExtras;
+      if (whoRow) whoRow.hidden = !lastEligible || !showPlusExtras;
+
+      const customPicked = settings.pet === "custom";
+      const allowUpload = Boolean(customPicked && lastEligible && (showPlusExtras || settings.petIdle || settings.petTalk || settings.petExcited));
+      const consent = document.getElementById("media-consent");
+      if (consent) consent.hidden = !allowUpload;
+      for (const el of document.querySelectorAll("#opt-controls .media")) el.hidden = !allowUpload;
+
+      const testCohostBtn = document.getElementById("test-cohost");
+      if (testCohostBtn) testCohostBtn.hidden = !discoverPlus || (!showPlusExtras && !cohostActive);
+
+      const featureHint = document.getElementById("plus-feature-hint");
+      if (featureHint) {
+        const tryingLockedPreview = Boolean(discoverPlus && !showPlusExtras && (customPicked || cohostActive));
+        featureHint.hidden = !tryingLockedPreview;
+        if (tryingLockedPreview) {
+          featureHint.replaceChildren(document.createTextNode("Custom 3-frame PNGTuber uploads and AI Pet Co-Host replies unlock with "));
+          if (accountsOn) {
+            const link = document.createElement("a");
+            link.href = "/plus/";
+            link.textContent = "Frills Plus";
+            featureHint.append(link);
+          } else {
+            featureHint.append(document.createTextNode("Frills Plus"));
+          }
+          featureHint.append(document.createTextNode(" — explore the setup here, then subscribe to use them live on stream."));
+        }
+      }
     };
 
     const syncRegionUi = (eligible) => {
       const plusBoxEl = document.getElementById("plus-link");
       if (plusBoxEl) plusBoxEl.hidden = !eligible || !loadedAccount;
+      const lede = document.querySelector(".panel__lede");
+      if (lede) {
+        if (!lede.dataset.origHtml) lede.dataset.origHtml = lede.innerHTML;
+        lede.innerHTML = eligible
+          ? lede.dataset.origHtml
+          : lede.dataset.origHtml.replace(/,\s*and Frills Plus adds AI voices/gi, "");
+      }
       const engineCtl = document.querySelector('[aria-label="Voice mode"]')?.closest(".ctl");
       if (engineCtl) engineCtl.hidden = !eligible;
+      const sampleRow = document.getElementById("ai-voice-preview-row");
+      if (sampleRow) sampleRow.hidden = !eligible || (!accountsOn && !devSite);
       syncPlusFeatureControls();
       // In non-eligible regions (e.g. PH), remove/hide any "Frills Plus" wording in control hints and about text
       for (const el of document.querySelectorAll(".ctl__hint")) {
@@ -383,6 +438,29 @@ startWidgetEditor({
       }
     });
 
+    const sampleBtn = document.getElementById("ai-voice-preview-btn");
+    const sampleHint = document.getElementById("ai-voice-preview-hint");
+    sampleBtn?.addEventListener("click", async () => {
+      const voice = settings.voice || "nova";
+      const volume = (Number(settings.volume) || 90) / 100;
+      sampleBtn.disabled = true;
+      sampleBtn.textContent = "Playing…";
+      view.start({ kind: "gift", author: "AI Voice Preview", badge: voice, text: `Sample of “${voice}” Frills Plus AI voice.` });
+      try {
+        const res = await player.previewSample(voice, { volume });
+        if (sampleHint) {
+          if (res.ok && res.mode === "ai") sampleHint.textContent = `Played Studio AI sample for “${voice}”.`;
+          else if (res.ok) sampleHint.textContent = `Played browser preview for “${voice}” (configure an AI TTS key to hear Studio AI audio).`;
+          else if (res.error === "region_unavailable") sampleHint.textContent = "AI voice preview is not available in this region.";
+          else sampleHint.textContent = "Could not load voice sample right now.";
+        }
+      } finally {
+        view.idle();
+        sampleBtn.disabled = false;
+        sampleBtn.textContent = "▶ Hear AI voice";
+      }
+    });
+
     const sayForm = document.getElementById("say-form");
     const sayInput = document.getElementById("say-input");
     sayForm?.addEventListener("submit", (e) => {
@@ -402,10 +480,7 @@ startWidgetEditor({
         view.apply(next);
         queue.setSettings(next);
         if (voicePick && voicePick.value !== (next.browserVoice || "")) voicePick.value = next.browserVoice || "";
-        const customOn = next.pet === "custom";
-        const consent = document.getElementById("media-consent");
-        if (consent) consent.hidden = !customOn;
-        for (const el of document.querySelectorAll("#opt-controls .media")) el.hidden = !customOn;
+        syncPlusFeatureControls();
       },
       onEvent(event) {
         const item = ttsSpeechFor(event, settings);
@@ -440,6 +515,14 @@ startWidgetEditor({
           const item = ttsSpeechFor(
             { name: practiceName(), text: `${prefix} Can our pet cheer for tonight’s stream?` },
             { ...settings, trigger: "cmd" },
+          );
+          if (item) queue.enqueue(item, { bypassCooldown: true });
+        },
+        cohost() {
+          const askPrefix = String(settings.askCommand || "!ask").trim() || "!ask";
+          const item = ttsSpeechFor(
+            { name: practiceName(), text: `${askPrefix} What is your favorite cozy snack tonight?` },
+            { ...settings, cohost: "both", trigger: "both" },
           );
           if (item) queue.enqueue(item, { bypassCooldown: true });
         },

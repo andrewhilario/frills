@@ -755,7 +755,8 @@ export function createTtsView(host) {
   const petBox = el("div", { className: "tts__pet", "aria-hidden": "true" });
   const imgA = el("img", { className: "tts__sprite tts__sprite--a", alt: "" });
   const imgB = el("img", { className: "tts__sprite tts__sprite--b", alt: "", hidden: true });
-  petBox.append(imgA, imgB);
+  const imgC = el("img", { className: "tts__sprite tts__sprite--c", alt: "", hidden: true });
+  petBox.append(imgA, imgB, imgC);
 
   const bubble = el("div", { className: "tts__bubble", hidden: true });
   const meta = el("div", { className: "tts__meta" });
@@ -771,6 +772,7 @@ export function createTtsView(host) {
 
   let settings = null;
   let speaking = false;
+  let useExcited = false;
   let idleTimer = 0;
   let lastFlip = 0;
   let useB = false;
@@ -782,18 +784,24 @@ export function createTtsView(host) {
     if (pet === "custom" && MEDIA_ID.test(next?.petIdle ?? "")) {
       const idleSrc = mediaUrl(next.petIdle);
       const talkSrc = MEDIA_ID.test(next?.petTalk ?? "") ? mediaUrl(next.petTalk) : idleSrc;
+      const excitedSrc = MEDIA_ID.test(next?.petExcited ?? "") ? mediaUrl(next.petExcited) : talkSrc;
       imgA.src = idleSrc;
       imgB.src = talkSrc;
+      imgC.src = excitedSrc;
     } else {
       const fallbackPet = pet === "custom" ? "frog2" : pet;
       const a = decoPieces(fallbackPet, 0, { peek: true, corner: false, spark: false })?.peek;
       const b = decoPieces(fallbackPet, 1, { peek: true, corner: false, spark: false })?.peek;
       if (a?.src) imgA.src = a.src;
-      if (b?.src || a?.src) imgB.src = b?.src || a.src;
+      if (b?.src || a?.src) {
+        imgB.src = b?.src || a.src;
+        imgC.src = b?.src || a.src;
+      }
     }
     if (!speaking) {
       imgA.hidden = false;
       imgB.hidden = true;
+      imgC.hidden = true;
     }
   };
 
@@ -809,6 +817,7 @@ export function createTtsView(host) {
     start(item) {
       clearTimeout(idleTimer);
       speaking = true;
+      useExcited = Boolean(item.kind === "gift" && settings?.pet === "custom" && MEDIA_ID.test(settings?.petExcited ?? ""));
       root.dataset.speaking = "1";
       root.dataset.kind = item.kind || "chat";
       author.textContent = item.author || "";
@@ -816,6 +825,11 @@ export function createTtsView(host) {
       badge.hidden = !item.badge || item.badge === "chat";
       textEl.textContent = item.kind === "gift" ? item.text : item.message || item.text;
       bubble.hidden = settings ? !settings.showBubble : false;
+    },
+    updateText(nextText) {
+      if (typeof nextText === "string" && nextText.trim()) {
+        textEl.textContent = nextText.trim();
+      }
     },
     level(v) {
       const clamped = Math.max(0, Math.min(1, Number(v) || 0));
@@ -825,19 +839,23 @@ export function createTtsView(host) {
         useB = !useB;
         lastFlip = now;
         imgA.hidden = useB;
-        imgB.hidden = !useB;
+        imgB.hidden = !useB || useExcited;
+        imgC.hidden = !useB || !useExcited;
       } else if (!speaking || clamped <= 0.05) {
         useB = false;
         imgA.hidden = false;
         imgB.hidden = true;
+        imgC.hidden = true;
       }
     },
     idle() {
       speaking = false;
+      useExcited = false;
       root.style.setProperty("--tts-level", "0");
       useB = false;
       imgA.hidden = false;
       imgB.hidden = true;
+      imgC.hidden = true;
       clearTimeout(idleTimer);
       idleTimer = setTimeout(() => {
         if (speaking) return;
@@ -848,10 +866,12 @@ export function createTtsView(host) {
     clear() {
       clearTimeout(idleTimer);
       speaking = false;
+      useExcited = false;
       root.dataset.speaking = "0";
       root.style.setProperty("--tts-level", "0");
       imgA.hidden = false;
       imgB.hidden = true;
+      imgC.hidden = true;
       bubble.hidden = true;
     },
   };

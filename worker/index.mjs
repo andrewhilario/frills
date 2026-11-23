@@ -17,7 +17,7 @@ import { handlePolarWebhook } from "./polar.mjs";
 import { handlePlusRelayTicket } from "./plus-relay.mjs";
 import { cloudHostIdFromPath, handleCloudOverlays } from "./cloud-overlays.mjs";
 import { checkProRegion, handleProStatus } from "./region.mjs";
-import { handleDevPass, handleTts } from "./tts.mjs";
+import { handleDevPass, handleTts, handleVoiceSample, handleCohost } from "./tts.mjs";
 import { countOverlay, handleEvent } from "./stats.mjs";
 
 /** How long the edge keeps a file it has already read from the database. Short, so a deleted or reported file is gone within the hour. */
@@ -55,6 +55,8 @@ export default {
     if (pathname === "/api/webhooks/lemonsqueezy") return handlePlusWebhook(request, env);
     if (pathname === "/api/webhooks/polar") return handlePolarWebhook(request, env);
     if (pathname === "/api/tts") return handleTts(request, env);
+    if (pathname === "/api/voice-sample") return handleVoiceSample(request, env, { ctx });
+    if (pathname === "/api/cohost") return handleCohost(request, env);
     if (pathname.startsWith("/api/admin/")) {
       const response = await handleAdmin(request, env);
       // a file the owner removed also goes from the copy this edge holds right now (other edges clear within the hour)

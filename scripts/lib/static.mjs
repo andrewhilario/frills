@@ -57,6 +57,11 @@ export function createStatic(folder) {
       res.end();
       return;
     }
+    if (req.method === "GET" && url.pathname === "/api/cloud-overlays" && url.searchParams.get("probe") === "1") {
+      res.writeHead(200, { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" });
+      res.end('{"ok":true,"signedIn":false,"plusActive":false,"eligible":false,"overlays":[]}');
+      return;
+    }
     const headers = Object.assign({}, ...loadHeaders(root).filter((r) => r.test(url.pathname)).map((r) => r.headers));
     let found;
     try {

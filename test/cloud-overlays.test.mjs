@@ -179,17 +179,27 @@ test("cloud overlays CRUD, Plus gating, CSRF, cross-account isolation, OBS polli
   assert.equal(deckRes.status, 200);
   assert.equal((await deckRes.json()).seq, 1);
 
+  const largeBoard = JSON.stringify(Array.from({ length: 45 }, (_, i) => ({ user: `u${i}`, name: `Supporter ${i}`, avatar: "", diamonds: 1000 - i, subgifts: 2, bits: 100 })));
   const stateRes = await handleCloudOverlays(new Request(`${SITE}/api/o/${overlay.id}`, {
     method: "POST",
     headers: { origin: SITE, "content-type": "application/json" },
-    body: JSON.stringify({ state: { "frills:jar:mochi": "{\"total\":450,\"target\":1000}" } }),
+    body: JSON.stringify({ state: { "frills:jar:mochi": "{\"total\":450,\"target\":1000}", "frills:gifters:twitch:mochi_tv:m:2026-11": largeBoard } }),
   }), env, { now: T0 + 7900 });
   assert.equal(stateRes.status, 200);
 
+  const resetDeck = await handleCloudOverlays(new Request(`${SITE}/api/cloud-overlays/${overlay.id}/cmd`, {
+    method: "POST",
+    headers: { origin: SITE, cookie: plusA.cookie, "content-type": "application/json" },
+    body: JSON.stringify({ action: "gifters:reset", value: 0 }),
+  }), env, { now: T0 + 7920 });
+  assert.equal(resetDeck.status, 200);
+
   const pollCmds = await (await handleCloudOverlays(new Request(`${SITE}/api/o/${overlay.id}?c=0`), env, { now: T0 + 7950 })).json();
-  assert.equal(pollCmds.cmdSeq, 1);
+  assert.equal(pollCmds.cmdSeq, 2);
   assert.equal(pollCmds.cmds[0].cmd, "tts:say:Be right back in 2 minutes!");
+  assert.equal(pollCmds.cmds[1].cmd, "gifters:reset");
   assert.equal(pollCmds.state["frills:jar:mochi"], "{\"total\":450,\"target\":1000}");
+  assert.equal(pollCmds.state["frills:gifters:twitch:mochi_tv:m:2026-11"], largeBoard);
 
   // 9. Graceful fallback: if Plus A's subscription expires, /api/o/:id STILL serves the last saved overlay so OBS never breaks, while edits are blocked
   env.DB.raw.prepare("UPDATE plus SET status = 'expired', renews_at = ? WHERE account_id = ?").run(T0, plusA.id);

@@ -141,9 +141,26 @@ test("TTS settings sanitize out-of-range inputs and round-trip through query par
   assert.equal(clean.command, "!talk");
   assert.equal(clean.minDiamonds, 25);
 
-  const params = TTS.toParams({ ...TTS.defaults, pet: "neko", voice: "shimmer", trigger: "cmd" });
+  const params = TTS.toParams({ ...TTS.defaults, pet: "neko", petExcited: "abcd1234", cohost: "both", cohostVibe: "sassy", voice: "shimmer", trigger: "cmd" });
   const parsed = TTS.fromParams(params);
-  assert.deepEqual([parsed.pet, parsed.voice, parsed.trigger], ["neko", "shimmer", "cmd"]);
+  assert.deepEqual([parsed.pet, parsed.petExcited, parsed.cohost, parsed.cohostVibe, parsed.voice, parsed.trigger], ["neko", "abcd1234", "both", "sassy", "shimmer", "cmd"]);
+});
+
+test("ttsSpeechFor supports AI Pet Co-Host !ask chat and gift/sub/bits cohost metadata", () => {
+  const cohostCfg = { ...TTS.defaults, cohost: "both", cohostVibe: "sassy", askCommand: "!ask", who: "subs", trigger: "both" };
+  assert.equal(ttsSpeechFor({ name: "Viewer", text: "!ask what snack?" }, cohostCfg), null, "who filter blocks non-sub");
+
+  const ask = ttsSpeechFor({ name: "SubPal", subscriber: true, text: "!ask what is your favorite pond snack?" }, cohostCfg);
+  assert.equal(ask.kind, "cohost");
+  assert.equal(ask.badge, "co-host");
+  assert.deepEqual(ask.cohost, { eventKind: "ask", author: "SubPal", detail: "what is your favorite pond snack?" });
+
+  const subCohost = ttsSpeechFor({ kind: "sub", name: "Alex" }, cohostCfg);
+  assert.equal(subCohost.kind, "gift");
+  assert.deepEqual(subCohost.cohost, { eventKind: "sub", author: "Alex", detail: "sub" });
+
+  const offCfg = { ...TTS.defaults, cohost: "off", trigger: "both" };
+  assert.equal(ttsSpeechFor({ kind: "bits", name: "Alex", count: 500 }, offCfg).cohost, undefined);
 });
 
 test("pickBrowserVoice maps personas onto distinct installed/Natural voices and honors explicit filter", () => {

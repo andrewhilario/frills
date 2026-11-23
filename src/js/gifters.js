@@ -2,8 +2,10 @@
 // milestone celebration checks, and optional localStorage persistence. Pure code so it is tested without a page.
 
 import { defineWidget, chipsOf, number, range, selectOf, text, toggle } from "./widget-settings.js";
-import { LEADERBOARD_LAYOUTS } from "./leaderboard-layouts.js";
+import { LEADERBOARD_LAYOUTS, periodBucket } from "./leaderboard-layouts.js";
 import { SOUNDS } from "./alerts-settings.js";
+
+export { periodBucket };
 
 /** Minimum celebration interval so milestones cannot fire on every single 1-diamond gift. */
 export const MIN_GIFTER_MILESTONE = 5;
@@ -22,6 +24,7 @@ export const GIFTERS = defineWidget({
     twitchMode: "subgift",
     minDiamonds: 1,
     keep: false,
+    period: "all",
     celebrate: true,
     milestone: 1000,
     celebrateWho: "top",
@@ -40,6 +43,7 @@ export const GIFTERS = defineWidget({
     { section: "list", onlyPlatform: "twitch", ...chipsOf("twitchMode", "Twitch ranks", [["subgift", "Sub gifters"], ["bits", "Bit senders"], ["combined", "Both together"]]) },
     { section: "list", onlyPlatform: "tiktok", ...number("minDiamonds", "Diamonds needed to be listed", 1, 1000000) },
     { section: "list", ...toggle("keep", "Remember the totals if the page reloads", "Kept only in this browser or streaming app. Off starts again each time the page loads.") },
+    { section: "list", ...chipsOf("period", "Leaderboard window", [["all", "All-time (until reset)"], ["week", "This week (resets Mon)"], ["month", "This month (resets 1st)"]]) },
     { section: "list", ...toggle("celebrate", "Celebrate a gift milestone", "When someone reaches a milestone, their picture, name and score zoom in with a crown, for a few seconds.") },
     { section: "list", ...number("milestone", "Celebrate every", MIN_GIFTER_MILESTONE, 1000000, { hint: "Diamonds on TikTok, bits on Twitch, or gifted subs (try 5 or 10 for Sub gifters)." }) },
     { section: "list", ...chipsOf("celebrateWho", "Who is celebrated", [["top", "The top gifter"], ["any", "Anyone on the list"]]) },
@@ -240,11 +244,14 @@ export class GifterBoard {
   }
 }
 
-export const giftersKey = (platform, channel) => `frills:gifters:${platform}:${channel}`;
+export const giftersKey = (platform, channel, period = "all", now = Date.now()) => {
+  const bucket = periodBucket(period, now);
+  return bucket ? `frills:gifters:${platform}:${channel}:${bucket}` : `frills:gifters:${platform}:${channel}`;
+};
 
-export function loadGifters(storage, platform, channel) {
+export function loadGifters(storage, platform, channel, period = "all", now = Date.now()) {
   try {
-    const saved = JSON.parse(storage.getItem(giftersKey(platform, channel)) ?? "null");
+    const saved = JSON.parse(storage.getItem(giftersKey(platform, channel, period, now)) ?? "null");
     if (!Array.isArray(saved)) return [];
     return saved
       .filter((e) => e && typeof e.user === "string" && typeof e.name === "string"
@@ -255,6 +262,6 @@ export function loadGifters(storage, platform, channel) {
   }
 }
 
-export function saveGifters(storage, platform, channel, board) {
-  try { storage.setItem(giftersKey(platform, channel), JSON.stringify(board.entries)); } catch { /* blocked */ }
+export function saveGifters(storage, platform, channel, board, period = "all", now = Date.now()) {
+  try { storage.setItem(giftersKey(platform, channel, period, now), JSON.stringify(board.entries)); } catch { /* blocked */ }
 }

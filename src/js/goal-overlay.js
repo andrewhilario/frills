@@ -20,18 +20,19 @@ const note = document.getElementById("note");
 const say = (text) => { note.hidden = !text; note.textContent = text; };
 const channel = channelFromParams(params, platform);
 const demo = params.get("demo") === "1";
+const persist = !demo && Boolean(channel) && (settings.keep || params.has("_cv"));
 
 const sounds = createSounds();
 const view = createGoalView(document.getElementById("goal"));
 view.apply(settings);
-const remembered = settings.keep && channel ? loadGoal(globalThis.localStorage, channel, settings.type) : null;
+const remembered = persist ? loadGoal(globalThis.localStorage, channel, settings.type) : null;
 const state = new GoalState(settings, {
   gained: remembered?.gained ?? 0,
   target: remembered?.goal,
   onGain: (gain) => view.gain(gain),
   onChange: (snapshot) => {
     view.update(snapshot);
-    if (settings.keep && channel) saveGoal(globalThis.localStorage, channel, state);
+    if (persist) saveGoal(globalThis.localStorage, channel, state);
   },
   onReach: async () => {
     if (settings.celebrate) {
@@ -48,7 +49,7 @@ window.addEventListener("frills:cloud-cmd", (e) => {
   const val = Math.max(1, Math.round(Number(e.detail?.value) || 1));
   if (raw === "goal:reset") {
     state.reset();
-    if (settings.keep && channel) saveGoal(globalThis.localStorage, channel, state);
+    if (persist) saveGoal(globalThis.localStorage, channel, state);
   } else if (raw === "goal:reach") {
     state.add(Math.max(1, state.goal - state.value), "Stream Deck");
   } else if (raw === "goal:add") {

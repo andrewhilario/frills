@@ -16,6 +16,7 @@ view.apply(settings);
 
 const player = createTtsPlayer({
   onLevel: (lvl) => view.level(lvl),
+  onTextUpdate: (_item, reply) => view.updateText(reply),
 });
 
 const queue = new TtsQueue(settings, {

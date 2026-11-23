@@ -3,7 +3,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { GIFTERS, GIFTER_LAYOUTS, GifterBoard, MIN_GIFTER_MILESTONE, giftersKey, loadGifters, saveGifters } from "../src/js/gifters.js";
+import { GIFTERS, GIFTER_LAYOUTS, GifterBoard, MIN_GIFTER_MILESTONE, giftersKey, loadGifters, periodBucket, saveGifters } from "../src/js/gifters.js";
 import { LOOKS, coerce } from "../src/js/widget-settings.js";
 
 const gift = (name, diamonds, count = 1) => ({ kind: "gift", id: `g-${name}`, user: name.toLowerCase(), name, gift: "Galaxy", diamonds, count, total: diamonds * count, picture: "", avatar: "" });
@@ -93,4 +93,13 @@ test("GifterBoard fires milestone celebrations accurately and persists top gifte
   assert.ok(map.has(giftersKey("twitch", "maya_tv")));
   const restored = loadGifters(storage, "twitch", "maya_tv");
   assert.deepEqual(restored.map((e) => [e.name, e.subgifts]), [["Maya", 7]]);
+
+  const novTime = Date.UTC(2026, 10, 23, 12, 0, 0);
+  assert.equal(periodBucket("all", novTime), "");
+  assert.equal(periodBucket("month", novTime), "m:2026-11");
+  assert.equal(periodBucket("week", novTime), "w:2026-W48");
+  assert.equal(giftersKey("twitch", "maya_tv", "week", novTime), "frills:gifters:twitch:maya_tv:w:2026-W48");
+  saveGifters(storage, "twitch", "maya_tv", board, "month", novTime);
+  assert.equal(loadGifters(storage, "twitch", "maya_tv", "month", novTime)[0].name, "Maya");
+  assert.deepEqual(loadGifters(storage, "twitch", "maya_tv", "month", Date.UTC(2026, 11, 1)), [], "new month starts fresh automatically");
 });

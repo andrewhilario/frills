@@ -20,6 +20,7 @@ const note = document.getElementById("note");
 const say = (text) => { note.hidden = !text; note.textContent = text; };
 const channel = channelFromParams(params, platform);
 const demo = params.get("demo") === "1";
+const persist = !demo && Boolean(channel) && (settings.keep || params.has("_cv"));
 
 const view = createGiftersView(document.getElementById("gifters"));
 view.apply(settings);
@@ -30,16 +31,23 @@ const board = new GifterBoard(settings, {
   platform,
   entries: demo
     ? demoGifters(platform, settings.twitchMode, settings.milestone)
-    : settings.keep && channel ? loadGifters(globalThis.localStorage, platform, channel) : [],
+    : persist ? loadGifters(globalThis.localStorage, platform, channel, settings.period) : [],
   onMilestone: (person) => view.celebrate(person, { onStart: () => sounds.play(settings.celebrateSound, { volume: 70, tier: 3 }) }),
   onChange: (top) => {
     view.render(top);
-    if (settings.keep && channel && !saving && !demo) {
-      saving = setTimeout(() => { saving = 0; saveGifters(globalThis.localStorage, platform, channel, board); }, 1500);
+    if (persist && !saving) {
+      saving = setTimeout(() => { saving = 0; saveGifters(globalThis.localStorage, platform, channel, board, settings.period); }, 1500);
     }
   },
 });
 view.render(board.top);
+
+window.addEventListener("frills:cloud-cmd", (e) => {
+  if (String(e.detail?.cmd ?? "") === "gifters:reset") {
+    board.clear();
+    if (persist) saveGifters(globalThis.localStorage, platform, channel, board, settings.period);
+  }
+});
 
 if (demo) {
   fontsReady(generalFaces(settings), 1000).then(() => {

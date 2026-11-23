@@ -22,7 +22,7 @@ import { handlePolarWebhook } from "../worker/polar.mjs";
 import { handlePlusRelayTicket } from "../worker/plus-relay.mjs";
 import { cloudHostIdFromPath, handleCloudOverlays } from "../worker/cloud-overlays.mjs";
 import { handleProStatus } from "../worker/region.mjs";
-import { handleDevPass, handleTts } from "../worker/tts.mjs";
+import { handleDevPass, handleTts, handleVoiceSample, handleCohost } from "../worker/tts.mjs";
 
 const root = join(import.meta.dirname, "..");
 const port = Number(process.argv[2] ?? process.env.PORT ?? 3020);
@@ -37,8 +37,12 @@ const env = {
   ADMIN_KEY: process.env.ADMIN_KEY,
   SPOTIFY_TOKEN_KEY: process.env.SPOTIFY_TOKEN_KEY ?? throwaway,
   OPENAI_TTS_KEY: process.env.OPENAI_TTS_KEY,
+  OPENAI_API_KEY: process.env.OPENAI_API_KEY,
   GOOGLE_TTS_KEY: process.env.GOOGLE_TTS_KEY,
   GROQ_TTS_KEY: process.env.GROQ_TTS_KEY,
+  GROQ_API_KEY: process.env.GROQ_API_KEY,
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+  COHOST_MODEL: process.env.COHOST_MODEL,
   PRO_DEV_KEY: process.env.PRO_DEV_KEY,
   PRO_COUNTRIES: process.env.PRO_COUNTRIES,
   PRO_ALLOW_IPS: process.env.PRO_ALLOW_IPS,
@@ -127,7 +131,7 @@ createServer(async (req, res) => {
     serveFiles(req, res);
     return;
   }
-  if (path === "/api/pro/status" || path === "/api/pro/dev-pass" || path === "/api/plus/relay-ticket" || path === "/api/tts") {
+  if (path === "/api/pro/status" || path === "/api/pro/dev-pass" || path === "/api/plus/relay-ticket" || path === "/api/tts" || path === "/api/voice-sample" || path === "/api/cohost") {
     const chunks = [];
     for await (const chunk of req) chunks.push(chunk);
     const request = new Request(`http://${req.headers.host}${req.url}`, { method: req.method, headers: req.headers, body: ["GET", "HEAD"].includes(req.method) ? undefined : Buffer.concat(chunks) });
@@ -137,7 +141,11 @@ createServer(async (req, res) => {
         ? await handleDevPass(request, env)
         : path === "/api/plus/relay-ticket"
           ? await handlePlusRelayTicket(request, env)
-          : await handleTts(request, env);
+          : path === "/api/voice-sample"
+            ? await handleVoiceSample(request, env)
+            : path === "/api/cohost"
+              ? await handleCohost(request, env)
+              : await handleTts(request, env);
     res.writeHead(response.status, Object.fromEntries(response.headers));
     res.end(Buffer.from(await response.arrayBuffer()));
     return;

@@ -36,10 +36,46 @@ if (!id) {
   let frame = null;
   let version = 0;
   let cmdSeq = null;
+  let activeKind = "";
+  let activeUrl = "";
   let stopped = false;
   let timer = 0;
   let fails = 0;
   let lastSavedState = "";
+
+  const cleanChannel = (s) => String(s ?? "").trim().replace(/^@+/, "").toLowerCase();
+
+  /** Derives an exact key matcher for the active overlay so sibling OBS sources never collide. */
+  const matchesKeyFor = (kind, rawUrl) => {
+    if (!kind || !rawUrl) return null;
+    try {
+      const p = new URL(rawUrl, location.origin).searchParams;
+      const tt = cleanChannel(p.get("tiktok"));
+      const tw = cleanChannel(p.get("twitch"));
+      const platform = tt && tw ? "both" : p.get("platform") === "twitch" ? "twitch" : "tiktok";
+      const channel = tt && tw ? `${tt}+${tw}` : cleanChannel(p.get("channel"));
+      if (kind === "timer") {
+        const code = String(p.get("code") || "").trim();
+        const key = `frills:timer:state:${code || channel || "demo"}`;
+        return (k) => k === key;
+      }
+      if (!channel) return null;
+      if (kind === "jar") return (k) => k === `frills:jar:${channel}`;
+      if (kind === "goal") {
+        const t = String(p.get("type") || "follow").trim() || "follow";
+        const key = t === "follow" ? `frills:goal:${channel}` : `frills:goal:${channel}:${t}`;
+        return (k) => k === key;
+      }
+      if (kind === "gifters" || kind === "likers") {
+        const base = kind === "gifters" ? `frills:gifters:${platform}:${channel}` : `frills:likers:${channel}`;
+        const period = p.get("period") || "all";
+        if (period === "week") return (k) => k.startsWith(`${base}:w:`);
+        if (period === "month") return (k) => k.startsWith(`${base}:m:`);
+        return (k) => k === base;
+      }
+    } catch { /* ignore */ }
+    return null;
+  };
 
   const restoreState = (stateObj) => {
     if (!stateObj || typeof stateObj !== "object") return;
@@ -55,17 +91,18 @@ if (!id) {
 
   const checkpointState = () => {
     if (stopped || !frame) return;
+    const isMatch = matchesKeyFor(activeKind, activeUrl);
+    if (!isMatch) return;
     try {
       const snap = {};
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
-        if (k && /^frills:(jar|goal|timer:state|likers|gifters):/.test(k)) {
-          const val = localStorage.getItem(k);
-          if (val && val.length <= 2048) snap[k] = val;
-        }
+        if (!k || !isMatch(k)) continue;
+        const val = localStorage.getItem(k);
+        if (val !== null && val.length <= 14000) snap[k] = val;
       }
       const nextJson = JSON.stringify(snap);
-      if (nextJson === "{}" || nextJson === lastSavedState || nextJson.length > 4096) return;
+      if (nextJson === "{}" || nextJson === lastSavedState || nextJson.length > 16000) return;
       lastSavedState = nextJson;
       fetch(`/api/o/${id}`, {
         method: "POST",
@@ -77,11 +114,15 @@ if (!id) {
 
   const dispatchCommands = (cmds) => {
     if (!Array.isArray(cmds) || !cmds.length || !frame?.contentWindow) return;
+    let shouldFlush = false;
     for (const item of cmds) {
       try {
         frame.contentWindow.dispatchEvent(new CustomEvent("frills:cloud-cmd", { detail: item }));
+        const c = String(item?.cmd ?? "");
+        if (c === "gifters:reset" || c === "likers:reset" || c === "jar:clear" || c === "goal:reset") shouldFlush = true;
       } catch { /* ignore */ }
     }
+    if (shouldFlush) setTimeout(checkpointState, 600);
   };
 
   const mountTarget = (targetUrl) => {
@@ -114,6 +155,8 @@ if (!id) {
       fails = 0;
       if (data?.ok) {
         say("");
+        if (data.kind) activeKind = data.kind;
+        if (data.url) activeUrl = data.url;
         if (version === 0 && data.state) restoreState(data.state);
         if (cmdSeq !== null && Array.isArray(data.cmds) && data.cmds.length) {
           dispatchCommands(data.cmds);

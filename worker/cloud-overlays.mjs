@@ -28,9 +28,10 @@ export const OVERLAY_KINDS = Object.freeze({
 });
 
 export const MAX_CLOUD_OVERLAYS = 50;
-const MAX_BODY = 8192;
+const MAX_BODY = 24576;
 const MAX_QUERY = 4096;
-const MAX_STATE = 4096;
+const MAX_STATE = 16384;
+const MAX_STATE_VALUE = 14000;
 const MAX_NAME = 60;
 const ID_RE = /^[A-Za-z0-9_-]{12}$/;
 
@@ -216,7 +217,7 @@ export async function handleCloudOverlays(request, env, { now = Date.now() } = {
         }
         const cleanedState = {};
         for (const [k, v] of Object.entries(stateBody.state)) {
-          if (typeof k === "string" && k.startsWith("frills:") && typeof v === "string" && v.length <= 2048) {
+          if (typeof k === "string" && k.startsWith("frills:") && typeof v === "string" && v.length <= MAX_STATE_VALUE) {
             cleanedState[k] = v;
           }
         }
@@ -376,7 +377,7 @@ export async function handleCloudOverlays(request, env, { now = Date.now() } = {
       const existing = await db.prepare("SELECT * FROM cloud_overlays WHERE id = ? AND account_id = ?").bind(id, who.accountId).first();
       if (!existing) return json(404, { ok: false, error: "not_found" });
       const rawAction = String(body.action ?? "").trim();
-      const ALLOWED_ACTIONS = ["tts:say", "tts:clear", "jar:drop", "jar:fill", "jar:clear", "goal:add", "goal:reach", "goal:reset"];
+      const ALLOWED_ACTIONS = ["tts:say", "tts:clear", "jar:drop", "jar:fill", "jar:clear", "goal:add", "goal:reach", "goal:reset", "gifters:reset", "likers:reset"];
       if (!ALLOWED_ACTIONS.includes(rawAction)) return json(400, { ok: false, error: "bad_command" });
       const val = Math.max(-1000000, Math.min(1000000, Math.round(Number(body.value) || 0)));
       const textPart = rawAction === "tts:say"

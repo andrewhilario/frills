@@ -42,6 +42,10 @@ export const TTS = defineWidget({
     pet: "frog2",
     petIdle: "",
     petTalk: "",
+    petExcited: "",
+    cohost: "off",
+    cohostVibe: "cozy",
+    askCommand: "!ask",
     trigger: "both",
     who: "all",
     command: "!say",
@@ -65,7 +69,11 @@ export const TTS = defineWidget({
     { section: "pet", ...chipsOf("pet", "Talking pet", PET_OPTIONS) },
     { section: "pet", ...imageOf("petIdle", "Custom pet: idle picture or GIF", "Shown when custom pet is picked (PNG, WebP, or GIF up to 1 MB).") },
     { section: "pet", ...imageOf("petTalk", "Custom pet: talking picture or GIF", "Optional mouth-open frame that swaps while speaking. Leave empty to bounce your idle picture.") },
+    { section: "pet", ...imageOf("petExcited", "Custom pet: excited picture or GIF", "Optional 3rd frame shown when reacting to gifts, subs, bits, or raids.") },
     { section: "pet", ...toggle("showBubble", "Show speech bubble on stream", "Turn off for voice-only mode.") },
+    { section: "rules", ...chipsOf("cohost", "AI Pet Co-Host replies", [["off", "Off (repeat verbatim)"], ["gifts", "React to gifts, subs & bits"], ["both", "Gifts + !ask chat"]]) },
+    { section: "rules", ...chipsOf("cohostVibe", "Co-Host personality", [["cozy", "Cozy & wholesome"], ["sassy", "Playful & sassy"], ["hype", "Hype & chaotic"], ["chill", "Dry & chill"]]) },
+    { section: "rules", ...text("askCommand", "Co-Host chat command", 20, "Viewers type e.g. !ask what snack do you like? for a short AI reply.") },
     { section: "rules", ...chipsOf("trigger", "When it speaks", [["gift", "Gifts, subs & bits only"], ["cmd", "Chat command"], ["both", "Alerts + command"], ["all_chat", "Every chat message"]]) },
     { section: "rules", ...chipsOf("who", "Who can trigger chat TTS", WHO_OPTIONS) },
     { section: "rules", ...text("command", "Chat command", 20, "Viewers type this first, e.g. !say hello.") },
@@ -133,7 +141,17 @@ export function ttsSpeechFor(input, settings) {
       ? count > 1 ? `${author} sent ${count} ${gift}!` : `${author} sent ${gift}!`
       : count > 1 ? `${count} ${gift}!` : `${gift}!`;
     const userKey = cleanName(input.user || author).toLowerCase() || "gift";
-    return { kind: "gift", userKey, author, badge, text: line.slice(0, 220), message: badge, voice: alertVoice };
+    const cohostOn = cfg.cohost === "gifts" || cfg.cohost === "both";
+    return {
+      kind: "gift",
+      userKey,
+      author,
+      badge,
+      text: line.slice(0, 220),
+      message: badge,
+      voice: alertVoice,
+      ...(cohostOn ? { cohost: { eventKind: "gift", author, detail: badge } } : {}),
+    };
   }
 
   if (input.kind === "bits" || input.kind === "sub" || input.kind === "subgift" || input.kind === "raid") {
@@ -161,7 +179,17 @@ export function ttsSpeechFor(input, settings) {
       badge = `raid · ${count}`;
       line = cfg.readUser ? `${author} raided with ${count} viewers!` : `Raid of ${count} viewers!`;
     }
-    return { kind: "gift", userKey, author, badge, text: line.slice(0, 220), message: badge, voice: alertVoice };
+    const cohostOn = cfg.cohost === "gifts" || cfg.cohost === "both";
+    return {
+      kind: "gift",
+      userKey,
+      author,
+      badge,
+      text: line.slice(0, 220),
+      message: badge,
+      voice: alertVoice,
+      ...(cohostOn ? { cohost: { eventKind: input.kind, author, detail: badge } } : {}),
+    };
   }
 
   if (input.kind && input.kind !== "chat") return null;
@@ -171,6 +199,29 @@ export function ttsSpeechFor(input, settings) {
 
   let rawText = input.text.trim();
   if (!rawText) return null;
+
+  if (cfg.cohost === "both") {
+    const askPrefix = String(cfg.askCommand || "!ask").trim().toLowerCase() || "!ask";
+    const lowerAsk = rawText.toLowerCase();
+    const afterAsk = rawText.slice(askPrefix.length);
+    if (lowerAsk.startsWith(askPrefix) && afterAsk && /^\s/.test(afterAsk)) {
+      const askMsg = cleanSpeechText(afterAsk.trim(), cfg.maxChars);
+      if (!askMsg) return null;
+      const author = cleanName(input.name || input.user || "Viewer") || "Viewer";
+      const userKey = cleanName(input.user || author).toLowerCase() || "viewer";
+      const fullAsk = cfg.readUser ? `${author} asks: ${askMsg}` : askMsg;
+      return {
+        kind: "cohost",
+        userKey,
+        author,
+        badge: "co-host",
+        text: fullAsk.slice(0, 220),
+        message: askMsg,
+        voice: chatVoice,
+        cohost: { eventKind: "ask", author, detail: askMsg },
+      };
+    }
+  }
 
   if (cfg.trigger === "cmd" || cfg.trigger === "both") {
     const prefix = String(cfg.command || "!say").trim().toLowerCase() || "!say";

@@ -18,6 +18,7 @@ const note = document.getElementById("note");
 const say = (text) => { note.hidden = !text; note.textContent = text; };
 const channel = channelFromParams(params);
 const demo = params.get("demo") === "1";
+const persist = !demo && Boolean(channel) && (settings.keep || params.has("_cv"));
 
 const view = createLikersView(document.getElementById("likers"));
 view.apply(settings);
@@ -25,14 +26,21 @@ const sounds = createSounds();
 let saving = 0;
 const board = new LikeBoard(settings, {
   // the practice page starts with a few likers, the first just short of a milestone, so the celebration can be seen
-  entries: demo ? demoLikers(settings.milestone) : settings.keep && channel ? loadLikers(globalThis.localStorage, channel) : [],
+  entries: demo ? demoLikers(settings.milestone) : persist ? loadLikers(globalThis.localStorage, channel, settings.period) : [],
   onMilestone: (person) => view.celebrate(person, { onStart: () => sounds.play(settings.celebrateSound, { volume: 70, tier: 3 }) }),
   onChange: (top) => {
     view.render(top);
-    if (settings.keep && channel && !saving) saving = setTimeout(() => { saving = 0; saveLikers(globalThis.localStorage, channel, board); }, 1500);
+    if (persist && !saving) saving = setTimeout(() => { saving = 0; saveLikers(globalThis.localStorage, channel, board, settings.period); }, 1500);
   },
 });
 view.render(board.top);
+
+window.addEventListener("frills:cloud-cmd", (e) => {
+  if (String(e.detail?.cmd ?? "") === "likers:reset") {
+    board.clear();
+    if (persist) saveLikers(globalThis.localStorage, channel, board, settings.period);
+  }
+});
 
 if (demo) {
   fontsReady(generalFaces(settings), 1000).then(() => fakeLikeSource((event) => board.add(event), demoPace ? () => [demoPace * 0.6, demoPace * 1.4] : undefined));

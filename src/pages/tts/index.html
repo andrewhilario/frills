@@ -32,6 +32,7 @@
       <button class="btn btn--soft btn--sm" type="button" data-test="gift">Gift thank-you</button>
       <button class="btn btn--soft btn--sm" type="button" data-test="bigGift">Big gift</button>
       <button class="btn btn--soft btn--sm" type="button" data-test="cmd">Say !say line</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="cohost" id="test-cohost" hidden>Test !ask Co-Host</button>
       <button class="btn btn--soft btn--sm" type="button" data-test="clear">Stop &amp; clear</button>
       <form class="tts-saybox" id="say-form">
         <label class="visually-hidden" for="say-input">Custom test message</label>
@@ -60,6 +61,10 @@
         <span class="step-card__num" aria-hidden="true">2</span>
         <h2 class="step-card__title" id="s2">Pet, voice &amp; triggers</h2>
       </div>
+      <div class="ctl tts-preview-sample" id="ai-voice-preview-row" hidden>
+        <button class="btn btn--soft btn--sm" type="button" id="ai-voice-preview-btn">▶ Hear AI voice</button>
+        <span class="ctl__hint" id="ai-voice-preview-hint">Hear the current voice persona right now before connecting OBS.</span>
+      </div>
       <div class="ctl" id="browser-voice-row" hidden>
         <label class="ctl__label" for="browser-voice-pick">Installed browser voices</label>
         <select id="browser-voice-pick">
@@ -67,6 +72,7 @@
         </select>
         <p class="ctl__hint">Lists free voices exposed by your current browser (Microsoft Edge offers free Online Natural voices).</p>
       </div>
+      <p class="pro-hint" id="plus-feature-hint" hidden></p>
       <label class="media__consent" id="media-consent" hidden><input type="checkbox" id="media-ok"> I have the right to use any image or GIF I upload here. Files can be up to 1 MB.</label>
       <div class="stack" id="opt-controls"></div>
     </section>
