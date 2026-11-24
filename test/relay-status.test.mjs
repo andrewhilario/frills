@@ -472,38 +472,47 @@ test("parseEulerConfig reads EULER_API_KEYS or EULER_API_KEY/_2/_3 and createHel
 });
 
 test("Signing.syncRemoteLimits queries Euler /accounts/me/rate_limits and auto-rotates/recovers slots", async () => {
-  const pool = new Signing(() => 2000, { keys: ["key_one", "key_two", "key_three"] });
+  const rotations = [];
+  const pool = new Signing(() => 2000, {
+    keys: ["key_one", "key_two", "key_three"],
+    onRotate: (ev) => rotations.push(ev),
+  });
   const calls = [];
-  const summary = await pool.syncRemoteLimits({
-    fetchImpl: async (url, init) => {
-      calls.push({ url, key: init?.headers?.["x-api-key"] });
-      if (init?.headers?.["x-api-key"] === "key_one") {
-        return new Response(JSON.stringify({
-          code: 200,
-          day: { max: 1500, remaining: 0, reset_at: "2026-11-24T00:00:00.000Z" },
-          hour: { max: 300, remaining: 0, reset_at: "2026-11-23T12:00:00.000Z" },
-          minute: { max: 30, remaining: 30, reset_at: null },
-        }), { status: 200 });
-      }
+  const fetchImpl = async (url, init) => {
+    calls.push({ url, key: init?.headers?.["x-api-key"] });
+    if (init?.headers?.["x-api-key"] === "key_one") {
       return new Response(JSON.stringify({
         code: 200,
-        day: { max: 1500, remaining: 1420, reset_at: "2026-11-24T00:00:00.000Z" },
-        hour: { max: 300, remaining: 290, reset_at: "2026-11-23T12:00:00.000Z" },
+        day: { max: 1500, remaining: 0, reset_at: "2026-11-24T00:00:00.000Z" },
+        hour: { max: 300, remaining: 0, reset_at: "2026-11-23T12:00:00.000Z" },
         minute: { max: 30, remaining: 30, reset_at: null },
       }), { status: 200 });
-    },
-  });
+    }
+    return new Response(JSON.stringify({
+      code: 200,
+      day: { max: 1500, remaining: 1420, reset_at: "2026-11-24T00:00:00.000Z" },
+      hour: { max: 300, remaining: 290, reset_at: "2026-11-23T12:00:00.000Z" },
+      minute: { max: 30, remaining: 30, reset_at: null },
+    }), { status: 200 });
+  };
+  const summary = await pool.syncRemoteLimits({ fetchImpl });
   assert.equal(calls.length, 3);
   assert.ok(calls.every((c) => c.url.endsWith("/accounts/me/rate_limits")));
   assert.equal(summary.accounts[0].remote.ok, true);
   assert.equal(summary.accounts[0].remote.day.remaining, 0);
-  assert.equal(summary.accounts[0].resetsLeft, 2, "0 remaining on active slot triggers consumeReset");
+  assert.equal(summary.accounts[0].exhausted, true, "0 remaining with no reset webhook immediately marks slot 1 exhausted");
+  assert.equal(summary.activeSlot, 2, "and rotates immediately to healthy Backup Key #2");
+  assert.equal(rotations.at(-1)?.to, 2);
   assert.equal(summary.accounts[1].used, 80, "syncs day.max - day.remaining on standby slots");
   assert.equal(summary.accounts[1].remote.day.remaining, 1420);
 
-  // When slot 1 becomes completely exhausted and later Euler resets day.remaining > 0, it recovers automatically
-  pool.slots[0].exhausted = true;
-  pool.activeIndex = 1;
+  // With a reset webhook configured, 0 remaining triggers consumeReset instead of immediate exhaustion
+  const hooked = new Signing(() => 2000, { keys: ["key_one", "key_two"], resetUrls: ["https://hook.example/reset"] });
+  const hookSummary = await hooked.syncRemoteLimits({ fetchImpl });
+  assert.equal(hookSummary.accounts[0].resetsLeft, 2, "reset webhook slot consumes a reset first");
+  assert.equal(hookSummary.activeSlot, 1);
+
+  // When slot 1 later recovers (day.remaining > 0 after daily reset), sync un-exhausts it automatically
   const recovered = await pool.syncRemoteLimits({
     fetchImpl: async () => new Response(JSON.stringify({
       code: 200,
@@ -513,6 +522,14 @@ test("Signing.syncRemoteLimits queries Euler /accounts/me/rate_limits and auto-r
   });
   assert.equal(recovered.accounts[0].exhausted, false);
   assert.equal(recovered.accounts[0].used, 0);
+
+  // Live 429 on an unhooked key immediately fails over to the backup key
+  let now = 10_000;
+  const livePool = new Signing(() => now, { keys: ["k1", "k2"] });
+  const hit = livePool.limitHit();
+  assert.equal(hit.action, "exhausted");
+  assert.equal(hit.rotatedTo, 2);
+  assert.equal(livePool.currentKey(), "k2");
 });
 
 test("syncConnectorSignKey clears tiktok-live-connector's cached Euler client when rotating keys", () => {

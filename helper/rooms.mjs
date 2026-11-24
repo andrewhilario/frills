@@ -441,6 +441,7 @@ export class Hub {
     this.rooms = new Map();
     this.waiting = new Map(); // accounts in line for a spot, oldest first
     this.cooldownUntil = 0; // while it is later than now, nobody asks the signing service (it said "busy")
+    this.cooldownWaiters = new Set(); // sleeping attempts waiting for cooldownUntil to expire (woken early by clearBusy)
     this.strikes = 0; // how many "busy" in a row, which sets how long the next pause is
     this.active = 0; // attempts to connect that are under way
     this.line = []; // attempts waiting for a turn
@@ -449,6 +450,14 @@ export class Hub {
   /** What is left of the pause after the signing service said "busy" (0 when there is none). */
   cooldownLeft(now = Date.now()) {
     return Math.max(0, this.cooldownUntil - now);
+  }
+
+  /** Clears an active signing backoff pause immediately (e.g. after rotating to a fresh backup Euler key). */
+  clearBusy() {
+    this.cooldownUntil = 0;
+    this.strikes = 0;
+    for (const wake of [...this.cooldownWaiters]) wake();
+    this.cooldownWaiters.clear();
   }
 
   /**
@@ -477,7 +486,12 @@ export class Hub {
     for (;;) {
       const wait = this.cooldownLeft();
       if (wait > 0) {
-        await new Promise((resolve) => setTimeout(resolve, wait + 10).unref?.());
+        await new Promise((resolve) => {
+          const done = () => { clearTimeout(t); this.cooldownWaiters.delete(done); resolve(); };
+          const t = setTimeout(done, wait + 10);
+          t.unref?.();
+          this.cooldownWaiters.add(done);
+        });
         continue;
       }
       // after a "busy" only one goes first, to find out whether the service has calmed down; the rest follow once it has (strikes back to 0)
@@ -591,6 +605,7 @@ export class Hub {
   }
 
   closeAll() {
+    this.clearBusy();
     for (const place of this.waiting.values()) clearTimeout(place.leaveTimer);
     this.waiting.clear();
     for (const room of [...this.rooms.values()]) this.drop(room);

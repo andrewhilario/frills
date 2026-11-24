@@ -104,10 +104,11 @@ export class Signing {
               s.exhausted = false;
               s.used = Math.max(0, Math.min(s.cap, day.max - day.remaining));
             } else if (!s.exhausted && (day.remaining <= 0 || (hour && hour.remaining <= 0))) {
-              if (this.slots[this.activeIndex]?.slot === s.slot) {
+              if (this.slots[this.activeIndex]?.slot === s.slot && s.resetUrl && s.resetsLeft > 0) {
                 this.consumeReset(s.slot);
               } else {
                 s.exhausted = true;
+                s.used = s.cap;
               }
             } else if (day.max === s.cap) {
               s.used = Math.max(s.used, Math.max(0, Math.min(s.cap, day.max - day.remaining)));
@@ -119,8 +120,7 @@ export class Signing {
       }),
     );
     if (this.slots[this.activeIndex]?.exhausted) {
-      const nextIdx = this.slots.findIndex((s) => s.configured && !s.exhausted);
-      if (nextIdx >= 0) this.activeIndex = nextIdx;
+      this.#advance(this.slots[this.activeIndex].slot);
     }
     return this.poolSummary();
   }
@@ -217,6 +217,15 @@ export class Signing {
     const now = this.now();
     if (now - this.lastLimitActionAt < 5000) return null;
     this.lastLimitActionAt = now;
+    const cur = this.slots[this.activeIndex];
+    if (cur && cur.configured && !cur.resetUrl) {
+      // Without an automated reset webhook, a live HTTP 429 means this key is exhausted right now:
+      // immediately fail over to the next backup key instead of retrying the same rate-limited key.
+      cur.exhausted = true;
+      cur.used = cur.cap;
+      const rotated = this.#advance(cur.slot);
+      return { action: "exhausted", slot: cur.slot, label: cur.label, rotatedTo: rotated?.to ?? null };
+    }
     return this.consumeReset();
   }
 

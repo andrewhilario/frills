@@ -106,16 +106,20 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", apiK
   };
   const shared = relay ? { queue: true, idleStopMs: 600000, offlineWaitMs: 20000, offlineGiveUpMs: 0, offlineSlowSteps: [[900000, 30000], [3600000, 60000], [14400000, 180000]], maxRooms: relay.slots ?? 30 } : {};
   const ticketSecret = relay ? String(relay.ticketSecret ?? "").trim() : "";
+  let hub = null;
   const signing = new Signing(Date.now, {
     keys: resolvedKeys,
     resetUrls,
     cap: eulerCap,
     maxResets: eulerResets,
     onReset: triggerResetHook,
-    onRotate: ({ from, to }) => log(to ? `Euler key #${from} exhausted all resets — rotated to Backup Account #${to}` : `All ${resolvedKeys.length} Euler key accounts are exhausted`),
+    onRotate: ({ from, to }) => {
+      if (to) hub?.clearBusy();
+      log(to ? `Euler key #${from} exhausted — rotated to Backup Account #${to}` : `All ${resolvedKeys.length} Euler key accounts are exhausted`);
+    },
   });
   const startedAt = Date.now();
-  const hub = new Hub({
+  hub = new Hub({
     factory: make,
     apiKey: () => signing.currentKey(),
     log,
@@ -263,18 +267,22 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", apiK
       const slot = body?.slot ?? null;
       if (action === "reset") {
         const result = signing.consumeReset(slot);
+        if (result) hub.clearBusy();
         return json(res, result ? 200 : 400, { ok: Boolean(result), result, pool: signing.poolSummary() });
       }
       if (action === "rotate") {
         const result = signing.rotateKey(slot);
+        if (result?.to) hub.clearBusy();
         return json(res, result ? 200 : 400, { ok: Boolean(result), result, pool: signing.poolSummary() });
       }
       if (action === "refill") {
         const ok = signing.refillKey(slot ?? "all");
+        if (ok) hub.clearBusy();
         return json(res, ok ? 200 : 400, { ok, pool: signing.poolSummary() });
       }
       if (action === "sync") {
         const pool = await signing.syncRemoteLimits();
+        if (pool?.activeSlot) hub.clearBusy();
         return json(res, pool ? 200 : 502, { ok: Boolean(pool), action: "sync", pool });
       }
       return json(res, 400, { ok: false, error: "bad_action" });
@@ -470,6 +478,13 @@ async function mainRelay() {
   const bind = process.env.RELAY_BIND ?? "127.0.0.1"; // behind a tunnel nothing else may reach it
   const euler = parseEulerConfig(process.env);
   const helper = createHelper({ relay, apiKeys: euler.keys, resetUrls: euler.resetUrls, eulerCap: euler.cap, eulerResets: euler.maxResets, log: say });
+  if (helper.signing.hasKeys()) {
+    // Check real Euler quotas before opening the server so an already-exhausted primary key rotates immediately to a healthy backup key.
+    await Promise.race([
+      helper.signing.syncRemoteLimits(),
+      new Promise((resolve) => setTimeout(resolve, 4000).unref?.()),
+    ]).catch(() => {});
+  }
   try {
     await helper.listen(port, bind);
   } catch (error) {
@@ -500,7 +515,6 @@ async function mainRelay() {
   };
   if (supervised) relay.restart = stop; // asked for from the owner's status page: it stops and is started again. Without a keeper it would just stay stopped.
   if (helper.signing.hasKeys()) {
-    helper.signing.syncRemoteLimits().catch(() => {});
     setInterval(() => {
       if (helper.signing.hasKeys()) helper.signing.syncRemoteLimits().catch(() => {});
     }, 5 * 60000).unref();
