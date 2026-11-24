@@ -146,18 +146,10 @@ startWidgetEditor({
         customChip.textContent = !showPlusExtras && discoverPlus ? "Custom PNG / GIF · Plus" : "Custom PNG / GIF";
       }
 
-      const cohostRow = document.querySelector('[aria-label="AI Pet Co-Host replies"]')?.closest(".ctl");
-      if (cohostRow) cohostRow.hidden = !discoverPlus && settings.cohost === "off";
-      const cohostActive = (settings.cohost || "off") !== "off";
-      const vibeRow = document.querySelector('[aria-label="Co-Host personality"]')?.closest(".ctl");
-      if (vibeRow) vibeRow.hidden = !discoverPlus || !cohostActive;
-      const askRow = document.getElementById("c-askCommand")?.closest(".ctl");
-      if (askRow) askRow.hidden = !discoverPlus || settings.cohost !== "both";
-
       const giftVoiceRow = document.getElementById("c-giftVoice")?.closest(".ctl");
-      if (giftVoiceRow) giftVoiceRow.hidden = !lastEligible || !showPlusExtras;
+      if (giftVoiceRow) giftVoiceRow.hidden = !discoverPlus && (settings.giftVoice || "same") === "same";
       const whoRow = document.querySelector('[aria-label="Who can trigger chat TTS"]')?.closest(".ctl");
-      if (whoRow) whoRow.hidden = !lastEligible || !showPlusExtras;
+      if (whoRow) whoRow.hidden = !discoverPlus && (settings.who || "all") === "all";
 
       const customPicked = settings.pet === "custom";
       const allowUpload = Boolean(customPicked && lastEligible && (showPlusExtras || settings.petIdle || settings.petTalk || settings.petExcited));
@@ -165,15 +157,16 @@ startWidgetEditor({
       if (consent) consent.hidden = !allowUpload;
       for (const el of document.querySelectorAll("#opt-controls .media")) el.hidden = !allowUpload;
 
-      const testCohostBtn = document.getElementById("test-cohost");
-      if (testCohostBtn) testCohostBtn.hidden = !discoverPlus || (!showPlusExtras && !cohostActive);
-
       const featureHint = document.getElementById("plus-feature-hint");
       if (featureHint) {
-        const tryingLockedPreview = Boolean(discoverPlus && !showPlusExtras && (customPicked || cohostActive));
+        const tryingLockedPreview = Boolean(
+          discoverPlus &&
+          !showPlusExtras &&
+          (customPicked || (settings.giftVoice && settings.giftVoice !== "same") || (settings.who && settings.who !== "all")),
+        );
         featureHint.hidden = !tryingLockedPreview;
         if (tryingLockedPreview) {
-          featureHint.replaceChildren(document.createTextNode("Custom 3-frame PNGTuber uploads and AI Pet Co-Host replies unlock with "));
+          featureHint.replaceChildren(document.createTextNode("Custom 3-frame PNGTuber uploads, separate alert voices, and Sub/VIP/Mod chat filters unlock with "));
           if (accountsOn) {
             const link = document.createElement("a");
             link.href = "/plus/";
@@ -188,6 +181,7 @@ startWidgetEditor({
     };
 
     const syncRegionUi = (eligible) => {
+      for (const el of document.querySelectorAll("[data-plus-only]")) el.hidden = !eligible;
       const plusBoxEl = document.getElementById("plus-link");
       if (plusBoxEl) plusBoxEl.hidden = !eligible || !loadedAccount;
       const lede = document.querySelector(".panel__lede");
@@ -515,14 +509,6 @@ startWidgetEditor({
           const item = ttsSpeechFor(
             { name: practiceName(), text: `${prefix} Can our pet cheer for tonight’s stream?` },
             { ...settings, trigger: "cmd" },
-          );
-          if (item) queue.enqueue(item, { bypassCooldown: true });
-        },
-        cohost() {
-          const askPrefix = String(settings.askCommand || "!ask").trim() || "!ask";
-          const item = ttsSpeechFor(
-            { name: practiceName(), text: `${askPrefix} What is your favorite cozy snack tonight?` },
-            { ...settings, cohost: "both", trigger: "both" },
           );
           if (item) queue.enqueue(item, { bypassCooldown: true });
         },

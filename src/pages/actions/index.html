@@ -1,0 +1,211 @@
+<!--
+{
+  "title": "OBS & Stream Actions for TikTok & Twitch | Frills",
+  "description": "Trigger OBS clips, instant replay cams, scene switches, filters, mic mutes, and sounds from TikTok LIVE or Twitch chat & gifts. 10 actions free, no installs.",
+  "path": "/actions/",
+  "updated": "2026-11-23",
+  "published": "2026-11-23",
+  "css": "widget",
+  "js": "actions",
+  "bodyClass": "page-editor page-alerts",
+  "chrome": "appbar",
+  "footer": false,
+  "intro": "intro-actions",
+  "about": "about-actions",
+  "jsonld": ["webapp"]
+}
+-->
+<main class="workspace" id="main">
+  <section class="preview" id="preview" data-back="dark" aria-label="Live preview of your actions overlay">
+    <div class="preview__bar">
+      <span class="preview__tag">Preview</span>
+      <label class="visually-hidden" for="backdrop">What sits behind the overlay</label>
+      <select id="backdrop">
+        <option value="dark">Dark game</option>
+        <option value="bright">Bright game</option>
+        <option value="busy">Busy scene</option>
+        <option value="checker">See-through</option>
+      </select>
+    </div>
+    <div class="chatstage" id="stage" aria-hidden="true"><div id="widget"></div></div>
+    <div class="preview__tests" role="group" aria-label="Try it">
+      <button class="btn btn--soft btn--sm" type="button" data-test="clip">Test !clip</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="replay">Test !replay</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="sticky">Test sticky note</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="gift">Simulate gift</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="clear">Clear</button>
+    </div>
+    <div class="act-log-wrap" aria-label="Recent action runs">
+      <span class="act-log__head">Live activity log</span>
+      <ul class="act-log" id="act-log" role="list">
+        <li class="act-log__empty">Press Test on any action to see it run here.</li>
+      </ul>
+    </div>
+  </section>
+
+  <div class="panel">
+    <noscript><p class="note">Frills needs JavaScript to run your actions overlay. Turn it on for this page and reload.</p></noscript>
+    {{{intro}}}
+
+    <section class="step-card" aria-labelledby="s1">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">1</span>
+        <h2 class="step-card__title" id="s1">Pick a look</h2>
+        <button class="btn btn--soft btn--sm step-card__aside" type="button" id="reset">Reset</button>
+      </div>
+      <div class="chips" id="looks" role="group" aria-label="Starting looks"></div>
+      <div class="stack" id="look-controls"></div>
+      <div class="stack" id="opt-controls"></div>
+    </section>
+
+    <section class="step-card" aria-labelledby="s2">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">2</span>
+        <h2 class="step-card__title" id="s2">Connect OBS &amp; VTube Studio</h2>
+      </div>
+      <p class="ctl__hint"><strong>OBS Studio (28+) &amp; Streamlabs Desktop only—not TikTok LIVE Studio.</strong> OBS control steps (clips, replay cam, scenes, sources, filters, mute, hotkeys) require OBS Studio’s built-in WebSocket (port 4455). In Streamlabs Desktop, skip OBS WebSocket and use sound, banner, and VTube Studio actions via a Browser Source.</p>
+      <div class="act-obs">
+        <div class="act-grid">
+          <label class="act-field">
+            <span class="act-field__label">OBS WebSocket port</span>
+            <input type="number" id="obs-port" min="1" max="65535" inputmode="numeric" value="4455">
+          </label>
+          <label class="act-field">
+            <span class="act-field__label">Password (stays on your PC)</span>
+            <span class="act-pass-row">
+              <input type="password" id="obs-pass" autocomplete="off" spellcheck="false" placeholder="Leave blank if off">
+              <button class="btn btn--soft btn--sm" type="button" id="obs-pass-toggle">Show</button>
+            </span>
+          </label>
+        </div>
+        <div class="act-obs__bar">
+          <button class="btn btn--sm" type="button" id="obs-connect">Connect OBS</button>
+          <label class="act-check">
+            <input type="checkbox" id="obs-autostart" checked>
+            <span>Auto-start Replay Buffer</span>
+          </label>
+        </div>
+        <p class="source__status" id="obs-status" role="status" aria-live="polite">Not connected. Open OBS → Tools → WebSocket Server Settings to turn it on.</p>
+
+        <div class="act-obs__tools" id="obs-tools" hidden>
+          <div class="act-obs__sub">
+            <p class="ctl__hint" id="obs-rb-text" role="status"></p>
+            <div class="act-obs__bar">
+              <button class="btn btn--soft btn--sm" type="button" id="obs-start-rb" hidden>Start Replay Buffer</button>
+              <button class="btn btn--soft btn--sm" type="button" id="obs-refresh">Refresh OBS lists</button>
+            </div>
+          </div>
+          <div class="act-obs__sub">
+            <div class="act-grid">
+              <label class="act-field">
+                <span class="act-field__label">Replay Cam source name</span>
+                <input type="text" id="obs-replay-name" maxlength="60" value="Frills Replay Cam" autocomplete="off" spellcheck="false">
+              </label>
+              <label class="act-field">
+                <span class="act-field__label">Replay placement</span>
+                <select id="obs-replay-layout">
+                  <option value="pip">Corner PiP</option>
+                  <option value="full">Full-screen</option>
+                </select>
+              </label>
+            </div>
+            <button class="btn btn--soft btn--sm" type="button" id="obs-make-replay">Create Replay Cam</button>
+            <p class="source__status" id="obs-replay-msg" role="status"></p>
+          </div>
+        </div>
+
+        <div class="act-vts">
+          <div class="act-vts__head">
+            <h3 class="act-vts__title">VTube Studio</h3>
+            <span class="cloud-box__badge">5 notes free · Plus ∞</span>
+          </div>
+          <p class="ctl__hint">Slap named gift sticky notes onto your avatar’s face—up to <strong>5 sticky notes at once are free</strong> with no account. Frills Plus unlocks unlimited sticky notes piling up plus all other VTube Studio actions (hotkeys, props, expressions, zoom/flip, color tint).</p>
+          <div class="act-grid">
+            <label class="act-field">
+              <span class="act-field__label">VTube Studio API port</span>
+              <input type="number" id="vts-port" min="1" max="65535" inputmode="numeric" value="8001">
+            </label>
+          </div>
+          <div class="act-obs__bar">
+            <button class="btn btn--soft btn--sm" type="button" id="vts-connect">Connect VTube Studio</button>
+            <button class="btn btn--soft btn--sm" type="button" id="vts-forget" hidden>Forget token</button>
+          </div>
+          <p class="source__status" id="vts-status" role="status" aria-live="polite">Not connected. Turn on Settings → General → Start API (allow plugins) in VTube Studio.</p>
+          <div class="act-obs__bar" id="vts-tools" hidden>
+            <button class="btn btn--soft btn--sm" type="button" id="vts-refresh">Refresh VTS lists</button>
+            <button class="btn btn--soft btn--sm" type="button" id="vts-clear-items">Clear sticky notes</button>
+          </div>
+        </div>
+      </div>
+      <datalist id="obs-scenes-dl"></datalist>
+      <datalist id="obs-sources-dl"></datalist>
+      <datalist id="obs-inputs-dl"></datalist>
+      <datalist id="obs-media-dl"></datalist>
+      <datalist id="obs-text-dl"></datalist>
+      <datalist id="obs-hotkeys-dl"></datalist>
+      <datalist id="obs-filters-dl"></datalist>
+      <datalist id="obs-gifts-dl"></datalist>
+      <datalist id="vts-hotkeys-dl"></datalist>
+      <datalist id="vts-expressions-dl"></datalist>
+      <datalist id="vts-items-dl"></datalist>
+      <datalist id="vts-meshes-dl"></datalist>
+    </section>
+
+    <section class="step-card" aria-labelledby="s3">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">3</span>
+        <h2 class="step-card__title" id="s3">Your actions</h2>
+        <span class="items__count step-card__aside" id="act-count">2 / 10 free</span>
+      </div>
+      <p class="ctl__hint">Tap a starter to add it, then customize any trigger, OBS step, or VTube Studio step. 10 actions &amp; up to 5 live VTube Studio sticky notes are free; Frills Plus unlocks unlimited actions, unlimited sticky notes, and all VTube Studio effects.</p>
+      <div class="items__presets" id="act-starters" role="group" aria-label="Action starter templates"></div>
+      <div class="act-rules" id="act-rules"></div>
+      <p class="act-limit" id="vts-plus-note" role="status" hidden></p>
+      <p class="act-limit" id="act-limit-note" role="status" hidden></p>
+      <div class="items__actions">
+        <button class="btn btn--soft btn--sm" type="button" id="act-add-blank">+ Blank action</button>
+        <button class="btn btn--soft btn--sm" type="button" id="act-export">Export JSON</button>
+        <button class="btn btn--soft btn--sm" type="button" id="act-import">Import JSON</button>
+      </div>
+      <div class="act-import" id="act-import-box" hidden>
+        <label class="act-field">
+          <span class="act-field__label">Paste exported actions JSON</span>
+          <textarea id="act-import-text" rows="4" spellcheck="false" placeholder="[{ &quot;name&quot;: ... }]"></textarea>
+        </label>
+        <button class="btn btn--sm" type="button" id="act-import-apply">Load actions</button>
+      </div>
+      <p class="ctl__hint" id="act-import-msg" role="status" hidden></p>
+    </section>
+
+    <section class="step-card" aria-labelledby="s4">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">4</span>
+        <h2 class="step-card__title" id="s4">Connect your stream</h2>
+      </div>
+      <div id="source"></div>
+      <p class="ctl__hint" id="relay-note" role="status"></p>
+    </section>
+
+    <section class="step-card" aria-labelledby="s5">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">5</span>
+        <h2 class="step-card__title" id="s5">Add it to OBS or Streamlabs</h2>
+      </div>
+      <div class="linkfield">
+        <label class="ctl__label" for="link">Your Browser source link</label>
+        <input type="text" id="link" readonly placeholder="Appears once you type a name" spellcheck="false" autocomplete="off">
+        <div class="linkfield__actions">
+          <button class="btn" type="button" id="copy-link" disabled>Copy link</button>
+        </div>
+        <p class="linkfield__hint" id="link-hint" role="status"></p>
+        <p class="ctl__hint"><strong>Works in OBS Studio and Streamlabs Desktop only—will not work in TikTok LIVE Studio.</strong> Your OBS password and VTube Studio token stay after <code>#</code> in the link, so browsers never send them to any server. If you use a Frills Plus <code>/o/…</code> cloud link, append <code>#obsPass=…&amp;vtsToken=…</code> inside your streaming app.</p>
+      </div>
+    </section>
+
+    {{{about}}}
+
+    <section class="preview-tools" aria-label="Preview options">
+      <div id="preview-canvas"></div>
+    </section>
+  </div>
+</main>

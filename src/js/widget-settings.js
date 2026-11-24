@@ -18,6 +18,8 @@ export const toggle = (key, label, hint) => ({ key, type: "toggle", label, hint 
 export const text = (key, label, max = 80, hint) => ({ key, type: "text", label, max, hint });
 /** A list of rows, each a name and a number (kept as the text "Rose=10, Galaxy=300"). `suggest` are names to pick from; the name can also be typed. */
 export const pairs = (key, label, { max = 600, suggest = [], hint, namePlaceholder = "Name", unit = "seconds" } = {}) => ({ key, type: "pairs", label, max, suggest, hint, namePlaceholder, unit });
+/** A list of short text items (kept as comma-separated text "10 Pushups, Sing a Chorus"). */
+export const list = (key, label, { max = 420, minItems = 2, maxItems = 12, itemMax = 32, itemLabel = "Item", placeholder = "Item", addLabel = "+ Add item", presets = [], shuffle = false, minHint, hint } = {}) => ({ key, type: "list", label, max, minItems, maxItems, itemMax, itemLabel, placeholder, addLabel, presets, shuffle, minHint, hint });
 /** A picture the streamer uploads (the setting holds only its id, "" for none). */
 export const imageOf = (key, label, hint) => ({ key, type: "media", media: "image", label, hint });
 export const chipsOf = (key, label, options) => ({ key, type: "chips", label, options: options.map(([id, name]) => ({ id, name })) });
@@ -39,6 +41,30 @@ export function parsePairs(textValue) {
 /** [{ name, seconds }] -> "Rose=10, Galaxy=300". A name cannot carry the signs the text is made of; a row with no name is left out. */
 export const pairsText = (rows) => rows.map(({ name, seconds }) => [String(name).replace(/[=,;\n]/g, " ").replace(/\s+/g, " ").trim(), Math.round(Number(seconds) || 0)]).filter(([name]) => name).map(([name, seconds]) => `${name}=${Math.max(0, Math.min(86400, seconds))}`).join(", ");
 
+/** "10 Pushups, Sing a Chorus" -> ["10 Pushups", "Sing a Chorus"]. Splits on commas or newlines, trims, and caps count & length. */
+export function parseList(textValue, { maxItems = 12, itemMax = 32 } = {}) {
+  return String(textValue ?? "")
+    .replace(/[\u0000-\u001f\u007f]+/g, ",")
+    .split(/[,\n]+/)
+    .map((s) => s.trim().replace(/\s+/g, " ").slice(0, itemMax))
+    .filter(Boolean)
+    .slice(0, maxItems);
+}
+
+/** ["10 Pushups", "Sing a Chorus"] -> "10 Pushups, Sing a Chorus". Cleans commas/newlines inside an item so round-tripping stays 1-to-1. */
+export function listText(items, { maxItems = 12, itemMax = 32 } = {}) {
+  return (items ?? [])
+    .map((s) => String(s ?? "")
+      .replace(/(\d),(\d)/g, "$1$2")
+      .replace(/[,\n\r\u0000-\u001f\u007f]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, itemMax))
+    .filter(Boolean)
+    .slice(0, maxItems)
+    .join(", ");
+}
+
 /** One value, checked against its control. Returns undefined if it isn't acceptable. */
 export function coerce(control, value) {
   if (control.type === "color") return typeof value === "string" && HEX.test(value) ? value.toLowerCase() : undefined;
@@ -52,7 +78,7 @@ export function coerce(control, value) {
   }
   if (control.type === "toggle") return typeof value === "boolean" ? value : undefined;
   if (control.type === "media") return value === "" || (typeof value === "string" && MEDIA_ID.test(value)) ? value : undefined;
-  if (control.type === "text" || control.type === "pairs") return typeof value === "string" ? value.replace(/[\u0000-\u001f\u007f]+/g, " ").slice(0, control.max) : undefined;
+  if (control.type === "text" || control.type === "pairs" || control.type === "list") return typeof value === "string" ? value.replace(/[\u0000-\u001f\u007f]+/g, " ").slice(0, control.max) : undefined;
   return control.options.some((o) => o.id === value) ? value : undefined;
 }
 

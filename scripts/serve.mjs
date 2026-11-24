@@ -23,6 +23,7 @@ import { handlePlusRelayTicket } from "../worker/plus-relay.mjs";
 import { cloudHostIdFromPath, handleCloudOverlays } from "../worker/cloud-overlays.mjs";
 import { handleProStatus } from "../worker/region.mjs";
 import { handleDevPass, handleTts, handleVoiceSample, handleCohost } from "../worker/tts.mjs";
+import { handlePublicStatus } from "../worker/stats-report.mjs";
 
 const root = join(import.meta.dirname, "..");
 const port = Number(process.argv[2] ?? process.env.PORT ?? 3020);
@@ -70,6 +71,12 @@ const env = {
 
 createServer(async (req, res) => {
   const path = req.url?.split("?")[0] ?? "";
+  if (path === "/api/status") {
+    const response = await handlePublicStatus(new Request(`http://${req.headers.host}${req.url}`, { method: req.method, headers: req.headers }), env);
+    res.writeHead(response.status, Object.fromEntries(response.headers));
+    res.end(Buffer.from(await response.arrayBuffer()));
+    return;
+  }
   if (path === "/api/songs") {
     const response = await handleSongs(new Request(`http://${req.headers.host}${req.url}`, { method: req.method }), { cache: null });
     res.writeHead(response.status, Object.fromEntries(response.headers));

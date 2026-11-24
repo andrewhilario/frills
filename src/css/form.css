@@ -27,12 +27,8 @@
 .acct-who { margin: 0 0 var(--space-md); }
 .acct-card { display: grid; gap: var(--space-sm); max-width: 40rem; margin-block: 0 var(--space-lg); padding: var(--space-lg); background: var(--color-paper); border: 2px solid var(--color-rule-2); border-radius: var(--radius-card); }
 .acct-card > * { margin: 0; min-width: 0; }
-.acct-card__head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2xs) var(--space-sm); }
-.acct-card__title { margin: 0; font-size: var(--text-md); font-weight: 800; letter-spacing: -0.015em; }
 .acct-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-sm); }
-.acct-badge { padding: 2px var(--space-sm); border: 2px solid var(--color-ink); border-radius: var(--radius-pill); background: var(--color-paper-2); font-family: var(--font-label); font-size: var(--text-xs); letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap; }
-.acct-badge[data-tone="on"] { background: var(--color-mint-tint); }
-.acct-badge[data-tone="soon"] { background: var(--color-accent-tint); }
+.acct-row input[type="text"] { flex: 1 1 13rem; width: auto; min-width: 0; }
 .acct-credits { display: grid; gap: var(--space-2xs); }
 .acct-credits > * { margin: 0; }
 .acct-credits__text { font-size: var(--text-sm); color: var(--color-ink-2); font-variant-numeric: tabular-nums; }
@@ -61,16 +57,12 @@
 .acct-cloud__meta { font-family: var(--font-label); font-size: var(--text-xs); color: var(--color-ink-2); }
 .acct-cloud__url { font-family: var(--font-label); font-size: var(--text-xs); color: var(--color-ink-2); overflow-wrap: anywhere; }
 .acct-cloud__del[data-armed="1"] { color: var(--color-error); border-color: var(--color-error); }
-
-/* Frills Plus plan summary card on /plus/ */
-.plus-card { display: grid; gap: var(--space-md); max-width: 40rem; margin: 0 0 var(--space-xl); padding: var(--space-lg); background: var(--color-paper); border: 2px solid var(--color-ink); border-radius: var(--radius-card); box-shadow: var(--shadow-soft); }
-.plus-card > * { margin: 0; min-width: 0; }
-.plus-card__top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-xs) var(--space-md); }
-.plus-card__price { display: flex; align-items: baseline; gap: var(--space-2xs); font-size: var(--text-xl); font-weight: 800; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-.plus-card__per { font-size: var(--text-sm); font-weight: 600; color: var(--color-ink-2); letter-spacing: 0; }
-.plus-card__meta { font-size: var(--text-sm); color: var(--color-ink-2); }
-.plus-promo { margin: 0; padding: var(--space-xs) var(--space-md); border-radius: var(--radius-input); background: var(--color-accent-tint); border: 1.5px dashed var(--color-ink); font-size: var(--text-sm); line-height: 1.45; }
-.plus-promo code { padding: 1px 6px; border-radius: 6px; background: var(--color-paper); border: 1px solid var(--color-ink); font-weight: 700; }
-.plus-card__list { display: grid; gap: var(--space-xs); margin: 0; padding-left: 1.25rem; }
-.plus-card__list li { margin: 0; }
-.plus-card__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); padding-top: var(--space-2xs); }
+.acct-scene__layers { display: grid; gap: var(--space-xs); }
+.acct-scene__row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-xs); padding: var(--space-xs) var(--space-sm); border-radius: var(--radius-input); background: var(--color-paper-2); border: 1.5px solid var(--color-rule-2); }
+.acct-scene__pick { display: flex; align-items: center; gap: var(--space-xs); font-size: var(--text-sm); font-weight: 650; cursor: pointer; min-width: 0; }
+.acct-scene__pick input { width: 18px; height: 18px; accent-color: var(--color-ink); }
+.acct-scene__row select { min-height: 36px; padding: 4px 10px; font-size: var(--text-xs); width: auto; }
+.acct-recap__inputs { display: grid; gap: var(--space-xs); }
+.acct-recap__inputs input { width: 100%; min-height: 40px; padding: 6px 12px; font: inherit; font-size: var(--text-sm); border: 2px solid var(--color-rule-2); border-radius: var(--radius-input); background: var(--color-paper); color: var(--color-ink); }
+.acct-recap__stage { display: flex; justify-content: center; padding: var(--space-sm); border-radius: var(--radius-input); background: var(--color-paper-2); border: 1.5px solid var(--color-rule-2); }
+#acct-recap-canvas { max-width: 100%; max-height: 340px; width: auto; height: auto; border-radius: 12px; box-shadow: 0 8px 20px rgba(22, 27, 34, 0.16); }

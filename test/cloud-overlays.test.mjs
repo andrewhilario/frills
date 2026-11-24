@@ -187,19 +187,49 @@ test("cloud overlays CRUD, Plus gating, CSRF, cross-account isolation, OBS polli
   }), env, { now: T0 + 7900 });
   assert.equal(stateRes.status, 200);
 
+  // List returns aggregated Post-Stream MVP Recap from saved cloud checkpoints
+  const listWithRecap = await (await handleCloudOverlays(new Request(`${SITE}/api/cloud-overlays`, { headers: { cookie: plusA.cookie } }), env, { now: T0 + 7910 })).json();
+  assert.equal(listWithRecap.recap.channel, "mochi_tv");
+  assert.equal(listWithRecap.recap.topGifters[0].name, "Supporter 0");
+  assert.match(listWithRecap.recap.jar.label, /450 \/ 1,000 in Gift Jar/);
+
   const resetDeck = await handleCloudOverlays(new Request(`${SITE}/api/cloud-overlays/${overlay.id}/cmd`, {
     method: "POST",
     headers: { origin: SITE, cookie: plusA.cookie, "content-type": "application/json" },
-    body: JSON.stringify({ action: "gifters:reset", value: 0 }),
+    body: JSON.stringify({ action: "alerts:gift", value: 0 }),
   }), env, { now: T0 + 7920 });
   assert.equal(resetDeck.status, 200);
 
   const pollCmds = await (await handleCloudOverlays(new Request(`${SITE}/api/o/${overlay.id}?c=0`), env, { now: T0 + 7950 })).json();
   assert.equal(pollCmds.cmdSeq, 2);
   assert.equal(pollCmds.cmds[0].cmd, "tts:say:Be right back in 2 minutes!");
-  assert.equal(pollCmds.cmds[1].cmd, "gifters:reset");
+  assert.equal(pollCmds.cmds[1].cmd, "alerts:gift");
   assert.equal(pollCmds.state["frills:jar:mochi"], "{\"total\":450,\"target\":1000}");
   assert.equal(pollCmds.state["frills:gifters:twitch:mochi_tv:m:2026-11"], largeBoard);
+
+  // 8e. 1-Link Master Scene (kind: "scene") combines child cloud overlays with aspect & slot layout
+  const emptyScene = await handleCloudOverlays(new Request(`${SITE}/api/cloud-overlays`, {
+    method: "POST",
+    headers: { origin: SITE, cookie: plusA.cookie, "content-type": "application/json" },
+    body: JSON.stringify({ kind: "scene", name: "Empty Scene", query: "aspect=9x16&items=" }),
+  }), env, { now: T0 + 7960 });
+  assert.equal(emptyScene.status, 400);
+
+  const sceneRes = await handleCloudOverlays(new Request(`${SITE}/api/cloud-overlays`, {
+    method: "POST",
+    headers: { origin: SITE, cookie: plusA.cookie, "content-type": "application/json" },
+    body: JSON.stringify({ kind: "scene", name: "Main TikTok Scene", query: `aspect=9x16&items=${overlay.id}:bl,${timerOverlay.id}:tc` }),
+  }), env, { now: T0 + 7970 });
+  assert.equal(sceneRes.status, 201);
+  const sceneOverlay = (await sceneRes.json()).overlay;
+  const sceneRead = await (await handleCloudOverlays(new Request(`${SITE}/api/o/${sceneOverlay.id}`), env, { now: T0 + 7980 })).json();
+  assert.equal(sceneRead.ok, true);
+  assert.equal(sceneRead.kind, "scene");
+  assert.equal(sceneRead.aspect, "9x16");
+  assert.deepEqual(
+    sceneRead.layers.map((l) => [l.id, l.slot, l.liveUrl]),
+    [[overlay.id, "bl", `/o/${overlay.id}`], [timerOverlay.id, "tc", `/o/${timerOverlay.id}`]],
+  );
 
   // 9. Graceful fallback: if Plus A's subscription expires, /api/o/:id STILL serves the last saved overlay so OBS never breaks, while edits are blocked
   env.DB.raw.prepare("UPDATE plus SET status = 'expired', renews_at = ? WHERE account_id = ?").run(T0, plusA.id);

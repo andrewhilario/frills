@@ -11,7 +11,7 @@ import { createSounds } from "./sounds.js";
 import { cleanName, connectTo, statusText } from "./connect.js";
 import { relayForPage } from "./tiktok.js";
 import { plusCodeFromParams, plusRelayForPage } from "./plus-relay.js";
-import { fakeAlertSource } from "./fake-alerts.js";
+import { fakeAlert, fakeAlertSource } from "./fake-alerts.js";
 import { fontsReady, generalFaces } from "./look.js";
 import { FollowReader, validCode } from "./follow-bridge.js";
 
@@ -45,6 +45,12 @@ const push = (event) => {
   const alert = makeAlert(event, settings);
   if (alert) queue.push(alert);
 };
+
+window.addEventListener("frills:cloud-cmd", (e) => {
+  const cmd = String(e.detail?.cmd ?? "");
+  if (cmd === "alerts:gift") push(fakeAlert(platform === "twitch" ? "bits" : "gift"));
+  else if (cmd === "alerts:sub") push(fakeAlert("sub"));
+});
 
 const channel = cleanName(platform, params.get("channel"));
 // Twitch follows reach this page another way: the streamer's Twitch follows page puts each one in a small post box, and this reads the box.

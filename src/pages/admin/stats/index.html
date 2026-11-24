@@ -1,22 +1,27 @@
 <!--
 {
-  "title": "Stats | Frills admin",
-  "description": "The private stats page for Frills and valwidgets.live: visits, links copied, overlays opened, relay status, Google Search Console, and the Frills Plus check.",
+  "title": "Admin Command Center | Frills",
+  "description": "The private command center for Frills and valwidgets.live: live analytics, conversion funnel, relay fleet, 3-account Euler key pool, Search Console, and Frills Plus readiness.",
   "path": "/admin/stats/",
   "css": "admin",
   "js": "adminStats",
-  "bodyClass": "page-admin",
+  "bodyClass": "page-admin page-admin--console",
   "chrome": "none",
   "footer": false,
   "noindex": true,
   "listed": false
 }
 -->
-<main class="admin stats" id="main">
-  <header class="admin__bar">
-    <h1 class="admin__title">Stats &amp; System Status</h1>
+<main class="admin stats stats-console" id="main">
+  <header class="admin__bar stats-console__bar">
+    <div class="stats-console__brand">
+      <span class="stats-console__kicker">FRILLS OPS AUTHORITY</span>
+      <h1 class="admin__title">Analytics &amp; Fleet Command</h1>
+      <p class="admin__note stats-console__sync" id="status" role="status"></p>
+    </div>
     <div class="admin__bar-actions" id="bar-actions" hidden>
-      <a class="btn btn--soft btn--sm" href="/admin/">Feedback and files</a>
+      <a class="btn btn--soft btn--sm" href="/status/">Live server status</a>
+      <a class="btn btn--soft btn--sm" href="/admin/">Moderation &amp; files</a>
       <button class="btn btn--soft btn--sm" type="button" id="export-csv">Export CSV</button>
       <button class="btn btn--soft btn--sm" type="button" id="export-json">Export JSON</button>
       <button class="btn btn--soft btn--sm" type="button" id="refresh">Refresh</button>
@@ -24,31 +29,95 @@
     </div>
   </header>
 
-  <noscript><p class="admin__note">The stats page needs JavaScript. Turn it on for this page and reload.</p></noscript>
+  <noscript><p class="admin__note">The admin command center needs JavaScript. Turn it on for this page and reload.</p></noscript>
 
   <section class="admin__login" id="login" aria-labelledby="login-title">
-    <h2 class="admin__h" id="login-title">Log in</h2>
+    <h2 class="admin__h" id="login-title">Operator Authentication</h2>
     <form id="login-form" class="admin__form">
-      <label class="admin__label" for="key">Admin password</label>
+      <label class="admin__label" for="key">Admin key (<code>ADMIN_KEY</code>)</label>
       <input type="password" id="key" name="key" autocomplete="current-password" spellcheck="false" required>
-      <button class="btn" type="submit" id="login-go">Open the stats</button>
+      <button class="btn" type="submit" id="login-go">Unlock Command Center</button>
       <p class="admin__status" id="login-status" role="status"></p>
     </form>
-    <p class="admin__note">The same password as the admin page (the <code>ADMIN_KEY</code> secret). It stays in this tab only and is forgotten when you close it.</p>
+    <p class="admin__note">Enter the <code>ADMIN_KEY</code> secret configured in Cloudflare. It stays in this tab’s session storage only.</p>
   </section>
 
-  <div id="dash" hidden>
+  <div id="dash" data-view="overview" hidden>
     <p class="admin__note admin__note--warn" id="setup" hidden></p>
-    <p class="admin__note" id="status" role="status"></p>
-    <section class="stats__site" id="relays" aria-labelledby="relays-title" hidden></section>
-    <section class="stats__plus" id="plus" aria-labelledby="plus-title" hidden>
-      <h2 class="admin__h" id="plus-title">Is Frills Plus worth building yet?</h2>
-      <p class="admin__note">Three numbers, each against a starting point of mine (not a rule: they are in <code>worker/stats-report.mjs</code>). Watch them for a few weeks before deciding.</p>
-      <ul class="stats__score" id="score"></ul>
-    </section>
-    <section class="stats__site" id="frills" aria-labelledby="frills-title"></section>
-    <section class="stats__site" id="gsc" aria-labelledby="gsc-title" hidden></section>
-    <section class="stats__site" id="valwidgets" aria-labelledby="valwidgets-title"></section>
-    <p class="admin__note">Counts are anonymous: no cookies, no addresses, no names. Cloudflare keeps them for three months. Overlays opened on a real account are counted as different ones by a scrambled, one-way code of the account (it cannot be turned back into a name). Practice overlays and the editors' previews are counted apart.</p>
+
+    <div class="stats-console__ribbon" id="authority-ribbon" aria-label="Live operational summary">
+      <div class="stats-console__metric">
+        <span class="stats-console__metric-k">Relay Fleet</span>
+        <b class="stats-console__metric-v" id="ribbon-relays">—</b>
+      </div>
+      <div class="stats-console__metric">
+        <span class="stats-console__metric-k">Euler Signing Pool</span>
+        <b class="stats-console__metric-v" id="ribbon-euler">3-Key Pool Standby</b>
+      </div>
+      <div class="stats-console__metric">
+        <span class="stats-console__metric-k">7d Traffic / Conversion</span>
+        <b class="stats-console__metric-v" id="ribbon-traffic">—</b>
+      </div>
+      <div class="stats-console__metric">
+        <span class="stats-console__metric-k">Plus Readiness Gate</span>
+        <b class="stats-console__metric-v" id="ribbon-plus">—</b>
+      </div>
+    </div>
+
+    <div class="stats-console__shell">
+      <aside class="stats-console__rail" aria-label="Dashboard views">
+        <nav class="stats-console__nav" id="stats-nav">
+          <button class="stats-console__nav-btn" type="button" data-view-target="overview" aria-current="page">
+            <span class="stats-console__nav-num">01</span>
+            <span class="stats-console__nav-text">Overview &amp; KPIs</span>
+          </button>
+          <button class="stats-console__nav-btn" type="button" data-view-target="breakdowns">
+            <span class="stats-console__nav-num">02</span>
+            <span class="stats-console__nav-text">Traffic &amp; Breakdowns</span>
+          </button>
+          <button class="stats-console__nav-btn" type="button" data-view-target="relays">
+            <span class="stats-console__nav-num">03</span>
+            <span class="stats-console__nav-text">Relays &amp; Euler Keys</span>
+            <span class="stats-console__nav-pill" id="nav-badge-relays"></span>
+          </button>
+          <button class="stats-console__nav-btn" type="button" data-view-target="plus">
+            <span class="stats-console__nav-num">04</span>
+            <span class="stats-console__nav-text">Plus Scorecard</span>
+            <span class="stats-console__nav-pill" id="nav-badge-plus"></span>
+          </button>
+          <button class="stats-console__nav-btn" type="button" data-view-target="gsc">
+            <span class="stats-console__nav-num">05</span>
+            <span class="stats-console__nav-text">Search Console SEO</span>
+          </button>
+          <button class="stats-console__nav-btn" type="button" data-view-target="valwidgets">
+            <span class="stats-console__nav-num">06</span>
+            <span class="stats-console__nav-text">Valorant Widgets</span>
+          </button>
+          <button class="stats-console__nav-btn stats-console__nav-btn--all" type="button" data-view-target="all">
+            <span class="stats-console__nav-num">ALL</span>
+            <span class="stats-console__nav-text">Full Scroll Report</span>
+          </button>
+        </nav>
+        <div class="stats-console__rail-foot">
+          <p class="admin__note">Anonymous counts retained 90 days in Cloudflare Analytics Engine. Press 1–7 to switch views.</p>
+        </div>
+      </aside>
+
+      <div class="stats-console__stage" id="stats-stage">
+        <section class="stats__site" id="frills" data-view-section="frills" aria-labelledby="frills-title"></section>
+        <section class="stats__site" id="relays" data-view-section="relays" aria-labelledby="relays-title" hidden></section>
+        <section class="stats__plus" id="plus" data-view-section="plus" aria-labelledby="plus-title" hidden>
+          <div class="stats__panel-head">
+            <div class="stats__panel-title-group">
+              <h2 class="admin__h" id="plus-title">Frills Plus Readiness Scorecard</h2>
+              <p class="admin__note">Weekly product-market thresholds configured in <code>worker/stats-report.mjs</code>.</p>
+            </div>
+          </div>
+          <ul class="stats__score" id="score"></ul>
+        </section>
+        <section class="stats__site" id="gsc" data-view-section="gsc" aria-labelledby="gsc-title" hidden></section>
+        <section class="stats__site" id="valwidgets" data-view-section="valwidgets" aria-labelledby="valwidgets-title"></section>
+      </div>
+    </div>
   </div>
 </main>

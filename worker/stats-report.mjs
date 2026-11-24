@@ -314,3 +314,36 @@ export async function report(env, { now = Date.now(), fetchImpl = globalThis.fet
     gsc: gsc.status === "fulfilled" ? gsc.value : { configured: false },
   };
 }
+
+/** Public same-origin status endpoint (`GET /api/status`) that probes both TikTok relays without exposing owner rosters, device facts, or key pools. */
+export async function handlePublicStatus(request, env, { now = Date.now(), fetchImpl = globalThis.fetch?.bind(globalThis) } = {}) {
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return new Response(JSON.stringify({ ok: false, error: "method" }), {
+      status: 405,
+      headers: { "content-type": "application/json; charset=utf-8", allow: "GET, HEAD" },
+    });
+  }
+  const publicEnv = {
+    ...env,
+    RELAY_URLS: env?.RELAY_URLS || "https://relay.valwidgets.live,https://plus-relay.valwidgets.live",
+    RELAY_OWNER_KEY: "",
+  };
+  const rawRelays = await checkRelays(publicEnv, { fetchImpl });
+  const relays = rawRelays.map((r) => ({
+    host: r.host,
+    label: r.label,
+    ok: Boolean(r.ok),
+    level: r.level ?? (r.ok ? "ok" : "down"),
+    status: r.status ?? (r.ok ? 200 : 0),
+    latencyMs: r.latencyMs ?? null,
+    version: r.version ?? "—",
+    free: r.free ?? 0,
+    slots: r.slots ?? { used: 0, max: 30, waiting: 0 },
+    uptimeS: typeof r.uptimeS === "number" ? r.uptimeS : null,
+    signing: r.signing ? { busy: Boolean(r.signing.busy), busyRecently: Number(r.signing.busyRecently) || 0 } : null,
+  }));
+  return new Response(request.method === "HEAD" ? null : JSON.stringify({ ok: true, now, relays }), {
+    status: 200,
+    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", "x-content-type-options": "nosniff" },
+  });
+}

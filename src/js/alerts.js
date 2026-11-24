@@ -71,6 +71,8 @@ export function makeAlert(event, config) {
   if (kind === "gift" && diamonds < config.giftMin) return null;
   if (kind === "bits" && (event.count ?? 0) < config.bitsMin) return null;
   const tier = tierFor(event, config);
+  const bigImage = tier === 3 ? (kind === "gift" ? config.giftBigImage : kind === "bits" ? config.bitsBigImage : kind === "subgift" ? config.subgiftBigImage : "") : "";
+  const bigSound = tier === 3 ? (kind === "gift" ? config.giftBigMySound : kind === "bits" ? config.bitsBigMySound : kind === "subgift" ? config.subgiftBigMySound : "") : "";
   return {
     key: `a${++serial}`,
     kind,
@@ -88,9 +90,9 @@ export function makeAlert(event, config) {
     time: Math.round(config[`${kind}Time`] * 1000 * TIME_FACTOR[tier - 1]),
     sound: config[`${kind}Sound`],
     fx: config[`${kind}Fx`],
-    // the person's own uploaded image and sound (ids), and for a big gift the ones set for big gifts when there are any
-    image: (kind === "gift" && tier === 3 && config.giftBigImage) || config[`${kind}Image`] || "",
-    mySound: (kind === "gift" && tier === 3 && config.giftBigMySound) || config[`${kind}MySound`] || "",
+    // the person's own uploaded image and sound (ids), and for a tier-3 jackpot alert the big-tier overrides when set
+    image: bigImage || config[`${kind}Image`] || "",
+    mySound: bigSound || config[`${kind}MySound`] || "",
   };
 }
 

@@ -28,6 +28,7 @@ export const LABELS = defineWidget({
   defaults: {
     layout: "card",
     enter: "slide",
+    anim: "shine",
     rotateSec: 6,
     showDots: true,
     avatar: true,
@@ -52,7 +53,8 @@ export const LABELS = defineWidget({
   },
   controls: [
     { section: "labels", ...selectOf("layout", "Highlight design", LABEL_LAYOUTS) },
-    { section: "labels", ...chipsOf("enter", "Transition", [["slide", "Slide"], ["pop", "Pop"], ["fade", "Fade"]]) },
+    { section: "labels", ...chipsOf("enter", "Transition", [["slide", "Slide"], ["pop", "Pop"], ["bounce", "Bounce"], ["flip", "3D Flip"], ["fade", "Fade"]]) },
+    { section: "labels", ...chipsOf("anim", "Card animation", [["shine", "Shine & crown"], ["pulse", "Spotlight glow"], ["float", "Gentle float"], ["none", "Still"]]) },
     { section: "labels", ...range("rotateSec", "Rotate every", 3, 30, 1, " s") },
     { section: "labels", ...toggle("showDots", "Show slide dots") },
     { section: "labels", ...toggle("avatar", "Show picture or gift image") },
@@ -113,6 +115,8 @@ export class LabelBoard {
     this.timer = 0;
     this.index = 0;
     this.revision = 0;
+    this.celebrateId = 0;
+    this.celebrateKind = "";
 
     this.lastGift = initial?.lastGift ?? null;
     this.lastFollower = initial?.lastFollower ?? null;
@@ -158,6 +162,7 @@ export class LabelBoard {
         const top = this.diamondBoard.top[0];
         out.push({
           id,
+          top: true,
           label: s.labelTopGifter || "Top gifter",
           headline: top.name,
           detail: top.label,
@@ -169,6 +174,7 @@ export class LabelBoard {
         const top = this.likeBoard.top[0];
         out.push({
           id,
+          top: true,
           label: s.labelTopLiker || "Top liker",
           headline: top.name,
           detail: plural(top.count, "like", "likes"),
@@ -201,6 +207,7 @@ export class LabelBoard {
         const top = this.subBoard.top[0];
         out.push({
           id,
+          top: true,
           label: s.labelTopSub || "Top sub gifter",
           headline: top.name,
           detail: plural(top.subgifts, "gifted sub", "gifted subs"),
@@ -212,6 +219,7 @@ export class LabelBoard {
         const top = this.bitsBoard.top[0];
         out.push({
           id,
+          top: true,
           label: s.labelTopBits || "Top bit sender",
           headline: top.name,
           detail: plural(top.bits, "bit", "bits"),
@@ -227,7 +235,7 @@ export class LabelBoard {
   snapshot() {
     const cards = this.cards();
     if (!cards.length) {
-      if (!this.settings.showEmpty) return { card: null, count: 0, index: 0, revision: this.revision };
+      if (!this.settings.showEmpty) return { card: null, count: 0, index: 0, revision: this.revision, celebrateId: this.celebrateId, celebrateKind: this.celebrateKind };
       return {
         card: {
           id: "idle",
@@ -242,10 +250,12 @@ export class LabelBoard {
         count: 0,
         index: 0,
         revision: this.revision,
+        celebrateId: this.celebrateId,
+        celebrateKind: this.celebrateKind,
       };
     }
     const index = ((this.index % cards.length) + cards.length) % cards.length;
-    return { card: cards[index], cards, count: cards.length, index, revision: this.revision };
+    return { card: cards[index], cards, count: cards.length, index, revision: this.revision, celebrateId: this.celebrateId, celebrateKind: this.celebrateKind };
   }
 
   emit() {
@@ -306,6 +316,7 @@ export class LabelBoard {
   add(event) {
     if (!event || !event.kind) return false;
     let jumpTo = "";
+    let newLeader = false;
 
     if (event.kind === "gift" && this.platform === "tiktok") {
       const name = event.name || event.user;
@@ -314,16 +325,28 @@ export class LabelBoard {
       const count = Math.max(1, Math.round(Number(event.count) || 1));
       const diamonds = Math.max(0, Math.round(Number(event.diamonds) || 0));
       const total = Math.max(0, Math.round(Number(event.total) || diamonds * count));
+      const prevTop = this.diamondBoard.top[0]?.user ?? "";
       this.lastGift = { name, gift, count, diamonds, total, picture: event.picture || "", avatar: event.avatar || "" };
       this.diamondBoard.add({ ...event, total });
+      const nextTop = this.diamondBoard.top[0]?.user ?? "";
+      newLeader = Boolean(nextTop && nextTop !== prevTop);
       jumpTo = this.settings.showGift ? "lastGift" : (this.settings.showTopGifter ? "topGifter" : "");
     } else if (event.kind === "like" && this.platform === "tiktok") {
       const before = this.cards().length;
+      const prevTop = this.likeBoard.top[0]?.user ?? "";
       if (!this.likeBoard.add(event)) return false;
+      const nextTop = this.likeBoard.top[0]?.user ?? "";
+      newLeader = Boolean(nextTop && nextTop !== prevTop);
       if (this.cards().length === before) {
         // Likes come about once a second. They must not restart the rotation timer or change the slide: the top liker's own slide just
         // updates its words, in place, when it is the one on show.
-        if (this.snapshot().card?.id === "topLiker") this.emit();
+        if (this.snapshot().card?.id === "topLiker") {
+          if (newLeader) {
+            this.celebrateId += 1;
+            this.celebrateKind = "leader";
+          }
+          this.emit();
+        }
         return true;
       }
     } else if (event.kind === "follow") {
@@ -338,14 +361,20 @@ export class LabelBoard {
       if (this.settings.showSub) jumpTo = "lastSub";
     } else if (event.kind === "subgift" && this.platform === "twitch") {
       if (!event.user) return false;
+      const prevTop = this.subBoard.top[0]?.user ?? "";
       this.subBoard.add(event);
+      const nextTop = this.subBoard.top[0]?.user ?? "";
+      newLeader = Boolean(nextTop && nextTop !== prevTop);
       if (this.settings.showTopSubGifter) jumpTo = "topSubGifter";
     } else if (event.kind === "bits" && this.platform === "twitch") {
       const name = event.name || event.user;
       const count = Math.max(0, Math.round(Number(event.count) || 0));
       if (!name || !(count > 0)) return false;
+      const prevTop = this.bitsBoard.top[0]?.user ?? "";
       this.lastBits = { name, count };
       this.bitsBoard.add(event);
+      const nextTop = this.bitsBoard.top[0]?.user ?? "";
+      newLeader = Boolean(nextTop && nextTop !== prevTop);
       jumpTo = this.settings.showBits ? "lastBits" : (this.settings.showTopBitSender ? "topBitSender" : "");
     } else {
       return false;
@@ -356,6 +385,8 @@ export class LabelBoard {
     if (at >= 0) this.index = at;
     else if (cards.length) this.index = this.index % cards.length;
     this.revision += 1;
+    this.celebrateId += 1;
+    this.celebrateKind = newLeader ? "leader" : "event";
     this.emit();
     this.schedule();
     return true;
@@ -372,6 +403,7 @@ export class LabelBoard {
     this.bitsBoard.clear();
     this.index = 0;
     this.revision += 1;
+    this.celebrateKind = "";
     this.emit();
     this.schedule();
   }

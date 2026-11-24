@@ -38,7 +38,7 @@ function ellipseWall(cx, cy, rx, ry, y) {
 const VESSELS = {
 
   boba: {
-    cx: 140, mouthY: 72, mouthRx: 26, mouthRy: 6, liqTop: 132, liqBot: 298,
+    cx: 140, mouthY: 72, mouthRx: 26, mouthRy: 6, liqTop: 132, liqBot: 298, fullPile: 22,
     art: { src: "/jar-art/boba.webp", x: 58, y: 0, w: 163, h: 326, shadowY: 324, shadowRx: 52, spillY: 124, spillRx: 58 },
     chamberPath(ctx) {
       ctx.beginPath();
@@ -74,7 +74,7 @@ const VESSELS = {
   },
 
   potion: {
-    cx: 140, mouthY: 108, mouthRx: 20, mouthRy: 6, liqTop: 170, liqBot: 300,
+    cx: 140, mouthY: 108, mouthRx: 20, mouthRy: 6, liqTop: 170, liqBot: 300, fullPile: 22,
     art: { src: "/jar-art/potion.webp", x: 30, y: 0, w: 221, h: 332, shadowY: 328, shadowRx: 66 },
     chamberPath(ctx) {
       ctx.beginPath();
@@ -99,7 +99,7 @@ const VESSELS = {
   },
 
   piggy: {
-    cx: 140, mouthY: 70, mouthRx: 30, mouthRy: 5, liqTop: 118, liqBot: 274,
+    cx: 140, mouthY: 70, mouthRx: 30, mouthRy: 5, liqTop: 118, liqBot: 274, fullPile: 30,
     art: { src: "/jar-art/piggy.webp", x: 12, y: 32, w: 256, h: 294, shadowY: 324, shadowRx: 86, spillY: 74, spillRx: 32 },
     chamberPath(ctx) {
       ctx.beginPath();
@@ -124,7 +124,7 @@ const VESSELS = {
   },
 
   cat: {
-    cx: 140, mouthY: 82, mouthRx: 46, mouthRy: 10, liqTop: 136, liqBot: 298,
+    cx: 140, mouthY: 82, mouthRx: 46, mouthRy: 10, liqTop: 136, liqBot: 298, fullPile: 28,
     art: { src: "/jar-art/cat.webp", x: 25, y: 28, w: 230, h: 298, shadowY: 324, shadowRx: 78, spillY: 76, spillRx: 52 },
     chamberPath(ctx) {
       ctx.beginPath();
@@ -145,7 +145,7 @@ const VESSELS = {
   },
 
   frog: {
-    cx: 140, mouthY: 88, mouthRx: 52, mouthRy: 10, liqTop: 120, liqBot: 276,
+    cx: 140, mouthY: 88, mouthRx: 52, mouthRy: 10, liqTop: 120, liqBot: 276, fullPile: 30,
     art: { src: "/jar-art/frog.webp", x: 11, y: 38, w: 258, h: 288, shadowY: 324, shadowRx: 88 },
     chamberPath(ctx) {
       ctx.beginPath();
@@ -169,7 +169,7 @@ const VESSELS = {
   },
 
   arcade: {
-    cx: 140, mouthY: 64, mouthRx: 44, mouthRy: 6, liqTop: 74, liqBot: 268,
+    cx: 140, mouthY: 64, mouthRx: 44, mouthRy: 6, liqTop: 74, liqBot: 268, fullPile: 30,
     art: { src: "/jar-art/arcade.webp", x: 55, y: 4, w: 170, h: 322, shadowY: 324, shadowRx: 66, internalSpawn: true, spillY: 72, spillRx: 52 },
     chamberPath(ctx) {
       ctx.beginPath();
@@ -232,7 +232,10 @@ export function createJarCanvas(container, { reducedMotion = () => false } = {})
   let isFull = false;
   let palette = { accent: [255, 204, 0], pop: [255, 68, 136], bg: [255, 255, 255], text: [34, 34, 34] };
 
-  const bodies = []; // active physics bodies inside the vessel
+  const MAX_PHYSICS_BODIES = 48;
+  const bodies = []; // persistent active & stacked 2D rigid-body gift tokens inside the vessel
+  const spawnQueue = []; // staggered multi-gift & fill-proportional token shower queue
+  const spawnedItemUids = new Set(); // ensures logical gift items aren't re-spawned on later syncs
   const splashes = []; // liquid splash droplets when gifts hit the wave surface
   const overflowDrops = []; // spilling tokens cascading over brim when full
   const overflowDrips = []; // glowing liquid beads overflowing the rim
@@ -248,7 +251,20 @@ export function createJarCanvas(container, { reducedMotion = () => false } = {})
   let simTime = 0;
   let spillAccum = 0;
   let spillSide = 1;
+  let spawnCounter = 0;
   let dpr = 1;
+  let hasSyncedOnce = false;
+
+  function syncBodiesCount() {
+    const v = VESSELS[design] || VESSELS.boba;
+    canvas.dataset.bodies = String(bodies.length + spawnQueue.length);
+    let escaped = 0;
+    for (const b of bodies) {
+      const wall = v.wallBounds(b.y);
+      if (b.y < v.mouthY - 0.5 || b.x - b.r < wall.left - 1.5 || b.x + b.r > wall.right + 1.5) escaped += 1;
+    }
+    canvas.dataset.escaped = String(escaped);
+  }
 
   function resize() {
     dpr = Math.min(2, globalThis.devicePixelRatio || 1);
@@ -260,6 +276,7 @@ export function createJarCanvas(container, { reducedMotion = () => false } = {})
     }
   }
   resize();
+  syncBodiesCount();
 
   function getImg(src) {
     const clean = safeUrl(src);
@@ -277,27 +294,47 @@ export function createJarCanvas(container, { reducedMotion = () => false } = {})
     return entry;
   }
 
-  function makeBody(item, fromTop = true) {
+  function makeBody(item, fromTop = true, subIndex = 0) {
     const v = VESSELS[design] || VESSELS.boba;
-    const amt = Math.max(1, Number(item.amount) || Number(item.diamonds) || 1);
-    const r = amt >= 1000 ? 20 : amt >= 50 ? 17.5 : 15;
-    const maxSpread = Math.max(3, (v.mouthRx || 30) - r - 3);
-    const jitter = (Math.random() * 2 - 1) * maxSpread * 0.85;
-    const yStart = fromTop
-      ? (v.art?.internalSpawn ? v.mouthY - 2 : Math.max(-18, v.mouthY - 26 - Math.random() * 14))
-      : (v.liqBot - 40 - Math.random() * 80);
+    const unitDiamonds = Math.max(1, Number(item.diamonds) || Number(item.amount) || 1);
+    const r = unitDiamonds >= 1000 ? 17.5 : unitDiamonds >= 100 ? 15.5 : 13.5;
+    spawnCounter += 1;
+    const phi = ((spawnCounter * 0.6180339887) % 1) * 2 - 1;
+    const spread = Math.max(-1, Math.min(1, phi * 0.78 + (Math.random() * 2 - 1) * 0.22));
+    let x = v.cx;
+    let yStart;
+    if (fromTop) {
+      yStart = v.mouthY + r * 0.25 + (subIndex % 2) * 2;
+      const topWall = v.wallBounds(yStart);
+      const minX = topWall.left + r + 1;
+      const maxX = topWall.right - r - 1;
+      x = maxX > minX
+        ? Math.max(minX, Math.min(maxX, topWall.cx + spread * (maxX - topWall.cx)))
+        : topWall.cx;
+    } else {
+      const rowHeight = r * 1.65;
+      const layer = Math.floor(subIndex / 3);
+      const targetY = Math.max(v.liqTop + r, v.liqBot - r - layer * rowHeight);
+      const wb = v.wallBounds(targetY);
+      const usableHalf = Math.max(4, (wb.right - wb.left) * 0.5 - r - 1);
+      x = wb.cx + spread * usableHalf;
+      yStart = Math.min(targetY, v.bottomY(x) - r);
+    }
     return {
-      uid: item.uid,
+      uid: `${item.uid}:${subIndex}`,
+      parentUid: item.uid,
+      spawnIdx: spawnCounter,
       picture: item.picture || "",
-      amount: amt,
+      amount: unitDiamonds,
       r,
-      x: v.cx + jitter,
+      x,
       y: yStart,
-      vx: fromTop ? (Math.random() - 0.5) * 75 : 0,
-      vy: fromTop ? 88 + Math.random() * 60 : 0,
-      angle: (Math.random() - 0.5) * 0.8,
-      vAngle: fromTop ? (Math.random() - 0.5) * 4 : 0,
+      vx: fromTop ? (Math.random() - 0.5) * 46 : 0,
+      vy: fromTop ? 190 + Math.random() * 60 : 0,
+      angle: (Math.random() - 0.5) * 0.7,
+      vAngle: fromTop ? (Math.random() - 0.5) * 3.5 : 0,
       splashed: !fromTop,
+      supported: false,
     };
   }
 
@@ -313,13 +350,13 @@ export function createJarCanvas(container, { reducedMotion = () => false } = {})
       for (let i = 0; i < count; i++) {
         if (overflowDrops.length >= 20) overflowDrops.shift();
         spillSide *= -1;
-        const offsetRatio = 0.72 + Math.random() * 0.35;
+        const offsetRatio = 0.55 + Math.random() * 0.25;
         overflowDrops.push({
           picture: pic,
           r: 10.5 + Math.random() * 3.5,
           x: v.cx + spillSide * spillRx * offsetRatio,
           y: spillY - Math.random() * 6,
-          vx: spillSide * (62 + Math.random() * 64),
+          vx: spillSide * (22 + Math.random() * 26),
           vy: -(78 + Math.random() * 72),
           angle: (Math.random() - 0.5) * 0.8,
           vAngle: spillSide * (2.4 + Math.random() * 2.4),
@@ -333,9 +370,9 @@ export function createJarCanvas(container, { reducedMotion = () => false } = {})
         if (overflowDrips.length >= 28) overflowDrips.shift();
         const side = i % 2 === 0 ? 1 : -1;
         overflowDrips.push({
-          x: v.cx + side * (spillRx * (0.78 + Math.random() * 0.28)),
+          x: v.cx + side * (spillRx * (0.58 + Math.random() * 0.24)),
           y: spillY,
-          vx: side * (42 + Math.random() * 46),
+          vx: side * (18 + Math.random() * 24),
           vy: -(32 + Math.random() * 44),
           r: 3.2 + Math.random() * 2.4,
           life: 1,
@@ -344,30 +381,40 @@ export function createJarCanvas(container, { reducedMotion = () => false } = {})
     }
   }
 
-  function stepPhysics(dt) {
+  function stepPhysics(dt, headless = false) {
     const v = VESSELS[design] || VESSELS.boba;
     const liquidY = v.liqBot - (Math.max(0, Math.min(100, smoothPercent)) / 100) * (v.liqBot - v.liqTop);
     const subSteps = 3;
     const h = dt / subSteps;
-    const gravity = 680;
+    const gravity = 940;
+    const maxPile = v.fullPile || 28;
 
-    if (isFull) {
-      spillAccum += dt;
-      if (spillAccum >= 0.34) {
-        spillAccum = 0;
-        const pick = bodies.length ? bodies[Math.floor(Math.random() * bodies.length)] : null;
-        spawnOverflow(pick, 1);
+    if (!headless) {
+      while (spawnQueue.length && spawnQueue[0].readyAt <= simTime) {
+        const nextSpawn = spawnQueue.shift();
+        if (bodies.length >= maxPile) bodies.shift();
+        bodies.push(makeBody(nextSpawn.item, true, nextSpawn.subIndex));
       }
-    } else {
-      spillAccum = 0;
+
+      if (isFull) {
+        spillAccum += dt;
+        if (spillAccum >= 0.34) {
+          spillAccum = 0;
+          const pick = bodies.length ? bodies[Math.floor(Math.random() * bodies.length)] : null;
+          spawnOverflow(pick, 1);
+        }
+      } else {
+        spillAccum = 0;
+      }
     }
 
+    const bodyCount = bodies.length;
     for (let s = 0; s < subSteps; s++) {
-      for (const b of bodies) {
-        const insideMouth = !v.art?.internalSpawn && b.y < v.mouthY + 6;
+      for (let i = 0; i < bodyCount; i++) {
+        const b = bodies[i];
         const inLiquid = showLiquid && smoothPercent > 2 && b.y + b.r * 0.5 >= liquidY;
 
-        if (!b.splashed && inLiquid && b.vy > 70) {
+        if (!headless && !b.splashed && inLiquid && b.vy > 70) {
           b.splashed = true;
           for (let k = 0; k < 5; k++) {
             splashes.push({
@@ -380,107 +427,125 @@ export function createJarCanvas(container, { reducedMotion = () => false } = {})
           }
         }
 
-        b.vy += gravity * h * (inLiquid ? 0.36 : 1);
+        b.vy += gravity * h;
         if (inLiquid) {
-          b.vx *= Math.pow(0.08, h);
-          b.vy *= Math.pow(0.12, h);
+          b.vx *= Math.pow(0.65, h);
+          b.vy *= Math.pow(0.88, h);
         }
-        b.vAngle *= Math.pow(0.05, h);
+        b.vAngle *= Math.pow(0.12, h);
 
         b.x += b.vx * h;
         b.y += b.vy * h;
         b.angle += b.vAngle * h;
 
-        if (!insideMouth) {
-          const wall = v.wallBounds(b.y);
-          if (b.x - b.r < wall.left) {
-            b.x = wall.left + b.r;
-            b.vx = Math.abs(b.vx) > 25 ? Math.abs(b.vx) * 0.24 : 0;
-            b.vAngle *= 0.6;
-          } else if (b.x + b.r > wall.right) {
-            b.x = wall.right - b.r;
-            b.vx = Math.abs(b.vx) > 25 ? -Math.abs(b.vx) * 0.24 : 0;
-            b.vAngle *= 0.6;
-          }
-          const fy = v.bottomY(b.x);
-          if (b.y + b.r > fy) {
-            b.y = fy - b.r;
-            b.vy = b.vy > 36 ? -b.vy * 0.2 : 0;
-            b.vx *= 0.72;
-            b.vAngle = Math.abs(b.vx) > 6 ? b.vx / Math.max(12, b.r) : 0;
-          }
+        const wall = v.wallBounds(b.y);
+        if (b.x - b.r < wall.left) {
+          b.x = wall.left + b.r;
+          b.vx = Math.abs(b.vx) > 20 ? Math.abs(b.vx) * 0.22 : 0;
+        } else if (b.x + b.r > wall.right) {
+          b.x = wall.right - b.r;
+          b.vx = Math.abs(b.vx) > 20 ? -Math.abs(b.vx) * 0.22 : 0;
         }
 
-        if (Math.hypot(b.vx, b.vy) < 6) {
-          b.vx *= 0.5;
-          b.vy *= 0.5;
-          b.vAngle *= 0.5;
-          if (Math.hypot(b.vx, b.vy) < 1.5) {
-            b.vx = 0;
-            b.vy = 0;
-            b.vAngle = 0;
-          }
+        const fy = v.bottomY(b.x);
+        if (b.y + b.r >= fy) {
+          b.y = fy - b.r;
+          if (b.vy > 48) b.vy = -b.vy * 0.14;
+          else if (b.vy > 0) b.vy = 0;
+          b.vx *= 0.82;
+          b.vAngle = Math.abs(b.vx) > 8 ? b.vx / Math.max(12, b.r) : 0;
+          b.supported = true;
+        } else {
+          b.supported = false;
         }
       }
 
-      // Circle-to-circle collisions (calm weighted solver passes with contact friction & zero micro-jitter bounce)
-      for (let pass = 0; pass < 3; pass++) {
-        for (let i = 0; i < bodies.length; i++) {
+      // Multi-pass 2D rigid-body circle collision + anti-totem-pole lateral roll (Matter.js style)
+      for (let pass = 0; pass < 6; pass++) {
+        for (let i = 0; i < bodyCount; i++) {
           const a = bodies[i];
-          for (let j = i + 1; j < bodies.length; j++) {
+          for (let j = i + 1; j < bodyCount; j++) {
             const b = bodies[j];
             const dx = b.x - a.x;
             const dy = b.y - a.y;
-            const minD = a.r + b.r - 0.6;
-            const distSq = dx * dx + dy * dy;
-            if (distSq >= minD * minD) continue;
-            const dist = Math.sqrt(distSq) || 0.01;
-            const nx = dx / dist;
-            const ny = dy / dist;
-            const overlap = minD - dist - 0.35;
-            if (overlap > 0) {
-              const push = overlap * 0.42;
-              a.x -= nx * push;
-              a.y -= ny * push;
-              b.x += nx * push;
-              b.y += ny * push;
-            }
+            const minD = a.r + b.r - 0.8;
+            const d2 = dx * dx + dy * dy;
+            if (d2 >= minD * minD) continue;
 
-            const rvx = b.vx - a.vx;
-            const rvy = b.vy - a.vy;
-            const relNorm = rvx * nx + rvy * ny;
-            if (relNorm < 0) {
-              const e = relNorm < -55 ? 0.22 : 0;
-              const imp = -(1 + e) * relNorm * 0.5;
-              a.vx -= imp * nx;
-              a.vy -= imp * ny;
-              b.vx += imp * nx;
-              b.vy += imp * ny;
-              // Damp tangential sliding between resting tokens
-              const tx = -ny;
-              const ty = nx;
-              const relTan = rvx * tx + rvy * ty;
-              const tanImp = relTan * 0.14;
-              a.vx += tanImp * tx;
-              a.vy += tanImp * ty;
-              b.vx -= tanImp * tx;
-              b.vy -= tanImp * ty;
+            const dist = Math.sqrt(d2);
+            const fallbackDir = (a.spawnIdx + b.spawnIdx) % 2 === 0 ? 1 : -1;
+            const nx = dist > 0.01 ? dx / dist : fallbackDir * 0.48;
+            const ny = dist > 0.01 ? dy / dist : -0.877;
+            const pen = minD - dist;
+
+            const aLower = a.y > b.y;
+            const wA = aLower ? 0.25 : 0.75;
+            const wB = 1 - wA;
+
+            a.x -= nx * pen * wA;
+            a.y -= ny * pen * wA;
+            b.x += nx * pen * wB;
+            b.y += ny * pen * wB;
+
+            // +y is downward: larger y supports the token resting above it
+            if (dy > 0.25 * minD) a.supported = true;
+            else if (dy < -0.25 * minD) b.supported = true;
+
+            if (pass === 0) {
+              const upper = a.y < b.y ? a : b;
+              if (Math.abs(nx) < 0.38 && (!upper.supported || Math.abs(upper.vy) > 18)) {
+                const rollDir = Math.abs(dx) > 0.4 ? Math.sign(dx) : fallbackDir;
+                upper.vx += rollDir * 52;
+                upper.x += rollDir * 0.8;
+              }
+              const rvx = b.vx - a.vx;
+              const rvy = b.vy - a.vy;
+              const vn = rvx * nx + rvy * ny;
+              if (vn < 0) {
+                const jImp = -1.14 * vn;
+                a.vx -= jImp * nx * wA;
+                a.vy -= jImp * ny * wA;
+                b.vx += jImp * nx * wB;
+                b.vy += jImp * ny * wB;
+                a.angle -= (nx * pen * wA) / Math.max(10, a.r);
+                b.angle += (nx * pen * wB) / Math.max(10, b.r);
+              }
             }
           }
         }
-      }
 
-      // Re-clamp against outer boundary post circle push so nothing ever escapes a curved wall
-      for (const b of bodies) {
-        if (b.y >= v.mouthY + 4) {
+        // Re-clamp against top mouth, outer curved walls & bottom floor after every solver iteration
+        for (let i = 0; i < bodyCount; i++) {
+          const b = bodies[i];
+          const topLimit = v.mouthY + b.r * 0.2;
+          if (b.y < topLimit) {
+            b.y = topLimit;
+            if (b.vy < 0) b.vy = 0;
+          }
           const wall = v.wallBounds(b.y);
           if (b.x - b.r < wall.left) b.x = wall.left + b.r;
           if (b.x + b.r > wall.right) b.x = wall.right - b.r;
           const fy = v.bottomY(b.x);
-          if (b.y + b.r > fy) { b.y = fy - b.r; b.vy = Math.min(0, b.vy); }
+          if (b.y + b.r > fy) {
+            b.y = fy - b.r;
+            if (b.vy > 0) b.vy = 0;
+            b.supported = true;
+          }
+        }
+      }
+
+      // Sleep damping on slow supported tokens so the stacked pile rests solidly
+      for (let i = 0; i < bodyCount; i++) {
+        const b = bodies[i];
+        if (b.supported && Math.hypot(b.vx, b.vy) < 28) {
+          b.vx *= 0.7;
+          b.vy *= 0.7;
+          b.vAngle *= 0.6;
         }
       }
     }
+
+    if (headless) return;
 
     // Update liquid splash droplets
     for (let i = splashes.length - 1; i >= 0; i--) {
@@ -515,7 +580,9 @@ export function createJarCanvas(container, { reducedMotion = () => false } = {})
 
   function drawOverflow(context) {
     for (const d of overflowDrips) {
-      const fade = Math.max(0, Math.min(1, d.life)) * (d.y > 260 ? Math.max(0, 1 - (d.y - 260) / 60) : 1);
+      const yFade = Math.max(0, Math.min(1, d.life)) * (d.y > 260 ? Math.max(0, 1 - (d.y - 260) / 60) : 1);
+      const xFade = Math.min(1, Math.max(0, (d.x - d.r - 4) / 14), Math.max(0, (W - d.r - 4 - d.x) / 14));
+      const fade = yFade * xFade;
       if (fade <= 0.02) continue;
       context.save();
       context.fillStyle = withAlpha(palette.pop, 0.72 * fade);
@@ -529,7 +596,9 @@ export function createJarCanvas(container, { reducedMotion = () => false } = {})
       context.restore();
     }
     for (const od of overflowDrops) {
-      const fade = od.y > 245 ? Math.max(0, 1 - (od.y - 245) / 76) : 1;
+      const yFade = od.y > 245 ? Math.max(0, 1 - (od.y - 245) / 76) : 1;
+      const xFade = Math.min(1, Math.max(0, (od.x - od.r - 4) / 16), Math.max(0, (W - od.r - 4 - od.x) / 16));
+      const fade = yFade * xFade;
       if (fade <= 0.02) continue;
       context.save();
       context.globalAlpha = fade * 0.94;
@@ -539,6 +608,7 @@ export function createJarCanvas(container, { reducedMotion = () => false } = {})
   }
 
   function renderFrame() {
+    syncBodiesCount();
     if (!ctx) return;
     const v = VESSELS[design] || VESSELS.boba;
     const artEntry = v.art ? getImg(v.art.src) : null;
@@ -587,9 +657,9 @@ export function createJarCanvas(container, { reducedMotion = () => false } = {})
       ctx.closePath();
 
       const liqGrad = ctx.createLinearGradient(0, liquidY, 0, v.liqBot);
-      liqGrad.addColorStop(0, withAlpha(palette.pop, 0.68));
-      liqGrad.addColorStop(0.35, withAlpha(palette.accent, 0.74));
-      liqGrad.addColorStop(1, withAlpha(palette.accent, 0.9));
+      liqGrad.addColorStop(0, withAlpha(palette.pop, 0.24));
+      liqGrad.addColorStop(0.35, withAlpha(palette.accent, 0.32));
+      liqGrad.addColorStop(1, withAlpha(palette.accent, 0.44));
       ctx.fillStyle = liqGrad;
       ctx.fill();
 
@@ -638,9 +708,7 @@ export function createJarCanvas(container, { reducedMotion = () => false } = {})
       ctx.save();
       (v.dropPath || v.chamberPath)(ctx);
       ctx.clip();
-      for (const b of bodies) {
-        if (!artReady || v.art.internalSpawn || b.y + b.r >= v.mouthY) drawToken(ctx, b, palette, getImg);
-      }
+      for (const b of bodies) drawToken(ctx, b, palette, getImg);
       ctx.restore();
     }
 
@@ -648,14 +716,6 @@ export function createJarCanvas(container, { reducedMotion = () => false } = {})
     if (artReady) {
       ctx.drawImage(artEntry.img, v.art.x, v.art.y, v.art.w, v.art.h);
       if (isFull) drawSparkles(ctx, v.cx, (v.liqTop + v.liqBot) * 0.5, 68, simTime * 1.3);
-      if (showDrops && bodies.length && !v.art.internalSpawn) {
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(0, 0, W, v.mouthY + 1);
-        ctx.clip();
-        for (const b of bodies) if (b.y - b.r < v.mouthY) drawToken(ctx, b, palette, getImg);
-        ctx.restore();
-      }
     } else {
       ctx.save();
       ctx.strokeStyle = withAlpha(palette.accent, 0.72);
@@ -707,7 +767,10 @@ export function createJarCanvas(container, { reducedMotion = () => false } = {})
         };
       }
       if (changed) {
-        for (const b of bodies) b.vx += (Math.random() - 0.5) * 35;
+        for (const b of bodies) {
+          b.vx += (Math.random() - 0.5) * 35;
+          b.supported = false;
+        }
       }
       ensureRunning();
     },
@@ -717,32 +780,70 @@ export function createJarCanvas(container, { reducedMotion = () => false } = {})
       isFull = Boolean(full);
       const keep = new Set(items.map((it) => it.uid));
       for (let i = bodies.length - 1; i >= 0; i--) {
-        if (!keep.has(bodies[i].uid)) bodies.splice(i, 1);
+        if (!keep.has(bodies[i].parentUid)) bodies.splice(i, 1);
       }
-      const existing = new Set(bodies.map((b) => b.uid));
+      for (let i = spawnQueue.length - 1; i >= 0; i--) {
+        if (!keep.has(spawnQueue[i].item.uid)) spawnQueue.splice(i, 1);
+      }
+      for (const uid of [...spawnedItemUids]) {
+        if (!keep.has(uid)) spawnedItemUids.delete(uid);
+      }
+      const initialLoad = !hasSyncedOnce && !droppedUid;
+      hasSyncedOnce = true;
+      const fullPile = (VESSELS[design] || VESSELS.boba).fullPile || 40;
+      const desiredFillBodies = targetPercent <= 0 ? 0 : Math.max(1, Math.round((Math.min(100, targetPercent) / 100) * fullPile));
       let addedBatch = false;
       let droppedItem = null;
-      for (const it of items) {
+      for (let idx = 0; idx < items.length; idx++) {
+        const it = items[idx];
         if (droppedUid && it.uid === droppedUid) droppedItem = it;
-        if (existing.has(it.uid)) continue;
-        const freshDrop = !droppedUid || it.uid === droppedUid;
-        bodies.push(makeBody(it, freshDrop && !reducedMotion()));
-        if (!freshDrop || reducedMotion()) addedBatch = true;
+        if (spawnedItemUids.has(it.uid)) continue;
+        spawnedItemUids.add(it.uid);
+
+        const rawCount = Math.max(1, Math.round(Number(it.count) || 1));
+        const byCount = Math.min(24, rawCount);
+        const currentTotal = bodies.length + spawnQueue.length;
+        const neededForFill = idx === items.length - 1 ? Math.max(0, desiredFillBodies - currentTotal) : 0;
+        const spawnCount = Math.max(1, Math.min(fullPile, Math.max(byCount, neededForFill)));
+
+        if (!initialLoad && !reducedMotion()) {
+          bodies.push(makeBody(it, true, 0));
+          const interval = spawnCount > 14 ? 0.032 : 0.052;
+          const baseReady = spawnQueue.length ? Math.max(simTime, spawnQueue[spawnQueue.length - 1].readyAt) : simTime;
+          for (let k = 1; k < spawnCount; k++) {
+            spawnQueue.push({ item: it, subIndex: k, readyAt: baseReady + k * interval });
+          }
+        } else {
+          for (let k = 0; k < spawnCount; k++) {
+            bodies.push(makeBody(it, false, k));
+          }
+          addedBatch = true;
+        }
       }
-      // Headless pre-settle restored items immediately
+      let overflow = bodies.length + spawnQueue.length - fullPile;
+      while (overflow > 0 && bodies.length > 0) {
+        bodies.shift();
+        overflow -= 1;
+      }
+      if (overflow > 0 && spawnQueue.length > overflow) {
+        spawnQueue.splice(0, overflow);
+      }
       if (addedBatch) {
         smoothPercent = targetPercent;
-        for (let i = 0; i < 90; i++) stepPhysics(0.016);
+        for (let i = 0; i < 75; i++) stepPhysics(0.016, true);
       }
       if (!wasFull && isFull) {
         spawnOverflow(droppedItem || items[items.length - 1], 7);
       } else if (isFull && droppedUid) {
         spawnOverflow(droppedItem || items[items.length - 1], 3);
       }
+      syncBodiesCount();
       ensureRunning();
     },
     clear() {
       bodies.length = 0;
+      spawnQueue.length = 0;
+      spawnedItemUids.clear();
       splashes.length = 0;
       overflowDrops.length = 0;
       overflowDrips.length = 0;
@@ -750,6 +851,7 @@ export function createJarCanvas(container, { reducedMotion = () => false } = {})
       targetPercent = 0;
       smoothPercent = 0;
       isFull = false;
+      hasSyncedOnce = false;
       renderFrame();
     },
     destroy: stop,
@@ -757,7 +859,9 @@ export function createJarCanvas(container, { reducedMotion = () => false } = {})
 }
 
 function drawToken(ctx, b, palette, getImg) {
+  if ((b.alpha ?? 1) <= 0.02) return;
   ctx.save();
+  ctx.globalAlpha *= b.alpha ?? 1;
   ctx.translate(b.x, b.y);
   ctx.rotate(b.angle);
 

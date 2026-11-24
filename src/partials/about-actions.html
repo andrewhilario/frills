@@ -1,0 +1,57 @@
+<section class="about" aria-labelledby="about-title">
+      <h2 class="step-card__title" id="about-title">About this overlay</h2>
+      <p>Frills Actions turns live TikTok and Twitch chat commands, gifts, follows, shares, likes, subs, bits, and raids into real-time stream automations, VTube Studio named sticky notes &amp; props, and on-screen effects—directly from one Browser source with zero extra software to install. Up to 10 actions and up to 5 live VTube Studio sticky notes on your face at once are completely free with no account; Frills Plus unlocks unlimited actions, unlimited sticky notes piling up, all other VTube Studio actions (hotkeys, custom props, expressions, zooms, tints), live cloud updates, and Phone Stream Deck buttons.</p>
+
+      <h3>Supported streaming apps (not for TikTok LIVE Studio)</h3>
+      <ul>
+        <li><strong>OBS Studio (version 28 or newer) — full support:</strong> runs every action, including OBS Replay Buffer clips (<code>!clip</code>), instant Replay Cam (<code>!replay</code>), scene switches, source toggles, webcam filters, mic mutes, local media videos, text updates, OBS hotkeys, built-in sounds &amp; banners, and VTube Studio actions (up to 5 named sticky notes free; unlimited + all other VTS actions with Frills Plus).</li>
+        <li><strong>Streamlabs Desktop — Browser source &amp; VTube Studio actions:</strong> runs built-in sounds, banners, wait timers, free VTube Studio named sticky notes (up to 5 at once), and all Frills Plus VTube Studio actions (unlimited sticky notes, hotkeys, props, expressions, avatar zoom/flip, color tints). Because Streamlabs Desktop does not include OBS Studio’s WebSocket v5 server on port <code>4455</code>, OBS-specific steps (<code>!clip</code>, <code>!replay</code>, OBS scenes, filters, mutes, and OBS hotkeys) require OBS Studio.</li>
+        <li><strong>TikTok LIVE Studio — not supported:</strong> Frills Actions is built exclusively for <strong>OBS Studio</strong> and <strong>Streamlabs Desktop</strong> and will not work in TikTok LIVE Studio.</li>
+      </ul>
+
+      <h3>Step-by-step setup for OBS Studio</h3>
+      <ol>
+        <li>In OBS Studio (version 28 or newer), open <strong>Tools → WebSocket Server Settings</strong>, tick <strong>Enable WebSocket server</strong> (port <code>4455</code> by default), and click <strong>Show Connect Info</strong> if you enabled authentication. For <code>!clip</code> and <code>!replay</code>, also open <strong>Settings → Output → Replay Buffer</strong> and tick <strong>Enable Replay Buffer</strong>.</li>
+        <li>In <strong>Step 2</strong> above, enter your OBS port and password (if enabled) and click <strong>Connect OBS</strong>. Frills reads your live scenes, sources, audio inputs, filters, and hotkeys into dropdown suggestions automatically. If you want instant replays, click <strong>Create Replay Cam</strong> once.</li>
+        <li><em>Optional (Frills Plus):</em> To trigger VTube Studio sticky notes, props, or expressions, open VTube Studio → <strong>Settings → General → Start API</strong> (port <code>8001</code>), click <strong>Connect VTube Studio</strong> in Step 2, and press <strong>Allow</strong> on the popup inside VTube Studio.</li>
+        <li>In <strong>Step 3</strong>, tap any starter pack or <strong>+ Blank action</strong> to build your <strong>WHEN → DO</strong> rules. Press <strong>Test</strong> on any rule to watch it fire live in OBS or VTube Studio before going live.</li>
+        <li>In <strong>Step 4</strong>, choose TikTok, Twitch, or Both and enter your channel name. In <strong>Step 5</strong>, click <strong>Copy link</strong>.</li>
+        <li>In OBS Studio, go to <strong>Sources → + → Browser</strong>, name it <code>Frills Actions</code>, paste your full copied link (keeping everything after <code>#</code>), set <strong>Width / Height</strong> to match your canvas (<code>1920 × 1080</code> landscape or <code>1080 × 1920</code> vertical), and tick <strong>Control audio via OBS</strong> if your actions play sounds.</li>
+      </ol>
+
+      <h3>Step-by-step setup for Streamlabs Desktop</h3>
+      <ol>
+        <li>Skip the OBS WebSocket section in <strong>Step 2</strong>—Streamlabs Desktop does not run OBS Studio’s WebSocket v5 server on port <code>4455</code>.</li>
+        <li><em>Optional (Frills Plus):</em> If you use <strong>VTube Studio</strong>, open VTube Studio → <strong>Settings → General → Start API</strong> (port <code>8001</code>), click <strong>Connect VTube Studio</strong> in Step 2, and press <strong>Allow</strong> on the one-time popup inside VTube Studio.</li>
+        <li>In <strong>Step 3</strong>, switch off or delete any OBS-only starter rules (<code>!clip</code> and <code>!replay</code>) and add <strong>VTube Studio</strong>, <strong>Play sound</strong>, or <strong>Show banner</strong> actions (such as <strong>+ VTS Sticky note</strong> or <strong>+ VTS Face zoom</strong>). Press <strong>Test</strong> on each rule to confirm it fires on your avatar or preview.</li>
+        <li>In <strong>Step 4</strong>, choose TikTok, Twitch, or Both and enter your channel name. In <strong>Step 5</strong>, click <strong>Copy link</strong> (keep everything after <code>#</code>, including <code>#vtsToken=…</code>, intact).</li>
+        <li>In <strong>Streamlabs Desktop</strong>, open your scene’s <strong>Sources</strong> panel, click <strong>+</strong>, pick <strong>Browser Source</strong>, and click <strong>Add Source</strong>.</li>
+        <li>Name it <code>Frills Actions</code>, paste your copied link into the <strong>URL</strong> box, set <strong>Width</strong> and <strong>Height</strong> to match your canvas (<code>1920 × 1080</code> landscape or <code>1080 × 1920</code> vertical), enable <strong>Control audio via Streamlabs</strong> if you use sound steps, and click <strong>Close</strong>.</li>
+      </ol>
+
+      <h3>Good to know</h3>
+      <ul>
+        <li>Actions is made for <strong>OBS Studio</strong> and <strong>Streamlabs Desktop</strong> only—do not add this overlay to TikTok LIVE Studio. For general setup tips, see the <a href="/guides/obs/">OBS setup guide</a> and the <a href="/guides/test/">test guide</a>.</li>
+        <li>Your OBS WebSocket password and VTube Studio token stay on your computer inside the URL’s <code>#</code> hash fragment—browsers never send hash fragments to Frills or Cloudflare servers.</li>
+        <li>Timed actions (like switching scenes, enabling a webcam filter, muting your mic for 10 seconds, or pinning a VTube Studio sticky note for 30 seconds) automatically revert when the timer finishes, and queued rules run in order so overlapping gifts never fight each other.</li>
+        <li>Combine Actions with <a href="/wheel/">Spin the wheel</a>, <a href="/jar/">Gift jar</a>, <a href="/alerts/">Alerts</a>, or <a href="/timer/">Subathon timer</a> from the <a href="/overlays/">overlays hub</a>.</li>
+      </ul>
+
+      <h3>Why will Actions not work in TikTok LIVE Studio?</h3>
+      <p>Frills Actions requires a standard desktop Browser source with local WebSocket access for OBS Studio (port <code>4455</code>) and VTube Studio (port <code>8001</code>). TikTok LIVE Studio does not expose a local control API or Replay Buffer, and its built-in web source is not supported for Actions—use OBS Studio or Streamlabs Desktop instead.</p>
+
+      <h3>Which actions work in Streamlabs Desktop vs. OBS Studio?</h3>
+      <p>In <strong>OBS Studio (28+)</strong>, all 17 step types work—including <code>!clip</code>, <code>!replay</code>, scene switches, source visibility, webcam filters, mic mute, media playback, OBS text, OBS hotkeys, VTube Studio actions, sounds, and banners. In <strong>Streamlabs Desktop</strong>, Browser source actions—<strong>VTube Studio</strong> props/sticky notes/expressions/movements/tints (Frills Plus), <strong>Play sound</strong>, <strong>Show banner</strong>, and <strong>Wait</strong>—work directly; OBS WebSocket steps require OBS Studio.</p>
+
+      <h3>How many actions and sticky notes are free?</h3>
+      <p>You can create and run up to 10 actions and up to 5 live VTube Studio sticky notes on your face at once completely free with no account required (when a 6th gift arrives on Free, the oldest sticky note peels off so the new gifter’s name appears right away). Frills Plus removes the 10-action limit, lets unlimited sticky notes pile up on your avatar, and unlocks live execution for all other VTube Studio actions (hotkeys, custom props, expressions, zoom/flip, color tints) plus cloud syncing and Phone Stream Deck triggers.</p>
+
+      <h3>Are my OBS password and VTube Studio token sent to Frills?</h3>
+      <p>No. Frills stores both only in your browser’s local storage and puts them after the <code>#</code> hash symbol in your Browser source URL. By browser standard, nothing after <code>#</code> is ever transmitted in HTTP requests to any server, and your Browser source connects only to OBS or VTube Studio on your own PC.</p>
+
+      <h3>Can viewers stick sticky notes with their name onto my VTube Studio avatar?</h3>
+      <p>Yes—for free (up to 5 on your face at once) in both OBS Studio and Streamlabs Desktop, with zero manual setup. Connect VTube Studio in Step 2 (Settings → General → Start API, port <code>8001</code>), press <strong>Allow</strong> on the popup, and tap <strong>+ VTS Sticky note</strong> in Step 3. Whenever a qualifying gift lands, Frills draws a cute sticky note with the viewer’s name and gift and pins it right onto your avatar’s face so it moves with your head (click <strong>Pick in VTS</strong> if you want to choose an exact forehead or cheek spot). Frills Plus lets unlimited sticky notes stack on your avatar and unlocks all other VTube Studio actions.</p>
+
+      <h3>Can viewers spam !clip or !replay?</h3>
+      <p>No. Every action has its own cooldown timer (in seconds), command actions can be locked to <strong>Mods &amp; streamer</strong> or <strong>Streamer only</strong>, and queued actions wait their turn cleanly instead of overlapping.</p>
+    </section>

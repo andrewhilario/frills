@@ -392,3 +392,25 @@ test("the pictures on a card are their own secret setting: none to begin with, a
   assert.deepEqual([dressed.searchParams.get("deco"), dressed.searchParams.get("card")], ["frog2", "ticket"]);
   assert.equal(currentLook({ ...DEFAULTS, deco: "frog2" }), "sticker", "a starting look does not touch them");
 });
+
+test("VIP Jackpot tier overrides custom image/sound for big cheers and 20+ gifted subs, and toggles vipSpotlight cleanly", () => {
+  const cfg = sanitize({
+    ...DEFAULTS,
+    vipSpotlight: false,
+    bitsImage: "ImgSmallBits1234",
+    bitsMySound: "SndSmallBits1234",
+    bitsBigImage: "ImgVipBits123456",
+    bitsBigMySound: "SndVipBits123456",
+    subgiftImage: "ImgSmallSub12345",
+    subgiftBigImage: "ImgVipSub1234567",
+  });
+  assert.equal(cfg.vipSpotlight, false);
+  const smallBits = makeAlert({ kind: "bits", name: "Cheerer", count: 50 }, cfg);
+  assert.deepEqual([smallBits.tier, smallBits.image, smallBits.mySound], [1, "ImgSmallBits1234", "SndSmallBits1234"]);
+
+  const vipBits = makeAlert({ kind: "bits", name: "Whale", count: 2500 }, cfg);
+  assert.deepEqual([vipBits.tier, vipBits.image, vipBits.mySound], [3, "ImgVipBits123456", "SndVipBits123456"]);
+
+  const vipSubBomb = makeAlert({ kind: "subgift", name: "Generous", count: 25 }, cfg);
+  assert.deepEqual([vipSubBomb.tier, vipSubBomb.image], [3, "ImgVipSub1234567"]);
+});

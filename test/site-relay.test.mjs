@@ -32,7 +32,9 @@ test("the security policy lets the pages reach the relay and still nothing else 
   const headers = read("_headers");
   assert.ok(headers.includes(`connect-src 'self' wss://irc-ws.chat.twitch.tv ${RELAY} wss://eventsub.wss.twitch.tv https://api.twitch.tv https://id.twitch.tv https://accounts.spotify.com https://api.spotify.com;`), "the relay is allowed to be connected to, and Twitch's follow notifications and Spotify (for the private pages)");
   assert.ok(headers.includes("default-src 'self'") && headers.includes("script-src 'self'"));
-  assert.ok(!/connect-src[^;]*\*/.test(headers), "no wildcard in connect-src");
+  const mainCsp = /^\/\*\n([\s\S]*?)\n\n/.exec(headers)?.[1] ?? "";
+  assert.ok(!/connect-src[^;]*\*/.test(mainCsp), "no wildcard in global connect-src");
+  assert.ok(!/connect-src[^;]*(?<!127\.0\.0\.1:|localhost:)\*/.test(headers), "no host wildcard in connect-src");
 });
 
 test("the wording says TikTok works in the browser through a free beta relay, and the privacy page says what that means", () => {

@@ -4,6 +4,23 @@ html { color-scheme: normal; background: transparent; }
 html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; }
 #cloud-root { position: fixed; inset: 0; width: 100%; height: 100%; }
 .cloud-frame { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; display: block; background: transparent; }
+.cloud-scene { position: fixed; inset: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; pointer-events: none; }
+.cloud-layer { position: absolute; border: 0; display: block; background: transparent; pointer-events: none; width: 32%; height: 42%; }
+.cloud-scene[data-aspect="9x16"] .cloud-layer { width: 47%; height: 30%; }
+
+.cloud-layer[data-slot="tl"] { top: 2%; left: 2%; }
+.cloud-layer[data-slot="tc"] { top: 2%; left: 50%; transform: translateX(-50%); width: 46%; height: 28%; }
+.cloud-layer[data-slot="tr"] { top: 2%; right: 2%; }
+.cloud-layer[data-slot="ml"] { top: 50%; left: 2%; transform: translateY(-50%); }
+.cloud-layer[data-slot="mc"] { top: 50%; left: 50%; transform: translate(-50%, -50%); width: 52%; height: 48%; }
+.cloud-layer[data-slot="mr"] { top: 50%; right: 2%; transform: translateY(-50%); }
+.cloud-layer[data-slot="bl"] { bottom: 2%; left: 2%; }
+.cloud-layer[data-slot="bc"] { bottom: 2%; left: 50%; transform: translateX(-50%); width: 54%; height: 30%; }
+.cloud-layer[data-slot="br"] { bottom: 2%; right: 2%; }
+
+.cloud-scene[data-aspect="9x16"] .cloud-layer[data-slot="tc"],
+.cloud-scene[data-aspect="9x16"] .cloud-layer[data-slot="bc"] { width: 88%; height: 24%; }
+.cloud-scene[data-aspect="9x16"] .cloud-layer[data-slot="mc"] { width: 84%; height: 34%; }
 .note-live {
   position: fixed;
   right: 10px;

@@ -141,26 +141,23 @@ test("TTS settings sanitize out-of-range inputs and round-trip through query par
   assert.equal(clean.command, "!talk");
   assert.equal(clean.minDiamonds, 25);
 
-  const params = TTS.toParams({ ...TTS.defaults, pet: "neko", petExcited: "abcd1234", cohost: "both", cohostVibe: "sassy", voice: "shimmer", trigger: "cmd" });
+  const params = TTS.toParams({ ...TTS.defaults, pet: "neko", petExcited: "abcd1234", voice: "shimmer", giftVoice: "onyx", who: "subs", trigger: "cmd" });
   const parsed = TTS.fromParams(params);
-  assert.deepEqual([parsed.pet, parsed.petExcited, parsed.cohost, parsed.cohostVibe, parsed.voice, parsed.trigger], ["neko", "abcd1234", "both", "sassy", "shimmer", "cmd"]);
+  assert.deepEqual([parsed.pet, parsed.petExcited, parsed.voice, parsed.giftVoice, parsed.who, parsed.trigger], ["neko", "abcd1234", "shimmer", "onyx", "subs", "cmd"]);
 });
 
-test("ttsSpeechFor supports AI Pet Co-Host !ask chat and gift/sub/bits cohost metadata", () => {
-  const cohostCfg = { ...TTS.defaults, cohost: "both", cohostVibe: "sassy", askCommand: "!ask", who: "subs", trigger: "both" };
-  assert.equal(ttsSpeechFor({ name: "Viewer", text: "!ask what snack?" }, cohostCfg), null, "who filter blocks non-sub");
+test("ttsSpeechFor enforces who role gating and distinct gift vs chat voice personas", () => {
+  const gatedCfg = { ...TTS.defaults, who: "subs", trigger: "both", voice: "alloy", giftVoice: "onyx" };
+  assert.equal(ttsSpeechFor({ name: "Viewer", text: "!say hello" }, gatedCfg), null, "who filter blocks non-sub");
 
-  const ask = ttsSpeechFor({ name: "SubPal", subscriber: true, text: "!ask what is your favorite pond snack?" }, cohostCfg);
-  assert.equal(ask.kind, "cohost");
-  assert.equal(ask.badge, "co-host");
-  assert.deepEqual(ask.cohost, { eventKind: "ask", author: "SubPal", detail: "what is your favorite pond snack?" });
+  const subSay = ttsSpeechFor({ name: "SubPal", subscriber: true, text: "!say hello pond" }, gatedCfg);
+  assert.equal(subSay.kind, "chat");
+  assert.equal(subSay.voice, "alloy");
+  assert.equal(subSay.text, "SubPal says: hello pond");
 
-  const subCohost = ttsSpeechFor({ kind: "sub", name: "Alex" }, cohostCfg);
-  assert.equal(subCohost.kind, "gift");
-  assert.deepEqual(subCohost.cohost, { eventKind: "sub", author: "Alex", detail: "sub" });
-
-  const offCfg = { ...TTS.defaults, cohost: "off", trigger: "both" };
-  assert.equal(ttsSpeechFor({ kind: "bits", name: "Alex", count: 500 }, offCfg).cohost, undefined);
+  const subAlert = ttsSpeechFor({ kind: "sub", name: "Alex" }, gatedCfg);
+  assert.equal(subAlert.kind, "gift");
+  assert.equal(subAlert.voice, "onyx");
 });
 
 test("pickBrowserVoice maps personas onto distinct installed/Natural voices and honors explicit filter", () => {

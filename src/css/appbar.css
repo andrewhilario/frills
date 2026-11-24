@@ -4,6 +4,10 @@
 .nav__link { display: inline-flex; align-items: center; min-height: 44px; padding: 0 var(--space-sm); border-radius: var(--radius-pill); font-size: var(--text-sm); font-weight: 600; white-space: nowrap; color: var(--color-ink); text-decoration: none; transition: background-color 140ms var(--ease-out); }
 @media (hover: hover) { .nav__link:hover { background: var(--color-paper-2); } }
 .nav__link[aria-current="page"] { background: var(--color-accent-tint); }
+.nav__link--plus { background: var(--color-accent-tint); border: 1.5px solid var(--color-ink); font-weight: 750; }
+@media (hover: hover) { .nav__link--plus:hover { background: var(--color-accent); } }
+.nav__link--plus[aria-current="page"] { background: var(--color-accent); }
+[data-plus-only][hidden] { display: none !important; }
 
 /* App bar: the brand, and a way back. */
 .appbar { position: sticky; top: 0; z-index: var(--z-sticky-nav); background: var(--color-paper); border-bottom: 2px dashed var(--color-rule); }

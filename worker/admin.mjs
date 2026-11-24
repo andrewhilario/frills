@@ -7,7 +7,7 @@
 
 import { KINDS } from "./feedback.mjs";
 import { MEDIA } from "./media.mjs";
-import { report } from "./stats-report.mjs";
+import { parseRelayUrls, report } from "./stats-report.mjs";
 
 export const ADMIN = { minKey: 12, maxWrong: 10, windowMs: 10 * 60 * 1000, pageSize: 40, maxPage: 100 };
 export const STATUSES = ["new", "done"];
@@ -126,8 +126,36 @@ async function removeMedia(id, env) {
   return json(200, { ok: true });
 }
 
+const EULER_ACTIONS = new Set(["reset", "rotate", "refill", "sync"]);
+
+async function controlEuler(request, env, { fetchImpl = globalThis.fetch?.bind(globalThis) } = {}) {
+  let body;
+  try { body = await request.json(); } catch { return json(400, { ok: false, error: "bad_json" }); }
+  const action = String(body?.action ?? "");
+  if (!EULER_ACTIONS.has(action)) return json(400, { ok: false, error: "bad_action" });
+  const allowedRelays = parseRelayUrls(env);
+  const requestedUrl = typeof body?.relayUrl === "string" ? body.relayUrl.trim().replace(/\/+$/, "") : "";
+  if (requestedUrl && !allowedRelays.includes(requestedUrl)) return json(400, { ok: false, error: "unknown_relay" });
+  const targets = requestedUrl ? [requestedUrl] : allowedRelays;
+  const ownerKey = String(env?.RELAY_OWNER_KEY ?? "").trim();
+  const payload = JSON.stringify({ action, ...(body?.slot != null ? { slot: Number(body.slot) } : {}) });
+  const headers = { "content-type": "application/json", accept: "application/json", ...(ownerKey ? { authorization: `Bearer ${ownerKey}` } : {}) };
+  const results = await Promise.all(
+    targets.map(async (base) => {
+      try {
+        const res = await fetchImpl(`${base}/owner/euler`, { method: "POST", headers, body: payload });
+        const data = await res.json().catch(() => ({}));
+        return { url: base, ok: res.ok, status: res.status, ...data };
+      } catch {
+        return { url: base, ok: false, status: 0, error: "unreachable" };
+      }
+    }),
+  );
+  return json(200, { ok: results.some((r) => r.ok), action, results });
+}
+
 /** Routes everything under /api/admin/. Returns a Response, or null when the address is not under it. */
-export async function handleAdmin(request, env, { now = Date.now(), fetchImpl } = {}) {
+export async function handleAdmin(request, env, { now = Date.now(), fetchImpl = globalThis.fetch?.bind(globalThis) } = {}) {
   const url = new URL(request.url);
   if (url.pathname !== "/api/admin" && !url.pathname.startsWith("/api/admin/")) return null;
   const denied = await authorize(request, env, now);
@@ -138,6 +166,7 @@ export async function handleAdmin(request, env, { now = Date.now(), fetchImpl } 
   try {
     if (more.length === 0 && area === "summary" && !rest) return method === "GET" ? await summary(env) : json(405, { ok: false, error: "method" }, { allow: "GET" });
     if (more.length === 0 && area === "stats" && !rest) return method === "GET" ? json(200, await report(env, { now, fetchImpl })) : json(405, { ok: false, error: "method" }, { allow: "GET" });
+    if (more.length === 0 && area === "euler" && !rest) return method === "POST" ? await controlEuler(request, env, { fetchImpl }) : json(405, { ok: false, error: "method" }, { allow: "POST" });
     if (more.length === 0 && area === "feedback") {
       if (!rest) return method === "GET" ? await listFeedback(url, env) : json(405, { ok: false, error: "method" }, { allow: "GET" });
       const id = Number(rest);

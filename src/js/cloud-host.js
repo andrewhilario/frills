@@ -34,6 +34,8 @@ if (!id) {
   say("This Frills cloud overlay link is incomplete.");
 } else {
   let frame = null;
+  let sceneBox = null;
+  const layerFrames = new Map();
   let version = 0;
   let cmdSeq = null;
   let activeKind = "";
@@ -126,6 +128,7 @@ if (!id) {
   };
 
   const mountTarget = (targetUrl) => {
+    if (sceneBox) { sceneBox.remove(); sceneBox = null; layerFrames.clear(); }
     if (!frame) {
       frame = document.createElement("iframe");
       frame.className = "cloud-frame";
@@ -133,7 +136,38 @@ if (!id) {
       frame.title = "Frills live overlay";
       root.replaceChildren(frame);
     }
-    frame.src = targetUrl;
+    const hash = location.hash && /^#(?:obsPass|vtsToken)=/.test(location.hash) ? location.hash : "";
+    frame.src = targetUrl + hash;
+  };
+
+  const mountScene = (aspect, layers) => {
+    if (frame) { frame.remove(); frame = null; }
+    if (!sceneBox) {
+      sceneBox = document.createElement("div");
+      sceneBox.className = "cloud-scene";
+      root.replaceChildren(sceneBox);
+    }
+    sceneBox.dataset.aspect = aspect === "9x16" ? "9x16" : "16x9";
+    const wanted = new Set(layers.map((l) => l.id));
+    for (const [layerId, el] of [...layerFrames.entries()]) {
+      if (!wanted.has(layerId)) {
+        el.remove();
+        layerFrames.delete(layerId);
+      }
+    }
+    for (const layer of layers) {
+      let el = layerFrames.get(layer.id);
+      if (!el) {
+        el = document.createElement("iframe");
+        el.className = "cloud-layer";
+        el.setAttribute("allow", "autoplay");
+        el.title = layer.name || "Frills overlay layer";
+        el.src = `/o/${encodeURIComponent(layer.id)}`;
+        layerFrames.set(layer.id, el);
+        sceneBox.append(el);
+      }
+      el.dataset.slot = layer.slot || "mc";
+    }
   };
 
   const poll = async () => {
@@ -147,6 +181,7 @@ if (!id) {
       if (res.status === 404) {
         stopped = true;
         if (frame) { frame.remove(); frame = null; }
+        if (sceneBox) { sceneBox.remove(); sceneBox = null; layerFrames.clear(); }
         say("This Frills cloud overlay was removed or does not exist.");
         return;
       }
@@ -163,16 +198,21 @@ if (!id) {
         }
         if (Number.isFinite(Number(data.cmdSeq))) cmdSeq = Number(data.cmdSeq);
         if (data.changed !== false && Number(data.version) > 0 && Number(data.version) !== version) {
-          const target = safeOverlayTarget(data.url, data.version);
-          if (target) {
+          if (data.kind === "scene" && Array.isArray(data.layers)) {
             version = Number(data.version);
-            mountTarget(target);
+            mountScene(data.aspect || "16x9", data.layers);
+          } else {
+            const target = safeOverlayTarget(data.url, data.version);
+            if (target) {
+              version = Number(data.version);
+              mountTarget(target);
+            }
           }
         }
       }
     } catch {
       fails += 1;
-      if (!frame && fails >= 2) say("Connecting to Frills cloud overlay…");
+      if (!frame && !sceneBox && fails >= 2) say("Connecting to Frills cloud overlay…");
     }
     if (!stopped) {
       const wait = fails > 2 ? Math.min(20000, POLL_MS * Math.min(5, fails)) : POLL_MS;

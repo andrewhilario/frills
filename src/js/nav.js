@@ -20,8 +20,33 @@ export function initAnnouncement() {
   });
 }
 
+export function applyPlusRegionDom(eligible) {
+  for (const el of document.querySelectorAll("[data-plus-only]")) el.hidden = !eligible;
+  for (const a of document.querySelectorAll('.foot__links a[href="/plus/"], .foot__links a[href="/account/"], .nav__sheet a[href="/plus/"], .nav__sheet a[href="/account/"]')) {
+    const item = a.closest("li") ?? a;
+    item.hidden = !eligible;
+  }
+}
+
+export function initPlusRegion() {
+  if (document.body?.dataset?.plusAccounts !== "on") return;
+  try {
+    const cached = sessionStorage.getItem("frills:plus:eligible");
+    if (cached === "1" || cached === "0") applyPlusRegionDom(cached === "1");
+  } catch {}
+  fetch("/api/cloud-overlays?probe=1", { credentials: "same-origin", cache: "no-store" })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((data) => {
+      if (typeof data?.eligible !== "boolean") return;
+      try { sessionStorage.setItem("frills:plus:eligible", data.eligible ? "1" : "0"); } catch {}
+      applyPlusRegionDom(data.eligible);
+    })
+    .catch(() => {});
+}
+
 export function initNav() {
   initAnnouncement();
+  initPlusRegion();
   const nav = document.querySelector("[data-nav]");
   if (!nav) return;
 

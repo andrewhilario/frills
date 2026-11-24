@@ -57,7 +57,7 @@ mkdirSync(dist, { recursive: true });
 if (existsSync(join(root, "public"))) cpSync(join(root, "public"), dist, { recursive: true });
 
 const common = { absWorkingDir: root, bundle: true, minify: true, metafile: true, logLevel: "warning", outdir: join(dist, "assets"), entryNames: "[name]-[hash]", target: ["chrome100", "firefox100", "safari15"] };
-const jsEntries = { home: "src/js/home.js", check: "src/js/check.js", editor: "src/js/editor.js", overlay: "src/js/overlay.js", cloudHost: "src/js/cloud-host.js", matcha: "src/js/matcha-page.js", page: "src/js/page.js", account: "src/js/account.js", start: "src/js/start.js", feedback: "src/js/feedback.js", alerts: "src/js/alerts-editor.js", alertsOverlay: "src/js/alerts-overlay.js", gifts: "src/js/gifts-editor.js", jar: "src/js/jar-editor.js", jarOverlay: "src/js/jar-overlay.js", likers: "src/js/likers-editor.js", likersOverlay: "src/js/likers-overlay.js", gifters: "src/js/gifters-editor.js", giftersOverlay: "src/js/gifters-overlay.js", labels: "src/js/labels-editor.js", labelsOverlay: "src/js/labels-overlay.js", songs: "src/js/songs-editor.js", songsOverlay: "src/js/songs-overlay.js", spotify: "src/js/spotify-page.js", twitch: "src/js/twitch-page.js", admin: "src/js/admin.js", adminStats: "src/js/admin-stats.js", ticker: "src/js/ticker.js", goal: "src/js/goal-editor.js", giftsOverlay: "src/js/gifts-overlay.js", goalOverlay: "src/js/goal-overlay.js", counter: "src/js/counter-editor.js", counterOverlay: "src/js/counter-overlay.js", timer: "src/js/timer-editor.js", timerOverlay: "src/js/timer-overlay.js", tts: "src/js/tts-editor.js", ttsOverlay: "src/js/tts-overlay.js", ...(withOgCard && { og: "src/js/og.js" }) };
+const jsEntries = { home: "src/js/home.js", check: "src/js/check.js", status: "src/js/status.js", editor: "src/js/editor.js", overlay: "src/js/overlay.js", cloudHost: "src/js/cloud-host.js", matcha: "src/js/matcha-page.js", page: "src/js/page.js", account: "src/js/account.js", start: "src/js/start.js", feedback: "src/js/feedback.js", alerts: "src/js/alerts-editor.js", alertsOverlay: "src/js/alerts-overlay.js", gifts: "src/js/gifts-editor.js", jar: "src/js/jar-editor.js", jarOverlay: "src/js/jar-overlay.js", wheel: "src/js/wheel-editor.js", wheelOverlay: "src/js/wheel-overlay.js", actions: "src/js/actions-editor.js", actionsOverlay: "src/js/actions-overlay.js", likers: "src/js/likers-editor.js", likersOverlay: "src/js/likers-overlay.js", gifters: "src/js/gifters-editor.js", giftersOverlay: "src/js/gifters-overlay.js", labels: "src/js/labels-editor.js", labelsOverlay: "src/js/labels-overlay.js", songs: "src/js/songs-editor.js", songsOverlay: "src/js/songs-overlay.js", spotify: "src/js/spotify-page.js", twitch: "src/js/twitch-page.js", admin: "src/js/admin.js", adminStats: "src/js/admin-stats.js", ticker: "src/js/ticker.js", goal: "src/js/goal-editor.js", giftsOverlay: "src/js/gifts-overlay.js", goalOverlay: "src/js/goal-overlay.js", counter: "src/js/counter-editor.js", counterOverlay: "src/js/counter-overlay.js", timer: "src/js/timer-editor.js", timerOverlay: "src/js/timer-overlay.js", tts: "src/js/tts-editor.js", ttsOverlay: "src/js/tts-overlay.js", ...(withOgCard && { og: "src/js/og.js" }) };
 const cssEntries = { home: "src/css/entry/home.css", check: "src/css/entry/check.css", page: "src/css/entry/page.css", start: "src/css/entry/start.css", editor: "src/css/entry/editor.css", matcha: "src/css/entry/matcha.css", overlay: "src/css/entry/overlay.css", cloudHost: "src/css/entry/cloud-host.css", alerts: "src/css/entry/alerts.css", alertsOverlay: "src/css/entry/alerts-overlay.css", widget: "src/css/entry/widget.css", admin: "src/css/entry/admin.css", widgetOverlay: "src/css/entry/widget-overlay.css", ...(withOgCard && { og: "src/css/entry/og.css" }) };
 const jsBuild = await esbuild({ ...common, entryPoints: jsEntries, format: "iife", legalComments: "none" });
 const cssBuild = await esbuild({ ...common, entryPoints: cssEntries, external: ["/fonts/*", "/decor/*"], legalComments: "inline" });
@@ -135,7 +135,10 @@ const copy = {
   matchaLede: relayOn ? "real TikTok chat or Twitch chat" : "real TikTok chat (with the Frills helper) or Twitch chat",
 };
 copy.tiktokGuide = render(partials[relayOn ? "guide-tiktok-relay" : "guide-tiktok-helper"], { helperGet }, partials, "guide-tiktok");
-const words = plusWords({ on: site.plusAccounts === true }); // (what the pages say changes once accounts exist: see src/plus-words.mjs)
+const plusPromoBanner = site.plusAccounts && site.plusPromoCode
+  ? `\n        <p class="plus-promo"><strong>Founding 20 offer:</strong> use code <code>${esc(site.plusPromoCode)}</code> at checkout for <strong>20% off forever</strong> ($4.79/month — first 20 subscribers only).</p>`
+  : "";
+const words = plusWords({ on: site.plusAccounts === true, promoBanner: plusPromoBanner }); // (what the pages say changes once accounts exist: see src/plus-words.mjs)
 const shared = {
   ...copy,
   themeColor: tokenHex("paper"),
@@ -147,9 +150,7 @@ const shared = {
   ...Object.fromEntries(Object.entries(words).map(([k, v]) => ["plus" + k[0].toUpperCase() + k.slice(1), v])), // plusNotAffiliated, plusPrivacyLede, plusIdeasIntro, ...
   plusAccounts: site.plusAccounts ? "on" : "", // ("on" when the Frills Plus account pages are built: a page that links to them checks this)
   plusPromoCode: site.plusAccounts && site.plusPromoCode ? site.plusPromoCode : "",
-  plusPromoBanner: site.plusAccounts && site.plusPromoCode
-    ? `\n        <p class="plus-promo"><strong>Founding 20 offer:</strong> use code <code>${esc(site.plusPromoCode)}</code> at checkout for <strong>20% off forever</strong> ($4.79/month — first 20 subscribers only).</p>`
-    : "",
+  plusPromoBanner,
   siteAddress: site.url,
   spotifyClientId: site.spotifyClientId ?? "",
   twitchClientId: site.twitchClientId ?? "",
@@ -276,9 +277,11 @@ const SPOTIFY_CONNECT = site.spotifyClientId ? " https://accounts.spotify.com ht
 const SPOTIFY_PICTURES = site.spotifyClientId ? " https://i.scdn.co" : "";
 const RELAY_CONNECT = [site.relayUrl, site.plusRelayUrl].filter(Boolean).map((u) => " " + u).join("");
 const csp = ["default-src 'self'", "script-src 'self'", "style-src 'self'", `img-src 'self' data: https://static-cdn.jtvnw.net https://cdn-images.dzcdn.net${SPOTIFY_PICTURES} ${TIKTOK_PICTURES}`, "font-src 'self'", `connect-src 'self' wss://irc-ws.chat.twitch.tv${RELAY_CONNECT}${TWITCH_CONNECT}${SPOTIFY_CONNECT}`, "base-uri 'self'", "form-action 'self'", "frame-ancestors 'none'", "object-src 'none'"].join("; ");
+const actionsCsp = csp.replace("connect-src 'self'", "connect-src 'self' ws://127.0.0.1:* ws://localhost:*");
+const actionsOverlayCsp = actionsCsp.replace("frame-ancestors 'none'", "frame-ancestors 'self'");
 writeFileSync(
   join(dist, "_headers"),
-  `/*\n  Content-Security-Policy: ${csp}\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n  Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()\n\n/assets/*\n  Cache-Control: public, max-age=31536000, immutable\n\n/fonts/*\n  Cache-Control: public, max-age=31536000, immutable\n\n/overlay/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n  ! Content-Security-Policy\n  Content-Security-Policy: ${csp.replace("frame-ancestors 'none'", "frame-ancestors 'self'")}\n\n/o/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n\n/matcha/*\n  X-Robots-Tag: noindex, nofollow\n\n/check/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n\n/admin/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n`,
+  `/*\n  Content-Security-Policy: ${csp}\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n  Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()\n\n/assets/*\n  Cache-Control: public, max-age=31536000, immutable\n\n/fonts/*\n  Cache-Control: public, max-age=31536000, immutable\n\n/actions/*\n  ! Content-Security-Policy\n  Content-Security-Policy: ${actionsCsp}\n\n/overlay/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n  ! Content-Security-Policy\n  Content-Security-Policy: ${csp.replace("frame-ancestors 'none'", "frame-ancestors 'self'")}\n\n/overlay/actions/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n  ! Content-Security-Policy\n  Content-Security-Policy: ${actionsOverlayCsp}\n\n/o/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n\n/matcha/*\n  X-Robots-Tag: noindex, nofollow\n\n/check/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n\n/admin/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n`,
 );
 
 // ── Report ────────────────────────────────────────────────────────────────────────────────────────────────────────────

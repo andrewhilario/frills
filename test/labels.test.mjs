@@ -31,14 +31,22 @@ function clock() {
 test("Labels settings validate bounds and serialize only overrides cleanly", () => {
   assert.ok(LABEL_LAYOUTS.length >= 12, "offers plenty of highlight card designs");
   for (const c of LABELS.controls) assert.notEqual(coerce(c, LABELS.defaults[c.key]), undefined, `${c.key}`);
-  const s = LABELS.sanitize({ layout: "polaroid", enter: "pop", rotateSec: 99, showBits: false, labelGift: "Latest\u0000Gift" });
-  assert.deepEqual([s.layout, s.enter, s.rotateSec, s.showBits, s.labelGift], ["polaroid", "pop", 30, false, "Latest Gift"]);
+  const s = LABELS.sanitize({ layout: "polaroid", enter: "flip", anim: "pulse", rotateSec: 99, showBits: false, labelGift: "Latest\u0000Gift" });
+  assert.deepEqual([s.layout, s.enter, s.anim, s.rotateSec, s.showBits, s.labelGift], ["polaroid", "flip", "pulse", 30, false, "Latest Gift"]);
+  assert.equal(LABELS.sanitize({ enter: "bounce", anim: "float" }).enter, "bounce");
+  assert.equal(LABELS.sanitize({ enter: "bounce", anim: "float" }).anim, "float");
 
   const url = new URL(LABELS.url("https://x.test/overlay/labels/", { channel: "pondpal", platform: "twitch", settings: s }));
   assert.equal(url.searchParams.get("platform"), "twitch");
   assert.equal(url.searchParams.get("layout"), "polaroid");
+  assert.equal(url.searchParams.get("enter"), "flip");
+  assert.equal(url.searchParams.get("anim"), "pulse");
   assert.equal(url.searchParams.get("showBits"), "0");
   assert.deepEqual(LABELS.sanitize(LABELS.fromParams(url.searchParams)), s);
+  // Default animation & transition stay omitted from URLs so links stay short
+  const defUrl = new URL(LABELS.url("https://x.test/overlay/labels/", { channel: "pondpal", platform: "twitch", settings: LABELS.defaults }));
+  assert.equal(defUrl.searchParams.has("anim"), false);
+  assert.equal(defUrl.searchParams.has("enter"), false);
   assert.deepEqual(enabledSlotIds("tiktok", LABELS.defaults), ["lastGift", "lastFollower", "topGifter", "topLiker"]);
   assert.deepEqual(enabledSlotIds("twitch", s), ["lastFollower", "lastSub", "topSubGifter", "topBitSender"]);
 });

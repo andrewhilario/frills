@@ -5,6 +5,9 @@
   // free plan, and they never reach the Worker: only /api/* and the overlay pages do (run_worker_first; the Worker counts an overlay opening, then serves the page). The Worker (worker/) takes the feedback form's
   // messages and saves them in a D1 database (the binding DB, below; its table is in worker/schema.sql).
   "main": "worker/index.mjs",
+  "vars": {
+    "RELAY_URLS": "https://relay.valwidgets.live,https://plus-relay.valwidgets.live"
+  },
   "d1_databases": [
     { "binding": "DB", "database_name": "frills-feedback", "database_id": "11ced78c-30ad-4e22-88c7-61360de5cafb" }
   ],

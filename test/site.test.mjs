@@ -27,7 +27,7 @@ const assetOf = (html, kind) => (new RegExp(`${kind === "css" ? 'href="(/assets/
 
 test("the pages we expect are all there", () => {
   const urls = pages.map((p) => p.url).sort();
-  const base = ["/","/404.html","/admin/", "/admin/stats/","/alerts/","/changelog/","/check/","/counter/","/editor/","/feedback/","/gifters/","/gifts/","/goal/","/guides/alerts/","/guides/both/","/guides/live-studio/","/guides/not-showing/","/guides/obs/","/guides/setup/","/guides/sizes/","/guides/songs/","/guides/test/","/guides/tiktok/","/jar/","/labels/","/likers/","/looks/","/looks/bunny-cloud/","/looks/frog-pond/","/looks/hamster-burrow/","/looks/neko-cafe/","/matcha/","/matcha/alerts/","/overlay/","/overlay/alerts/","/overlay/counter/","/overlay/gifters/","/overlay/gifts/","/overlay/goal/","/overlay/jar/","/overlay/labels/","/overlay/likers/","/overlay/songs/","/overlay/timer/","/overlay/tts/","/overlays/","/overlays/faq/","/privacy/","/songs/","/spotify/","/spotify/callback/","/start/","/timer/","/tts/","/twitch/","/twitch/callback/"];
+  const base = ["/","/404.html","/actions/","/admin/", "/admin/stats/","/alerts/","/changelog/","/check/","/counter/","/editor/","/feedback/","/gifters/","/gifts/","/goal/","/guides/alerts/","/guides/both/","/guides/live-studio/","/guides/not-showing/","/guides/obs/","/guides/setup/","/guides/sizes/","/guides/songs/","/guides/test/","/guides/tiktok/","/jar/","/labels/","/likers/","/looks/","/looks/bunny-cloud/","/looks/frog-pond/","/looks/hamster-burrow/","/looks/neko-cafe/","/matcha/","/matcha/alerts/","/overlay/","/overlay/actions/","/overlay/alerts/","/overlay/counter/","/overlay/gifters/","/overlay/gifts/","/overlay/goal/","/overlay/jar/","/overlay/labels/","/overlay/likers/","/overlay/songs/","/overlay/timer/","/overlay/tts/","/overlay/wheel/","/overlays/","/overlays/faq/","/privacy/","/songs/","/spotify/","/spotify/callback/","/start/","/status/","/timer/","/tts/","/twitch/","/twitch/callback/","/wheel/"];
   const expected = site.plusAccounts ? [...base, "/account/", "/account/verify/", "/o/", "/plus/"].sort() : base;
   assert.deepEqual(urls, expected);
 });
@@ -130,8 +130,10 @@ test("the only outside addresses are Twitch, the site itself, Tally and the stan
   const plusRelayHost = site.plusRelayUrl ? new URL(site.plusRelayUrl).host : "no-plus-relay.invalid";
   const allowed = [new RegExp(`^${relayHost.replace(/\./g, "\\.")}$`), new RegExp(`^${plusRelayHost.replace(/\./g, "\\.")}$`), /^static-cdn\.jtvnw\.net$/, /^irc-ws\.chat\.twitch\.tv$/, /^eventsub\.wss\.twitch\.tv$/, /^api\.twitch\.tv$/, /^id\.twitch\.tv$/, /^accounts\.spotify\.com$/, /^api\.spotify\.com$/, /^www\.spotify\.com$/,/^developer\.spotify\.com$/, /^i\.scdn\.co$/, new RegExp(`^${new URL(site.url).host.replace(/\./g, "\\.")}$`), new RegExp(`^${new URL(site.tally.url).host.replace(/\./g, "\\.")}$`), /^schema\.org$/, /^www\.w3\.org$/, /^www\.sitemaps\.org$/];
   for (const file of files.filter((f) => /\.(html|js|css|xml|txt)$/.test(f) && !f.startsWith("fonts/licenses/"))) {
-    for (const m of read(file).matchAll(/(?:https?|wss?):\/\/([a-z0-9.-]+)/gi)) {
-      assert.ok(allowed.some((re) => re.test(m[1])), `${file} talks to ${m[1]}`);
+    const isActionsJs = /^assets\/actions(?:Overlay)?-[^/]+\.js$/.test(file);
+    for (const m of read(file).matchAll(/(https?|wss?):\/\/([a-z0-9.-]+)/gi)) {
+      if (isActionsJs && m[1].toLowerCase() === "ws" && m[2] === "127.0.0.1") continue; // local OBS Studio WebSocket v5
+      assert.ok(allowed.some((re) => re.test(m[2])), `${file} talks to ${m[2]}`);
     }
   }
 });
@@ -153,7 +155,15 @@ test("the overlay stays light, and the site's own numbers are true", () => {
 });
 
 test("nothing from the machine it was built on leaks into the site", () => {
-  for (const file of files.filter((f) => /\.(html|js|css|xml|txt)$/.test(f))) assert.doesNotMatch(read(file), /localhost|127\.0\.0\.1/, file);
+  for (const file of files.filter((f) => /\.(html|js|css|xml|txt)$/.test(f))) {
+    const content = read(file);
+    assert.doesNotMatch(content, /localhost/, file);
+    if (/^assets\/actions(?:Overlay)?-[^/]+\.js$/.test(file)) {
+      assert.doesNotMatch(content, /https?:\/\/127\.0\.0\.1/, file);
+    } else {
+      assert.doesNotMatch(content, /127\.0\.0\.1/, file);
+    }
+  }
 });
 
 test("the brand images exist and are the right size", () => {

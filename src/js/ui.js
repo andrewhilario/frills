@@ -5,7 +5,7 @@ import { el } from "./feed.js";
 import { initAnnouncement } from "./nav.js";
 import { countCopy } from "./stats.js";
 import { activeSeason } from "./season.js";
-import { pairsText, parsePairs } from "./widget-settings.js";
+import { listText, pairsText, parseList, parsePairs } from "./widget-settings.js";
 
 initAnnouncement();
 
@@ -190,6 +190,207 @@ export function buildControl(control, value, onSet, { id = "c-" + control.key } 
       if (now === pairsText(parsePairs(v))) return;
       for (const r of rows.splice(0)) r.node.remove();
       for (const { name, seconds } of parsePairs(v)) addRow(name, seconds);
+    };
+  } else if (control.type === "list") {
+    // Editable list of short text items (e.g., Spin the Wheel slices): one row per item with quick starter packs,
+    // Enter-to-add, Backspace-on-empty-to-remove, Alt+Up/Down reorder, bulk paste splitting, and optional Shuffle.
+    row.classList.add("ctl--wide");
+    const minItems = control.minItems ?? 2;
+    const maxItems = control.maxItems ?? 12;
+    const itemMax = control.itemMax ?? 32;
+    const itemLabel = control.itemLabel ?? "Item";
+    const opts = { maxItems, itemMax };
+
+    const heading = el("span", { className: "ctl__label", id: id + "-label", textContent: control.label });
+    const countOut = el("output", { className: "items__count" });
+    countOut.setAttribute("aria-live", "polite");
+
+    const listEl = el("div", { className: "items", id });
+    listEl.setAttribute("role", "list");
+    listEl.setAttribute("aria-labelledby", id + "-label");
+
+    const warn = el("p", { className: "items__warn", hidden: true });
+    warn.setAttribute("role", "status");
+
+    const rows = [];
+    const presetButtons = [];
+
+    const serialize = () => listText(rows.map((r) => r.input.value), opts);
+
+    const syncUi = () => {
+      const filled = rows.filter((r) => r.input.value.trim().length > 0).length;
+      countOut.textContent = `${rows.length} / ${maxItems}`;
+      const canRemove = rows.length > minItems;
+      rows.forEach((r, idx) => {
+        const n = idx + 1;
+        r.input.setAttribute("aria-label", `${itemLabel} ${n}`);
+        r.remove.disabled = !canRemove;
+        r.remove.setAttribute("aria-label", `Remove ${itemLabel.toLowerCase()} ${n}`);
+      });
+      addBtn.disabled = rows.length >= maxItems;
+      if (shuffleBtn) shuffleBtn.disabled = filled < 2;
+      const tooFew = filled < minItems;
+      warn.hidden = !tooFew;
+      if (tooFew) warn.textContent = control.minHint ?? `Fill in at least ${minItems} ${itemLabel.toLowerCase()}s.`;
+      const cur = serialize();
+      for (const p of presetButtons) {
+        p.btn.setAttribute("aria-pressed", String(cur === p.normalized));
+      }
+    };
+
+    const emit = () => {
+      syncUi();
+      onSet(serialize());
+    };
+
+    const rebuildFrom = (items, focusIndex = -1) => {
+      for (const r of rows.splice(0)) r.node.remove();
+      for (const text of items.slice(0, maxItems)) addRow(text, false);
+      while (rows.length < minItems) addRow("", false);
+      syncUi();
+      if (focusIndex >= 0 && rows[focusIndex]) rows[focusIndex].input.focus();
+    };
+
+    const addRow = (text = "", focus = false) => {
+      if (rows.length >= maxItems) return null;
+      const dot = el("span", { className: "items__dot" });
+      dot.setAttribute("aria-hidden", "true");
+      const input = el("input", {
+        type: "text",
+        className: "items__input",
+        maxLength: itemMax,
+        placeholder: control.placeholder ?? itemLabel,
+        autocomplete: "off",
+        spellcheck: false,
+      });
+      input.value = text;
+      const remove = el("button", { type: "button", className: "items__remove", textContent: "×" });
+      const r = { input, remove, node: el("div", { className: "items__row" }, dot, input, remove) };
+      r.node.setAttribute("role", "listitem");
+
+      input.addEventListener("input", emit);
+      input.addEventListener("keydown", (event) => {
+        const idx = rows.indexOf(r);
+        if (event.key === "Enter") {
+          event.preventDefault();
+          if (idx < rows.length - 1) {
+            rows[idx + 1].input.focus();
+          } else if (rows.length < maxItems) {
+            addRow("", true);
+            syncUi();
+          }
+        } else if (event.key === "Backspace" && input.value === "" && rows.length > minItems) {
+          event.preventDefault();
+          rows.splice(idx, 1);
+          r.node.remove();
+          const nextFocus = rows[Math.max(0, idx - 1)];
+          emit();
+          nextFocus?.input.focus();
+        } else if (event.altKey && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
+          const targetIdx = event.key === "ArrowUp" ? idx - 1 : idx + 1;
+          if (targetIdx < 0 || targetIdx >= rows.length) return;
+          event.preventDefault();
+          const values = rows.map((x) => x.input.value);
+          [values[idx], values[targetIdx]] = [values[targetIdx], values[idx]];
+          rebuildFrom(values, targetIdx);
+          onSet(serialize());
+        }
+      });
+      input.addEventListener("paste", (event) => {
+        const raw = (event.clipboardData?.getData("text") ?? "").replace(/(\d),(\d{3})(?!\d)/g, "$1$2");
+        if (!/[,\n\r]/.test(raw)) return;
+        const pasted = parseList(raw, opts);
+        if (pasted.length < 2) return;
+        event.preventDefault();
+        const idx = rows.indexOf(r);
+        const before = rows.slice(0, idx).map((x) => x.input.value);
+        const after = rows.slice(idx + 1).map((x) => x.input.value);
+        const replaceCurrent = !input.value.trim() || (input.selectionStart === 0 && input.selectionEnd === input.value.length);
+        const merged = (replaceCurrent
+          ? [...before, ...pasted, ...after]
+          : [...before, input.value, ...pasted, ...after]).slice(0, maxItems);
+        const focusAt = Math.min(merged.length - 1, idx + (replaceCurrent ? pasted.length - 1 : pasted.length));
+        rebuildFrom(merged, focusAt);
+        onSet(serialize());
+      });
+      remove.addEventListener("click", () => {
+        if (rows.length <= minItems) return;
+        const idx = rows.indexOf(r);
+        rows.splice(idx, 1);
+        r.node.remove();
+        emit();
+        rows[Math.min(idx, rows.length - 1)]?.input.focus();
+      });
+
+      rows.push(r);
+      listEl.append(r.node);
+      if (focus) input.focus();
+      return r;
+    };
+
+    const actions = el("div", { className: "items__actions" });
+    const addBtn = el("button", { type: "button", className: "btn btn--soft btn--sm items__add", textContent: control.addLabel ?? "+ Add item" });
+    addBtn.addEventListener("click", () => {
+      if (rows.length >= maxItems) return;
+      addRow("", true);
+      syncUi();
+    });
+    actions.append(addBtn);
+
+    let shuffleBtn = null;
+    if (control.shuffle) {
+      shuffleBtn = el("button", { type: "button", className: "btn btn--soft btn--sm items__shuffle", textContent: "Shuffle" });
+      shuffleBtn.addEventListener("click", () => {
+        const filled = rows.map((r) => r.input.value.trim()).filter(Boolean);
+        if (filled.length < 2) return;
+        const next = [...filled];
+        const hasDistinct = new Set(next).size > 1;
+        for (let attempt = 0; attempt < 6; attempt++) {
+          for (let i = next.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [next[i], next[j]] = [next[j], next[i]];
+          }
+          if (!hasDistinct || next.some((v, idx) => v !== filled[idx])) break;
+        }
+        if (hasDistinct && next.every((v, idx) => v === filled[idx])) {
+          const swapIdx = next.findIndex((v) => v !== next[0]);
+          if (swapIdx > 0) [next[0], next[swapIdx]] = [next[swapIdx], next[0]];
+        }
+        rebuildFrom(next);
+        onSet(serialize());
+      });
+      actions.append(shuffleBtn);
+    }
+
+    row.append(heading, countOut);
+
+    if (control.presets?.length) {
+      const presetBar = el("div", { className: "items__presets" });
+      presetBar.setAttribute("role", "group");
+      presetBar.setAttribute("aria-label", `${control.label} starter packs`);
+      for (const preset of control.presets) {
+        const btn = el("button", { type: "button", className: "chip items__preset", textContent: preset.name });
+        const normalized = listText(parseList(preset.value, opts), opts);
+        btn.addEventListener("click", () => {
+          rebuildFrom(parseList(preset.value, opts));
+          onSet(serialize());
+        });
+        presetButtons.push({ btn, normalized });
+        presetBar.append(btn);
+      }
+      row.append(presetBar);
+    }
+
+    row.append(listEl, warn, actions);
+
+    write = (v) => {
+      const incoming = parseList(v, opts);
+      const nextText = listText(incoming, opts);
+      if (rows.length > 0 && serialize() === nextText && (rows.length === Math.max(minItems, incoming.length) || listEl.contains(document.activeElement))) {
+        syncUi();
+        return;
+      }
+      rebuildFrom(incoming);
     };
   } else {
     row.classList.add("ctl--wide");

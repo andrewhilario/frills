@@ -1,0 +1,119 @@
+<!--
+{
+  "title": "Live Server & Relay Status | Frills",
+  "description": "Check live server status for Frills overlays, the free TikTok LIVE community relay, the dedicated Frills Plus 24/7 relay, and Twitch chat connections.",
+  "path": "/status/",
+  "updated": "2026-11-22",
+  "published": "2026-11-22",
+  "css": "page",
+  "js": "status",
+  "bodyClass": "page-guide page-status",
+  "chrome": "nav",
+  "footer": true,
+  "jsonld": ["webapp", "breadcrumb:Server status"]
+}
+-->
+<main id="main">
+  <article class="article shell">
+    <ol class="crumbs" aria-label="Breadcrumb">
+      <li><a href="/">Frills</a></li>
+      <li aria-current="page">Server status</li>
+    </ol>
+    <header class="article__head">
+      <h1 class="display">Live server and relay status</h1>
+      <p class="lede">This page checks Frills’ servers, live TikTok relays, and Twitch chat reachability directly from your browser every 15 seconds so you can tell immediately if everything is running smoothly.</p>
+    </header>
+
+    <div class="article__body article__body--wide status-board" data-relay-url="{{relay}}" data-plus-relay-url="{{plusRelay}}">
+      <section class="status-hero" id="status-hero" data-state="checking" aria-live="polite">
+        <div class="status-hero__main">
+          <span class="status-dot" aria-hidden="true"></span>
+          <div>
+            <h2 class="subtitle" id="status-headline">Checking live servers…</h2>
+            <p class="status-hero__sub" id="status-sub">Testing edge delivery, TikTok relays, and Twitch chat from your browser.</p>
+          </div>
+        </div>
+        <div class="status-hero__actions">
+          <span class="status-hero__time" id="status-time">Checking…</span>
+          <button class="btn btn--soft btn--sm" type="button" id="status-refresh">Check again</button>
+        </div>
+      </section>
+
+      <section class="status-grid" id="status-grid" aria-label="Live service components">
+        <article class="status-card" id="svc-edge" data-state="checking">
+          <div class="status-card__top">
+            <div>
+              <h2 class="subtitle">Website &amp; Overlay Edge</h2>
+              <p class="status-card__host">frills.valwidgets.live</p>
+            </div>
+            <span class="status-pill" id="edge-pill">Checking…</span>
+          </div>
+          <p class="status-card__desc">Cloudflare global edge serving overlay pages, editors, feedback, and cloud overlay links.</p>
+          <div class="status-metrics">
+            <div class="status-metric"><span>Latency</span><b id="edge-latency">—</b></div>
+            <div class="status-metric"><span>Cloud Overlay API</span><b id="edge-api">—</b></div>
+          </div>
+        </article>
+
+        <article class="status-card" id="svc-relay" data-state="checking">
+          <div class="status-card__top">
+            <div>
+              <h2 class="subtitle">Free TikTok LIVE Community Relay</h2>
+              <p class="status-card__host" id="relay-host">relay.valwidgets.live</p>
+            </div>
+            <span class="status-pill" id="relay-pill">Checking…</span>
+          </div>
+          <p class="status-card__desc">Shared free relay reading public TikTok LIVE chat, gifts, follows, and shares with nothing to install.</p>
+          <div class="status-bar" aria-hidden="true"><i id="relay-fill"></i></div>
+          <div class="status-metrics">
+            <div class="status-metric"><span>Free Spots</span><b id="relay-spots">—</b></div>
+            <div class="status-metric"><span>Queue</span><b id="relay-queue">—</b></div>
+            <div class="status-metric"><span>Signing Service</span><b id="relay-signing">—</b></div>
+            <div class="status-metric"><span>Latency / Uptime</span><b id="relay-uptime">—</b></div>
+          </div>
+        </article>
+
+        <article class="status-card" id="svc-plus-relay" data-state="checking">
+          <div class="status-card__top">
+            <div>
+              <h2 class="subtitle">Dedicated Frills Plus 24/7 Relay</h2>
+              <p class="status-card__host" id="plus-relay-host">plus-relay.valwidgets.live</p>
+            </div>
+            <span class="status-pill" id="plus-relay-pill">Checking…</span>
+          </div>
+          <p class="status-card__desc">Dedicated subscriber-only TikTok relay server with 100 reserved slots and zero public queue.</p>
+          <div class="status-bar" aria-hidden="true"><i id="plus-relay-fill"></i></div>
+          <div class="status-metrics">
+            <div class="status-metric"><span>Free Reserved Spots</span><b id="plus-relay-spots">—</b></div>
+            <div class="status-metric"><span>Queue</span><b id="plus-relay-queue">—</b></div>
+            <div class="status-metric"><span>Signing Service</span><b id="plus-relay-signing">—</b></div>
+            <div class="status-metric"><span>Latency / Uptime</span><b id="plus-relay-uptime">—</b></div>
+          </div>
+        </article>
+
+        <article class="status-card" id="svc-twitch" data-state="checking">
+          <div class="status-card__top">
+            <div>
+              <h2 class="subtitle">Twitch Chat &amp; Alerts Direct</h2>
+              <p class="status-card__host">irc-ws.chat.twitch.tv</p>
+            </div>
+            <span class="status-pill" id="twitch-pill">Checking…</span>
+          </div>
+          <p class="status-card__desc">Your browser or streaming app connects straight to Twitch without passing through Frills’ relays.</p>
+          <div class="status-metrics">
+            <div class="status-metric"><span>Handshake</span><b id="twitch-state">—</b></div>
+            <div class="status-metric"><span>Latency</span><b id="twitch-latency">—</b></div>
+          </div>
+        </article>
+      </section>
+
+      <h2>Need to test your own streaming app?</h2>
+      <p>If all servers are green above but your overlay isn’t showing inside OBS or TikTok LIVE Studio, open the browser check inside your streaming app, or try a practice link first:</p>
+      <ul>
+        <li><a href="/check/">Open the Browser Source check (/check/)</a> — copy or open inside OBS / Studio to verify animations, WebSockets, and fonts.</li>
+        <li><a href="/guides/test/">Test your overlay with practice chat</a> — uses <code>frills_demo</code> with zero relay spots required.</li>
+        <li><a href="/guides/not-showing/">Chat not showing troubleshooting guide</a> — fixes for browser source caching, usernames, and TikTok LIVE status.</li>
+      </ul>
+    </div>
+  </article>
+</main>

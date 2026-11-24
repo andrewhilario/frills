@@ -10,7 +10,7 @@ import { decoPieces, hasDeco, seedOf } from "./decor.js";
 const BURST = [10, 18, 30]; // particles for a small, medium and big alert
 /** The small label some card styles show along the top (a trading card's name bar, a profile card's banner). */
 const KIND_TAGS = { follow: "New follower", gift: "Gift", share: "Shared the LIVE", sub: "New sub", subgift: "Gifted subs", bits: "Bits", raid: "Raid" };
-/** The card style "frogpond" (made before the pictures were their own choice) means the simple card wearing this pack. */
+const VIP_TAGS = { gift: "★ VIP GIFT", bits: "★ VIP CHEER", subgift: "★ SUB BOMB", sub: "★ VIP RESUB", raid: "★ BIG RAID" };
 const LEGACY_PACKS = { frogpond: "frog2" };
 /** The pack of little pictures the alerts wear: the `deco` setting, else what an old card style implied, else none. */
 const packOf = (c) => (c.deco && c.deco !== "none" ? c.deco : LEGACY_PACKS[c.card] ?? "none");
@@ -32,6 +32,7 @@ export function createAlertView(host) {
     for (const [name, value] of Object.entries(alertVars(next))) host.style.setProperty(name, value);
     host.dataset.card = next.card || "card";
     host.dataset.deco = packOf(next);
+    host.dataset.vip = next.vipSpotlight === false ? "off" : "on";
     host.dataset.vpos = next.vpos;
     host.dataset.hpos = next.hpos;
     host.dataset.enter = next.enter;
@@ -110,13 +111,15 @@ export function createAlertView(host) {
     for (const piece of wording(item, config)) {
       words.append(piece.mark ? el("strong", { className: "alert__mark", textContent: piece.text }) : document.createTextNode(piece.text));
     }
+    const isVip = item.tier === 3 && config.vipSpotlight !== false;
     const card = el("div", { className: "alert__card" });
-    card.append(el("span", { className: "alert__tag", textContent: KIND_TAGS[item.kind] ?? "" }));
+    card.append(el("span", { className: "alert__tag", textContent: (isVip ? VIP_TAGS[item.kind] : KIND_TAGS[item.kind]) ?? "" }));
     const custom = item.image && MEDIA_ID.test(item.image) ? el("img", { className: `alert__custom alert__custom--${config.imageMode}`, src: mediaUrl(item.image), alt: "", referrerPolicy: "no-referrer" }) : null;
     if (custom) custom.addEventListener("error", () => custom.remove()); // a file that was deleted just leaves the alert without it
     if (custom && config.imageMode === "avatar") card.append(custom);
     else if (config.avatar) card.append(avatar(item));
     card.append(words);
+    if (isVip) card.append(el("span", { className: "alert__vip", "aria-hidden": "true", textContent: "★ VIP" }));
     if (custom && config.imageMode === "beside") card.append(custom);
     if (config.giftPicture && item.picture) card.append(el("img", { className: "alert__gift", src: item.picture, alt: "", referrerPolicy: "no-referrer" }));
     const node = el("div", { className: "alert alert--in" }, burst(item), card);

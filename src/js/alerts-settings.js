@@ -113,16 +113,16 @@ export const DEFAULTS = {
   enter: "pop", leave: "fade", idle: "float", speed: 500,
   // how many, and how a crowd is handled
   maxShown: 2, maxWaiting: 8, merge: true,
-  // sound and pictures
-  volume: 70, avatar: true, giftPicture: true, imageMode: "beside",
+  // sound, VIP tier spotlight, and pictures
+  volume: 70, avatar: true, giftPicture: true, imageMode: "beside", vipSpotlight: true,
   // each kind
   followOn: true, followText: "{name} just followed!", followCrowd: "{name} and {others} others followed!", followSound: "chime", followTime: 4, followFx: "hearts", followImage: "", followMySound: "",
   giftOn: true, giftText: "{name} sent {gift} ×{count}", giftBigText: "{name} sent {gift} ×{count}!!", giftSound: "coin", giftTime: 5, giftFx: "confetti", giftMid: 100, giftBig: 1000, giftMin: 0, giftImage: "", giftMySound: "", giftBigImage: "", giftBigMySound: "",
   shareOn: true, shareText: "{name} shared the LIVE!", shareCrowd: "{name} and {others} others shared!", shareSound: "pop", shareTime: 4, shareFx: "sparkles", shareImage: "", shareMySound: "",
   // Twitch
   subOn: true, subText: "{name} subscribed!", resubText: "{name} resubscribed for {count} months!", subSound: "levelup", subTime: 5, subFx: "hearts", subImage: "", subMySound: "",
-  subgiftOn: true, subgiftText: "{name} gifted {count} subs!", subgiftOneText: "{name} gifted a sub!", subgiftSound: "fanfare", subgiftTime: 6, subgiftFx: "confetti", subgiftImage: "", subgiftMySound: "",
-  bitsOn: true, bitsText: "{name} cheered {count} bits!", bitsBigText: "{name} cheered {count} bits!!", bitsSound: "coin", bitsTime: 5, bitsFx: "sparkles", bitsMin: 0, bitsMid: 100, bitsBig: 1000, bitsImage: "", bitsMySound: "",
+  subgiftOn: true, subgiftText: "{name} gifted {count} subs!", subgiftOneText: "{name} gifted a sub!", subgiftSound: "fanfare", subgiftTime: 6, subgiftFx: "confetti", subgiftImage: "", subgiftMySound: "", subgiftBigImage: "", subgiftBigMySound: "",
+  bitsOn: true, bitsText: "{name} cheered {count} bits!", bitsBigText: "{name} cheered {count} bits!!", bitsSound: "coin", bitsTime: 5, bitsFx: "sparkles", bitsMin: 0, bitsMid: 100, bitsBig: 1000, bitsImage: "", bitsMySound: "", bitsBigImage: "", bitsBigMySound: "",
   raidOn: true, raidText: "{name} is raiding with {count} viewers!", raidSound: "fanfare", raidTime: 8, raidFx: "confetti", raidImage: "", raidMySound: "",
 };
 
@@ -155,6 +155,7 @@ export const CONTROLS = [
   { section: "look", ...chipsOf("shadow", "Shadow", list(["none", "None"], ["soft", "Soft"], ["hard", "Hard"], ["glow", "Glow"])) },
   { section: "look", ...toggle("avatar", "Show the person's picture") },
   { section: "look", ...toggle("giftPicture", "Show the gift's picture") },
+  { section: "look", ...toggle("vipSpotlight", "Golden VIP spotlight on big gifts, big cheers & sub bombs", "Shows a golden VIP badge and spotlight ring on tier-3 jackpot alerts.") },
   { section: "look", ...select("imageMode", "Where your own image goes", list(["beside", "Beside the words"], ["avatar", "In place of the person's picture"], ["sticker", "A big sticker on the corner"]), "Used when you upload an image for an alert below.") },
   // where and how it moves
   { section: "move", ...chipsOf("vpos", "Up and down", list(["top", "Top"], ["middle", "Middle"], ["bottom", "Bottom"])) },
@@ -219,6 +220,8 @@ export const CONTROLS = [
   { section: "subgift", ...range("subgiftTime", "Seconds on screen", 2, 15, 1, " s") },
   { section: "subgift", ...media("subgiftImage", "Your own image or GIF", "image") },
   { section: "subgift", ...media("subgiftMySound", "Your own sound", "sound", "Plays instead of the sound above.") },
+  { section: "subgift", ...media("subgiftBigImage", "Your own image for 20+ gifted subs", "image", "Used for big sub bombs instead of the one above.") },
+  { section: "subgift", ...media("subgiftBigMySound", "Your own sound for 20+ gifted subs", "sound", "Used for big sub bombs instead of the one above.") },
   // bits
   { section: "bits", ...toggle("bitsOn", "Show bits") },
   { section: "bits", ...text("bitsText", "Text") },
@@ -228,6 +231,8 @@ export const CONTROLS = [
   { section: "bits", ...range("bitsTime", "Seconds on screen", 2, 15, 1, " s") },
   { section: "bits", ...media("bitsImage", "Your own image or GIF", "image") },
   { section: "bits", ...media("bitsMySound", "Your own sound", "sound", "Plays instead of the sound above.") },
+  { section: "bits", ...media("bitsBigImage", "Your own image for a big cheer", "image", "Used for big cheers instead of the one above.") },
+  { section: "bits", ...media("bitsBigMySound", "Your own sound for a big cheer", "sound", "Used for big cheers instead of the one above.") },
   { section: "bits", ...range("bitsMin", "Smallest cheer to show", 0, 1000, 1, " bits", { zero: "every cheer" }) },
   { section: "bits", ...range("bitsMid", "A medium cheer is at least", 1, 5000, 1, " bits", { hint: "Medium cheers stay longer and get a bigger effect." }) },
   { section: "bits", ...range("bitsBig", "A big cheer is at least", 1, 50000, 1, " bits", { hint: "Big cheers get the biggest effect, the longest time and the big-cheer text." }) },

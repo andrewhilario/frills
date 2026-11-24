@@ -35,7 +35,7 @@ function queryFromOverlayUrl(raw) {
  * Mounts the Frills Plus "Live cloud link" box right below the editor's normal copy-link field.
  * Returns `{ sync() }` — call `sync()` whenever the editor's overlay URL changes so the save button & dirty status stay accurate.
  */
-export function mountCloudSave({ kind, storeKey, anchor, getUrl, defaultName = "Live overlay" }) {
+export function mountCloudSave({ kind, storeKey, anchor, getUrl, defaultName = "Live overlay", onStatus } = {}) {
   const params = new URLSearchParams(location.search);
   const urlCloudId = ID_RE.test(params.get("cloud") ?? "") ? params.get("cloud") : "";
   const alreadyLoaded = params.get("loaded") === "1";
@@ -258,6 +258,17 @@ export function mountCloudSave({ kind, storeKey, anchor, getUrl, defaultName = "
     els = { box, select, nameInput, saveBtn, urlWrap, urlInput, copyBtn, status };
   };
 
+  const TIER1_TIPS = {
+    timer: "Want crash-proof cloud timer recovery across OBS restarts, live phone controls (+1m, pause, start), and 1-click theme sync? ",
+    tts: "Want 150,000 natural AI voice characters/mo, custom 3-frame PNGTuber uploads, and 1-Link OBS Master Scenes? ",
+    gifters: "Want crash-proof Weekly, Monthly & All-Time cloud leaderboards, phone reset controls, and 1-click OBS theme sync? ",
+    likers: "Want crash-proof Weekly, Monthly & All-Time cloud leaderboards, phone reset controls, and 1-click OBS theme sync? ",
+    jar: "Want crash-proof cloud progress backup across restarts, live phone remote controls, and 1-click OBS theme sync? ",
+    wheel: "Want a Spin Wheel Now remote trigger on your phone, 1-Link Master Scenes, and 1-click OBS theme sync? ",
+    actions: "Want unlimited OBS actions (beyond 10 free), live VTube Studio props & expressions, and Phone Stream Deck buttons for every action? ",
+    goal: "Want crash-proof cloud progress backup across restarts, live phone remote controls, and 1-click OBS theme sync? ",
+  };
+
   const mountTier1Tip = () => {
     if (document.body?.dataset?.plusAccounts !== "on") return;
     try { if (sessionStorage.getItem("frills:plus:tip:off") === "1") return; } catch {}
@@ -268,7 +279,7 @@ export function mountCloudSave({ kind, storeKey, anchor, getUrl, defaultName = "
 
     const text = document.createElement("p");
     text.className = "cloud-tip__text";
-    text.append("Want one link that updates in OBS without re-pasting, plus a dedicated 24/7 TikTok server? ");
+    text.append(TIER1_TIPS[kind] ?? "Want one link that updates in OBS without re-pasting, 1-click full-stream theme sync, and a dedicated 24/7 TikTok server? ");
     if (promo) {
       text.append("First 20 get 20% off forever with ");
       const code = document.createElement("code");
@@ -300,6 +311,15 @@ export function mountCloudSave({ kind, storeKey, anchor, getUrl, defaultName = "
     fetch(`/api/cloud-overlays?kind=${encodeURIComponent(kind)}&probe=1`, { credentials: "same-origin", cache: "no-store" })
       .then(async (r) => ({ ok: r.ok, data: await r.json().catch(() => null) }))
       .then(({ ok, data }) => {
+        if (ok && typeof data?.eligible === "boolean") {
+          try { sessionStorage.setItem("frills:plus:eligible", data.eligible ? "1" : "0"); } catch {}
+          for (const el of document.querySelectorAll("[data-plus-only]")) el.hidden = !data.eligible;
+        }
+        onStatus?.({
+          signedIn: Boolean(ok && data?.signedIn),
+          plusActive: Boolean(ok && data?.ok && data.plusActive),
+          eligible: Boolean(ok && data?.eligible),
+        });
         if (ok && data?.ok && data.plusActive) {
           overlays = Array.isArray(data.overlays) ? data.overlays : [];
           buildBox();

@@ -20,7 +20,7 @@ const CANVASES = { vertical: [1080, 1920], landscape: [1920, 1080], square: [108
  * { apply(settings), onEvent(event), onPlatform?(platform), tests: { id: () => void } }. `events` can be a list of kinds or a
  * function returning them for the current platform. `platforms` defaults to `["tiktok"]`.
  */
-export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs = "alerts", platforms = ["tiktok"], defaultPlatform = "tiktok", extraUrlParams, create, idleHint }) {
+export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs = "alerts", platforms = ["tiktok"], defaultPlatform = "tiktok", extraUrlParams, urlTransform, create, idleHint }) {
   const params = new URLSearchParams(location.search);
   const load = () => { try { return JSON.parse(localStorage.getItem(storeKey) ?? "null"); } catch { return null; } };
   const saved = load();
@@ -99,6 +99,7 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
   $("reset").addEventListener("click", () => {
     settings = { ...widget.defaults };
     syncControls();
+    api.onReset?.(settings);
     paint();
     refreshLink();
     save();
@@ -141,7 +142,7 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
   const copyBtn = $("copy-link");
   copyButton(copyBtn, () => linkInput.value);
   const cloudKind = String(overlayPath ?? "").replace(/^\/overlay\/|\/+$/g, "");
-  const cloud = cloudKind ? mountCloudSave({ kind: cloudKind, storeKey, anchor: linkInput.closest(".linkfield"), getUrl: () => linkInput.value, defaultName: `My ${cloudKind} overlay` }) : { sync() {} };
+  const cloud = cloudKind ? mountCloudSave({ kind: cloudKind, storeKey, anchor: linkInput.closest(".linkfield"), getUrl: () => linkInput.value, defaultName: `My ${cloudKind} overlay`, onStatus: (st) => api.onPlusStatus?.(st) }) : { sync() {} };
   function refreshLink() {
     const platform = source.platform;
     const isBoth = platform === "both";
@@ -166,7 +167,8 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
       }
       nextUrl = parsed.toString();
     }
-    if (platform === "tiktok" || platform === "both" || cloudKind === "tts") nextUrl = appendPlusCode(nextUrl);
+    if (platform === "tiktok" || platform === "both" || cloudKind === "tts" || cloudKind === "actions") nextUrl = appendPlusCode(nextUrl);
+    if (urlTransform) nextUrl = urlTransform(nextUrl, { channel, platform, both, settings });
     linkInput.value = nextUrl;
     copyBtn.disabled = false;
     cloud.sync();

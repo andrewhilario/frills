@@ -71,7 +71,7 @@ test("editor: Top Gifters supports switching TikTok & Twitch, updates controls, 
   await page.goto(`${base}/gifters/`, { settle: 700 });
   await click('[data-test="gift"]');
   await until(async () => (await gifterRows()).length === 1);
-  assert.match((await gifterRows())[0], /diamonds$/);
+  assert.match((await gifterRows())[0], /diamonds?$/);
 
   await page.evaluate(`[...document.querySelectorAll("#source .chip")].find((b) => b.textContent.trim() === "Twitch")?.click()`);
   await click('[data-test="subgift"]');
@@ -107,19 +107,29 @@ test("overlay & editor: Rotating Highlights receives live TikTok gifts/follows, 
   await until(async () => (await labelState())?.slot !== "lastFollower", 5000);
   assert.deepEqual(page.problems, [], page.problems.join(" | "));
 
-  // Editor Twitch mode shows Follow box and generates Twitch link with design choice
+  // Editor Twitch mode shows Follow box and generates Twitch link with design + animation choices
   await page.goto(`${base}/labels/`, { settle: 700 });
   await page.evaluate(`[...document.querySelectorAll("#source .chip")].find((b) => b.textContent.trim() === "Twitch")?.click()`);
   assert.equal(await page.evaluate(`document.querySelector(".followbox").hidden`), false);
   await page.evaluate(`(() => { const s = document.getElementById("c-layout"); s.value = "macos"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
   assert.equal(await page.evaluate(`document.querySelector(".labels").dataset.layout`), "macos");
+  await page.evaluate(`[...document.querySelectorAll("#opt-controls .chip")].find((b) => b.textContent.trim() === "3D Flip")?.click()`);
+  await page.evaluate(`[...document.querySelectorAll("#opt-controls .chip")].find((b) => b.textContent.trim() === "Spotlight glow")?.click()`);
+  assert.equal(await page.evaluate(`document.querySelector(".labels").dataset.enter`), "flip");
+  assert.equal(await page.evaluate(`document.querySelector(".labels").dataset.anim`), "pulse");
   await type("#source-channel", "pondpal");
   await click('[data-test="bits"]');
   await until(async () => (await labelState())?.slot === "lastBits");
+  await click('[data-test="subgift"]');
+  await until(async () => (await labelState())?.slot === "topSubGifter");
+  assert.equal(await page.evaluate(`Boolean(document.querySelector(".labelcard:not(.labelcard--out)[data-top='true'] .labelcard__crown"))`), true, "top highlight wears animated gold crown");
+  assert.equal(await page.evaluate(`Boolean(document.querySelector(".labelcard:not(.labelcard--out) .labelcard__sheen"))`), true, "card has TikOps-style glossy sheen");
   const url = new URL(await page.evaluate(`document.getElementById("link").value`));
   assert.equal(url.pathname, "/overlay/labels/");
   assert.equal(url.searchParams.get("platform"), "twitch");
   assert.equal(url.searchParams.get("layout"), "macos");
+  assert.equal(url.searchParams.get("enter"), "flip");
+  assert.equal(url.searchParams.get("anim"), "pulse");
   assert.deepEqual(page.problems, [], page.problems.join(" | "));
 });
 

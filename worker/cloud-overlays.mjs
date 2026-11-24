@@ -17,6 +17,8 @@ export const OVERLAY_KINDS = Object.freeze({
   alerts: { path: "/overlay/alerts/", editorPath: "/alerts/", label: "Alerts" },
   gifts: { path: "/overlay/gifts/", editorPath: "/gifts/", label: "Last gifts" },
   jar: { path: "/overlay/jar/", editorPath: "/jar/", label: "Gift jar" },
+  wheel: { path: "/overlay/wheel/", editorPath: "/wheel/", label: "Spin the wheel" },
+  actions: { path: "/overlay/actions/", editorPath: "/actions/", label: "OBS Actions" },
   goal: { path: "/overlay/goal/", editorPath: "/goal/", label: "Goal" },
   likers: { path: "/overlay/likers/", editorPath: "/likers/", label: "Top likers" },
   gifters: { path: "/overlay/gifters/", editorPath: "/gifters/", label: "Top gifters" },
@@ -25,11 +27,31 @@ export const OVERLAY_KINDS = Object.freeze({
   timer: { path: "/overlay/timer/", editorPath: "/timer/", label: "Subathon timer" },
   songs: { path: "/overlay/songs/", editorPath: "/songs/", label: "Song requests" },
   tts: { path: "/overlay/tts/", editorPath: "/tts/", label: "Talking pet TTS" },
+  scene: { path: "/o/", editorPath: "/account/#acct-cloud", label: "Master scene (all-in-one)" },
 });
+
+export const SCENE_SLOTS = Object.freeze(["tl", "tc", "tr", "ml", "mc", "mr", "bl", "bc", "br"]);
+
+/** Parses a Master Scene query (`aspect=16x9|9x16&items=id1:slot1,id2:slot2`) into normalized layer specs. */
+export function parseSceneQuery(rawQuery) {
+  const params = new URLSearchParams(String(rawQuery ?? ""));
+  const aspect = params.get("aspect") === "9x16" ? "9x16" : "16x9";
+  const seen = new Set();
+  const items = [];
+  for (const part of String(params.get("items") ?? "").split(",")) {
+    const [rawId, rawSlot] = part.trim().split(":");
+    if (!ID_RE.test(rawId) || seen.has(rawId)) continue;
+    const slot = SCENE_SLOTS.includes(rawSlot) ? rawSlot : "mc";
+    seen.add(rawId);
+    items.push({ id: rawId, slot });
+    if (items.length >= 12) break;
+  }
+  return { aspect, items };
+}
 
 export const MAX_CLOUD_OVERLAYS = 50;
 const MAX_BODY = 24576;
-const MAX_QUERY = 4096;
+const MAX_QUERY = 16384;
 const MAX_STATE = 16384;
 const MAX_STATE_VALUE = 14000;
 const MAX_NAME = 60;
@@ -81,6 +103,7 @@ export const GLOBAL_THEMES = Object.freeze({
 });
 
 export function applyThemeToQuery(kind, rawQuery, themeId) {
+  if (kind === "scene") return null;
   const theme = GLOBAL_THEMES[themeId];
   if (!theme) return null;
   const params = new URLSearchParams(String(rawQuery ?? ""));
@@ -185,6 +208,52 @@ async function readJson(request) {
   }
 }
 
+/** Aggregates live cloud-checkpointed MVP stats (Top Gifters, Top Likers, Gift Jar, Goal Bar) for the Post-Stream Recap generator. */
+export function buildStreamRecap(rows, stateByBoxCode) {
+  let channel = "";
+  const topGifters = [];
+  const topLikers = [];
+  let jar = null;
+  let goal = null;
+  const fmt = (n) => Math.round(Number(n) || 0).toLocaleString("en-US");
+
+  for (const row of rows ?? []) {
+    if (!channel && row.query) {
+      const ch = new URLSearchParams(String(row.query)).get("channel");
+      if (ch) channel = String(ch).trim();
+    }
+    const rawState = stateByBoxCode?.get(`co_${row.id}`);
+    if (!rawState || typeof rawState !== "string" || !rawState.startsWith("{")) continue;
+    let parsed;
+    try { parsed = JSON.parse(rawState); } catch { continue; }
+    for (const [k, valStr] of Object.entries(parsed)) {
+      if (typeof valStr !== "string") continue;
+      let val;
+      try { val = JSON.parse(valStr); } catch { continue; }
+      if (k.startsWith("frills:gifters:") && Array.isArray(val) && !topGifters.length) {
+        for (const p of val.slice(0, 3)) {
+          if (!p?.name) continue;
+          const parts = [];
+          if (p.diamonds > 0) parts.push(`${fmt(p.diamonds)} diamonds`);
+          if (p.subgifts > 0) parts.push(`${fmt(p.subgifts)} subs`);
+          if (p.bits > 0) parts.push(`${fmt(p.bits)} bits`);
+          topGifters.push({ name: String(p.name), label: parts.join(" · ") || "Top gifter" });
+        }
+      } else if (k.startsWith("frills:likers:") && Array.isArray(val) && !topLikers.length) {
+        for (const p of val.slice(0, 3)) {
+          if (!p?.name) continue;
+          topLikers.push({ name: String(p.name), label: `${fmt(p.count)} likes` });
+        }
+      } else if (k.startsWith("frills:jar:") && val && typeof val.total === "number" && !jar) {
+        jar = { label: `${fmt(val.total)} / ${fmt(val.target || 1000)} in Gift Jar` };
+      } else if (k.startsWith("frills:goal:") && val && typeof val.gained === "number" && !goal) {
+        goal = { label: `${fmt(val.gained)} gained toward ${fmt(val.goal || 100)} goal` };
+      }
+    }
+  }
+  return { channel, topGifters, topLikers, jar, goal };
+}
+
 /**
  * Handles:
  *   GET    /api/o/:id[?v=<n>]        -> public OBS live config read (no auth cookies needed)
@@ -205,7 +274,7 @@ export async function handleCloudOverlays(request, env, { now = Date.now() } = {
     if (pathname.startsWith("/api/o/")) {
       const id = pathname.slice("/api/o/".length).replace(/\/+$/, "");
       if (!ID_RE.test(id)) return json(404, { ok: false, error: "not_found" });
-      const row = await db.prepare("SELECT id, kind, name, path, query, version, updated_at FROM cloud_overlays WHERE id = ?").bind(id).first();
+      const row = await db.prepare("SELECT id, account_id, kind, name, path, query, version, updated_at FROM cloud_overlays WHERE id = ?").bind(id).first();
       if (!row || !Object.hasOwn(OVERLAY_KINDS, row.kind)) return json(404, { ok: false, error: "not_found" });
       const boxCode = `co_${id}`;
 
@@ -251,6 +320,39 @@ export async function handleCloudOverlays(request, env, { now = Date.now() } = {
       if (box?.key_hash && box.key_hash.startsWith("{")) {
         try { state = JSON.parse(box.key_hash); } catch { state = null; }
       }
+      if (row.kind === "scene") {
+        const parsed = parseSceneQuery(row.query);
+        const childRows = (await db.prepare("SELECT id, kind, name, version FROM cloud_overlays WHERE account_id = ? AND kind != 'scene'").bind(row.account_id).all()).results ?? [];
+        const byId = new Map(childRows.map((c) => [c.id, c]));
+        const layers = parsed.items
+          .map((item) => {
+            const child = byId.get(item.id);
+            if (!child) return null;
+            return {
+              id: child.id,
+              kind: child.kind,
+              name: child.name,
+              slot: item.slot,
+              liveUrl: `/o/${child.id}`,
+              version: Number(child.version) || 1,
+            };
+          })
+          .filter(Boolean);
+        return json(200, {
+          ok: true,
+          id: row.id,
+          kind: row.kind,
+          name: row.name,
+          version: currentVersion,
+          changed: true,
+          aspect: parsed.aspect,
+          layers,
+          query: row.query,
+          updatedAt: Number(row.updated_at) || 0,
+          cmdSeq,
+          cmds,
+        });
+      }
       const meta = OVERLAY_KINDS[row.kind];
       return json(200, {
         ok: true,
@@ -295,15 +397,24 @@ export async function handleCloudOverlays(request, env, { now = Date.now() } = {
 
     if (!id && request.method === "GET") {
       const filterKind = String(url.searchParams.get("kind") ?? "").trim();
-      const rows = filterKind && Object.hasOwn(OVERLAY_KINDS, filterKind)
+      const rows = (filterKind && Object.hasOwn(OVERLAY_KINDS, filterKind)
         ? (await db.prepare("SELECT * FROM cloud_overlays WHERE account_id = ? AND kind = ? ORDER BY updated_at DESC").bind(who.accountId, filterKind).all()).results
-        : (await db.prepare("SELECT * FROM cloud_overlays WHERE account_id = ? ORDER BY updated_at DESC").bind(who.accountId).all()).results;
+        : (await db.prepare("SELECT * FROM cloud_overlays WHERE account_id = ? ORDER BY updated_at DESC").bind(who.accountId).all()).results) ?? [];
+      let recap = null;
+      if (!filterKind && rows.length) {
+        const codes = rows.map((r) => `co_${r.id}`);
+        const placeholders = codes.map(() => "?").join(",");
+        const stateRows = (await db.prepare(`SELECT code, key_hash FROM timer_boxes WHERE code IN (${placeholders})`).bind(...codes).all()).results ?? [];
+        const stateByBox = new Map(stateRows.map((s) => [s.code, s.key_hash]));
+        recap = buildStreamRecap(rows, stateByBox);
+      }
       return json(200, {
         ok: true,
         plusActive: hasPlus,
-        eligible,
+        eligible: hasPlus || eligible,
         limit: MAX_CLOUD_OVERLAYS,
-        overlays: (rows ?? []).map((r) => formatRow(r, origin)),
+        overlays: rows.map((r) => formatRow(r, origin)),
+        ...(recap ? { recap } : {}),
       });
     }
 
@@ -325,8 +436,8 @@ export async function handleCloudOverlays(request, env, { now = Date.now() } = {
       return json(200, { ok: true, id });
     }
 
-    // Create & update require active Frills Plus + eligible region
-    if (!regionAllowed(request, env)) return json(403, { ok: false, error: "region_unavailable" });
+    // Create & update require active Frills Plus + eligible region (active Plus bypasses geo-lock)
+    if (!hasPlus && !regionAllowed(request, env)) return json(403, { ok: false, error: "region_unavailable" });
     if (!hasPlus) return json(403, { ok: false, error: "plus_required" });
 
     const { body, tooBig } = await readJson(request);
@@ -338,7 +449,7 @@ export async function handleCloudOverlays(request, env, { now = Date.now() } = {
       if (!Object.hasOwn(OVERLAY_KINDS, kind)) return json(400, { ok: false, error: "bad_kind" });
       const name = cleanOverlayName(body.name) || `${OVERLAY_KINDS[kind].label} overlay`;
       const query = cleanOverlayQuery(body.query);
-      if (!query) return json(400, { ok: false, error: "bad_query" });
+      if (!query || (kind === "scene" && parseSceneQuery(query).items.length < 1)) return json(400, { ok: false, error: "bad_query" });
 
       const existing = await db.prepare("SELECT COUNT(*) AS n FROM cloud_overlays WHERE account_id = ?").bind(who.accountId).first();
       if (Number(existing?.n ?? 0) >= MAX_CLOUD_OVERLAYS) {
@@ -377,13 +488,14 @@ export async function handleCloudOverlays(request, env, { now = Date.now() } = {
       const existing = await db.prepare("SELECT * FROM cloud_overlays WHERE id = ? AND account_id = ?").bind(id, who.accountId).first();
       if (!existing) return json(404, { ok: false, error: "not_found" });
       const rawAction = String(body.action ?? "").trim();
-      const ALLOWED_ACTIONS = ["tts:say", "tts:clear", "jar:drop", "jar:fill", "jar:clear", "goal:add", "goal:reach", "goal:reset", "gifters:reset", "likers:reset"];
+      const ALLOWED_ACTIONS = ["alerts:gift", "alerts:sub", "tts:say", "tts:clear", "jar:drop", "jar:fill", "jar:clear", "wheel:spin", "wheel:clear", "actions:run", "actions:clear", "goal:add", "goal:reach", "goal:reset", "gifters:reset", "likers:reset"];
       if (!ALLOWED_ACTIONS.includes(rawAction)) return json(400, { ok: false, error: "bad_command" });
       const val = Math.max(-1000000, Math.min(1000000, Math.round(Number(body.value) || 0)));
-      const textPart = rawAction === "tts:say"
-        ? ":" + String(body.text ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 180)
+      const needsText = rawAction === "tts:say" || rawAction === "actions:run";
+      const textPart = needsText
+        ? ":" + String(body.text ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, rawAction === "actions:run" ? 32 : 180)
         : "";
-      if (rawAction === "tts:say" && textPart.length <= 1) return json(400, { ok: false, error: "bad_text" });
+      if (needsText && textPart.length <= 1) return json(400, { ok: false, error: "bad_text" });
 
       const boxCode = `co_${id}`;
       let box = await db.prepare("SELECT seq FROM timer_boxes WHERE code = ?").bind(boxCode).first();

@@ -81,7 +81,17 @@
             <h2 class="acct-card__title" id="acct-cloud-title">Live cloud overlays &amp; remote deck</h2>
             <span class="acct-badge" id="acct-cloud-count" hidden></span>
           </div>
-          <p class="form__hint" id="acct-cloud-hint">Save a live link from any editor (<a href="/editor/">Chat</a>, <a href="/alerts/">Alerts</a>, <a href="/tts/">Talking pet</a>, <a href="/jar/">Gift jar</a>, <a href="/timer/">Subathon timer</a>, or <a href="/goal/">Goal bar</a>). Paste its permanent <code>/o/…</code> link into OBS once — switch themes across all overlays below or trigger live remote actions from your phone mid-stream.</p>
+          <p class="form__hint" id="acct-cloud-hint">Save a live link from any editor (<a href="/editor/">Chat</a>, <a href="/alerts/">Alerts</a>, <a href="/tts/">Talking pet</a>, <a href="/jar/">Gift jar</a>, <a href="/timer/">Subathon timer</a>, or <a href="/goal/">Goal bar</a>). Paste its permanent <code>/o/…</code> link into OBS once — combine multiple overlays into a 1-Link Master Scene, switch themes across all overlays, or trigger live remote actions mid-stream.</p>
+          <details class="acct-sub" id="acct-cloud-guide">
+            <summary><strong>Step-by-step: How to set up every Frills Plus feature</strong></summary>
+            <ol class="form__hint">
+              <li><strong>24/7 Cloud TikTok Server &amp; AI Voices:</strong> Click <strong>Activate on this browser</strong> above, then open <a href="/tts/">Talking pet</a> (to pick neural AI voices or upload your 3-frame PNGTuber) or any editor to route TikTok through the dedicated server.</li>
+              <li><strong>Save a Cloud Overlay (<code>/o/…</code>):</strong> In any editor (<a href="/editor/">Chat</a>, <a href="/alerts/">Alerts</a>, <a href="/jar/">Gift jar</a>, <a href="/timer/">Subathon timer</a>, <a href="/goal/">Goal bar</a>, <a href="/tts/">Talking pet</a>, <a href="/gifters/">Top gifters</a>, <a href="/likers/">Top likers</a>), scroll to the final step and click <strong>Save to cloud</strong> inside the <em>Live cloud link</em> box.</li>
+              <li><strong>1-Link Master Stream Scene:</strong> Once you save at least 1 cloud overlay, use <strong>1-Link Master Stream Scene</strong> below to pick <code>16:9</code> (OBS) or <code>9:16</code> (TikTok LIVE Studio), assign screen zones, and paste that one master <code>/o/…</code> link into your streaming app.</li>
+              <li><strong>Phone Stream Deck &amp; Theme Sync:</strong> Open <code>frills.valwidgets.live/account/</code> on your phone while your <code>/o/…</code> link is open in OBS to tap <em>+5m Timer</em>, <em>Speak Live</em>, <em>Test Gift Alert</em>, <em>Fill Jar</em>, or <em>Apply theme to all overlays</em> live.</li>
+              <li><strong>&#9733; VIP Jackpot Alerts &amp; Post-Stream MVP Card:</strong> Upload custom big-gift/big-cheer media in Step 3 of <a href="/alerts/">Alerts</a>, and click <strong>Download Recap PNG</strong> below after your stream to share your <code>9:16</code> or <code>16:9</code> Hall of Fame card. <a href="/plus/#how-to-use">Full guide</a>.</li>
+            </ol>
+          </details>
           <div class="acct-row" id="acct-theme-bar" hidden>
             <label class="visually-hidden" for="acct-theme-pick">Sync theme across all cloud overlays</label>
             <select id="acct-theme-pick">
@@ -97,6 +107,52 @@
             <button class="btn btn--soft btn--sm" type="button" id="acct-theme-apply">Apply theme to all overlays</button>
           </div>
           <ul class="acct-cloud__list" id="acct-cloud-list" role="list"></ul>
+          <div class="acct-sub" id="acct-scene-box" hidden>
+            <h3 class="acct-sub__title">1-Link Master Stream Scene</h3>
+            <p class="form__hint">Combine your saved cloud overlays into one master URL for OBS Studio (16:9 Twitch/YouTube) or TikTok LIVE Studio (9:16 Vertical).</p>
+            <div class="acct-row">
+              <input type="text" id="acct-scene-name" maxlength="60" value="Main Stream Scene" aria-label="Master scene name">
+              <select id="acct-scene-aspect" aria-label="Scene canvas aspect ratio">
+                <option value="16x9">16:9 Landscape (OBS / Twitch)</option>
+                <option value="9x16">9:16 Vertical (TikTok LIVE Studio)</option>
+              </select>
+            </div>
+            <div class="acct-scene__layers" id="acct-scene-layers"></div>
+            <div class="acct-row">
+              <button class="btn btn--sm" type="button" id="acct-scene-save">Save 1-Link Master Scene</button>
+            </div>
+            <div class="acct-row" id="acct-scene-link-wrap" hidden>
+              <code class="acct-cloud__url" id="acct-scene-url"></code>
+              <button class="btn btn--outline btn--sm" type="button" id="acct-scene-copy">Copy scene link</button>
+            </div>
+          </div>
+          <div class="acct-sub" id="acct-recap-box" hidden>
+            <h3 class="acct-sub__title">1-Click Stream MVP Recap Card</h3>
+            <p class="form__hint">Auto-fills from your cloud leaderboards &amp; Gift Jar, or edit before downloading to post on TikTok Stories, Discord, or X.</p>
+            <div class="acct-row">
+              <select id="acct-recap-format" aria-label="Recap card aspect ratio">
+                <option value="9x16">9:16 Vertical (TikTok Story / Reels)</option>
+                <option value="16x9">16:9 Landscape (Discord / X)</option>
+              </select>
+              <select id="acct-recap-theme" aria-label="Recap card theme">
+                <option value="matcha">Cream &amp; Gold (Frills Signature)</option>
+                <option value="night">Midnight Arcade</option>
+                <option value="bubblegum">Neon Bubblegum</option>
+              </select>
+            </div>
+            <div class="acct-recap__inputs">
+              <input type="text" id="acct-recap-title" maxlength="60" value="Tonight’s Stream MVPs" aria-label="Recap headline">
+              <input type="text" id="acct-recap-gifter" maxlength="60" placeholder="#1 Top Gifter / Sub (e.g. mochi_bun · 2,500 diamonds)" aria-label="Top Gifter MVP">
+              <input type="text" id="acct-recap-liker" maxlength="60" placeholder="#1 Top Liker / Supporter (e.g. pondpal · 15,200 likes)" aria-label="Top Liker MVP">
+              <input type="text" id="acct-recap-goal" maxlength="60" placeholder="Stream Highlight / Jar Goal (e.g. Gift Jar Filled 1,250 / 1,000)" aria-label="Stream highlight">
+            </div>
+            <div class="acct-recap__stage">
+              <canvas id="acct-recap-canvas" width="540" height="960"></canvas>
+            </div>
+            <div class="acct-row">
+              <button class="btn btn--sm" type="button" id="acct-recap-download">Download Recap PNG</button>
+            </div>
+          </div>
           <p class="form__status" id="acct-cloud-status" role="status" aria-live="polite"></p>
         </section>
 

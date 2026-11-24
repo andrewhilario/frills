@@ -181,3 +181,57 @@ test("through the Worker, removing a file also clears the copy the edge holds", 
     delete globalThis.caches;
   }
 });
+
+test("POST /api/admin/euler proxies pool reset, rotate, refill, and sync actions to configured relays with owner auth", async () => {
+  const env = fresh({
+    RELAY_URLS: "https://relay-a.test,https://relay-b.test",
+    RELAY_OWNER_KEY: "owner-secret-123",
+  });
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    calls.push({ url, method: init?.method, headers: init?.headers, body: JSON.parse(init?.body || "{}") });
+    return new Response(JSON.stringify({ ok: true, pool: { activeSlot: 2 } }), { status: 200 });
+  };
+  const res = await handleAdmin(
+    new Request(`${SITE}/api/admin/euler`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${KEY}`, origin: SITE, "content-type": "application/json" },
+      body: JSON.stringify({ action: "sync", relayUrl: "https://relay-a.test" }),
+    }),
+    env,
+    { fetchImpl },
+  );
+  assert.equal(res.status, 200);
+  const json = await res.json();
+  assert.equal(json.ok, true);
+  assert.equal(json.action, "sync");
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, "https://relay-a.test/owner/euler");
+  assert.equal(calls[0].headers.authorization, "Bearer owner-secret-123");
+  assert.deepEqual(calls[0].body, { action: "sync" });
+
+  // Rejects unknown relayUrl to prevent SSRF and rejects invalid actions
+  const badRelay = await handleAdmin(
+    new Request(`${SITE}/api/admin/euler`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${KEY}`, origin: SITE, "content-type": "application/json" },
+      body: JSON.stringify({ action: "sync", relayUrl: "https://evil.test" }),
+    }),
+    env,
+    { fetchImpl },
+  );
+  assert.equal(badRelay.status, 400);
+  assert.equal((await badRelay.json()).error, "unknown_relay");
+
+  const badAction = await handleAdmin(
+    new Request(`${SITE}/api/admin/euler`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${KEY}`, origin: SITE, "content-type": "application/json" },
+      body: JSON.stringify({ action: "nuke" }),
+    }),
+    env,
+    { fetchImpl },
+  );
+  assert.equal(badAction.status, 400);
+  assert.equal((await badAction.json()).error, "bad_action");
+});

@@ -68,13 +68,14 @@ test("overlay: Gift Jar drops real TikTok gifts inside chamber and marks FULL wh
   assert.equal(await page.evaluate(`document.querySelector(".jar__fullbadge").hidden`), false);
   assert.equal(await page.evaluate(`document.querySelector(".jar__party").hidden`), false);
 
-  // When capNumbers=0 in gift-count mode, overflowing counts past target cleanly
+  // When capNumbers=0 in gift-count mode, overflowing counts past target cleanly and stacks all 5 gifts
   const idx2 = made.length;
   await page.goto(`${base}/overlay/jar/?channel=pond_cafe_uncap&platform=tiktok&design=boba&goalBy=count&target=2&capNumbers=0`, { settle: 500 });
   await until(() => made.length > idx2);
   made[idx2].emit("gift", gift("g3", "Ann", "Rose", 1, 5));
   await until(async () => (await page.evaluate(`document.querySelector(".jar").dataset.full`)) === "true");
   assert.equal(await page.evaluate(`document.querySelector(".jar__meta").textContent`), "5 / 2 gifts");
+  assert.ok(await page.evaluate(`Number(document.querySelector("canvas.jar__canvas").dataset.bodies) >= 5`), "drops and stacks >= 5 physical tokens for 5x Rose");
   assert.deepEqual(page.problems, [], page.problems.join(" | "));
 });
 
@@ -89,9 +90,13 @@ test("editor: Gift Jar supports switching between the 6 jar designs, dropping gi
 
   await click('[data-test="fill"]');
   await until(async () => (await page.evaluate(`document.querySelector(".jar").dataset.full`)) === "true");
+  assert.ok(await page.evaluate(`Number(document.querySelector("canvas.jar__canvas").dataset.bodies) >= 20`), "Fill jar showers >= 20 physical stacked gift icons");
+  await sleep(600);
+  assert.equal(await page.evaluate(`document.querySelector("canvas.jar__canvas").dataset.escaped`), "0", "No interior token escapes vessel walls or above mouth");
 
   await click('[data-test="clear"]');
   await until(async () => (await page.evaluate(`Number(document.querySelector(".jar__box").dataset.items)`)) === 0);
+  assert.equal(await page.evaluate(`document.querySelector("canvas.jar__canvas").dataset.bodies`), "0");
   assert.equal(await page.evaluate(`document.querySelector(".jar").dataset.full`), "false");
 
   await type("#source-channel", "pond.pal");

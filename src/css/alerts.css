@@ -24,7 +24,9 @@
 .alert[data-tier="2"] .alert__card { font-size: 1.12em; }
 .alert[data-tier="3"] .alert__card { font-size: 1.28em; }
 /* A ring around a big one: a drawn border rather than a second shadow, because a shadow list that starts with "none" is not valid. */
-.alert[data-tier="3"] .alert__card::after { content: ""; position: absolute; inset: -0.3em; border: 0.12em solid var(--a-accent, #fc0); border-radius: calc(var(--a-radius, 20px) + 0.3em); opacity: 0.55; }
+.alert[data-tier="3"] .alert__card::after { content: ""; position: absolute; inset: -0.3em; border: 0.12em solid var(--a-accent, #fc0); border-radius: calc(var(--a-radius, 20px) + 0.3em); opacity: 0.55; pointer-events: none; }
+.alerts[data-vip="on"] .alert[data-tier="3"] .alert__card::after { border-color: #ffd23f; opacity: 0.85; box-shadow: 0 0 0.9em rgba(255, 210, 63, 0.45); }
+.alert__vip { flex: none; padding: 0.18em 0.55em; border-radius: 999px; background: #ffd23f; color: #161b22; font-size: 0.54em; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; line-height: 1.2; box-shadow: 0 2px 0 rgba(22, 27, 34, 0.65); }
 .alert__mark { color: var(--a-pop, #f48); font-weight: 800; }
 .alert__words { min-width: 0; text-align: var(--a-align, left); }
 /* In a card laid out in a row (every style but the three tall ones: trading, profile, polaroid) the words never get narrower than their longest word.

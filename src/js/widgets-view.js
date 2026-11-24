@@ -223,10 +223,10 @@ function confettiBurst(fx, count = 34, { spreadX = 180, spreadY = 100, minDist =
 }
 
 /** A little gold crown (drawn here so it is the same on every look), for the person being celebrated. */
-function crownIcon() {
+function crownIcon(className = "likers__crown") {
   const svg = document.createElementNS(SVG, "svg");
   svg.setAttribute("viewBox", "0 0 64 48");
-  svg.setAttribute("class", "likers__crown");
+  svg.setAttribute("class", className);
   svg.setAttribute("aria-hidden", "true");
   const add = (tag, attrs) => { const n = document.createElementNS(SVG, tag); for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v); svg.append(n); };
   add("path", { d: "M6 40 L10 12 L24 26 L32 6 L40 26 L54 12 L58 40 Z", fill: "#ffd23f", stroke: "#b8860b", "stroke-width": "3", "stroke-linejoin": "round" });
@@ -894,46 +894,103 @@ export function createLabelsView(host) {
   let settings = null;
   let lastSnapshot = null;
   let lastRevision = -1;
+  let lastCelebrateId = -1;
   let currentCard = null;
+  const fxTimers = new Set();
+
+  function populateMedia(media, card) {
+    media.replaceChildren();
+    const giftPic = safePic(card.picture);
+    const hasMedia = !card.empty && Boolean(giftPic || card.initialName);
+    media.hidden = !(Boolean(settings?.avatar) && hasMedia);
+    if (!hasMedia) return false;
+    if (giftPic) {
+      const img = el("img", { className: "labelcard__gift", src: giftPic, alt: "", referrerPolicy: "no-referrer" });
+      img.addEventListener("error", () => { img.remove(); media.hidden = true; }, { once: true });
+      media.append(img);
+    } else {
+      const initial = [...(card.initialName || "?")][0].toUpperCase();
+      const av = el("span", { className: "labelcard__av", textContent: initial });
+      const avPic = safePic(card.avatar);
+      if (avPic) {
+        const img = el("img", { className: "gift__avimg", src: avPic, alt: "", referrerPolicy: "no-referrer" });
+        img.addEventListener("load", () => av.classList.add("labelcard__av--pic"), { once: true });
+        img.addEventListener("error", () => img.remove(), { once: true });
+        av.append(img);
+      }
+      media.append(av);
+    }
+    if (card.top) media.append(crownIcon("labelcard__crown"));
+    return true;
+  }
+
+  function sparkleBurst(fxHost, kind) {
+    if (!fxHost || settings?.anim === "none" || reducedMotion()) return;
+    fxHost.replaceChildren();
+    if (kind === "leader") {
+      confettiBurst(fxHost, 18, { spreadX: 95, spreadY: 65, minDist: 34, yMul: 0.75 });
+    }
+    const glyphs = kind === "leader" ? ["★", "✦", "✧"] : ["✦", "✧", "★"];
+    const total = kind === "leader" ? 10 : 8;
+    for (let i = 0; i < total; i += 1) {
+      const p = el("span", { className: "labelcard__spark", textContent: glyphs[i % glyphs.length] });
+      const angle = (Math.PI * 2 * i) / total + (Math.random() - 0.5) * 0.4;
+      const dist = 42 + Math.random() * 52;
+      p.style.setProperty("--sx", `${Math.round(Math.cos(angle) * dist * 1.25)}px`);
+      p.style.setProperty("--sy", `${Math.round(Math.sin(angle) * dist * 0.75)}px`);
+      p.style.setProperty("--sr", `${Math.round((Math.random() - 0.5) * 90)}deg`);
+      p.style.setProperty("--sd", `${Math.round(i * 22)}ms`);
+      p.style.color = i % 2 === 0 ? "#ffd23f" : "var(--a-pop, #f48)";
+      fxHost.append(p);
+    }
+    const tid = setTimeout(() => {
+      fxTimers.delete(tid);
+      fxHost.replaceChildren();
+    }, 1050);
+    fxTimers.add(tid);
+  }
 
   function buildCard(card) {
     const node = el("div", { className: "labelcard labelcard--in" });
     node.dataset.slot = card.id || "idle";
+    node.dataset.top = card.top ? "true" : "false";
+
+    const clip = el("span", { className: "labelcard__clip" }, el("i", { className: "labelcard__sheen" }));
+    clip.setAttribute("aria-hidden", "true");
+    const fxHost = el("span", { className: "alert__fx labelcard__fx" });
+    fxHost.setAttribute("aria-hidden", "true");
 
     const media = el("span", { className: "labelcard__media" });
     media.setAttribute("aria-hidden", "true");
-    const giftPic = safePic(card.picture);
-    const hasMedia = !card.empty && Boolean(giftPic || card.initialName);
-    media.hidden = !(Boolean(settings?.avatar) && hasMedia);
+    const hasMedia = populateMedia(media, card);
 
-    if (hasMedia) {
-      if (giftPic) {
-        const img = el("img", { className: "labelcard__gift", src: giftPic, alt: "", referrerPolicy: "no-referrer" });
-        img.addEventListener("error", () => { img.remove(); media.hidden = true; }, { once: true });
-        media.append(img);
-      } else {
-        const initial = [...(card.initialName || "?")][0].toUpperCase();
-        const av = el("span", { className: "labelcard__av", textContent: initial });
-        const avPic = safePic(card.avatar);
-        if (avPic) {
-          const img = el("img", { className: "gift__avimg", src: avPic, alt: "", referrerPolicy: "no-referrer" });
-          img.addEventListener("load", () => av.classList.add("labelcard__av--pic"), { once: true });
-          img.addEventListener("error", () => img.remove(), { once: true });
-          av.append(img);
-        }
-        media.append(av);
-      }
-    }
-
+    const kicker = el("span", { className: "labelcard__kicker" });
     const label = el("span", { className: "labelcard__label", textContent: card.label || "" });
+    if (card.top) {
+      const mini = crownIcon("labelcard__minicrown");
+      kicker.append(mini, label);
+    } else {
+      kicker.append(label);
+    }
     const headline = el("strong", { className: "labelcard__headline", textContent: card.headline || "" });
     const detail = el("span", { className: "labelcard__detail", textContent: card.detail || "" });
     detail.hidden = !card.detail;
 
-    const body = el("span", { className: "labelcard__body" }, label, headline, detail);
-    node.append(media, body);
-    node.addEventListener("animationend", () => node.classList.remove("labelcard--in"), { once: true });
-    return { node, label, headline, detail, media, hasMedia };
+    const body = el("span", { className: "labelcard__body" }, kicker, headline, detail);
+    node.append(clip, fxHost, media, body);
+    node.addEventListener("animationend", (e) => {
+      if (e.target === node) node.classList.remove("labelcard--in", "labelcard--bump");
+    });
+    return {
+      node,
+      fxHost,
+      label,
+      headline,
+      detail,
+      media,
+      hasMedia,
+      mediaKey: `${card.picture || ""}|${card.avatar || ""}|${card.initialName || ""}|${Boolean(card.top)}`,
+    };
   }
 
   function renderDots(snapshot) {
@@ -943,7 +1000,10 @@ export function createLabelsView(host) {
     dots.replaceChildren();
     for (let i = 0; i < snapshot.count; i += 1) {
       const dot = el("i", { className: "labels__dot" });
-      if (i === snapshot.index) dot.setAttribute("aria-current", "true");
+      if (i === snapshot.index) {
+        dot.setAttribute("aria-current", "true");
+        dot.append(el("b", { className: "labels__dotfill" }));
+      }
       dots.append(dot);
     }
   }
@@ -954,12 +1014,19 @@ export function createLabelsView(host) {
       applyLook(root, next);
       root.dataset.layout = next.layout || "card";
       root.dataset.enter = next.enter || "slide";
+      root.dataset.anim = next.anim || "shine";
+      const rotateMs = Math.max(3, Math.min(30, Number(next.rotateSec) || 6)) * 1000;
+      root.style.setProperty("--rotate-ms", `${rotateMs}ms`);
       if (lastSnapshot) this.render(lastSnapshot);
     },
     render(snapshot) {
       if (!settings || !snapshot) return;
       lastSnapshot = snapshot;
       renderDots(snapshot);
+
+      const celebId = Number(snapshot.celebrateId) || 0;
+      const shouldCelebrate = lastCelebrateId >= 0 && celebId > lastCelebrateId;
+      lastCelebrateId = celebId;
 
       if (!snapshot.card) {
         if (currentCard) { currentCard.node.remove(); currentCard = null; }
@@ -971,31 +1038,50 @@ export function createLabelsView(host) {
       lastRevision = snapshot.revision;
 
       if (!rotated && currentCard && currentCard.node.dataset.slot === (snapshot.card.id || "idle")) {
-        currentCard.media.hidden = !(Boolean(settings?.avatar) && currentCard.hasMedia);
+        const nextMediaKey = `${snapshot.card.picture || ""}|${snapshot.card.avatar || ""}|${snapshot.card.initialName || ""}|${Boolean(snapshot.card.top)}`;
+        if (nextMediaKey !== currentCard.mediaKey) {
+          currentCard.hasMedia = populateMedia(currentCard.media, snapshot.card);
+          currentCard.mediaKey = nextMediaKey;
+        } else {
+          currentCard.media.hidden = !(Boolean(settings?.avatar) && currentCard.hasMedia);
+        }
+        currentCard.node.dataset.top = snapshot.card.top ? "true" : "false";
         currentCard.label.textContent = snapshot.card.label || "";
         currentCard.headline.textContent = snapshot.card.headline || "";
         currentCard.detail.textContent = snapshot.card.detail || "";
         currentCard.detail.hidden = !snapshot.card.detail;
+        if (shouldCelebrate) {
+          currentCard.node.classList.remove("labelcard--bump");
+          void currentCard.node.offsetWidth;
+          currentCard.node.classList.add("labelcard--bump");
+          sparkleBurst(currentCard.fxHost, snapshot.celebrateKind || "event");
+        }
         return;
       }
 
       const prev = currentCard?.node;
       if (prev) {
-        prev.classList.remove("labelcard--in");
+        prev.classList.remove("labelcard--in", "labelcard--bump");
         prev.classList.add("labelcard--out");
         setTimeout(() => prev.remove(), 280);
       }
 
       currentCard = buildCard(snapshot.card);
       stage.append(currentCard.node);
+      if (shouldCelebrate && !snapshot.card.empty) {
+        sparkleBurst(currentCard.fxHost, snapshot.card.top ? "leader" : (snapshot.celebrateKind || "event"));
+      }
     },
     clear() {
+      for (const tid of fxTimers) clearTimeout(tid);
+      fxTimers.clear();
       stage.replaceChildren();
       dots.replaceChildren();
       dots.hidden = true;
       currentCard = null;
       lastSnapshot = null;
       lastRevision = -1;
+      lastCelebrateId = -1;
     },
   };
 }
@@ -1123,26 +1209,590 @@ export function createJarView(host) {
         }, ms);
       });
     },
-    clear() {
-      clearTimeout(thanksTimer);
-      clearTimeout(partyTimer);
-      delete root.dataset.celebrating;
-      thanks.hidden = true;
-      partyLayer.hidden = true;
-      partyLayer.classList.remove("jar__party--on");
-      fx.replaceChildren();
-      box.dataset.items = "0";
-      canvasCtrl.clear();
-      if (lastSnapshot) {
-        lastSnapshot = { ...lastSnapshot, total: 0, percent: 0, full: false, items: [] };
-        syncMeta();
-        canvasCtrl.sync({ percent: 0, full: false, items: [], droppedUid: "" });
+      clear() {
+        clearTimeout(thanksTimer);
+        clearTimeout(partyTimer);
+        delete root.dataset.celebrating;
+        thanks.hidden = true;
+        partyLayer.hidden = true;
+        partyLayer.classList.remove("jar__party--on");
+        fx.replaceChildren();
+        box.dataset.items = "0";
+        canvasCtrl.clear();
+        if (lastSnapshot) {
+          lastSnapshot = { ...lastSnapshot, total: 0, percent: 0, full: false, items: [] };
+          syncMeta();
+          canvasCtrl.sync({ percent: 0, full: false, items: [], droppedUid: "" });
+        }
+      },
+      destroy() {
+        clearTimeout(thanksTimer);
+        clearTimeout(partyTimer);
+        canvasCtrl.destroy?.();
+      },
+  };
+}
+
+// ── Spin the Wheel ───────────────────────────────────────────────────────────────────────────────────────────────────
+
+let sharedTickCtx = null;
+
+/** Synthesizes a short woody peg click via Web Audio for wheel pointer ticks with zero external assets. */
+export function playWheelTick() {
+  const Ctor = globalThis.AudioContext ?? globalThis.webkitAudioContext;
+  if (!Ctor) return false;
+  try {
+    if (!sharedTickCtx) sharedTickCtx = new Ctor();
+    if (sharedTickCtx.state === "suspended") { try { sharedTickCtx.resume(); } catch {} }
+    if (sharedTickCtx.state !== "running") return false;
+    const now = sharedTickCtx.currentTime;
+    const osc = sharedTickCtx.createOscillator();
+    const gain = sharedTickCtx.createGain();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(1450, now);
+    osc.frequency.exponentialRampToValueAtTime(520, now + 0.028);
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.22, now + 0.004);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.032);
+    osc.connect(gain);
+    gain.connect(sharedTickCtx.destination);
+    osc.start(now);
+    osc.stop(now + 0.04);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+const CLASSIC_WHEEL_PALETTE = ["#ffcc00", "#ff5f86", "#53c68c", "#65b8f6", "#c8b6ff", "#ffb347"];
+const KAWAII_WHEEL_PALETTE = ["#ffe5ec", "#d8f3dc", "#fff3b0", "#e9efff", "#f3d9fa", "#fde2e4"];
+const CRYSTAL_WHEEL_PALETTE = ["#1e2638", "#35405c", "#1e2638", "#35405c", "#1e2638", "#35405c"];
+
+/** Returns the 6 slice swatch colors & dot border color matching the wheel's active design & look palette. */
+export function wheelSlicePalette(settings) {
+  const accent = settings?.accent || "#ffcc00";
+  const pop = settings?.pop || "#ff5f86";
+  const design = settings?.design || "classic";
+  if (design === "kawaii") return { colors: KAWAII_WHEEL_PALETTE, ring: "#1f2430" };
+  if (design === "crystal") return { colors: CRYSTAL_WHEEL_PALETTE, ring: accent };
+  return { colors: [accent, pop, ...CLASSIC_WHEEL_PALETTE.slice(2)], ring: "#1f2430" };
+}
+
+function hexLuminance(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || "").trim());
+  if (!m) return 180;
+  const n = parseInt(m[1], 16);
+  return 0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255);
+}
+
+/**
+ * Animated canvas Spin the Wheel view (3 designs, spring top flapper, peg tick events, queue pill,
+ * confetti winner banner, and optional active-only idle hiding).
+ */
+export function createWheelView(host, { onTick = () => {}, onWin = () => {} } = {}) {
+  const root = el("div", { className: "wheel" });
+  host.append(root);
+
+  const title = el("p", { className: "wheel__title" });
+  const box = el("div", { className: "wheel__box" });
+  const canvas = document.createElement("canvas");
+  canvas.className = "wheel__canvas";
+  canvas.setAttribute("aria-hidden", "true");
+  const queueBadge = el("span", { className: "wheel__queue", hidden: true });
+
+  const partyLayer = el("div", { className: "wheel__party", hidden: true });
+  partyLayer.setAttribute("aria-hidden", "true");
+  const fx = el("span", { className: "alert__fx wheel__fx" });
+  const winCard = el("div", { className: "wheel__wincard" });
+  const winWho = el("span", { className: "wheel__who" });
+  const winPrize = el("strong", { className: "wheel__prize" });
+  winCard.append(winWho, winPrize);
+  partyLayer.append(fx, winCard);
+
+  box.append(canvas, queueBadge, partyLayer);
+  const meta = el("p", { className: "wheel__meta" });
+  root.append(title, box, meta);
+
+  const SIZE = 340;
+  const TAU = Math.PI * 2;
+  const ctx = canvas.getContext("2d");
+
+  let settings = null;
+  let lastSnapshot = null;
+  let theta = 0;
+  let flapAngle = 0;
+  let spinning = false;
+  let spinGen = 0;
+  let raf = 0;
+  let bulbPhase = 0;
+  let activeResolve = null;
+
+  function resize() {
+    const dpr = Math.min(2, globalThis.devicePixelRatio || 1);
+    const px = Math.round(SIZE * dpr);
+    if (canvas.width !== px || canvas.height !== px) {
+      canvas.width = px;
+      canvas.height = px;
+    }
+    return dpr;
+  }
+
+  function themePalette() {
+    const cs = getComputedStyle(root);
+    const read = (prop, cssVar, fallback) => settings?.[prop] || cs.getPropertyValue(cssVar).trim() || fallback;
+    const accent = read("accent", "--a-accent", "#ffcc00");
+    const pop = read("pop", "--a-pop", "#ff5f86");
+    const bg = read("bg", "--a-bg", "#ffffff");
+    const text = read("text", "--a-text", "#1f2430");
+    const design = settings?.design || "classic";
+    if (design === "kawaii") return { design, accent, pop, bg, text, slices: KAWAII_WHEEL_PALETTE };
+    return {
+      design,
+      accent,
+      pop,
+      bg,
+      text,
+      slices: [accent, pop, ...CLASSIC_WHEEL_PALETTE.slice(2)],
+    };
+  }
+
+  function fitSliceLabel(context, rawText, maxW) {
+    let txt = String(rawText || "");
+    if (context.measureText(txt).width <= maxW) return txt;
+    while (txt.length > 2 && context.measureText(txt + "…").width > maxW) txt = txt.slice(0, -1);
+    return txt + "…";
+  }
+
+  function draw() {
+    if (!ctx) return;
+    const dpr = resize();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, SIZE, SIZE);
+
+    const cx = SIZE / 2;
+    const cy = SIZE / 2 + 6;
+    const outerR = 144;
+    const slices = lastSnapshot?.slices?.length >= 2 ? lastSnapshot.slices : ["Prize 1", "Prize 2", "Prize 3", "Prize 4"];
+    const arc = TAU / slices.length;
+    const pal = themePalette();
+    const isCrystal = pal.design === "crystal";
+    const isKawaii = pal.design === "kawaii";
+
+    // Contact drop shadow under wheel
+    ctx.save();
+    ctx.fillStyle = "rgba(0, 0, 0, 0.28)";
+    ctx.beginPath();
+    ctx.arc(cx, cy + 7, outerR + 10, 0, TAU);
+    ctx.fill();
+    ctx.restore();
+
+    // Outer rim bezel
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, outerR + 10, 0, TAU);
+    ctx.fillStyle = isCrystal ? "rgba(255, 255, 255, 0.22)" : isKawaii ? "#fff0f5" : "#1f2430";
+    ctx.fill();
+    ctx.lineWidth = isCrystal ? 2.5 : 4;
+    ctx.strokeStyle = isCrystal ? pal.accent : isKawaii ? pal.pop : pal.accent;
+    ctx.stroke();
+
+    // Draw slices
+    for (let i = 0; i < slices.length; i++) {
+      const a0 = theta + i * arc;
+      const a1 = a0 + arc;
+      const sliceColor = pal.slices[i % pal.slices.length];
+
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, outerR - 1, a0, a1);
+      ctx.closePath();
+
+      if (isCrystal) {
+        ctx.fillStyle = i % 2 === 0 ? "rgba(18, 24, 38, 0.72)" : "rgba(38, 46, 68, 0.72)";
+      } else {
+        ctx.fillStyle = sliceColor;
       }
+      ctx.fill();
+
+      ctx.lineWidth = isCrystal ? 1.8 : 2.5;
+      ctx.strokeStyle = isCrystal ? "rgba(255, 255, 255, 0.55)" : isKawaii ? "#ffffff" : "#1f2430";
+      ctx.stroke();
+
+      // Slice text
+      const mid = a0 + arc * 0.5;
+      ctx.save();
+      ctx.translate(cx, cy);
+      const onRight = Math.cos(mid) >= 0;
+      ctx.rotate(onRight ? mid : mid + Math.PI);
+      const fontPx = slices.length >= 10 ? 11 : slices.length >= 7 ? 12.5 : 14;
+      ctx.font = `800 ${fontPx}px ${settings?.font || "sans-serif"}`;
+      ctx.textBaseline = "middle";
+      ctx.textAlign = onRight ? "right" : "left";
+      const label = fitSliceLabel(ctx, slices[i], outerR - 54);
+      const textColor = isCrystal ? "#ffffff" : hexLuminance(sliceColor) < 142 ? "#ffffff" : "#1f2430";
+      ctx.fillStyle = textColor;
+      if (textColor === "#ffffff") {
+        ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
+        ctx.shadowBlur = 3;
+      }
+      ctx.fillText(label, onRight ? outerR - 16 : -(outerR - 16), 0);
+      ctx.restore();
+    }
+
+    // Glossy inner radial highlight
+    const sheen = ctx.createRadialGradient(cx - 28, cy - 36, 12, cx, cy, outerR);
+    sheen.addColorStop(0, "rgba(255, 255, 255, 0.24)");
+    sheen.addColorStop(1, "rgba(0, 0, 0, 0.08)");
+    ctx.fillStyle = sheen;
+    ctx.beginPath();
+    ctx.arc(cx, cy, outerR, 0, TAU);
+    ctx.fill();
+
+    // Peg studs on rim at each slice boundary
+    for (let i = 0; i < slices.length; i++) {
+      const pegA = theta + i * arc;
+      const px = cx + Math.cos(pegA) * (outerR + 4);
+      const py = cy + Math.sin(pegA) * (outerR + 4);
+      ctx.beginPath();
+      ctx.arc(px, py, 3.6, 0, TAU);
+      const lit = (i + bulbPhase) % 2 === 0;
+      ctx.fillStyle = lit ? "#ffffff" : pal.accent;
+      ctx.fill();
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = "#1f2430";
+      ctx.stroke();
+    }
+
+    // Center hub cap
+    ctx.beginPath();
+    ctx.arc(cx, cy, 22, 0, TAU);
+    ctx.fillStyle = isKawaii ? "#ffffff" : isCrystal ? pal.pop : "#1f2430";
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = pal.accent;
+    ctx.stroke();
+
+    ctx.fillStyle = isKawaii ? pal.pop : "#ffd23f";
+    ctx.font = "900 18px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("★", cx, cy + 1);
+    ctx.restore();
+
+    // Top 12 o'clock spring flapper pointer
+    ctx.save();
+    ctx.translate(cx, cy - outerR - 6);
+    ctx.rotate(flapAngle);
+    ctx.shadowColor = "rgba(0, 0, 0, 0.35)";
+    ctx.shadowBlur = 4;
+    ctx.beginPath();
+    ctx.moveTo(-13, -10);
+    ctx.lineTo(13, -10);
+    ctx.lineTo(0, 18);
+    ctx.closePath();
+    ctx.fillStyle = pal.pop;
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = "#1f2430";
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(0, -6, 4.5, 0, TAU);
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function syncMeta() {
+    if (!settings || !lastSnapshot) return;
+    queueBadge.hidden = !(lastSnapshot.queued > 0);
+    queueBadge.textContent = `+${lastSnapshot.queued} ${lastSnapshot.queued === 1 ? "spin" : "spins"} queued`;
+
+    const idleHide = settings.idleMode === "active" && !spinning;
+    root.dataset.idleHidden = String(idleHide);
+
+    if (!settings.showPrompt) {
+      meta.hidden = true;
+      return;
+    }
+    meta.hidden = false;
+    if (lastSnapshot.triggerBy === "threshold") {
+      meta.textContent = `${lastSnapshot.meter.toLocaleString("en-US")} / ${lastSnapshot.meterTarget.toLocaleString("en-US")} to next spin`;
+    } else if (settings.giftName) {
+      meta.textContent = `Send ${settings.giftName} to spin!`;
+    } else {
+      meta.textContent = `Send ${Number(settings.minDiamonds || 10).toLocaleString("en-US")}+ diamonds or ${Number(settings.minBits || 100).toLocaleString("en-US")}+ bits to spin!`;
+    }
+  }
+
+  function clearTimersAndRaf() {
+    if (raf && typeof cancelAnimationFrame === "function") cancelAnimationFrame(raf);
+    raf = 0;
+    if (activeResolve) {
+      const done = activeResolve;
+      activeResolve = null;
+      done();
+    }
+  }
+
+  return {
+    apply(next) {
+      settings = next;
+      applyLook(root, next);
+      root.dataset.design = next.design || "classic";
+      title.hidden = !next.title;
+      title.textContent = next.titleText || "Spin the wheel!";
+      syncMeta();
+      draw();
+    },
+    render(snapshot) {
+      lastSnapshot = snapshot;
+      if (snapshot?.totalSpins !== undefined) root.dataset.spins = String(snapshot.totalSpins);
+      root.dataset.spinning = String(Boolean(snapshot?.spinning || spinning));
+      syncMeta();
+      draw();
+    },
+    spinTo(spinData, { spinMs = 5000, holdMs = 5000 } = {}) {
+      clearTimersAndRaf();
+      const myGen = ++spinGen;
+      spinning = true;
+      partyLayer.hidden = true;
+      partyLayer.classList.remove("wheel__party--on");
+      fx.replaceChildren();
+      root.dataset.spinning = "true";
+      syncMeta();
+
+      const slices = lastSnapshot?.slices?.length >= 2 ? lastSnapshot.slices : parseSlicesFallback();
+      const arc = TAU / slices.length;
+      const targetIdx = Math.max(0, Math.min(slices.length - 1, Number(spinData?.index) || 0));
+      const jitter = (Math.random() * 2 - 1) * arc * 0.28;
+      const desiredMod = ((-Math.PI / 2 - (targetIdx + 0.5) * arc + jitter) % TAU + TAU) % TAU;
+      const currentMod = ((theta % TAU) + TAU) % TAU;
+      let deltaMod = (desiredMod - currentMod + TAU) % TAU;
+      if (deltaMod < 0.15) deltaMod += TAU;
+      const extraTurns = (5 + Math.floor(Math.random() * 2)) * TAU;
+      const startTheta = theta;
+      const totalDelta = extraTurns + deltaMod;
+
+      const animSpinMs = reducedMotion() ? 140 : Math.max(1500, spinMs);
+      const animHoldMs = reducedMotion() ? 450 : Math.max(1000, holdMs);
+      let lastPeg = Math.floor((((-Math.PI / 2 - theta) % TAU + TAU) % TAU) / arc);
+
+      return new Promise((resolve) => {
+        activeResolve = resolve;
+        const t0 = performance.now();
+
+        const step = (now) => {
+          if (myGen !== spinGen) return;
+          const elapsed = now - t0;
+          const t = Math.min(1, elapsed / animSpinMs);
+          const eased = 1 - Math.pow(1 - t, 5);
+          theta = startTheta + totalDelta * eased;
+
+          const curPeg = Math.floor((((-Math.PI / 2 - theta) % TAU + TAU) % TAU) / arc);
+          if (curPeg !== lastPeg && t < 0.995) {
+            lastPeg = curPeg;
+            bulbPhase = (bulbPhase + 1) % 2;
+            flapAngle = -0.48;
+            onTick(spinData);
+          } else {
+            flapAngle *= 0.82;
+          }
+          draw();
+
+          if (t < 1) {
+            raf = requestAnimationFrame(step);
+            return;
+          }
+          raf = 0;
+          flapAngle = 0;
+          draw();
+
+          winWho.textContent = spinData?.who ? `${spinData.who} · ${spinData.label || "Spin"}` : "Wheel Winner!";
+          winPrize.textContent = spinData?.slice || slices[targetIdx];
+          partyLayer.hidden = false;
+          partyLayer.classList.add("wheel__party--on");
+          confettiBurst(fx, 36, { spreadX: 165, spreadY: 165, minDist: 75, yMul: 0.9 });
+          onWin(spinData);
+
+          setTimeout(() => {
+            if (myGen !== spinGen) return;
+            partyLayer.hidden = true;
+            partyLayer.classList.remove("wheel__party--on");
+            fx.replaceChildren();
+            spinning = false;
+            root.dataset.spinning = "false";
+            syncMeta();
+            const done = activeResolve;
+            activeResolve = null;
+            done?.();
+          }, animHoldMs);
+        };
+
+        if (typeof requestAnimationFrame === "function") raf = requestAnimationFrame(step);
+        else {
+          theta = startTheta + totalDelta;
+          draw();
+          spinning = false;
+          const done = activeResolve;
+          activeResolve = null;
+          done?.();
+        }
+      });
+    },
+    clear() {
+      ++spinGen;
+      clearTimersAndRaf();
+      spinning = false;
+      partyLayer.hidden = true;
+      partyLayer.classList.remove("wheel__party--on");
+      fx.replaceChildren();
+      theta = 0;
+      flapAngle = 0;
+      root.dataset.spinning = "false";
+      syncMeta();
+      draw();
     },
     destroy() {
-      clearTimeout(thanksTimer);
-      clearTimeout(partyTimer);
-      canvasCtrl.destroy?.();
+      ++spinGen;
+      clearTimersAndRaf();
+    },
+  };
+}
+
+function parseSlicesFallback() {
+  return ["10 Pushups", "Sing a Chorus", "VIP Shoutout", "Sip Water"];
+}
+
+// ── OBS & Stream Actions ─────────────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Transparent overlay view for Actions: renders a pulsing broadcast `● REPLAY` badge during Replay Cam playback
+ * and themed Frills action toast/banner cards with optional particle bursts. Stays completely invisible when idle.
+ */
+export function createActionsView(host) {
+  const root = el("div", { className: "actions" });
+  host.append(root);
+
+  const replayBar = el("div", { className: "actions__replay", hidden: true });
+  replayBar.setAttribute("aria-live", "polite");
+  const replayDot = el("span", { className: "actions__dot" });
+  replayDot.setAttribute("aria-hidden", "true");
+  const replayBadge = el("strong", { className: "actions__rbadge", textContent: "REPLAY" });
+  const replayWho = el("span", { className: "actions__rwho" });
+  replayBar.append(replayDot, replayBadge, replayWho);
+
+  const stack = el("div", { className: "actions__stack" });
+  const stickyLayer = el("div", { className: "actions__stickies" });
+  stickyLayer.setAttribute("aria-hidden", "true");
+  root.append(replayBar, stack, stickyLayer);
+
+  let settings = null;
+  const timers = new Set();
+  const activeStickies = [];
+  let stickySlot = 0;
+  const STICKY_SPOTS = [
+    [52, 46, -8],
+    [71, 36, 9],
+    [34, 62, -12],
+    [66, 66, 6],
+    [48, 72, -4],
+    [28, 40, 11],
+  ];
+
+  return {
+    apply(next) {
+      settings = next;
+      applyLook(root, next);
+    },
+    showReplay({ badge = "REPLAY", who = "", label = "" } = {}) {
+      replayBadge.textContent = String(badge || "REPLAY");
+      replayWho.textContent = who ? `${who}${label ? ` · ${label}` : ""}` : "";
+      replayWho.hidden = !replayWho.textContent;
+      replayBar.hidden = false;
+    },
+    hideReplay() {
+      replayBar.hidden = true;
+    },
+    showSticky({ base64 = "", maxNotes = 0 } = {}) {
+      const clean = String(base64 || "").replace(/[^A-Za-z0-9+/=]/g, "");
+      if (!clean) return;
+      const [bx, by, brot] = STICKY_SPOTS[stickySlot % STICKY_SPOTS.length];
+      stickySlot += 1;
+      const jx = (Math.random() - 0.5) * 6;
+      const jy = (Math.random() - 0.5) * 5;
+      const jrot = (Math.random() - 0.5) * 8;
+      const img = el("img", {
+        className: "actions__sticky",
+        src: `data:image/png;base64,${clean}`,
+        alt: "",
+      });
+      img.style.setProperty("--sx", `${Math.max(12, Math.min(82, Math.round(bx + jx)))}%`);
+      img.style.setProperty("--sy", `${Math.max(20, Math.min(78, Math.round(by + jy)))}%`);
+      img.style.setProperty("--sr", `${Math.round(brot + jrot)}deg`);
+      stickyLayer.append(img);
+      activeStickies.push(img);
+
+      const cap = maxNotes > 0 ? maxNotes : 16;
+      while (activeStickies.length > cap) {
+        const oldest = activeStickies.shift();
+        if (!oldest) continue;
+        oldest.classList.add("actions__sticky--out");
+        const rid = setTimeout(() => { timers.delete(rid); oldest.remove(); }, 340);
+        timers.add(rid);
+      }
+    },
+    clearStickies() {
+      activeStickies.length = 0;
+      stickySlot = 0;
+      stickyLayer.replaceChildren();
+    },
+    showToast({ title = "", text = "", fx = "none", ms } = {}) {
+      if (settings && settings.showToasts === false && !fx) return;
+      const card = el("div", { className: "actions__toast" });
+      const fxHost = el("span", { className: "alert__fx actions__fx" });
+      fxHost.setAttribute("aria-hidden", "true");
+      const body = el("div", { className: "actions__tbody" });
+      if (title) body.append(el("strong", { className: "actions__ttitle", textContent: String(title) }));
+      if (text) body.append(el("span", { className: "actions__ttext", textContent: String(text) }));
+      card.append(fxHost, body);
+      stack.append(card);
+      while (stack.children.length > 3) stack.firstElementChild?.remove();
+
+      if (fx === "confetti") confettiBurst(fxHost, 24, { spreadX: 120, spreadY: 90, minDist: 40, yMul: 0.8 });
+      else if (fx === "sparkles" || fx === "hearts") {
+        const glyphs = fx === "hearts" ? ["♥", "♡"] : ["✦", "✧", "★"];
+        for (let i = 0; i < 12; i++) {
+          const p = el("i", { textContent: glyphs[i % glyphs.length] });
+          const angle = (Math.PI * 2 * i) / 12 + Math.random() * 0.35;
+          const dist = 48 + Math.random() * 58;
+          p.style.setProperty("--dx", `${Math.round(Math.cos(angle) * dist)}px`);
+          p.style.setProperty("--dy", `${Math.round(Math.sin(angle) * dist)}px`);
+          p.style.setProperty("--r", `${Math.round((Math.random() - 0.5) * 50)}deg`);
+          p.style.color = i % 2 === 0 ? "var(--a-accent, #fc0)" : "var(--a-pop, #f48)";
+          fxHost.append(p);
+        }
+      }
+
+      const hold = Math.max(1500, Number(ms) || ((Number(settings?.toastSeconds) || 4) * 1000));
+      const tid = setTimeout(() => {
+        timers.delete(tid);
+        card.classList.add("actions__toast--out");
+        const rid = setTimeout(() => { timers.delete(rid); card.remove(); }, 280);
+        timers.add(rid);
+      }, hold);
+      timers.add(tid);
+    },
+    clear() {
+      for (const tid of timers) clearTimeout(tid);
+      timers.clear();
+      replayBar.hidden = true;
+      stack.replaceChildren();
+      activeStickies.length = 0;
+      stickySlot = 0;
+      stickyLayer.replaceChildren();
+    },
+    destroy() {
+      this.clear();
     },
   };
 }

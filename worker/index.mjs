@@ -19,6 +19,7 @@ import { cloudHostIdFromPath, handleCloudOverlays } from "./cloud-overlays.mjs";
 import { checkProRegion, handleProStatus } from "./region.mjs";
 import { handleDevPass, handleTts, handleVoiceSample, handleCohost } from "./tts.mjs";
 import { countOverlay, handleEvent } from "./stats.mjs";
+import { handlePublicStatus } from "./stats-report.mjs";
 
 /** How long the edge keeps a file it has already read from the database. Short, so a deleted or reported file is gone within the hour. */
 const EDGE_SECONDS = 3600;
@@ -27,6 +28,7 @@ export default {
   async fetch(request, env, ctx) {
     const { pathname } = new URL(request.url);
     if (pathname === "/api/e") return handleEvent(request, env);
+    if (pathname === "/api/status") return handlePublicStatus(request, env);
     if (pathname === "/overlay" || pathname.startsWith("/overlay/")) return countOverlay(request, env); // (counts the opening, then serves the page as before)
     if (pathname === "/api/feedback") return handleFeedback(request, env);
     if (pathname === "/api/songs") return handleSongs(request, { ctx });

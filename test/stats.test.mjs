@@ -5,7 +5,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { EVENTS, encodeEvent, labelsValid, loadOf, overlayOf, pageOf, parseEvent, platformOf, refOf, toDataPoint } from "../src/js/stats-events.js";
 import { countOverlay, handleEvent, scramble } from "../worker/stats.mjs";
-import { DATASETS, TARGETS, activeOverlays, checkRelays, fetchGsc, parseRelayUrls, report, scorecard, summarize } from "../worker/stats-report.mjs";
+import { DATASETS, TARGETS, activeOverlays, checkRelays, fetchGsc, handlePublicStatus, parseRelayUrls, report, scorecard, summarize } from "../worker/stats-report.mjs";
 import { handleAdmin } from "../worker/admin.mjs";
 import { localDatabase } from "../scripts/lib/d1-sqlite.mjs";
 
@@ -218,4 +218,27 @@ test("the stats come only through the admin password: none without it, none with
   assert.deepEqual(await ok.json(), { ok: false, error: "not_set" }, "right password, no Cloudflare secrets yet: it says so");
   const post = await handleAdmin(new Request(`${SITE}/api/admin/stats`, { method: "POST", headers: { authorization: `Bearer ${"k".repeat(16)}`, origin: SITE } }), env);
   assert.equal(post.status, 405);
+});
+
+test("public /api/status probes relays cleanly and strips owner/private fields", async () => {
+  const res = await handlePublicStatus(
+    new Request(`${SITE}/api/status`),
+    { RELAY_OWNER_KEY: "secret-owner-key" },
+    {
+      now: T,
+      fetchImpl: async (url) => {
+        if (url.includes("plus-relay.")) return Response.json({ ok: true, version: "0.6.0", slots: { used: 2, max: 100, waiting: 0 }, uptimeS: 7200, signing: { busy: false, busyRecently: 0, pool: { activeSlot: 1 } }, roster: { accounts: [{ user: "hidden" }] } });
+        return Response.json({ ok: true, version: "0.6.0", slots: { used: 10, max: 30, waiting: 1 }, uptimeS: 3600, signing: { busy: false, busyRecently: 0 }, device: { cores: 4 } });
+      },
+    },
+  );
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.ok, true);
+  assert.equal(body.relays.length, 2);
+  assert.equal(body.relays[0].free, 20);
+  assert.equal(body.relays[1].free, 98);
+  assert.equal("roster" in body.relays[1], false);
+  assert.equal("device" in body.relays[0], false);
+  assert.equal("pool" in (body.relays[1].signing ?? {}), false);
 });

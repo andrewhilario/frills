@@ -1,5 +1,6 @@
-// The private stats page (/admin/stats/): the numbers for Frills and valwidgets.live, live TikTok relay fleet status,
-// Google Search Console metrics, and one-click CSV/JSON export. Everything is put in with textContent, never as HTML.
+// The private Admin Command Center (/admin/stats/): viewport-locked telemetry dashboard for Frills & valwidgets.live,
+// live TikTok relay fleet + 3-account Euler signing key pool matrix, Google Search Console metrics, and CSV/JSON export.
+// Everything user-visible is set with textContent, never as HTML.
 
 import { el } from "./feed.js";
 
@@ -8,7 +9,8 @@ const KEY = "frills:admin:key";
 
 let key = "";
 let latestReport = null;
-try { key = sessionStorage.getItem(KEY) ?? ""; } catch { /* storage can be blocked; the password is then asked for each visit */ }
+let currentView = "overview";
+try { key = sessionStorage.getItem(KEY) ?? ""; } catch { /* storage can be blocked */ }
 
 class Wrong extends Error {}
 
@@ -41,15 +43,11 @@ const uptimeText = (s) => {
   return h > 0 ? `${h}h ${m}m` : `${m}m`;
 };
 
-/** Returns { text, tone } for a week-over-week comparison badge. */
 function deltaBadge(week, before) {
   if (!before) return week ? { text: "NEW vs prev 7d", tone: "up" } : { text: "0 prev 7d", tone: "flat" };
   const diff = Math.round(((week - before) / before) * 100);
   if (diff === 0) return { text: "0% vs prev 7d", tone: "flat" };
-  return {
-    text: `${diff > 0 ? "▲ +" : "▼ "}${diff}% vs prev 7d`,
-    tone: diff > 0 ? "up" : "down",
-  };
+  return { text: `${diff > 0 ? "▲ +" : "▼ "}${diff}% vs prev 7d`, tone: diff > 0 ? "up" : "down" };
 }
 
 const NAMES = {
@@ -96,6 +94,34 @@ const NAMES = {
 };
 const nameOf = (label) => NAMES[label] ?? label;
 
+// ── View Switching ───────────────────────────────────────────────────────────────────────────────────────────────
+function setView(view) {
+  currentView = view;
+  const dash = $("dash");
+  if (dash) dash.dataset.view = view;
+  const nav = $("stats-nav");
+  if (nav) {
+    for (const btn of nav.querySelectorAll("[data-view-target]")) {
+      if (btn.dataset.viewTarget === view) btn.setAttribute("aria-current", "page");
+      else btn.removeAttribute("aria-current");
+    }
+  }
+}
+
+$("stats-nav")?.addEventListener("click", (event) => {
+  const btn = event.target.closest("[data-view-target]");
+  if (!btn) return;
+  setView(btn.dataset.viewTarget);
+});
+
+document.addEventListener("keydown", (event) => {
+  if ($("dash")?.hidden) return;
+  if (event.target && ["INPUT", "TEXTAREA", "SELECT"].includes(event.target.tagName)) return;
+  const map = { "1": "overview", "2": "breakdowns", "3": "relays", "4": "plus", "5": "gsc", "6": "valwidgets", "7": "all" };
+  if (map[event.key]) setView(map[event.key]);
+});
+
+// ── Components ───────────────────────────────────────────────────────────────────────────────────────────────────
 function kpiCard(title, big, badge, metaItems) {
   const pill = el("span", { className: "stats__delta", textContent: badge.text });
   pill.dataset.tone = badge.tone;
@@ -108,25 +134,38 @@ function kpiCard(title, big, badge, metaItems) {
   return el("div", { className: "stats__card" }, top, el("b", { className: "stats__big", textContent: big }), meta);
 }
 
-/** Draws the live Relay Fleet Status section (supports 1 or multiple relays). */
-function drawRelays(host, relays) {
-  host.replaceChildren();
-  if (!Array.isArray(relays) || !relays.length) {
-    host.hidden = true;
-    return;
-  }
-  host.hidden = false;
-  const onlineCount = relays.filter((r) => r.ok).length;
-  const totalFree = relays.reduce((s, r) => s + (r.free || 0), 0);
-  const totalMax = relays.reduce((s, r) => s + (r.slots?.max || 0), 0);
-  const totalUsed = relays.reduce((s, r) => s + (r.slots?.used || 0), 0);
-  const totalWait = relays.reduce((s, r) => s + (r.slots?.waiting || 0), 0);
+/** Draws the 3-Account Euler Key Pool Authority Matrix inside Relays view. */
+function drawEulerPoolPanel(relays) {
+  const poolRelay = relays.find((r) => r.ok && r.signing?.pool);
+  const pool = poolRelay?.signing?.pool;
 
-  const fleetBadge = el("span", {
+  const accounts = pool?.accounts ?? [1, 2, 3].map((slot) => ({
+    slot,
+    label: slot === 1 ? "Account 1 (Primary)" : `Account ${slot} (Backup ${slot - 1})`,
+    configured: slot === 1 && Boolean(relays.some((r) => r.ok && r.signing?.key)),
+    active: slot === 1 && Boolean(relays.some((r) => r.ok && r.signing?.key)),
+    state: slot === 1 && relays.some((r) => r.ok && r.signing?.key) ? "active" : "standby",
+    used: 0,
+    totalUsed: 0,
+    cap: 1500,
+    resetsUsed: 0,
+    resetsLeft: 3,
+    maxResets: 3,
+  }));
+
+  const cap = pool?.cap ?? 1500;
+  const maxResets = pool?.maxResets ?? 3;
+  const configuredCount = pool?.configuredCount ?? accounts.filter((a) => a.configured).length;
+  const totalCapacity = 3 * cap * (maxResets + 1);
+  const remaining = pool?.totalRemainingRequests ?? totalCapacity;
+
+  const badge = el("span", {
     className: "stats__delta",
-    textContent: onlineCount === relays.length ? `● ${onlineCount}/${relays.length} ONLINE · ${totalFree} FREE SPOTS` : `${onlineCount}/${relays.length} ONLINE · DEGRADED`,
+    textContent: pool
+      ? (pool.activeSlot ? `KEY #${pool.activeSlot} ACTIVE · ${number(remaining)} REQS LEFT` : "ALL KEYS EXHAUSTED")
+      : (configuredCount ? "SINGLE KEY MODE · UPGRADE TO 3-KEY POOL" : "ENV STANDBY · 3 KEYS × 1,500 × 3 RESETS"),
   });
-  fleetBadge.dataset.tone = onlineCount === relays.length && totalFree > 0 ? "up" : "down";
+  badge.dataset.tone = pool ? (pool.activeSlot ? "up" : "down") : "flat";
 
   const head = el(
     "div",
@@ -134,14 +173,163 @@ function drawRelays(host, relays) {
     el(
       "div",
       { className: "stats__panel-title-group" },
-      el("h2", { className: "admin__h", id: "relays-title", textContent: "TikTok Relay Fleet Status" }),
-      el("span", { className: "stats__panel-sub", textContent: `Total Fleet Capacity: ${number(totalUsed)} / ${number(totalMax)} rooms in use · ${number(totalWait)} queued · Multi-relay ready (RELAY_URLS)` }),
+      el("h3", { className: "stats__panel-title", textContent: "Euler Signing Key Pool Authority (3 Accounts · 1,500 Cap · 3 Resets Each)" }),
+      el("span", {
+        className: "stats__panel-sub",
+        textContent: `Failover Chain: Key 1 (1,500 × 4 cycles) → Backup Key 2 (1,500 × 4) → Backup Key 3 (1,500 × 4) = ${number(totalCapacity)} total requests · ${configuredCount}/3 keys live`,
+      }),
+    ),
+    badge,
+  );
+
+  const cards = el("div", { className: "stats__euler-grid" });
+  for (const acc of accounts) {
+    const stateLabel = {
+      active: "ACTIVE KEY",
+      standby: acc.configured ? "BACKUP STANDBY" : "NOT SET IN ENV",
+      exhausted: "EXHAUSTED",
+      unconfigured: "NOT SET IN ENV",
+    }[acc.state] ?? acc.state.toUpperCase();
+
+    const tone = acc.state === "active" ? "up" : acc.state === "exhausted" ? "down" : "flat";
+    const pill = el("span", { className: "stats__delta", textContent: stateLabel });
+    pill.dataset.tone = tone;
+
+    const pctUsed = acc.cap > 0 ? Math.min(100, Math.round((acc.used / acc.cap) * 100)) : 0;
+    const fill = el("i", {});
+    fill.style.width = Math.max(3, pctUsed) + "%";
+    const track = el("div", { className: "stats__funnel-track stats__relay-bar" }, fill);
+    track.dataset.level = pctUsed >= 90 || acc.state === "exhausted" ? "full" : pctUsed >= 70 ? "low" : "ok";
+
+    const resetsRow = el("div", { className: "stats__reset-dots" });
+    for (let i = 0; i < acc.maxResets; i++) {
+      const dot = el("span", {
+        className: "stats__reset-dot",
+        textContent: i < acc.resetsLeft ? `Reset ${i + 1}: READY` : `Reset ${i + 1}: USED`,
+      });
+      dot.dataset.avail = i < acc.resetsLeft ? "true" : "false";
+      resetsRow.append(dot);
+    }
+
+    const card = el(
+      "div",
+      { className: "stats__euler-card" },
+      el("div", { className: "stats__card-top" }, el("strong", { textContent: acc.label }), pill),
+      el("div", { className: "stats__euler-nums" }, el("b", { textContent: `${number(acc.used)} / ${number(acc.cap)}` }), el("span", { textContent: `reqs this cycle · ${number(acc.totalUsed)} lifetime` })),
+      track,
+      el("p", {
+        className: "stats__euler-remote",
+        textContent: acc.remote?.ok && acc.remote.day
+          ? `Euler Live Quota: ${number(acc.remote.day.remaining)} / ${number(acc.remote.day.max)} day · ${number(acc.remote.hour?.remaining ?? 0)} / ${number(acc.remote.hour?.max ?? 0)} hr`
+          : acc.configured
+            ? "Euler Live Quota: press Sync Live Euler Quota"
+            : "Euler Live Quota: key not configured",
+      }),
+      resetsRow,
+    );
+    card.dataset.state = acc.state;
+    cards.append(card);
+  }
+
+  const actionStatus = el("span", { className: "admin__note", id: "euler-action-msg", role: "status" });
+  const eulerBtn = (action, label, variant = "btn btn--soft btn--sm") => {
+    const btn = el("button", { type: "button", className: variant, textContent: label });
+    btn.dataset.eulerAction = action;
+    btn.addEventListener("click", async () => {
+      const allBtns = actionsBar.querySelectorAll("button");
+      for (const b of allBtns) b.disabled = true;
+      actionStatus.textContent = `Running ${action}…`;
+      try {
+        const res = await fetch("/api/admin/euler", {
+          method: "POST",
+          headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
+          body: JSON.stringify({ action, ...(poolRelay?.url ? { relayUrl: poolRelay.url } : {}) }),
+          cache: "no-store",
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          actionStatus.textContent = `Action failed (${data.error || res.status}).`;
+        } else {
+          const failed = (data.results ?? []).find((r) => !r.ok);
+          actionStatus.textContent = data.ok
+            ? `Updated Euler key pool (${action}). Refreshing…`
+            : `Relay refused (${failed?.error || failed?.status || "error"}).`;
+          if (data.ok) await refresh();
+        }
+      } catch {
+        actionStatus.textContent = "Could not reach /api/admin/euler.";
+      } finally {
+        for (const b of allBtns) b.disabled = false;
+      }
+    });
+    return btn;
+  };
+  const actionsBar = el(
+    "div",
+    { className: "stats__euler-actions" },
+    eulerBtn("reset", "Use 1 Reset on Active Key"),
+    eulerBtn("rotate", "Rotate to Backup Key"),
+    eulerBtn("refill", "Refill All Keys"),
+    eulerBtn("sync", "Sync Live Euler Quota", "btn btn--outline btn--sm"),
+    actionStatus,
+  );
+
+  const envHint = el(
+    "p",
+    { className: "admin__note" },
+    "Server configuration (",
+    el("code", { textContent: "/etc/frills-relay.env" }),
+    "): set ",
+    el("code", { textContent: "EULER_API_KEYS=key1,key2,key3" }),
+    " (or ",
+    el("code", { textContent: "EULER_API_KEY" }),
+    ", ",
+    el("code", { textContent: "EULER_API_KEY_2" }),
+    ", ",
+    el("code", { textContent: "EULER_API_KEY_3" }),
+    "). Optional ",
+    el("code", { textContent: "EULER_RESET_URLS" }),
+    " webhooks fire automatically when each key hits 1,500 requests.",
+  );
+
+  return el("div", { className: "stats__panel stats__euler-panel" }, head, cards, actionsBar, envHint);
+}
+
+/** Draws the live Relay Fleet Status section + Euler Key Pool Authority panel. */
+function drawRelays(host, relays) {
+  host.replaceChildren();
+  const list = Array.isArray(relays) ? relays : [];
+  if (!list.length) {
+    host.hidden = true;
+    return;
+  }
+  host.hidden = false;
+  const onlineCount = list.filter((r) => r.ok).length;
+  const totalFree = list.reduce((s, r) => s + (r.free || 0), 0);
+  const totalMax = list.reduce((s, r) => s + (r.slots?.max || 0), 0);
+  const totalUsed = list.reduce((s, r) => s + (r.slots?.used || 0), 0);
+  const totalWait = list.reduce((s, r) => s + (r.slots?.waiting || 0), 0);
+
+  const fleetBadge = el("span", {
+    className: "stats__delta",
+    textContent: onlineCount === list.length ? `● ${onlineCount}/${list.length} ONLINE · ${totalFree} FREE SPOTS` : `${onlineCount}/${list.length} ONLINE · DEGRADED`,
+  });
+  fleetBadge.dataset.tone = onlineCount === list.length && totalFree > 0 ? "up" : "down";
+
+  const head = el(
+    "div",
+    { className: "stats__panel-head" },
+    el(
+      "div",
+      { className: "stats__panel-title-group" },
+      el("h2", { className: "admin__h", id: "relays-title", textContent: "TikTok Relay Fleet & Signing Authority" }),
+      el("span", { className: "stats__panel-sub", textContent: `Total Fleet Capacity: ${number(totalUsed)} / ${number(totalMax)} rooms in use · ${number(totalWait)} queued · Multi-relay probe` }),
     ),
     fleetBadge,
   );
 
   const grid = el("div", { className: "stats__relay-grid" });
-  for (const r of relays) {
+  for (const r of list) {
     const statusPill = el("span", { className: "stats__delta" });
     if (!r.ok) {
       statusPill.textContent = `OFFLINE (${r.status || "unreachable"})`;
@@ -160,7 +348,7 @@ function drawRelays(host, relays) {
     const cardHead = el(
       "div",
       { className: "stats__card-top" },
-      el("div", { className: "stats__relay-name" }, el("strong", { textContent: r.label }), el("a", { className: "stats__relay-link", href: r.url, target: "_blank", rel: "noopener", textContent: "Open relay status ↗" })),
+      el("div", { className: "stats__relay-name" }, el("strong", { textContent: r.label }), el("a", { className: "stats__relay-link", href: r.url, target: "_blank", rel: "noopener", textContent: "Relay health ↗" })),
       statusPill,
     );
 
@@ -170,7 +358,7 @@ function drawRelays(host, relays) {
           "div",
           { className: "stats__panel stats__relay-card" },
           cardHead,
-          el("p", { className: "admin__note", textContent: `Could not reach ${r.url}/health (latency ${r.latencyMs}ms). Check if the relay server or Cloudflare tunnel is running.` }),
+          el("p", { className: "admin__note", textContent: `Could not reach ${r.url}/health (latency ${r.latencyMs}ms). Check relay process and Cloudflare tunnel.` }),
         ),
       );
       continue;
@@ -182,8 +370,9 @@ function drawRelays(host, relays) {
     const track = el("div", { className: "stats__funnel-track stats__relay-bar" }, fill);
     track.dataset.level = r.level || "ok";
 
+    const poolActive = r.signing?.pool?.activeSlot ? ` · Pool Key #${r.signing.pool.activeSlot}` : "";
     const signText = r.signing
-      ? `${r.signing.busy ? "Busy (rate-limited)" : "Healthy"}${typeof r.signing.connectsHour === "number" ? ` · ${r.signing.connectsHour}/hr (${r.signing.connectsDay}/24h)` : ""}`
+      ? `${r.signing.busy ? "Busy (rate-limited)" : "Healthy"}${poolActive}${typeof r.signing.connectsHour === "number" ? ` · ${r.signing.connectsHour}/hr (${r.signing.connectsDay}/24h)` : ""}`
       : "—";
     const streamsText = r.streams ? `${number(r.streams.open)} open (${number(r.streams.turnedAway)} turned away)` : "—";
     const capText = r.capacity ? `~${number(r.capacity.estimate)} max accounts (${r.capacity.perRoomMB} MB/room)` : "—";
@@ -202,10 +391,9 @@ function drawRelays(host, relays) {
     grid.append(el("div", { className: "stats__panel stats__relay-card" }, cardHead, track, miniGrid));
   }
 
-  host.append(head, grid);
+  host.append(head, grid, drawEulerPoolPanel(list));
 }
 
-/** Draws the Google Search Console section (or setup instructions when not yet connected). */
 function drawGsc(host, gsc) {
   host.replaceChildren();
   host.hidden = false;
@@ -217,13 +405,13 @@ function drawGsc(host, gsc) {
         "div",
         { className: "stats__panel" },
         el("h3", { className: "stats__panel-title", textContent: "Connect Google Search Console (Optional 2-Minute Setup)" }),
-        el("p", { className: "admin__note", textContent: "To pull live Google Search clicks, impressions, rankings, queries, and countries into this dashboard:" }),
+        el("p", { className: "admin__note", textContent: "Pull live Google Search clicks, impressions, rankings, queries, and countries directly into this console:" }),
         el(
           "ol",
           { className: "stats__setup-list" },
-          el("li", { textContent: "In Google Cloud Console, enable the 'Google Search Console API' and create a Service Account with a JSON key." }),
-          el("li", { textContent: "In Google Search Console (Settings -> Users and permissions), add the Service Account's client_email as a Restricted (Read-Only) user." }),
-          el("li", { textContent: "In Cloudflare (Workers & Pages -> frills -> Settings -> Variables and Secrets), add secret GSC_SERVICE_ACCOUNT with the JSON key contents, then press Refresh." }),
+          el("li", { textContent: "In Google Cloud Console, enable Google Search Console API and create a Service Account JSON key." }),
+          el("li", { textContent: "In Google Search Console (Settings -> Users and permissions), add the Service Account client_email as Restricted (Read-Only)." }),
+          el("li", { textContent: "In Cloudflare (Workers & Pages -> frills -> Settings -> Variables and Secrets), add secret GSC_SERVICE_ACCOUNT with the JSON contents, then press Refresh." }),
         ),
       ),
     );
@@ -234,7 +422,7 @@ function drawGsc(host, gsc) {
     host.append(
       el("p", {
         className: "admin__note admin__note--warn",
-        textContent: `Google Search Console returned an error (${gsc.error}, status ${gsc.status || "none"}). Check that the Service Account email is added to Search Console under Settings -> Users and permissions.`,
+        textContent: `Google Search Console returned an error (${gsc.error}, status ${gsc.status || "none"}). Check that the Service Account email is added under Settings -> Users and permissions.`,
       }),
     );
     return;
@@ -271,7 +459,7 @@ function drawGsc(host, gsc) {
       el("tr", {}, el("th", { textContent: colLabel }), el("th", { className: "stats__n", textContent: "Clicks" }), el("th", { className: "stats__n", textContent: "Impr." }), el("th", { className: "stats__n", textContent: "CTR" }), el("th", { className: "stats__n", textContent: "Pos" })),
     );
     const body = el("tbody");
-    for (const r of (rows ?? []).slice(0, 10)) {
+    for (const r of (rows ?? []).slice(0, 8)) {
       const label = r.key.replace(/^https?:\/\/[^/]+/, "") || "/";
       body.append(
         el(
@@ -300,7 +488,6 @@ function drawGsc(host, gsc) {
   host.append(cards, tables);
 }
 
-/** Visual 3-stage conversion funnel (7d & 28d): Visits -> Links Copied -> Live Overlay Loads. */
 function funnelSection(visits, copies, loads, funnel) {
   const wVisits = visits.week || 0;
   const wCopies = copies.week || 0;
@@ -335,20 +522,19 @@ function funnelSection(visits, copies, loads, funnel) {
     el(
       "div",
       { className: "stats__panel-head" },
-      el("h3", { className: "stats__panel-title", textContent: "Conversion Funnel (Last 7 Days vs. 28 Days)" }),
-      el("span", { className: "stats__panel-sub", textContent: "Visitor → Copy URL → Open in OBS" }),
+      el("h3", { className: "stats__panel-title", textContent: "Conversion Funnel (7d vs 28d)" }),
+      el("span", { className: "stats__panel-sub", textContent: "Visit → Copy URL → Live OBS" }),
     ),
     el(
       "div",
-      { className: "stats__funnel-grid" },
-      stage("1", "Site Visits", wVisits, "100%", 100, `28d total: ${number(mVisits)} visits`),
-      stage("2", "Overlay Links Copied", wCopies, `${pct(funnel?.week?.copyRate)} of visits`, copyBar, `28d: ${number(mCopies)} copied (${pct(funnel?.month?.copyRate)} of visits)`),
-      stage("3", "Live Stream Loads (OBS)", wLive, `${pct(funnel?.week?.liveRate)} per copy`, liveBar, `28d: ${number(mLive)} live loads (${number(loads.demo.total)} demo/preview loads)`),
+      { className: "stats__funnel-grid stats__funnel-grid--stack" },
+      stage("1", "Site Visits", wVisits, "100%", 100, `28d: ${number(mVisits)} visits`),
+      stage("2", "Overlay Links Copied", wCopies, `${pct(funnel?.week?.copyRate)} of visits`, copyBar, `28d: ${number(mCopies)} copied (${pct(funnel?.month?.copyRate)})`),
+      stage("3", "Live Stream Loads (OBS)", wLive, `${pct(funnel?.week?.liveRate)} per copy`, liveBar, `28d: ${number(mLive)} live (${number(loads.demo.total)} demo/preview loads)`),
     ),
   );
 }
 
-/** Interactive 28-day daily bar chart with tabs for Visits, Links Copied, and Live Stream Loads. */
 function dailyChartSection(visits, copies, loads) {
   const seriesList = [
     { id: "visits", label: "Site Visits", data: visits.perDay ?? [] },
@@ -369,7 +555,7 @@ function dailyChartSection(visits, copies, loads) {
     const top = Math.max(1, peak.n);
 
     box.setAttribute("aria-label", `${series.label} per day, the last 28 days`);
-    summaryNode.textContent = `28d Total: ${number(sum)} · Daily Avg: ${number(avg)}/day · Peak: ${number(peak.n)} (${peak.day.slice(5)})`;
+    summaryNode.textContent = `28d Total: ${number(sum)} · Avg: ${number(avg)}/day · Peak: ${number(peak.n)} (${peak.day.slice(5)})`;
 
     box.replaceChildren();
     pts.forEach(({ day, n }, idx) => {
@@ -410,7 +596,6 @@ function dailyChartSection(visits, copies, loads) {
   );
 }
 
-/** A breakdown table with 7d, 28d, % Share, and an inline progress bar. */
 function table(title, rows28d, rows7d, total28d) {
   const weekMap = new Map((rows7d ?? []).map((r) => [r.label, r.n]));
   const thead = el(
@@ -419,7 +604,7 @@ function table(title, rows28d, rows7d, total28d) {
     el("tr", {}, el("th", { textContent: "Item" }), el("th", { className: "stats__n", textContent: "7d" }), el("th", { className: "stats__n", textContent: "28d" }), el("th", { className: "stats__n", textContent: "Share" })),
   );
   const body = el("tbody");
-  for (const { label, n } of (rows28d ?? []).slice(0, 8)) {
+  for (const { label, n } of (rows28d ?? []).slice(0, 7)) {
     const share = total28d ? Math.round((n / total28d) * 100) : 0;
     const wCount = weekMap.get(label) ?? 0;
     const bar = el("i", { className: "stats__row-bar" });
@@ -441,12 +626,17 @@ function table(title, rows28d, rows7d, total28d) {
 }
 
 function site(host, id, title, data, { frills = false } = {}) {
-  host.replaceChildren(el("h2", { className: "admin__h", id: id + "-title", textContent: title }));
+  host.replaceChildren();
   if (data.error) {
+    host.append(el("h2", { className: "admin__h", id: id + "-title", textContent: title }));
     host.append(el("p", { className: "admin__note", textContent: `Cloudflare did not give the counts for this site (answer ${data.status || "none"}). If counting has only just started there may be nothing to read yet: it appears after the first visit.` }));
     return;
   }
+
   const { visits, copies, loads, plus, funnel } = data;
+  const overviewPane = el("div", { className: "stats__pane stats__pane--overview" });
+  overviewPane.append(el("h2", { className: "admin__h", id: id + "-title", textContent: title }));
+
   const cards = el(
     "div",
     { className: "admin__cards" },
@@ -501,13 +691,20 @@ function site(host, id, title, data, { frills = false } = {}) {
     }
   }
 
-  host.append(cards);
-  if (frills && funnel) host.append(funnelSection(visits, copies, loads, funnel));
-  host.append(dailyChartSection(visits, copies, loads));
+  overviewPane.append(cards);
+
+  if (frills && funnel) {
+    overviewPane.append(el("div", { className: "stats__deck" }, dailyChartSection(visits, copies, loads), funnelSection(visits, copies, loads, funnel)));
+  } else {
+    overviewPane.append(dailyChartSection(visits, copies, loads));
+  }
 
   if (frills && !data.active.month) {
-    host.append(el("p", { className: "admin__note", textContent: "Different overlays are counted only once the STATS_SALT secret is set on the worker (and overlays have opened on a real account since)." }));
+    overviewPane.append(el("p", { className: "admin__note", textContent: "Different overlays are counted once STATS_SALT is set and live overlays have opened." }));
   }
+
+  const tablesPane = el("div", { className: "stats__pane stats__pane--breakdowns" });
+  if (frills) tablesPane.append(el("h2", { className: "admin__h", textContent: "Traffic Sources, Tools & Conversion Breakdowns" }));
 
   const tables = el(
     "div",
@@ -524,8 +721,10 @@ function site(host, id, title, data, { frills = false } = {}) {
   if (frills && plus?.byFeature?.length) {
     tables.append(table("Frills Plus Interest Clicks", plus.byFeature, plus.byFeatureWeek, plus.total));
   }
-  host.append(tables);
-  if (data.others?.length) host.append(el("p", { className: "admin__note", textContent: "Other counts (28 days): " + data.others.map((o) => `${nameOf(o.label)} ${number(o.n)}`).join(", ") + "." }));
+  tablesPane.append(tables);
+  if (data.others?.length) tablesPane.append(el("p", { className: "admin__note", textContent: "Other counts (28 days): " + data.others.map((o) => `${nameOf(o.label)} ${number(o.n)}`).join(", ") + "." }));
+
+  host.append(overviewPane, tablesPane);
 }
 
 const SCORE_PROGRESS = {
@@ -533,6 +732,38 @@ const SCORE_PROGRESS = {
   returning: (data) => (data.active?.returningRate === null || data.active?.returningRate === undefined ? 0 : Math.min(100, Math.round((data.active.returningRate / 0.4) * 100))),
   copies: (data) => Math.min(100, Math.round(((data.copies?.week || 0) / 100) * 100)),
 };
+
+function updateRibbonAndBadges(data) {
+  const relays = Array.isArray(data.relays) ? data.relays : [];
+  const online = relays.filter((r) => r.ok).length;
+  const freeSpots = relays.reduce((s, r) => s + (r.free || 0), 0);
+  const relayText = relays.length ? `${online}/${relays.length} Online · ${number(freeSpots)} free spots` : "No relays configured";
+  if ($("ribbon-relays")) $("ribbon-relays").textContent = relayText;
+  if ($("nav-badge-relays")) $("nav-badge-relays").textContent = relays.length ? `${online}/${relays.length}` : "";
+
+  const poolRelay = relays.find((r) => r.ok && r.signing?.pool);
+  if ($("ribbon-euler")) {
+    if (poolRelay?.signing?.pool) {
+      const p = poolRelay.signing.pool;
+      const cur = p.activeSlot ? p.accounts[p.activeSlot - 1] : null;
+      $("ribbon-euler").textContent = cur ? `Key #${cur.slot} (${number(cur.used)}/${number(cur.cap)} · ${cur.resetsLeft}/${cur.maxResets} resets)` : "All 3 Keys Exhausted";
+    } else if (relays.some((r) => r.ok && r.signing?.key)) {
+      $("ribbon-euler").textContent = "Single Key Active (3-Key Ready)";
+    } else {
+      $("ribbon-euler").textContent = "Shared Signing / Env Ready";
+    }
+  }
+
+  const f = data.frills ?? {};
+  if ($("ribbon-traffic")) {
+    $("ribbon-traffic").textContent = f.error ? "Unavailable" : `${number(f.visits?.week)} visits · ${pct(f.funnel?.week?.copyRate)} copy rate`;
+  }
+
+  const score = f.scorecard ?? [];
+  const ready = score.filter((s) => s.ok).length;
+  if ($("ribbon-plus")) $("ribbon-plus").textContent = score.length ? `${ready}/${score.length} weekly goals met` : "—";
+  if ($("nav-badge-plus")) $("nav-badge-plus").textContent = score.length ? `${ready}/${score.length}` : "";
+}
 
 function draw(data) {
   latestReport = data;
@@ -547,7 +778,7 @@ function draw(data) {
     say($("status"), "");
     return;
   }
-  say($("status"), "Last updated: " + new Date(data.now).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) + " · Press Refresh for live numbers.");
+  say($("status"), "Synced " + new Date(data.now).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }));
   drawRelays($("relays"), data.relays);
   if (data.frills.scorecard) {
     $("plus").hidden = false;
@@ -574,12 +805,14 @@ function draw(data) {
       }),
     );
   }
-  site($("frills"), "frills", "Frills (frills.valwidgets.live)", data.frills, { frills: true });
+  site($("frills"), "frills", "Frills Executive Telemetry (frills.valwidgets.live)", data.frills, { frills: true });
   drawGsc($("gsc"), data.gsc);
   site($("valwidgets"), "valwidgets", "Valorant Widgets (valwidgets.live)", data.valwidgets);
+  updateRibbonAndBadges(data);
+  setView(currentView);
 }
 
-/** Triggers a browser download of `content` with `filename` and `mime`. */
+// ── Export ───────────────────────────────────────────────────────────────────────────────────────────────────────
 function downloadFile(filename, mime, content) {
   const blob = new Blob([content], { type: mime });
   const url = URL.createObjectURL(blob);
@@ -606,7 +839,6 @@ function exportCsv() {
   lines.push(csvRow(["Frills Analytics & System Status Export", new Date(latestReport.now || Date.now()).toISOString()]));
   lines.push("");
 
-  // 1. Summary KPIs
   lines.push(csvRow(["Section", "Metric", "Today", "Yesterday", "Last 7 Days", "Prev 7 Days", "Last 28 Days"]));
   if (!f.error) {
     lines.push(csvRow(["Frills", "Site Visits", f.visits?.today, f.visits?.yesterday, f.visits?.week, f.visits?.before, f.visits?.total]));
@@ -622,7 +854,6 @@ function exportCsv() {
   }
   lines.push("");
 
-  // 2. Relay Fleet Status
   if (latestReport.relays?.length) {
     lines.push(csvRow(["Relay Label", "URL", "Status", "Latency (ms)", "Free Spots", "Used Spots", "Max Spots", "Queue Waiting", "Uptime (s)", "Version"]));
     for (const r of latestReport.relays) {
@@ -631,24 +862,18 @@ function exportCsv() {
     lines.push("");
   }
 
-  // 3. 28-Day Daily Time Series
   if (f.visits?.perDay?.length) {
     lines.push(csvRow(["Date", "Frills Visits", "Frills Links Copied", "Frills Live Stream Loads", "valwidgets.live Visits"]));
     const cMap = new Map((f.copies?.perDay ?? []).map((d) => [d.day, d.n]));
     const lMap = new Map((f.loads?.livePerDay ?? []).map((d) => [d.day, d.n]));
     const vMap = new Map((v.visits?.perDay ?? []).map((d) => [d.day, d.n]));
-    for (const { day, n } of f.visits.perDay) {
-      lines.push(csvRow([day, n, cMap.get(day) ?? 0, lMap.get(day) ?? 0, vMap.get(day) ?? 0]));
-    }
+    for (const { day, n } of f.visits.perDay) lines.push(csvRow([day, n, cMap.get(day) ?? 0, lMap.get(day) ?? 0, vMap.get(day) ?? 0]));
     lines.push("");
   }
 
-  // 4. Breakdowns
   const dumpSplit = (cat, rows28d, rows7d) => {
     const wMap = new Map((rows7d ?? []).map((r) => [r.label, r.n]));
-    for (const { label, n } of rows28d ?? []) {
-      lines.push(csvRow([cat, nameOf(label), label, wMap.get(label) ?? 0, n]));
-    }
+    for (const { label, n } of rows28d ?? []) lines.push(csvRow([cat, nameOf(label), label, wMap.get(label) ?? 0, n]));
   };
   if (!f.error) {
     lines.push(csvRow(["Breakdown Category", "Name", "Raw Key", "Last 7 Days", "Last 28 Days"]));
@@ -661,7 +886,6 @@ function exportCsv() {
     lines.push("");
   }
 
-  // 5. Google Search Console
   if (latestReport.gsc?.configured && !latestReport.gsc.error) {
     const g = latestReport.gsc;
     lines.push(csvRow(["GSC Dimension", "Key", "Clicks (28d)", "Impressions (28d)", "CTR", "Position"]));
@@ -682,7 +906,7 @@ function exportJson() {
 }
 
 async function refresh() {
-  say($("status"), "Reading live analytics & relay status…");
+  say($("status"), "Syncing live telemetry & relay fleet…");
   try { draw(await load()); } catch (error) { if (error instanceof Wrong) say($("status"), error.message, true); else throw error; }
 }
 
@@ -702,11 +926,11 @@ $("login-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   key = $("key").value.trim();
   if (!key) return;
-  say($("login-status"), "Checking…");
+  say($("login-status"), "Verifying operator key…");
   $("login-go").disabled = true;
   try {
     const data = await load();
-    try { sessionStorage.setItem(KEY, key); } catch { /* the page still works until it is closed */ }
+    try { sessionStorage.setItem(KEY, key); } catch { /* temporary */ }
     say($("login-status"), "");
     showDash(true);
     draw(data);

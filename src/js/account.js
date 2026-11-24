@@ -2,6 +2,9 @@
 // only if its page elements are there. The cookie that keeps a person signed in is set by the server and cannot be read from here (HttpOnly).
 
 import { clearPlusCode, clearRelayTicketCache, savePlusCode, savedPlusCode } from "./plus-relay.js";
+import { initNav } from "./nav.js";
+
+initNav();
 
 const bindCopy = (btn, getText, label) => {
   let reset = 0;
@@ -37,6 +40,29 @@ const WORDS = {
   cancel_first: "Your subscription is still renewing. Press Manage or cancel and cancel it first, then delete your account.",
 };
 const RESEND_SECONDS = 30;
+const validEmail = (address) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address);
+const askLogin = async (address) => {
+  const res = await post("login", { email: address });
+  if (!res.ok || res.body.ok !== true) return WORDS[res.body.error] ?? "Sorry, that did not work. Please try again.";
+  return "";
+};
+const canBuy = (me) => Boolean(me.checkout) && !me.plus?.active && !["paused", "unpaid"].includes(me.plus?.status);
+const launchCheckout = async (button, note) => {
+  button.disabled = true;
+  note.hidden = false;
+  note.dataset.state = "";
+  note.textContent = "Opening the checkout…";
+  try {
+    const res = await post("checkout");
+    if (res.ok && res.body.ok === true && typeof res.body.url === "string") { location.assign(res.body.url); return; }
+    note.dataset.state = "error";
+    note.textContent = WORDS[res.body.error] ?? "Sorry, the checkout did not open. Please try again.";
+  } catch {
+    note.dataset.state = "error";
+    note.textContent = "Sorry, the checkout did not open. Check your connection and try again.";
+  }
+  button.disabled = false;
+};
 
 // ── /account/ ─────────────────────────────────────────────────────────────────────────────────────────
 if ($("acct-form")) {
@@ -48,12 +74,6 @@ if ($("acct-form")) {
   const show = (which) => {
     for (const id of ["acct-loading", "acct-form", "acct-sent", "acct-in"]) $(id).hidden = id !== which;
     $("acct-lede").hidden = which === "acct-in"; // (the "no account needed" words are for people who are not signed in)
-  };
-
-  const ask = async (address) => {
-    const res = await post("login", { email: address });
-    if (!res.ok || res.body.ok !== true) return WORDS[res.body.error] ?? "Sorry, that did not work. Please try again.";
-    return "";
   };
 
   const countdown = () => {
@@ -71,7 +91,7 @@ if ($("acct-form")) {
   form.addEventListener("submit", async (event) => {
     event.preventDefault();
     const address = email.value.trim();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) {
+    if (!validEmail(address)) {
       email.setAttribute("aria-invalid", "true");
       say(WORDS.bad_email, true);
       email.focus();
@@ -81,7 +101,7 @@ if ($("acct-form")) {
     send.disabled = true;
     say("Sending…");
     try {
-      const problem = await ask(address);
+      const problem = await askLogin(address);
       if (problem) { say(problem, true); return; }
       $("acct-sent-to").textContent = address;
       show("acct-sent");
@@ -97,7 +117,7 @@ if ($("acct-form")) {
   $("acct-again").addEventListener("click", async () => {
     $("acct-again").disabled = true;
     try {
-      const problem = await ask($("acct-sent-to").textContent);
+      const problem = await askLogin($("acct-sent-to").textContent);
       $("acct-wait").textContent = problem || "Sent again.";
     } catch {
       $("acct-wait").textContent = "That did not send. Please try again.";
@@ -142,7 +162,7 @@ if ($("acct-form")) {
     if (plus.active) return plus.status === "canceled" ? { text: `Ends ${shortDay(plus.renewsAt)}`, tone: "soon" } : { text: "On", tone: "on" };
     return { text: "Off", tone: "off" };
   };
-  const canBuy = (me) => Boolean(me.checkout) && !me.plus?.active && !["paused", "unpaid"].includes(me.plus?.status);
+  const canBuyAccount = (me) => canBuy(me);
   const showPlus = (me) => {
     $("acct-plus-state").textContent = plusWords(me);
     const badge = badgeOf(me);
@@ -159,10 +179,10 @@ if ($("acct-form")) {
       meter.dataset.level = used / me.plus.limit >= 0.9 ? "high" : "ok";
       $("acct-meter-fill").style.setProperty("--used", String(used / me.plus.limit));
     }
-    $("acct-buy").hidden = !canBuy(me);
-    $("acct-buy-hint").hidden = !canBuy(me);
+    $("acct-buy").hidden = !canBuyAccount(me);
+    $("acct-buy-hint").hidden = !canBuyAccount(me);
     const promoEl = $("acct-promo");
-    if (promoEl) promoEl.hidden = !canBuy(me) || !promoEl.textContent.trim();
+    if (promoEl) promoEl.hidden = !canBuyAccount(me) || !promoEl.textContent.trim();
     const manage = Boolean(me.portal) && Boolean(me.plus);
     $("acct-manage").hidden = !manage;
     $("acct-manage-hint").hidden = !manage;
@@ -365,16 +385,68 @@ if ($("acct-form")) {
           clearBtn.addEventListener("click", () => void sendTtsCmd("tts:clear"));
           ttsRow.append(input, speakBtn, clearBtn);
           li.append(ttsRow);
-        } else if (plusOn && (item.kind === "jar" || item.kind === "goal" || item.kind === "gifters" || item.kind === "likers")) {
+        } else if (plusOn && item.kind === "actions") {
+          const actRow = document.createElement("div");
+          actRow.className = "acct-row acct-cloud__timer";
+          let actRules = [];
+          try {
+            const sp = new URLSearchParams(item.query || "");
+            const raw = sp.get("rules") || "";
+            if (raw) {
+              const norm = raw.replace(/-/g, "+").replace(/_/g, "/");
+              const pad = norm.length % 4 ? "=".repeat(4 - (norm.length % 4)) : "";
+              const bin = atob(norm + pad);
+              const bytes = new Uint8Array(bin.length);
+              for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+              const parsed = JSON.parse(new TextDecoder().decode(bytes));
+              if (Array.isArray(parsed)) actRules = parsed.filter((r) => r && r.enabled !== false && r.id).slice(0, 20);
+            }
+          } catch { /* ignore */ }
+          const buttons = actRules.map((r) => [String(r.name || r.id).slice(0, 24), "actions:run", String(r.id)]);
+          buttons.push(["Clear Queue", "actions:clear", ""]);
+          for (const [label, action, text] of buttons) {
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "btn btn--soft btn--sm";
+            btn.textContent = label;
+            btn.addEventListener("click", async () => {
+              btn.disabled = true;
+              try {
+                const res = await fetch(`/api/cloud-overlays/${item.id}/cmd`, {
+                  method: "POST",
+                  headers: { "content-type": "application/json" },
+                  credentials: "same-origin",
+                  body: JSON.stringify({ action, text }),
+                });
+                if (note) {
+                  note.dataset.state = res.ok ? "" : "error";
+                  note.textContent = res.ok
+                    ? `Sent “${label}” to “${item.name}” — OBS responds within a few seconds.`
+                    : "Could not send command.";
+                }
+              } catch {
+                if (note) { note.dataset.state = "error"; note.textContent = "Could not reach Frills."; }
+              } finally {
+                btn.disabled = false;
+              }
+            });
+            actRow.append(btn);
+          }
+          li.append(actRow);
+        } else if (plusOn && (item.kind === "alerts" || item.kind === "jar" || item.kind === "wheel" || item.kind === "goal" || item.kind === "gifters" || item.kind === "likers")) {
           const deckRow = document.createElement("div");
           deckRow.className = "acct-row acct-cloud__timer";
-          const deckBtns = item.kind === "jar"
-            ? [["+100 Drop", "jar:drop", 100], ["Fill & Celebrate", "jar:fill", 0], ["Empty Jar", "jar:clear", 0]]
-            : item.kind === "goal"
-              ? [["+1", "goal:add", 1], ["+10", "goal:add", 10], ["Celebrate Goal", "goal:reach", 0], ["Reset", "goal:reset", 0]]
-              : item.kind === "gifters"
-                ? [["Reset leaderboard", "gifters:reset", 0]]
-                : [["Reset leaderboard", "likers:reset", 0]];
+          const deckBtns = item.kind === "alerts"
+            ? [["Test Gift Alert", "alerts:gift", 0], ["Test Sub Alert", "alerts:sub", 0]]
+            : item.kind === "jar"
+              ? [["+100 Drop", "jar:drop", 100], ["Fill & Celebrate", "jar:fill", 0], ["Empty Jar", "jar:clear", 0]]
+              : item.kind === "wheel"
+                ? [["Spin Wheel Now", "wheel:spin", 0], ["Clear Queue", "wheel:clear", 0]]
+                : item.kind === "goal"
+                  ? [["+1", "goal:add", 1], ["+10", "goal:add", 10], ["Celebrate Goal", "goal:reach", 0], ["Reset", "goal:reset", 0]]
+                  : item.kind === "gifters"
+                    ? [["Reset leaderboard", "gifters:reset", 0]]
+                    : [["Reset leaderboard", "likers:reset", 0]];
           for (const [label, action, value] of deckBtns) {
             const btn = document.createElement("button");
             btn.type = "button";
@@ -408,8 +480,275 @@ if ($("acct-form")) {
 
         list.append(li);
       }
+
+      renderSceneBuilder(plusOn, items);
+      renderRecapBuilder(plusOn, data.recap);
     } catch {
       section.hidden = true;
+    }
+  };
+
+  let recapBound = false;
+  let recapChannel = "";
+  const RECAP_PALETTES = {
+    matcha: { bg: "#f7f4ec", card: "#ffffff", border: "#161b22", ink: "#161b22", sub: "#4b525c", accent: "#f6ce00", pop: "#ff4f73" },
+    night: { bg: "#141824", card: "#1e2438", border: "#9db4ff", ink: "#f8f6f0", sub: "#b8c2dc", accent: "#ffd166", pop: "#49d193" },
+    bubblegum: { bg: "#1d0c24", card: "#2d1438", border: "#ff5fc8", ink: "#fff0fa", sub: "#e0b3d6", accent: "#58f0ff", pop: "#ff5fc8" },
+  };
+  const drawRecapCard = (canvasEl = $("acct-recap-canvas"), outScale = 1) => {
+    if (!canvasEl || !canvasEl.getContext) return;
+    const fmt = $("acct-recap-format")?.value === "16x9" ? "16x9" : "9x16";
+    const pal = RECAP_PALETTES[$("acct-recap-theme")?.value] ?? RECAP_PALETTES.matcha;
+    const logicalW = fmt === "16x9" ? 800 : 540;
+    const logicalH = fmt === "16x9" ? 450 : 960;
+    const targetW = logicalW * outScale;
+    const targetH = logicalH * outScale;
+    if (canvasEl.width !== targetW || canvasEl.height !== targetH) {
+      canvasEl.width = targetW;
+      canvasEl.height = targetH;
+    }
+    const ctx = canvasEl.getContext("2d");
+    if (!ctx) return;
+    ctx.save();
+    ctx.scale(outScale, outScale);
+    ctx.fillStyle = pal.bg;
+    ctx.fillRect(0, 0, logicalW, logicalH);
+
+    // Accent strip along bottom
+    ctx.fillStyle = pal.accent;
+    ctx.fillRect(0, logicalH - 18, logicalW, 18);
+
+    const headline = ($("acct-recap-title")?.value || "").trim() || "Tonight’s Stream MVPs";
+    const gifterLine = ($("acct-recap-gifter")?.value || "").trim() || "No gifts recorded yet";
+    const likerLine = ($("acct-recap-liker")?.value || "").trim() || "No likes recorded yet";
+    const goalLine = ($("acct-recap-goal")?.value || "").trim() || "Stream goal completed!";
+    const pad = fmt === "16x9" ? 40 : 34;
+
+    ctx.fillStyle = pal.pop;
+    ctx.font = `800 ${fmt === "16x9" ? 15 : 16}px "JetBrains Mono", monospace`;
+    ctx.fillText(recapChannel ? `LIVE RECAP · @${recapChannel.toUpperCase()}` : "FRILLS PLUS · STREAM RECAP", pad, fmt === "16x9" ? 44 : 58);
+
+    ctx.fillStyle = pal.ink;
+    ctx.font = `800 ${fmt === "16x9" ? 36 : 42}px system-ui, sans-serif`;
+    ctx.fillText(headline.slice(0, 32), pad, fmt === "16x9" ? 90 : 114);
+
+    const rows = [
+      ["#1 TOP GIFTER / SUB", gifterLine],
+      ["#1 TOP SUPPORTER / LIKES", likerLine],
+      ["STREAM HIGHLIGHT", goalLine],
+    ];
+    if (fmt === "16x9") {
+      const cardW = (logicalW - pad * 2 - 28) / 3;
+      const cardY = 132;
+      const cardH = 228;
+      rows.forEach(([k, v], i) => {
+        const x = pad + i * (cardW + 14);
+        ctx.fillStyle = pal.card;
+        ctx.strokeStyle = pal.border;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.roundRect(x, cardY, cardW, cardH, 18);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = pal.pop;
+        ctx.font = '800 12px "JetBrains Mono", monospace';
+        ctx.fillText(k, x + 16, cardY + 34);
+        ctx.fillStyle = pal.ink;
+        ctx.font = "800 20px system-ui, sans-serif";
+        ctx.fillText(v.slice(0, 22), x + 16, cardY + 86);
+        if (v.length > 22) ctx.fillText(v.slice(22, 46), x + 16, cardY + 116);
+      });
+    } else {
+      let y = 170;
+      const cardW = logicalW - pad * 2;
+      const cardH = 195;
+      rows.forEach(([k, v]) => {
+        ctx.fillStyle = pal.card;
+        ctx.strokeStyle = pal.border;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.roundRect(pad, y, cardW, cardH, 22);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = pal.pop;
+        ctx.font = '800 14px "JetBrains Mono", monospace';
+        ctx.fillText(k, pad + 24, y + 42);
+        ctx.fillStyle = pal.ink;
+        ctx.font = "800 26px system-ui, sans-serif";
+        ctx.fillText(v.slice(0, 28), pad + 24, y + 98);
+        if (v.length > 28) {
+          ctx.fillStyle = pal.sub;
+          ctx.font = "700 20px system-ui, sans-serif";
+          ctx.fillText(v.slice(28, 60), pad + 24, y + 136);
+        }
+        y += cardH + 22;
+      });
+    }
+
+    ctx.fillStyle = pal.sub;
+    ctx.font = '700 13px "JetBrains Mono", monospace';
+    ctx.fillText("MADE WITH FRILLS.VALWIDGETS.LIVE", pad, logicalH - 36);
+    ctx.restore();
+  };
+
+  const renderRecapBuilder = (plusOn, recap) => {
+    const box = $("acct-recap-box");
+    if (!box) return;
+    box.hidden = !plusOn;
+    if (!plusOn) return;
+    if (recap?.channel) recapChannel = recap.channel;
+    if (recap?.topGifters?.[0] && !$("acct-recap-gifter")?.value) {
+      $("acct-recap-gifter").value = `${recap.topGifters[0].name} · ${recap.topGifters[0].label}`;
+    }
+    if (recap?.topLikers?.[0] && !$("acct-recap-liker")?.value) {
+      $("acct-recap-liker").value = `${recap.topLikers[0].name} · ${recap.topLikers[0].label}`;
+    }
+    const highlight = recap?.jar?.label || recap?.goal?.label || "";
+    if (highlight && !$("acct-recap-goal")?.value) {
+      $("acct-recap-goal").value = highlight;
+    }
+    drawRecapCard();
+    if (!recapBound) {
+      recapBound = true;
+      for (const id of ["acct-recap-format", "acct-recap-theme", "acct-recap-title", "acct-recap-gifter", "acct-recap-liker", "acct-recap-goal"]) {
+        $(id)?.addEventListener("input", () => drawRecapCard());
+        $(id)?.addEventListener("change", () => drawRecapCard());
+      }
+      $("acct-recap-download")?.addEventListener("click", () => {
+        const off = document.createElement("canvas");
+        drawRecapCard(off, 2);
+        const a = document.createElement("a");
+        a.download = "frills-stream-recap.png";
+        a.href = off.toDataURL("image/png");
+        a.click();
+      });
+    }
+  };
+
+  let sceneSaveBound = false;
+  let activeSceneId = "";
+  const SCENE_SLOTS = [
+    ["tl", "Top-Left"],
+    ["tc", "Top-Center"],
+    ["tr", "Top-Right"],
+    ["ml", "Middle-Left"],
+    ["mc", "Center"],
+    ["mr", "Middle-Right"],
+    ["bl", "Bottom-Left"],
+    ["bc", "Bottom-Center"],
+    ["br", "Bottom-Right"],
+  ];
+  const DEFAULT_SLOT_BY_KIND = {
+    chat: "bl",
+    matcha: "bl",
+    alerts: "tc",
+    jar: "br",
+    goal: "tr",
+    timer: "tl",
+    tts: "bc",
+    gifters: "mr",
+    likers: "mr",
+    gifts: "ml",
+    counter: "tl",
+    labels: "bc",
+    songs: "br",
+  };
+  const renderSceneBuilder = (plusOn, items) => {
+    const box = $("acct-scene-box");
+    const layersEl = $("acct-scene-layers");
+    const linkWrap = $("acct-scene-link-wrap");
+    const urlOut = $("acct-scene-url");
+    if (!box || !layersEl) return;
+    const childItems = items.filter((o) => o.kind !== "scene");
+    box.hidden = !(plusOn && childItems.length > 0);
+    if (box.hidden) return;
+
+    const existingScene = items.find((o) => o.kind === "scene") ?? null;
+    activeSceneId = existingScene?.id ?? "";
+    if ($("acct-scene-name") && existingScene?.name) $("acct-scene-name").value = existingScene.name;
+    const savedMap = new Map();
+    if (existingScene?.query) {
+      const sp = new URLSearchParams(existingScene.query);
+      if ($("acct-scene-aspect")) $("acct-scene-aspect").value = sp.get("aspect") === "9x16" ? "9x16" : "16x9";
+      for (const pair of String(sp.get("items") ?? "").split(",")) {
+        const [cid, slot] = pair.trim().split(":");
+        if (cid && slot) savedMap.set(cid, slot);
+      }
+    }
+    if (linkWrap && urlOut) {
+      linkWrap.hidden = !existingScene;
+      if (existingScene) urlOut.textContent = existingScene.liveUrl;
+    }
+
+    layersEl.replaceChildren();
+    for (const child of childItems) {
+      const row = document.createElement("div");
+      row.className = "acct-scene__row";
+      row.dataset.layerId = child.id;
+
+      const label = document.createElement("label");
+      label.className = "acct-scene__pick";
+      const cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.checked = existingScene ? savedMap.has(child.id) : true;
+      label.append(cb, document.createTextNode(`${child.name} (${child.label || child.kind})`));
+
+      const sel = document.createElement("select");
+      sel.setAttribute("aria-label", `Screen zone for ${child.name}`);
+      for (const [val, textLabel] of SCENE_SLOTS) {
+        const opt = document.createElement("option");
+        opt.value = val;
+        opt.textContent = textLabel;
+        sel.append(opt);
+      }
+      sel.value = savedMap.get(child.id) || DEFAULT_SLOT_BY_KIND[child.kind] || "mc";
+      row.append(label, sel);
+      layersEl.append(row);
+    }
+
+    if (!sceneSaveBound) {
+      sceneSaveBound = true;
+      bindCopy($("acct-scene-copy"), () => $("acct-scene-url")?.textContent || "", "Copy scene link");
+      $("acct-scene-save")?.addEventListener("click", async () => {
+        const btn = $("acct-scene-save");
+        const note = $("acct-cloud-status");
+        const picked = [];
+        for (const r of layersEl.querySelectorAll(".acct-scene__row")) {
+          const cb = r.querySelector("input[type='checkbox']");
+          const sel = r.querySelector("select");
+          if (cb?.checked && r.dataset.layerId) picked.push(`${r.dataset.layerId}:${sel?.value || "mc"}`);
+        }
+        if (!picked.length) {
+          if (note) { note.dataset.state = "error"; note.textContent = "Select at least one overlay to include in your Master Scene."; }
+          return;
+        }
+        const name = ($("acct-scene-name")?.value || "").trim() || "Main Stream Scene";
+        const aspect = $("acct-scene-aspect")?.value === "9x16" ? "9x16" : "16x9";
+        const query = `aspect=${aspect}&items=${picked.join(",")}`;
+        btn.disabled = true;
+        try {
+          const res = await fetch(activeSceneId ? `/api/cloud-overlays/${activeSceneId}` : "/api/cloud-overlays", {
+            method: activeSceneId ? "PUT" : "POST",
+            headers: { "content-type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify(activeSceneId ? { name, query } : { kind: "scene", name, query }),
+          });
+          const data = await res.json().catch(() => null);
+          if (res.ok && data?.overlay) {
+            activeSceneId = data.overlay.id;
+            if (linkWrap && urlOut) { linkWrap.hidden = false; urlOut.textContent = data.overlay.liveUrl; }
+            if (note) { note.dataset.state = ""; note.textContent = `Saved Master Scene (v${data.overlay.version}) — paste ${data.overlay.liveUrl} into OBS once.`; }
+            await loadCloudOverlays(true);
+          } else if (note) {
+            note.dataset.state = "error";
+            note.textContent = "Could not save Master Scene right now.";
+          }
+        } catch {
+          if (note) { note.dataset.state = "error"; note.textContent = "Could not reach Frills."; }
+        } finally {
+          btn.disabled = false;
+        }
+      });
     }
   };
 
@@ -457,23 +796,7 @@ if ($("acct-form")) {
     }
   });
 
-  $("acct-buy").addEventListener("click", async () => {
-    const button = $("acct-buy");
-    const note = $("acct-buy-status");
-    button.disabled = true;
-    note.dataset.state = "";
-    note.textContent = "Opening the checkout…";
-    try {
-      const res = await post("checkout");
-      if (res.ok && res.body.ok === true && typeof res.body.url === "string") { location.assign(res.body.url); return; }
-      note.dataset.state = "error";
-      note.textContent = WORDS[res.body.error] ?? "Sorry, the checkout did not open. Please try again.";
-    } catch {
-      note.dataset.state = "error";
-      note.textContent = "Sorry, the checkout did not open. Check your connection and try again.";
-    }
-    button.disabled = false;
-  });
+  $("acct-buy").addEventListener("click", () => void launchCheckout($("acct-buy"), $("acct-buy-status")));
 
   $("acct-manage").addEventListener("click", async () => {
     const button = $("acct-manage");
@@ -629,4 +952,72 @@ if ($("verify-go")) {
       }
     });
   }
+}
+
+// ── /plus/ (inline sign-in + direct 1-click Polar checkout inside the plan card) ────────────────────────────
+if ($("plus-direct-buy") && $("plus-inline-form")) {
+  const ctaLink = $("plus-cta-link");
+  const directBuy = $("plus-direct-buy");
+  const inlineForm = $("plus-inline-form");
+  const inlineEmail = $("plus-inline-email");
+  const inlineSend = $("plus-inline-send");
+  const cardStatus = $("plus-card-status");
+  const sayCard = (text, bad = false) => {
+    cardStatus.hidden = !text;
+    cardStatus.dataset.state = bad ? "error" : "";
+    cardStatus.textContent = text;
+  };
+  const setLinkLabel = (label) => {
+    if (!ctaLink) return;
+    const arrow = ctaLink.querySelector(".btn__arrow")?.cloneNode(true);
+    ctaLink.textContent = `${label} `;
+    if (arrow) ctaLink.append(arrow);
+  };
+
+  directBuy.addEventListener("click", () => void launchCheckout(directBuy, cardStatus));
+
+  inlineForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const address = inlineEmail.value.trim();
+    if (!validEmail(address)) {
+      inlineEmail.setAttribute("aria-invalid", "true");
+      sayCard(WORDS.bad_email, true);
+      inlineEmail.focus();
+      return;
+    }
+    inlineEmail.removeAttribute("aria-invalid");
+    inlineSend.disabled = true;
+    sayCard("Sending sign-in link…");
+    try {
+      const problem = await askLogin(address);
+      if (problem) { sayCard(problem, true); return; }
+      sayCard(`Check your inbox — we sent a sign-in link to ${address}. Open it to finish signing in (check spam if needed).`);
+    } catch {
+      sayCard("Sorry, that did not send. Check your connection and try again.", true);
+    } finally {
+      inlineSend.disabled = false;
+    }
+  });
+
+  fetch("/api/account/me", { credentials: "same-origin" })
+    .then((res) => (res.ok ? res.json() : null))
+    .then((me) => {
+      if (!me?.ok) return;
+      if (me.signedIn) {
+        if (me.plus?.active) {
+          setLinkLabel("Manage Frills Plus");
+          return;
+        }
+        if (canBuy(me)) {
+          if (ctaLink) ctaLink.hidden = true;
+          directBuy.hidden = false;
+          return;
+        }
+        setLinkLabel("Open my account");
+        return;
+      }
+      if (ctaLink) ctaLink.hidden = true;
+      inlineForm.hidden = false;
+    })
+    .catch(() => {});
 }
