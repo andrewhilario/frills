@@ -23,6 +23,7 @@ export const OVERLAY_KINDS = Object.freeze({
   likers: { path: "/overlay/likers/", editorPath: "/likers/", label: "Top likers" },
   gifters: { path: "/overlay/gifters/", editorPath: "/gifters/", label: "Top gifters" },
   labels: { path: "/overlay/labels/", editorPath: "/labels/", label: "Rotating highlights" },
+  gallery: { path: "/overlay/gallery/", editorPath: "/gallery/", label: "Gift gallery rotator" },
   counter: { path: "/overlay/counter/", editorPath: "/counter/", label: "Viewer & like counter" },
   timer: { path: "/overlay/timer/", editorPath: "/timer/", label: "Subathon timer" },
   songs: { path: "/overlay/songs/", editorPath: "/songs/", label: "Song requests" },

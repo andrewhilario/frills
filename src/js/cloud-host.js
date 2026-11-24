@@ -63,6 +63,7 @@ if (!id) {
       }
       if (!channel) return null;
       if (kind === "jar") return (k) => k === `frills:jar:${channel}`;
+      if (kind === "gallery") return (k) => k === `frills:gallery:tiktok:${channel}`;
       if (kind === "goal") {
         const t = String(p.get("type") || "follow").trim() || "follow";
         const key = t === "follow" ? `frills:goal:${channel}` : `frills:goal:${channel}:${t}`;

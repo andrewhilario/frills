@@ -27,7 +27,7 @@ const assetOf = (html, kind) => (new RegExp(`${kind === "css" ? 'href="(/assets/
 
 test("the pages we expect are all there", () => {
   const urls = pages.map((p) => p.url).sort();
-  const base = ["/","/404.html","/actions/","/admin/", "/admin/stats/","/alerts/","/changelog/","/check/","/counter/","/editor/","/feedback/","/gifters/","/gifts/","/goal/","/guides/alerts/","/guides/both/","/guides/live-studio/","/guides/not-showing/","/guides/obs/","/guides/setup/","/guides/sizes/","/guides/songs/","/guides/test/","/guides/tiktok/","/jar/","/labels/","/likers/","/looks/","/looks/bunny-cloud/","/looks/frog-pond/","/looks/hamster-burrow/","/looks/neko-cafe/","/matcha/","/matcha/alerts/","/overlay/","/overlay/actions/","/overlay/alerts/","/overlay/counter/","/overlay/gifters/","/overlay/gifts/","/overlay/goal/","/overlay/jar/","/overlay/labels/","/overlay/likers/","/overlay/songs/","/overlay/timer/","/overlay/tts/","/overlay/wheel/","/overlays/","/overlays/faq/","/privacy/","/songs/","/spotify/","/spotify/callback/","/start/","/status/","/timer/","/tts/","/twitch/","/twitch/callback/","/wheel/"];
+  const base = ["/","/404.html","/actions/","/admin/", "/admin/stats/","/alerts/","/changelog/","/check/","/counter/","/editor/","/feedback/","/gallery/","/gifters/","/gifts/","/goal/","/guides/alerts/","/guides/both/","/guides/live-studio/","/guides/not-showing/","/guides/obs/","/guides/setup/","/guides/sizes/","/guides/songs/","/guides/test/","/guides/tiktok/","/jar/","/labels/","/likers/","/looks/","/looks/bunny-cloud/","/looks/frog-pond/","/looks/hamster-burrow/","/looks/neko-cafe/","/matcha/","/matcha/alerts/","/overlay/","/overlay/actions/","/overlay/alerts/","/overlay/counter/","/overlay/gallery/","/overlay/gifters/","/overlay/gifts/","/overlay/goal/","/overlay/jar/","/overlay/labels/","/overlay/likers/","/overlay/songs/","/overlay/timer/","/overlay/tts/","/overlay/wheel/","/overlays/","/overlays/faq/","/privacy/","/songs/","/spotify/","/spotify/callback/","/start/","/status/","/timer/","/tts/","/twitch/","/twitch/callback/","/wheel/"];
   const expected = site.plusAccounts ? [...base, "/account/", "/account/verify/", "/o/", "/plus/"].sort() : base;
   assert.deepEqual(urls, expected);
 });
@@ -399,15 +399,15 @@ test("the home page says in its first words what Frills is, and its structured d
   for (const heading of [...home.matchAll(/<h2 class="(?:title|display)" id="[a-z-]+">([^<]*)<\/h2>/g)].map((m) => m[1])) assert.ok(heading.length >= 12, `a home heading says something: "${heading}"`);
 });
 
-test("the alerts, gifts, jar, goal, likers, gifters, labels and songs pages have real text (how to add them, and questions with answers), and every page's footer links to every overlay page", () => {
-  for (const url of ["/alerts/", "/gifts/", "/jar/", "/goal/", "/likers/", "/gifters/", "/labels/", "/songs/"]) {
+test("the alerts, gifts, jar, goal, likers, gifters, labels, gallery and songs pages have real text (how to add them, and questions with answers), and every page's footer links to every overlay page", () => {
+  for (const url of ["/alerts/", "/gifts/", "/jar/", "/goal/", "/likers/", "/gifters/", "/labels/", "/gallery/", "/songs/"]) {
     const { html } = pages.find((p) => p.url === url);
     const words = textOf(html).split(/\s+/).length;
     assert.ok(words >= 420, `${url} has ${words} words`);
     assert.match(html, /<h3>Add it to your streaming app<\/h3>/);
     assert.ok([...html.matchAll(/<h3>[^<]*\?<\/h3>/g)].length >= 3, `${url}: at least three questions as headings`);
   }
-  for (const { url, html } of indexable.filter((p) => /class="foot/.test(p.html))) for (const link of ["/alerts/", "/gifts/", "/jar/", "/goal/", "/likers/", "/gifters/", "/labels/", "/songs/"]) assert.match(html, new RegExp(`<a href="${link}">`), `${url}: footer links to ${link}`);
+  for (const { url, html } of indexable.filter((p) => /class="foot/.test(p.html))) for (const link of ["/alerts/", "/gifts/", "/jar/", "/goal/", "/likers/", "/gifters/", "/labels/", "/gallery/", "/songs/"]) assert.match(html, new RegExp(`<a href="${link}">`), `${url}: footer links to ${link}`);
 });
 
 test("each look-pack page has a live practice chat that really names its look and its pictures, an editor link with the same two, questions as headings, and links to the other packs", () => {

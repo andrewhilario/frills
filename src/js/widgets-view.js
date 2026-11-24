@@ -1796,3 +1796,336 @@ export function createActionsView(host) {
     },
   };
 }
+
+// ── Gift Gallery Rotator (TikTok LIVE) ──────────────────────────────────────────────────────────────────────────────
+
+/** Crisp inline SVG badge for any TikTok gift before a live TikTok CDN image arrives (100% CSP-clean, zero outside URLs). */
+function galleryArtSvg(icon, color = "#ff5c8a") {
+  const svg = document.createElementNS(SVG, "svg");
+  svg.setAttribute("viewBox", "0 0 64 64");
+  svg.setAttribute("class", "galcard__svg");
+  svg.setAttribute("aria-hidden", "true");
+  const add = (tag, attrs) => {
+    const n = document.createElementNS(SVG, tag);
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+    svg.append(n);
+  };
+  add("circle", { cx: "32", cy: "32", r: "27", fill: color, opacity: "0.2" });
+  add("circle", { cx: "32", cy: "32", r: "23", fill: color });
+  add("circle", { cx: "24", cy: "22", r: "8", fill: "#ffffff", opacity: "0.24" });
+
+  if (icon === "rose") {
+    add("path", { d: "M32 45 V30", stroke: "#4ade80", "stroke-width": "4", "stroke-linecap": "round" });
+    add("path", { d: "M32 39 C26 38 23 34 25 32 C28 32 31 35 32 39 Z", fill: "#4ade80" });
+    add("circle", { cx: "32", cy: "25", r: "10", fill: "#fff0f5" });
+    add("circle", { cx: "32", cy: "25", r: "7", fill: "#ff2e63" });
+    add("path", { d: "M28 24 C30 21 35 21 36 25 C36 28 31 29 29 27", fill: "none", stroke: "#ffd6e4", "stroke-width": "2.2", "stroke-linecap": "round" });
+  } else if (icon === "heart") {
+    add("path", { d: "M32 45 C22 37 17 31 17 24.5 C17 19.8 20.8 16.5 25.2 16.5 C28.2 16.5 30.6 18 32 20.5 C33.4 18 35.8 16.5 38.8 16.5 C43.2 16.5 47 19.8 47 24.5 C47 31 42 37 32 45 Z", fill: "#ffffff" });
+    add("path", { d: "M32 41 C24.5 35 21 30.2 21 25.2 C21 22.3 23.2 20.4 25.8 20.4 C28 20.4 30 21.8 32 24.2 C34 21.8 36 20.4 38.2 20.4 C40.8 20.4 43 22.3 43 25.2 C43 30.2 39.5 35 32 41 Z", fill: "#ff2e63" });
+  } else if (icon === "doughnut") {
+    add("circle", { cx: "32", cy: "32", r: "15", fill: "#fde68a" });
+    add("circle", { cx: "32", cy: "32", r: "13", fill: "#ff7eb6" });
+    add("circle", { cx: "32", cy: "32", r: "5.5", fill: color });
+    for (const [x, y, c] of [[25, 24, "#fff"], [38, 25, "#fde047"], [40, 36, "#67e8f9"], [24, 38, "#fef08a"], [33, 21, "#a7f3d0"]]) {
+      add("circle", { cx: String(x), cy: String(y), r: "1.8", fill: c });
+    }
+  } else if (icon === "confetti") {
+    add("path", { d: "M21 44 L29 22 L43 36 Z", fill: "#ffffff", stroke: "#b45309", "stroke-width": "2.4", "stroke-linejoin": "round" });
+    add("circle", { cx: "37", cy: "19", r: "3", fill: "#fde047" });
+    add("circle", { cx: "45", cy: "25", r: "2.5", fill: "#38bdf8" });
+    add("circle", { cx: "27", cy: "17", r: "2.5", fill: "#f472b6" });
+    add("path", { d: "M39 29 L46 28", stroke: "#4ade80", "stroke-width": "2.6", "stroke-linecap": "round" });
+  } else if (icon === "galaxy") {
+    add("ellipse", { cx: "32", cy: "32", rx: "18", ry: "7.5", fill: "none", stroke: "#fde68a", "stroke-width": "3", transform: "rotate(-26 32 32)" });
+    add("circle", { cx: "32", cy: "32", r: "9", fill: "#ffffff" });
+    add("circle", { cx: "32", cy: "32", r: "6", fill: "#c084fc" });
+    add("circle", { cx: "45", cy: "20", r: "2.6", fill: "#fef08a" });
+    add("circle", { cx: "20", cy: "42", r: "2.2", fill: "#67e8f9" });
+  } else if (icon === "corgi" || icon === "panda") {
+    const ear = icon === "panda" ? "#1e293b" : "#ea580c";
+    const face = icon === "panda" ? "#ffffff" : "#fff7ed";
+    add("circle", { cx: "21", cy: "22", r: "6.5", fill: ear });
+    add("circle", { cx: "43", cy: "22", r: "6.5", fill: ear });
+    add("circle", { cx: "32", cy: "34", r: "14", fill: face });
+    add("circle", { cx: "26.5", cy: "32", r: icon === "panda" ? "3.8" : "2.3", fill: "#1e293b" });
+    add("circle", { cx: "37.5", cy: "32", r: icon === "panda" ? "3.8" : "2.3", fill: "#1e293b" });
+    add("ellipse", { cx: "32", cy: "37.5", rx: "3", ry: "2", fill: "#1e293b" });
+  } else if (icon === "crown") {
+    add("path", { d: "M17 42 L20 23 L27 31 L32 19 L37 31 L44 23 L47 42 Z", fill: "#ffd23f", stroke: "#92400e", "stroke-width": "2.4", "stroke-linejoin": "round" });
+    add("rect", { x: "17", y: "42", width: "30", height: "5", rx: "2", fill: "#fbbf24" });
+  } else if (icon === "note") {
+    add("path", { d: "M35 18 V37 A6.5 6.5 0 1 1 30 31 V22 L45 19 V25 L35 27", fill: "none", stroke: "#ffffff", "stroke-width": "4.2", "stroke-linecap": "round", "stroke-linejoin": "round" });
+  } else if (icon === "cash") {
+    add("rect", { x: "18", y: "24", width: "28", height: "16", rx: "3", fill: "#dcfce7", stroke: "#15803d", "stroke-width": "2.4" });
+    add("circle", { cx: "32", cy: "32", r: "4.8", fill: "#22c55e" });
+  } else if (icon === "glasses") {
+    add("rect", { x: "16", y: "26", width: "13", height: "11", rx: "3.5", fill: "#0f172a" });
+    add("rect", { x: "35", y: "26", width: "13", height: "11", rx: "3.5", fill: "#0f172a" });
+    add("path", { d: "M29 30 H35", stroke: "#ffffff", "stroke-width": "3", "stroke-linecap": "round" });
+  } else if (icon === "icecream") {
+    add("path", { d: "M25 33 L32 48 L39 33 Z", fill: "#fde68a" });
+    add("circle", { cx: "32", cy: "28", r: "9", fill: "#ffffff" });
+    add("circle", { cx: "32", cy: "22", r: "5", fill: "#fb7185" });
+  } else if (icon === "whale" || icon === "swan") {
+    add("path", { d: "M18 35 C18 25 27 21 36 23 C43 24.5 46 30 46 36 C46 39 43 41 38 41 H24 C20 41 18 39 18 35 Z", fill: "#ffffff" });
+    add("circle", { cx: "27", cy: "31", r: "2.2", fill: "#0f172a" });
+  } else {
+    // Sparkling gift box (default for custom/perfume/gg/star)
+    add("rect", { x: "19", y: "27", width: "26", height: "18", rx: "3.5", fill: "#ffffff" });
+    add("rect", { x: "17", y: "22", width: "30", height: "7", rx: "2.5", fill: "#fef08a" });
+    add("rect", { x: "29.5", y: "22", width: "5", height: "23", fill: "#f43f5e" });
+    add("circle", { cx: "28", cy: "19", r: "3.6", fill: "none", stroke: "#fef08a", "stroke-width": "2.6" });
+    add("circle", { cx: "36", cy: "19", r: "3.6", fill: "none", stroke: "#fef08a", "stroke-width": "2.6" });
+  }
+  return svg;
+}
+
+/**
+ * Standalone Gift Gallery Rotator view: cycles through featured or live-collected TikTok gifts with
+ * TikOps-style spotlight pedestal, unlit → lit-up golden halo & crown transition, glossy sheen,
+ * sparkle/confetti celebration bursts, and animated countdown dots.
+ */
+export function createGalleryView(host) {
+  const root = el("div", { className: "gallery" });
+  host.append(root);
+
+  const head = el("div", { className: "gallery__head" });
+  const titleEl = el("span", { className: "gallery__title" });
+  const progressEl = el("span", { className: "gallery__progress" });
+  head.append(titleEl, progressEl);
+
+  const stage = el("div", { className: "gallery__stage" });
+  const dots = el("div", { className: "labels__dots gallery__dots" });
+  dots.setAttribute("aria-hidden", "true");
+  root.append(head, stage, dots);
+
+  let settings = null;
+  let lastSnapshot = null;
+  let lastRevision = -1;
+  let lastCelebrateId = -1;
+  let currentCard = null;
+  const fxTimers = new Set();
+
+  function populateArt(artHost, card) {
+    artHost.replaceChildren();
+    artHost.append(el("span", { className: "galcard__halo" }));
+    const pic = safePic(card.picture);
+    if (pic) {
+      const img = el("img", { className: "galcard__img", src: pic, alt: "", referrerPolicy: "no-referrer" });
+      img.addEventListener("error", () => {
+        img.replaceWith(galleryArtSvg(card.icon, card.color));
+      }, { once: true });
+      artHost.append(img);
+    } else {
+      artHost.append(galleryArtSvg(card.icon, card.color));
+    }
+    if (card.unlocked) artHost.append(crownIcon("galcard__crown"));
+    const badge = el("span", { className: "galcard__count", textContent: card.count > 0 ? `×${card.count.toLocaleString("en-US")}` : "" });
+    badge.hidden = !(Boolean(settings?.showCount) && card.count > 0);
+    artHost.append(badge);
+    return badge;
+  }
+
+  function burst(fxHost, kind) {
+    if (!fxHost || settings?.anim === "none" || reducedMotion()) return;
+    fxHost.replaceChildren();
+    if (kind === "unlock") {
+      confettiBurst(fxHost, 24, { spreadX: 110, spreadY: 85, minDist: 40, yMul: 0.85 });
+    }
+    const glyphs = kind === "unlock" ? ["★", "✦", "✧"] : ["✦", "✧"];
+    const total = kind === "unlock" ? 12 : 8;
+    for (let i = 0; i < total; i += 1) {
+      const p = el("span", { className: "labelcard__spark", textContent: glyphs[i % glyphs.length] });
+      const angle = (Math.PI * 2 * i) / total + (Math.random() - 0.5) * 0.35;
+      const dist = 48 + Math.random() * 54;
+      p.style.setProperty("--sx", `${Math.round(Math.cos(angle) * dist * 1.15)}px`);
+      p.style.setProperty("--sy", `${Math.round(Math.sin(angle) * dist * 0.85)}px`);
+      p.style.setProperty("--sr", `${Math.round((Math.random() - 0.5) * 90)}deg`);
+      p.style.setProperty("--sd", `${Math.round(i * 20)}ms`);
+      p.style.color = i % 2 === 0 ? "#ffd23f" : "var(--a-pop, #f48)";
+      fxHost.append(p);
+    }
+    const tid = setTimeout(() => {
+      fxTimers.delete(tid);
+      fxHost.replaceChildren();
+    }, 1100);
+    fxTimers.add(tid);
+  }
+
+  function senderText(card) {
+    if (card.empty) return "";
+    if (card.unlocked && card.sender) return `Lit up by ${card.sender}`;
+    return "Be the first to light it up!";
+  }
+
+  function buildCard(card) {
+    const node = el("div", { className: "galcard galcard--in" });
+    node.dataset.slot = card.id || "idle";
+    node.dataset.lit = card.unlocked ? "true" : "false";
+
+    const clip = el("span", { className: "labelcard__clip" }, el("i", { className: "labelcard__sheen" }));
+    clip.setAttribute("aria-hidden", "true");
+    const fxHost = el("span", { className: "alert__fx galcard__fx" });
+    fxHost.setAttribute("aria-hidden", "true");
+
+    const art = el("span", { className: "galcard__art" });
+    art.setAttribute("aria-hidden", "true");
+    const countBadge = populateArt(art, card);
+
+    const status = el("span", {
+      className: "galcard__status",
+      textContent: card.empty ? "LIVE GALLERY" : (card.unlocked ? "LIT UP" : "UNLIT"),
+    });
+    const nameRow = el("span", { className: "galcard__namerow" });
+    const nameEl = el("strong", { className: "galcard__name", textContent: card.gift || "" });
+    const priceEl = el("span", {
+      className: "galcard__price",
+      textContent: card.diamonds > 0 ? `◆ ${card.diamonds.toLocaleString("en-US")}` : "",
+    });
+    priceEl.hidden = !(Boolean(settings?.showDiamonds) && card.diamonds > 0);
+    nameRow.append(nameEl, priceEl);
+
+    const captionEl = el("span", { className: "galcard__caption", textContent: card.caption || "" });
+    captionEl.hidden = !card.caption;
+
+    const senderEl = el("span", { className: "galcard__sender", textContent: senderText(card) });
+    senderEl.hidden = !(Boolean(settings?.showSender) && !card.empty);
+
+    const body = el("span", { className: "galcard__body" }, status, nameRow, captionEl, senderEl);
+    node.append(clip, fxHost, art, body);
+    node.addEventListener("animationend", (e) => {
+      if (e.target === node) node.classList.remove("galcard--in", "galcard--bump");
+    });
+
+    return {
+      node,
+      fxHost,
+      art,
+      countBadge,
+      status,
+      nameEl,
+      priceEl,
+      captionEl,
+      senderEl,
+      artKey: `${card.picture || ""}|${card.icon || ""}|${card.color || ""}|${Boolean(card.unlocked)}`,
+    };
+  }
+
+  function renderHeader(snapshot) {
+    const title = String(settings?.title ?? "").trim();
+    const showProg = Boolean(settings?.showProgress) && snapshot.totalSlots > 0;
+    titleEl.textContent = title;
+    titleEl.hidden = !title;
+    if (showProg) {
+      progressEl.textContent = settings?.mode === "live"
+        ? `${snapshot.unlockedCount} ${snapshot.unlockedCount === 1 ? "gift" : "gifts"}`
+        : `${snapshot.unlockedCount} / ${snapshot.totalSlots} lit`;
+      progressEl.hidden = false;
+    } else {
+      progressEl.hidden = true;
+    }
+    head.hidden = titleEl.hidden && progressEl.hidden;
+  }
+
+  function renderDots(snapshot) {
+    const show = Boolean(settings?.showDots) && snapshot.count > 1;
+    dots.hidden = !show;
+    if (!show) { dots.replaceChildren(); return; }
+    dots.replaceChildren();
+    for (let i = 0; i < snapshot.count; i += 1) {
+      const dot = el("i", { className: "labels__dot" });
+      if (snapshot.cards?.[i]?.unlocked) dot.dataset.lit = "true";
+      if (i === snapshot.index) {
+        dot.setAttribute("aria-current", "true");
+        dot.append(el("b", { className: "labels__dotfill" }));
+      }
+      dots.append(dot);
+    }
+  }
+
+  return {
+    apply(next) {
+      settings = next;
+      applyLook(root, next);
+      root.dataset.layout = next.layout || "showcase";
+      root.dataset.enter = next.enter || "pop";
+      root.dataset.anim = next.anim || "shine";
+      const rotateMs = Math.max(3, Math.min(30, Number(next.rotateSec) || 5)) * 1000;
+      root.style.setProperty("--rotate-ms", `${rotateMs}ms`);
+      if (lastSnapshot) this.render(lastSnapshot);
+    },
+    render(snapshot) {
+      if (!settings || !snapshot) return;
+      lastSnapshot = snapshot;
+      renderHeader(snapshot);
+      renderDots(snapshot);
+
+      const celebId = Number(snapshot.celebrateId) || 0;
+      const shouldCelebrate = lastCelebrateId >= 0 && celebId > lastCelebrateId;
+      lastCelebrateId = celebId;
+
+      if (!snapshot.card) {
+        if (currentCard) { currentCard.node.remove(); currentCard = null; }
+        lastRevision = snapshot.revision;
+        return;
+      }
+
+      const rotated = snapshot.revision !== lastRevision;
+      lastRevision = snapshot.revision;
+
+      if (!rotated && currentCard && currentCard.node.dataset.slot === (snapshot.card.id || "idle")) {
+        const card = snapshot.card;
+        const nextArtKey = `${card.picture || ""}|${card.icon || ""}|${card.color || ""}|${Boolean(card.unlocked)}`;
+        if (nextArtKey !== currentCard.artKey) {
+          currentCard.countBadge = populateArt(currentCard.art, card);
+          currentCard.artKey = nextArtKey;
+        } else {
+          currentCard.countBadge.textContent = card.count > 0 ? `×${card.count.toLocaleString("en-US")}` : "";
+          currentCard.countBadge.hidden = !(Boolean(settings?.showCount) && card.count > 0);
+        }
+        currentCard.node.dataset.lit = card.unlocked ? "true" : "false";
+        currentCard.status.textContent = card.empty ? "LIVE GALLERY" : (card.unlocked ? "LIT UP" : "UNLIT");
+        currentCard.nameEl.textContent = card.gift || "";
+        currentCard.priceEl.textContent = card.diamonds > 0 ? `◆ ${card.diamonds.toLocaleString("en-US")}` : "";
+        currentCard.priceEl.hidden = !(Boolean(settings?.showDiamonds) && card.diamonds > 0);
+        currentCard.captionEl.textContent = card.caption || "";
+        currentCard.captionEl.hidden = !card.caption;
+        currentCard.senderEl.textContent = senderText(card);
+        currentCard.senderEl.hidden = !(Boolean(settings?.showSender) && !card.empty);
+        if (shouldCelebrate) {
+          currentCard.node.classList.remove("galcard--bump");
+          void currentCard.node.offsetWidth;
+          currentCard.node.classList.add("galcard--bump");
+          burst(currentCard.fxHost, snapshot.celebrateKind || "unlock");
+        }
+        return;
+      }
+
+      const prev = currentCard?.node;
+      if (prev) {
+        prev.classList.remove("galcard--in", "galcard--bump");
+        prev.classList.add("galcard--out");
+        setTimeout(() => prev.remove(), 280);
+      }
+
+      currentCard = buildCard(snapshot.card);
+      stage.append(currentCard.node);
+      if (shouldCelebrate && !snapshot.card.empty) {
+        burst(currentCard.fxHost, snapshot.celebrateKind || "unlock");
+      }
+    },
+    clear() {
+      for (const tid of fxTimers) clearTimeout(tid);
+      fxTimers.clear();
+      stage.replaceChildren();
+      dots.replaceChildren();
+      dots.hidden = true;
+      head.hidden = true;
+      currentCard = null;
+      lastSnapshot = null;
+      lastRevision = -1;
+      lastCelebrateId = -1;
+    },
+  };
+}

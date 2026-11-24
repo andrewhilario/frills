@@ -1323,3 +1323,187 @@
 @media (prefers-reduced-motion: reduce) {
   .actions__replay, .actions__toast, .actions__dot, .actions__sticky, .actions__sticky--out { animation: none; transition: none; }
 }
+
+/* ── Gift Gallery Rotator (TikTok LIVE) ────────────────────────────────────────────────────────────────────────────── */
+.gallery {
+  position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: flex-start; align-items: flex-start;
+  gap: 0.45em; padding: 3%; overflow: hidden; pointer-events: none;
+  font-family: var(--a-font, sans-serif); font-size: var(--a-size, 24px); letter-spacing: var(--a-letter, 0px);
+}
+.gallery[data-align="center"] { align-items: center; }
+.gallery[data-align="right"] { align-items: flex-end; }
+.gallery__head {
+  display: inline-flex; align-items: center; gap: 0.5em; padding: 0.22em 0.78em;
+  background: var(--a-bg, #fff); color: var(--a-text, #222);
+  border: var(--a-border, 2px) solid var(--a-accent, #fc0); border-radius: 999px; box-shadow: var(--a-shadow, none);
+  font-size: 0.68em; font-weight: 900; letter-spacing: 0.04em; text-transform: uppercase;
+}
+.gallery__head[hidden], .gallery__title[hidden], .gallery__progress[hidden] { display: none; }
+.gallery__progress {
+  padding: 0.08em 0.5em; border-radius: 999px; background: var(--a-pop, #f48); color: #fff; font-variant-numeric: tabular-nums;
+}
+
+.gallery__stage { position: relative; max-width: 100%; perspective: 900px; padding-top: 0.45em; }
+.galcard {
+  position: relative; display: inline-flex; align-items: center; gap: 0.75em; max-width: 100%; box-sizing: border-box;
+  padding: 0.65em 1.05em; color: var(--a-text, #222); background: var(--a-bg, #fff);
+  border: var(--a-border, 2px) solid var(--a-accent, #fc0); border-radius: var(--a-radius, 20px); box-shadow: var(--a-shadow, none);
+  line-height: 1.18; transform-origin: 50% 50%;
+}
+.galcard--in { animation-duration: 420ms; animation-fill-mode: both; animation-timing-function: cubic-bezier(0.2, 1, 0.3, 1); }
+.gallery[data-enter="pop"] .galcard--in { animation-name: w-pop; }
+.gallery[data-enter="slide"] .galcard--in { animation-name: w-slide; }
+.gallery[data-enter="bounce"] .galcard--in { animation-name: w-bounce; animation-duration: 560ms; }
+.gallery[data-enter="flip"] .galcard--in { animation-name: w-flip; animation-duration: 540ms; }
+.gallery[data-enter="fade"] .galcard--in { animation-name: w-fade; }
+.galcard--out { position: absolute; left: 0; top: 0.45em; animation: w-out 260ms ease-in forwards; }
+.galcard--bump { animation: label-bump 440ms cubic-bezier(0.2, 1.3, 0.4, 1); }
+
+.gallery:not([data-anim="none"]) .galcard[data-lit="true"] .labelcard__sheen {
+  background: linear-gradient(105deg, transparent 0%, rgba(255, 232, 130, 0.72) 48%, rgba(255, 255, 255, 0.78) 56%, transparent 100%);
+  animation: label-sheen 3.8s ease-in-out infinite;
+}
+.gallery:not([data-anim="none"]) .galcard[data-lit="false"]:not([data-slot="idle"]) .labelcard__sheen {
+  animation: label-sheen 5.6s ease-in-out infinite;
+}
+.gallery[data-anim="pulse"] .galcard:not(.galcard--in):not(.galcard--out) {
+  animation: label-card-pulse 2.4s ease-in-out infinite;
+}
+.gallery[data-anim="float"] .galcard:not(.galcard--in):not(.galcard--out) {
+  animation: label-card-float 3.1s ease-in-out infinite;
+}
+.gallery[data-anim="shine"] .galcard[data-lit="true"]:not(.galcard--in):not(.galcard--out) {
+  animation: label-top-glow 2.8s ease-in-out infinite;
+}
+
+.galcard__fx { z-index: 4; top: 50%; }
+.galcard__art {
+  position: relative; z-index: 1; flex: none; display: grid; place-items: center; width: 3.15em; height: 3.15em;
+}
+.galcard__halo {
+  position: absolute; inset: 0.08em; border-radius: 50%;
+  border: 2px dashed color-mix(in srgb, var(--a-accent, #fc0) 55%, transparent);
+  opacity: 0.65;
+}
+.galcard[data-lit="true"] .galcard__halo {
+  border-style: solid; border-color: #ffd23f; opacity: 1;
+  box-shadow: 0 0 0.65em rgba(255, 210, 63, 0.78), inset 0 0 0.4em rgba(255, 232, 130, 0.45);
+}
+.gallery:not([data-anim="none"]) .galcard[data-lit="true"] .galcard__halo {
+  animation: gal-halo-spin 8s linear infinite;
+}
+.galcard__img, .galcard__svg {
+  position: relative; z-index: 1; width: 84%; height: 84%; object-fit: contain;
+  transition: filter 260ms ease, opacity 260ms ease;
+}
+.galcard[data-lit="false"] .galcard__img, .galcard[data-lit="false"] .galcard__svg {
+  filter: saturate(0.32) brightness(0.92); opacity: 0.72;
+}
+.gallery:not([data-anim="none"]) .galcard[data-lit="true"] .galcard__img,
+.gallery:not([data-anim="none"]) .galcard[data-lit="true"] .galcard__svg {
+  animation: label-gift-bob 2.3s ease-in-out infinite;
+}
+.galcard__crown {
+  position: absolute; left: 50%; top: -0.62em; width: 1.55em; height: auto; z-index: 3; pointer-events: none;
+  transform: translate(-50%, 0) rotate(-10deg); filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.35));
+}
+.gallery:not([data-anim="none"]) .galcard__crown {
+  animation: label-crown-drop 560ms cubic-bezier(0.25, 1.45, 0.45, 1) both, label-crown-bob 2.4s 600ms ease-in-out infinite;
+}
+.gallery[data-anim="none"] .galcard__crown { display: none; }
+.galcard__count {
+  position: absolute; right: -0.25em; bottom: -0.18em; z-index: 3;
+  padding: 0.08em 0.44em; border-radius: 999px; background: var(--a-pop, #f48); color: #fff;
+  border: 2px solid var(--a-bg, #fff); font-size: 0.56em; font-weight: 900; font-variant-numeric: tabular-nums;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.28);
+}
+.galcard__count[hidden] { display: none; }
+
+.galcard__body { position: relative; z-index: 1; flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 0.16em; }
+.galcard__status {
+  align-self: flex-start; padding: 0.08em 0.5em; border-radius: 999px; font-size: 0.52em; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase;
+  background: color-mix(in srgb, var(--a-text, #222) 12%, transparent); color: var(--a-text, #222); opacity: 0.78;
+}
+.galcard[data-lit="true"] .galcard__status { background: #ffd23f; color: #3b2a00; opacity: 1; }
+.galcard__namerow { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.4em; }
+.galcard__name { font-size: 1.02em; font-weight: 900; overflow-wrap: anywhere; }
+.galcard__price {
+  font-size: 0.72em; font-weight: 800; color: var(--a-pop, #f48); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.galcard__price[hidden], .galcard__caption[hidden], .galcard__sender[hidden] { display: none; }
+.galcard__caption { font-size: 0.78em; font-weight: 700; opacity: 0.92; overflow-wrap: anywhere; }
+.galcard__sender { font-size: 0.68em; font-weight: 800; opacity: 0.78; overflow-wrap: anywhere; }
+.galcard[data-lit="true"] .galcard__sender { color: var(--a-pop, #f48); opacity: 1; }
+
+/* Layouts for Gift Gallery Rotator */
+.gallery[data-layout="showcase"] .galcard {
+  flex-direction: column; align-items: center; text-align: center; gap: 0.45em;
+  min-width: 10.5em; padding: 0.85em 1.25em 0.8em;
+}
+.gallery[data-layout="showcase"] .galcard__art { width: 4.1em; height: 4.1em; }
+.gallery[data-layout="showcase"] .galcard__body { align-items: center; text-align: center; }
+.gallery[data-layout="showcase"] .galcard__status { align-self: center; }
+.gallery[data-layout="showcase"] .galcard__namerow { justify-content: center; }
+
+.gallery[data-layout="pill"] .galcard { padding: 0.4em 1.1em; border-radius: 999px; }
+.gallery[data-layout="pill"] .galcard__art { width: 2.55em; height: 2.55em; }
+
+.gallery[data-layout="glass"] .galcard,
+.gallery[data-layout="glass"] .gallery__head,
+.gallery[data-layout="glass"] .gallery__dots {
+  background: rgba(18, 22, 34, 0.5); color: #fff;
+  backdrop-filter: blur(18px) saturate(165%); -webkit-backdrop-filter: blur(18px) saturate(165%);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+.gallery[data-layout="glass"] .galcard__price, .gallery[data-layout="glass"] .galcard[data-lit="true"] .galcard__sender { color: #ffe08a; }
+.gallery[data-layout="glass"] .labels__dot { background: #fff; }
+
+.gallery[data-layout="neon"] .galcard,
+.gallery[data-layout="neon"] .gallery__head,
+.gallery[data-layout="neon"] .gallery__dots {
+  background: rgba(8, 8, 22, 0.84); color: #fff;
+  border: 2px solid var(--a-accent, #0ff);
+  box-shadow: 0 0 0.65em var(--a-accent, #0ff), inset 0 0 0.45em rgba(255, 255, 255, 0.08);
+  text-shadow: 0 0 0.35em rgba(255, 255, 255, 0.35);
+}
+.gallery[data-layout="neon"] .galcard__price { color: var(--a-pop, #ff5fc8); text-shadow: 0 0 0.45em var(--a-pop, #ff5fc8); }
+.gallery[data-layout="neon"] .labels__dot { background: #fff; }
+
+.gallery[data-layout="kawaii"] .galcard {
+  border-style: dashed; box-shadow: 0 0 0 0.16em var(--a-bg, #fff), 0 0 0 0.26em var(--a-pop, #f48), var(--a-shadow, none);
+}
+
+.gallery[data-layout="minimal"] .galcard,
+.gallery[data-layout="minimal"] .gallery__head,
+.gallery[data-layout="minimal"] .gallery__dots {
+  background: transparent; border: 0; box-shadow: none; padding-inline: 0.1em;
+  color: #fff; text-shadow: 0 2px 6px rgba(0, 0, 0, 0.85), 0 0 2px rgba(0, 0, 0, 0.9);
+}
+.gallery[data-layout="minimal"] .labelcard__clip { display: none; }
+.gallery[data-layout="minimal"] .galcard__price { color: #ffe066; }
+.gallery[data-layout="minimal"] .labels__dot { background: #fff; }
+
+.gallery[data-align="center"] .galcard__body { align-items: center; text-align: center; }
+.gallery[data-align="center"] .galcard__status { align-self: center; }
+.gallery[data-align="center"] .galcard__namerow { justify-content: center; }
+.gallery[data-align="right"]:not([data-layout="showcase"]) .galcard { flex-direction: row-reverse; }
+.gallery[data-align="right"] .galcard__body { align-items: flex-end; text-align: right; }
+.gallery[data-align="right"] .galcard__status { align-self: flex-end; }
+.gallery[data-layout="showcase"][data-align="right"] .galcard__body { align-items: center; text-align: center; }
+.gallery[data-layout="showcase"][data-align="right"] .galcard__status { align-self: center; }
+
+.gallery__dots .labels__dot[data-lit="true"]:not([aria-current="true"]) {
+  background: #ffd23f; opacity: 0.82;
+}
+
+@keyframes gal-halo-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .galcard--in, .galcard--out, .galcard--bump, .galcard .labelcard__sheen, .galcard__crown, .galcard__halo,
+  .galcard__img, .galcard__svg, .gallery[data-anim="pulse"] .galcard, .gallery[data-anim="float"] .galcard,
+  .gallery[data-anim="shine"] .galcard[data-lit="true"] { animation: none; }
+}

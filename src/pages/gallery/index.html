@@ -1,0 +1,102 @@
+<!--
+{
+  "title": "Gift Gallery Rotator for TikTok LIVE | Frills",
+  "description": "Free rotating TikTok LIVE Gift Gallery overlay: showcase featured gifts or auto-collect live gifts, light up cards when sent, and credit whoever unlocked them.",
+  "path": "/gallery/",
+  "updated": "2026-11-23",
+  "published": "2026-11-23",
+  "css": "widget",
+  "js": "gallery",
+  "bodyClass": "page-editor page-alerts",
+  "chrome": "appbar",
+  "footer": false,
+  "intro": "intro-gallery",
+  "about": "about-gallery",
+  "jsonld": ["webapp"]
+}
+-->
+<main class="workspace" id="main">
+  <section class="preview" id="preview" data-back="dark" aria-label="Live preview of your gift gallery rotator">
+    <div class="preview__bar">
+      <span class="preview__tag">Preview</span>
+      <label class="visually-hidden" for="backdrop">What sits behind the overlay</label>
+      <select id="backdrop">
+        <option value="dark">Dark game</option>
+        <option value="bright">Bright game</option>
+        <option value="busy">Busy scene</option>
+        <option value="checker">See-through</option>
+      </select>
+    </div>
+    <div class="chatstage" id="stage" aria-hidden="true"><div id="widget"></div></div>
+    <div class="preview__tests" role="group" aria-label="Try it">
+      <button class="btn btn--soft btn--sm" type="button" data-test="unlock">Test light up</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="gift">Test gift</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="next">Next gift</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="clear">Reset lit</button>
+    </div>
+  </section>
+
+  <div class="panel">
+    <noscript><p class="note">Frills needs JavaScript to draw your overlay. Turn it on for this page and reload.</p></noscript>
+    {{{intro}}}
+
+    <section class="step-card" aria-labelledby="s1">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">1</span>
+        <h2 class="step-card__title" id="s1">Pick a look</h2>
+        <button class="btn btn--soft btn--sm step-card__aside" type="button" id="reset">Reset</button>
+      </div>
+      <div class="chips" id="looks" role="group" aria-label="Starting looks"></div>
+      <div class="stack" id="look-controls"></div>
+    </section>
+
+    <section class="step-card" aria-labelledby="s2">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">2</span>
+        <h2 class="step-card__title" id="s2">Your gift gallery</h2>
+        <span class="items__count step-card__aside" id="gal-count">6 / 16 gifts</span>
+      </div>
+      <div class="stack" id="opt-controls"></div>
+      <div class="gal-editor" id="gal-custom-box">
+        <p class="ctl__hint">Pick a starter pack or customize each gift in your rotating gallery. Leave the reward blank for a classic TikTok Gift Gallery, or add what each gift triggers (like “Sticky note on face” or “Spin the wheel”).</p>
+        <div class="items__presets" id="gal-presets" role="group" aria-label="Gift gallery starter packs"></div>
+        <div class="gal-rows" id="gal-rows"></div>
+        <div class="items__actions">
+          <button class="btn btn--soft btn--sm" type="button" id="gal-add">+ Add gift</button>
+        </div>
+        <datalist id="gal-gifts-dl"></datalist>
+      </div>
+      <p class="ctl__hint" id="gal-live-note" hidden>Auto-collect mode starts empty and automatically adds every unique gift viewers send during your LIVE—showing TikTok’s gift picture, total sent count, and who lit it up first.</p>
+    </section>
+
+    <section class="step-card" aria-labelledby="s3">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">3</span>
+        <h2 class="step-card__title" id="s3">Connect your TikTok account</h2>
+      </div>
+      <div id="source"></div>
+      <p class="ctl__hint" id="relay-note" role="status"></p>
+    </section>
+
+    <section class="step-card" aria-labelledby="s4">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">4</span>
+        <h2 class="step-card__title" id="s4">Add it to your stream</h2>
+      </div>
+      <div class="linkfield">
+        <label class="ctl__label" for="link">Your link</label>
+        <input type="text" id="link" readonly placeholder="Appears once you type a name" spellcheck="false" autocomplete="off">
+        <div class="linkfield__actions">
+          <button class="btn" type="button" id="copy-link" disabled>Copy link</button>
+        </div>
+        <p class="linkfield__hint" id="link-hint" role="status"></p>
+      </div>
+    </section>
+
+    {{{about}}}
+
+    <section class="preview-tools" aria-label="Preview options">
+      <div id="preview-canvas"></div>
+    </section>
+  </div>
+</main>
