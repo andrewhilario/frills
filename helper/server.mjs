@@ -32,6 +32,20 @@ const VERSION = "0.6.0";
 /** What this program can do, so a page can tell an old one ("chat" only) from one that sends alerts. */
 const FEATURES = ["chat", "alerts", "info", "roles", "status", "viewers"];
 
+/**
+ * Updates `tiktok-live-connector`'s global `SignConfig` and clears its cached Euler client whenever the active pool key
+ * rotates. Without clearing `cachedInstance`, v2.5 keeps reusing the very first key's `EulerStreamApiClient` forever.
+ */
+export function syncConnectorSignKey(library, apiKey = "") {
+  const cfg = library?.SignConfig;
+  if (!cfg) return false;
+  const next = String(apiKey ?? "").trim() || undefined;
+  if (cfg.apiKey === next) return false;
+  cfg.apiKey = next;
+  cfg.cachedInstance = undefined;
+  return true;
+}
+
 /** Makes a connection to TikTok for one account. The library is loaded only now, so everything else works (and is tested) without it. */
 export async function realFactory(user, { apiKey } = {}) {
   let library;
@@ -42,6 +56,7 @@ export async function realFactory(user, { apiKey } = {}) {
     error.name = "SetupError";
     throw error;
   }
+  syncConnectorSignKey(library, apiKey);
   // processInitialData: false skips the little history TikTok sends on joining, so an overlay shows new chat only.
   return new library.TikTokLiveConnection(user, { processInitialData: false, ...(apiKey ? { signApiKey: apiKey } : {}) });
 }

@@ -5,7 +5,7 @@ import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
 import { EventEmitter } from "node:events";
-import { createHelper, parseEulerConfig } from "../helper/server.mjs";
+import { createHelper, parseEulerConfig, syncConnectorSignKey } from "../helper/server.mjs";
 import { ALERT_AT, EULER_DEFAULT_CAP, EULER_DEFAULT_RESETS, Signing, capacity, deviceFacts, level, snapshot, statusPage } from "../helper/status.mjs";
 import { SlotAlerts, termuxNotifier } from "../helper/alerts.mjs";
 
@@ -513,4 +513,21 @@ test("Signing.syncRemoteLimits queries Euler /accounts/me/rate_limits and auto-r
   });
   assert.equal(recovered.accounts[0].exhausted, false);
   assert.equal(recovered.accounts[0].used, 0);
+});
+
+test("syncConnectorSignKey clears tiktok-live-connector's cached Euler client when rotating keys", () => {
+  const fakeClient = { id: "first" };
+  const lib = { SignConfig: { apiKey: undefined, cachedInstance: undefined } };
+  assert.equal(syncConnectorSignKey(lib, "key_one"), true);
+  assert.equal(lib.SignConfig.apiKey, "key_one");
+  lib.SignConfig.cachedInstance = fakeClient;
+  assert.equal(syncConnectorSignKey(lib, "key_one"), false, "same key keeps cached Euler client");
+  assert.equal(lib.SignConfig.cachedInstance, fakeClient);
+  assert.equal(syncConnectorSignKey(lib, "key_two"), true, "rotating to backup key invalidates cached Euler client");
+  assert.equal(lib.SignConfig.apiKey, "key_two");
+  assert.equal(lib.SignConfig.cachedInstance, undefined);
+  lib.SignConfig.cachedInstance = { id: "second" };
+  assert.equal(syncConnectorSignKey(lib, ""), true, "clearing all keys resets SignConfig cleanly");
+  assert.equal(lib.SignConfig.apiKey, undefined);
+  assert.equal(lib.SignConfig.cachedInstance, undefined);
 });
