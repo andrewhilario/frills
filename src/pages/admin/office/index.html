@@ -68,10 +68,20 @@
       <section class="office__floor-wrap" aria-labelledby="floor-title">
         <div class="office__floor-head">
           <div>
-            <h2 class="admin__h office__h" id="floor-title">Studio Floor</h2>
-            <p class="admin__note">Click any workstation (or press 1–4) to inspect that bot’s desk, live data, and deliverables.</p>
+            <h2 class="admin__h office__h" id="floor-title">3D Studio Space</h2>
+            <p class="admin__note">Drag to orbit, scroll to zoom, click any 3D workstation (or press 1–4) to zoom to that bot’s desk.</p>
           </div>
-          <span class="office__clock" id="office-floor-tag">4 DESKS ONLINE</span>
+          <div class="office3d__controls">
+            <button class="btn btn--soft btn--sm" type="button" id="office-overview">Overview</button>
+            <button class="btn btn--soft btn--sm" type="button" id="office-theme">Cozy Night</button>
+            <button class="btn btn--soft btn--sm" type="button" id="office-mode">2D View</button>
+            <span class="office__clock" id="office-floor-tag">4 DESKS ONLINE</span>
+          </div>
+        </div>
+        <div class="office3d" id="office-3d-wrap">
+          <div class="office3d__canvas" id="office-3d-canvas" aria-label="Interactive 3D Virtual Office diorama"></div>
+          <div class="office3d__labels" id="office-3d-labels"></div>
+          <span class="office3d__hint">Drag to rotate · Scroll to zoom · Click a desk</span>
         </div>
         <div class="office__floor" id="office-floor" role="group" aria-label="Operator desks"></div>
       </section>

@@ -69,6 +69,15 @@ test("Virtual Office enforces ADMIN_KEY, renders 4 mascot desks, queues real fee
   assert.equal(await visible("#dash"), true);
   assert.equal(await text("#rib-feedback"), "1 unread of 1");
   assert.ok((await page.evaluate(`document.querySelectorAll("#office-tasks .office__task").length`)) >= 4);
+  // 3D space mounts cleanly (or falls back gracefully when WebGL is off) and supports Day/Night + 2D toggle
+  const has3dCanvas = await page.evaluate(`Boolean(document.querySelector("#office-3d-canvas canvas"))`);
+  if (has3dCanvas) {
+    assert.equal(await page.evaluate(`document.querySelectorAll("#office-3d-labels .office3d__tag").length`), 4, "all 4 floating 3D desk badges mounted");
+    await click("#office-theme");
+    assert.equal(await text("#office-theme"), "Sunny Day");
+    await click("#office-theme");
+    assert.equal(await text("#office-theme"), "Cozy Night");
+  }
 
   // Select Boba (Community) desk -> shows unread feedback safely as plain text & queues it
   await click('.office__desk[data-agent="community"]');

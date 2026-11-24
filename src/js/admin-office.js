@@ -3,6 +3,7 @@
 // copyable T3 agent prompts, and a D1-backed founder task & approval queue. Strictly textContent for user/DB text.
 
 import { el } from "./feed.js";
+import { mountOffice3D } from "./office-3d.js";
 
 const $ = (id) => document.getElementById(id);
 const KEY = "frills:admin:key";
@@ -12,6 +13,8 @@ let state = null;
 let selectedAgent = "ops";
 let statusFilter = "all";
 let scopeFilter = "all";
+let office3d = null;
+let view3d = true;
 try { key = sessionStorage.getItem(KEY) ?? ""; } catch { /* storage blocked */ }
 
 class Wrong extends Error {}
@@ -377,12 +380,7 @@ function renderFloor() {
     );
 
     desk.append(head, workstation, bubble, footer);
-    desk.addEventListener("click", () => {
-      selectedAgent = agent.id;
-      renderFloor();
-      renderInspector();
-      if (scopeFilter === "selected") renderTasks();
-    });
+    desk.addEventListener("click", () => selectDesk(agent.id, { focus3d: true }));
     host.append(desk);
   });
 }
@@ -614,6 +612,63 @@ function renderTasks() {
   }));
 }
 
+function selectDesk(agentId, { focus3d = true } = {}) {
+  selectedAgent = agentId;
+  renderFloor();
+  renderInspector();
+  if (scopeFilter === "selected") renderTasks();
+  if (office3d) {
+    office3d.sync(state, selectedAgent);
+    if (focus3d && view3d) office3d.focusAgent(selectedAgent);
+  }
+}
+
+function ensure3D() {
+  const wrap = $("office-3d-wrap");
+  if (!wrap) return;
+  if (!view3d) {
+    wrap.hidden = true;
+    $("office-floor")?.classList.remove("office__floor--dock");
+    return;
+  }
+  if (!office3d && state?.agents?.length) {
+    office3d = mountOffice3D({
+      canvasHost: $("office-3d-canvas"),
+      overlayHost: $("office-3d-labels"),
+      agents: state.agents,
+      onSelect: (id) => selectDesk(id, { focus3d: true }),
+    });
+  }
+  if (!office3d) {
+    view3d = false;
+    wrap.hidden = true;
+    if ($("office-mode")) $("office-mode").hidden = true;
+    if ($("office-overview")) $("office-overview").hidden = true;
+    if ($("office-theme")) $("office-theme").hidden = true;
+    return;
+  }
+  wrap.hidden = false;
+  $("office-floor")?.classList.add("office__floor--dock");
+  office3d.resize();
+  office3d.sync(state, selectedAgent);
+}
+
+$("office-overview")?.addEventListener("click", () => office3d?.resetOverview());
+$("office-theme")?.addEventListener("click", () => {
+  if (!office3d) return;
+  const next = !office3d.isNight();
+  office3d.setNight(next);
+  $("office-theme").textContent = next ? "Sunny Day" : "Cozy Night";
+});
+$("office-mode")?.addEventListener("click", () => {
+  view3d = !view3d;
+  $("office-mode").textContent = view3d ? "2D View" : "3D Space";
+  if ($("office-overview")) $("office-overview").hidden = !view3d;
+  if ($("office-theme")) $("office-theme").hidden = !view3d;
+  ensure3D();
+});
+window.addEventListener("pagehide", () => office3d?.dispose());
+
 function renderAll() {
   if (!state) return;
   renderRibbon();
@@ -622,17 +677,16 @@ function renderAll() {
   statusChips.mark();
   scopeChips.mark();
   renderTasks();
+  ensure3D();
 }
 
 document.addEventListener("keydown", (e) => {
   if ($("dash").hidden || !state) return;
   if (["INPUT", "TEXTAREA", "SELECT"].includes(e.target?.tagName)) return;
+  if (e.key === "0") { office3d?.resetOverview(); return; }
   const idx = Number(e.key) - 1;
   if (idx >= 0 && idx < state.agents.length) {
-    selectedAgent = state.agents[idx].id;
-    renderFloor();
-    renderInspector();
-    if (scopeFilter === "selected") renderTasks();
+    selectDesk(state.agents[idx].id, { focus3d: true });
   }
 });
 
