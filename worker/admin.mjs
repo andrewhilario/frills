@@ -7,6 +7,7 @@
 
 import { KINDS } from "./feedback.mjs";
 import { MEDIA } from "./media.mjs";
+import { handleOffice } from "./office.mjs";
 import { parseRelayUrls, report } from "./stats-report.mjs";
 
 export const ADMIN = { minKey: 12, maxWrong: 10, windowMs: 10 * 60 * 1000, pageSize: 40, maxPage: 100 };
@@ -166,6 +167,7 @@ export async function handleAdmin(request, env, { now = Date.now(), fetchImpl = 
   try {
     if (more.length === 0 && area === "summary" && !rest) return method === "GET" ? await summary(env) : json(405, { ok: false, error: "method" }, { allow: "GET" });
     if (more.length === 0 && area === "stats" && !rest) return method === "GET" ? json(200, await report(env, { now, fetchImpl })) : json(405, { ok: false, error: "method" }, { allow: "GET" });
+    if (area === "office") return await handleOffice(request, env, [rest, ...more].filter(Boolean), { now, fetchImpl });
     if (more.length === 0 && area === "euler" && !rest) return method === "POST" ? await controlEuler(request, env, { fetchImpl }) : json(405, { ok: false, error: "method" }, { allow: "POST" });
     if (more.length === 0 && area === "feedback") {
       if (!rest) return method === "GET" ? await listFeedback(url, env) : json(405, { ok: false, error: "method" }, { allow: "GET" });

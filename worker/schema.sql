@@ -160,3 +160,27 @@ CREATE TABLE IF NOT EXISTS cloud_overlays (
   updated_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS cloud_overlays_account ON cloud_overlays (account_id, updated_at);
+
+-- Private Virtual Office (/admin/office/): specialist bot desks and founder approval queue (see worker/office.mjs).
+CREATE TABLE IF NOT EXISTS office_agents (
+  id TEXT PRIMARY KEY,
+  status TEXT NOT NULL DEFAULT 'idle',
+  current_task TEXT NOT NULL DEFAULT '',
+  last_summary TEXT NOT NULL DEFAULT '',
+  last_run_at INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS office_tasks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  agent_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  body TEXT NOT NULL DEFAULT '',
+  output TEXT NOT NULL DEFAULT '',
+  kind TEXT NOT NULL DEFAULT 'ops',
+  priority TEXT NOT NULL DEFAULT 'normal',
+  status TEXT NOT NULL DEFAULT 'queued',
+  source TEXT NOT NULL DEFAULT 'founder',
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS office_tasks_agent ON office_tasks (agent_id, status, updated_at);

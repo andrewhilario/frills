@@ -1,0 +1,145 @@
+<!--
+{
+  "title": "Virtual Office | Frills Admin",
+  "description": "Private Frills Virtual Office: four specialist operator desks (Mochi Ops, Yuzu Growth, Boba Community, Kero QA), live relay and feedback pulse, and founder approval queue.",
+  "path": "/admin/office/",
+  "css": "admin",
+  "js": "adminOffice",
+  "bodyClass": "page-admin page-admin--console page-admin--office",
+  "chrome": "none",
+  "footer": false,
+  "noindex": true,
+  "listed": false
+}
+-->
+<main class="admin stats stats-console office" id="main">
+  <header class="admin__bar stats-console__bar">
+    <div class="stats-console__brand">
+      <span class="stats-console__kicker">FRILLS HQ · VIRTUAL OFFICE</span>
+      <h1 class="admin__title">Operator Desks &amp; Approval Queue</h1>
+      <p class="admin__note stats-console__sync" id="office-sync" role="status"></p>
+    </div>
+    <div class="admin__bar-actions" id="bar-actions" hidden>
+      <a class="btn btn--soft btn--sm" href="/admin/stats/">Analytics &amp; fleet</a>
+      <a class="btn btn--soft btn--sm" href="/admin/">Moderation &amp; files</a>
+      <a class="btn btn--soft btn--sm" href="/status/">Live server status</a>
+      <button class="btn btn--sm" type="button" id="office-scan">Run Live Scan</button>
+      <button class="btn btn--soft btn--sm" type="button" id="refresh">Refresh</button>
+      <button class="btn btn--outline btn--sm" type="button" id="logout">Log out</button>
+    </div>
+  </header>
+
+  <noscript><p class="admin__note">The virtual office needs JavaScript. Turn it on for this page and reload.</p></noscript>
+
+  <section class="admin__login" id="login" aria-labelledby="login-title">
+    <h2 class="admin__h" id="login-title">Unlock Virtual Office</h2>
+    <form id="login-form" class="admin__form">
+      <label class="admin__label" for="key">Admin password (<code>ADMIN_KEY</code>)</label>
+      <input type="password" id="key" name="key" autocomplete="current-password" spellcheck="false" required>
+      <button class="btn" type="submit" id="login-go">Enter Frills HQ</button>
+      <p class="admin__status" id="login-status" role="status"></p>
+    </form>
+    <p class="admin__note">Uses the same <code>ADMIN_KEY</code> secret as Moderation and Analytics. Kept in this tab’s session storage only.</p>
+  </section>
+
+  <div id="dash" class="office__dash" hidden>
+    <div class="stats-console__ribbon" aria-label="Live studio telemetry">
+      <div class="stats-console__metric">
+        <span class="stats-console__metric-k">Live Relay Fleet</span>
+        <b class="stats-console__metric-v" id="rib-relays">—</b>
+      </div>
+      <div class="stats-console__metric">
+        <span class="stats-console__metric-k">Frills Plus &amp; Cloud</span>
+        <b class="stats-console__metric-v" id="rib-plus">—</b>
+      </div>
+      <div class="stats-console__metric">
+        <span class="stats-console__metric-k">Unread Feedback</span>
+        <b class="stats-console__metric-v" id="rib-feedback">—</b>
+      </div>
+      <div class="stats-console__metric">
+        <span class="stats-console__metric-k">Waiting Approval</span>
+        <b class="stats-console__metric-v" id="rib-review">—</b>
+      </div>
+    </div>
+
+    <p class="admin__status" id="office-status" role="status" aria-live="polite"></p>
+
+    <div class="office__workspace">
+      <section class="office__floor-wrap" aria-labelledby="floor-title">
+        <div class="office__floor-head">
+          <div>
+            <h2 class="admin__h office__h" id="floor-title">Studio Floor</h2>
+            <p class="admin__note">Click any workstation (or press 1–4) to inspect that bot’s desk, live data, and deliverables.</p>
+          </div>
+          <span class="office__clock" id="office-floor-tag">4 DESKS ONLINE</span>
+        </div>
+        <div class="office__floor" id="office-floor" role="group" aria-label="Operator desks"></div>
+      </section>
+
+      <aside class="office__inspector" id="office-inspector" aria-label="Selected operator desk"></aside>
+    </div>
+
+    <section class="office__board" aria-labelledby="board-title">
+      <div class="office__board-head">
+        <div>
+          <h2 class="admin__h office__h" id="board-title">Tasks &amp; Approval Queue</h2>
+          <p class="admin__note">Bots drop ready-to-post drafts, support triage, and ops briefings here for 1-click copy or approval.</p>
+        </div>
+        <button class="btn btn--sm" type="button" id="toggle-composer">+ Assign Task</button>
+      </div>
+
+      <form class="office__composer" id="task-form" hidden>
+        <div class="office__composer-grid">
+          <label class="office__field">
+            <span>Assign to desk</span>
+            <select id="t-agent" name="agentId">
+              <option value="ops">Mochi · Ops &amp; Relay Watchdog</option>
+              <option value="growth">Yuzu · Growth &amp; Content Strategist</option>
+              <option value="community">Boba · Community &amp; Support Desk</option>
+              <option value="qa">Kero · Product &amp; QA Engineer</option>
+            </select>
+          </label>
+          <label class="office__field">
+            <span>Priority</span>
+            <select id="t-priority" name="priority">
+              <option value="normal">Normal</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
+          </label>
+          <label class="office__field">
+            <span>Initial status</span>
+            <select id="t-status" name="status">
+              <option value="queued">Queued</option>
+              <option value="working">Working</option>
+              <option value="needs_review">Needs Review</option>
+            </select>
+          </label>
+        </div>
+        <label class="office__field">
+          <span>Task title</span>
+          <input type="text" id="t-title" name="title" maxlength="120" placeholder="e.g. Draft 30s TikTok clip for Gift Gallery Rotator" required>
+        </label>
+        <label class="office__field">
+          <span>Brief / notes (optional)</span>
+          <textarea id="t-body" name="body" rows="2" maxlength="1500" placeholder="Context, target channel, or links for this bot…"></textarea>
+        </label>
+        <label class="office__field">
+          <span>Deliverable / draft output (optional)</span>
+          <textarea id="t-output" name="output" rows="3" maxlength="8000" placeholder="Paste a finished script, report, or reply macro if already drafted…"></textarea>
+        </label>
+        <div class="office__composer-actions">
+          <button class="btn btn--sm" type="submit" id="t-submit">Save to Queue</button>
+          <button class="btn btn--soft btn--sm" type="button" id="t-cancel">Cancel</button>
+        </div>
+      </form>
+
+      <div class="office__filters">
+        <div class="chips" id="f-status" role="group" aria-label="Filter by status"></div>
+        <div class="chips" id="f-scope" role="group" aria-label="Filter by desk"></div>
+      </div>
+
+      <div class="office__tasks" id="office-tasks"></div>
+    </section>
+  </div>
+</main>
