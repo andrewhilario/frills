@@ -3,7 +3,7 @@
   "title": "Frills Plus: what you get, cancelling and refunds | Frills",
   "description": "Frills stays free. Frills Plus ($5.99/mo) adds a 1-Link Master Scene for OBS & TikTok, 1-click theme sync, AI pet voices & PNGTuber uploads, and cloud backup.",
   "path": "/plus/",
-  "updated": "2026-11-23",
+  "updated": "2026-11-24",
   "published": "2026-11-15",
   "css": "page",
   "js": "account",
@@ -40,7 +40,7 @@
           <li><strong>1-Click Live Rebrand &amp; Global Theme Sync:</strong> save up to 50 permanent <code>/o/…</code> cloud links across every Frills editor and flip all open OBS sources to a new theme in one click with zero URL re-pasting.</li>
           <li><strong>Crash-Proof Cloud Memory across streams:</strong> Subathon Timers, Gift Jars, Goal Bars, and Weekly, Monthly, or All-Time Top Gifters &amp; Top Likers checkpoint automatically so OBS crashes or PC reboots never wipe stream totals.</li>
           <li><strong>Live Phone Stream Deck &amp; Post-Stream MVP Recap:</strong> start, pause, or add minutes to your <a href="/timer/">Subathon Timer</a>, fire test Alerts, speak <a href="/tts/">Talking Pet</a> lines, fill <a href="/jar/">Gift Jars</a>, bump <a href="/goal/">Goal Bars</a>, and download a 1-click 9:16 / 16:9 MVP Recap PNG from your <a href="/account/">account page</a>.</li>
-          <li><strong>Unlimited Actions &amp; Full VTube Studio Controls:</strong> go past 10 free rules and 5 free sticky notes in <a href="/actions/">Actions</a>—stack unlimited named viewer sticky notes on your avatar’s face, trigger VTS hotkeys &amp; custom props, toggle expressions, zoom/flip, or tint colors live from TikTok gifts, Twitch bits, subs, or chat commands.</li>
+          <li><strong>Unlimited Actions &amp; Full VTube Studio Controls:</strong> go past 10 free rules and 5 free pastel sticky notes in <a href="/actions/">Actions</a>—stack unlimited named viewer stickers in custom shapes (pastel note, heart, star, chibi paw, and dreamy cloud), trigger VTS hotkeys &amp; custom props, toggle expressions, zoom/flip, or tint colors live from TikTok gifts, Twitch bits, subs, or chat commands.</li>
           <li><strong>VIP Jackpot Alert Tier + Natural AI Pet Voices &amp; Custom 3-Frame PNGTuber:</strong> set exclusive big-cheer/sub-bomb VIP GIFs &amp; sounds with golden <code>★ VIP</code> spotlights in <a href="/alerts/">Alerts</a>, plus 150,000 AI voice characters a month (~3,000 messages) and custom idle/talking/excited mascot uploads on <a href="/tts/">Talking Pet</a>.</li>
           <li><strong>Zero-drop TikTok LIVE connection (+ native Twitch):</strong> priority dedicated 24/7 cloud TikTok connection with automatic free fallback so you never miss a paid alert, paired with zero-key Twitch support across all widgets.</li>
           <li><strong>Free Frills stays free:</strong> every free overlay keeps working with no account, and Plus falls back cleanly if ended.</li>
@@ -77,7 +77,7 @@
       <ol>
         <li>Sign in on your <a href="/account/">account page</a> with your Frills Plus email.</li>
         <li>Inside the <strong>Dedicated TikTok server &amp; overlay code</strong> section, click <strong>Activate on this browser</strong>.</li>
-        <li>Open any overlay editor (<a href="/editor/">Chat</a>, <a href="/alerts/">Alerts</a>, <a href="/jar/">Gift jar</a>, <a href="/goal/">Goals</a>, <a href="/timer/">Subathon timer</a>, <a href="/tts/">Talking pet</a>, <a href="/gifters/">Top gifters</a>, <a href="/likers/">Top likers</a>) or <a href="/start/">Quick start</a> and copy your link (or save it to the cloud). Your Plus code is included automatically so your TikTok stream routes through the dedicated 24/7 cloud server with automatic fallback to the free relay.</li>
+        <li>Open any overlay editor (<a href="/editor/">Chat</a>, <a href="/alerts/">Alerts</a>, <a href="/jar/">Gift jar</a>, <a href="/gallery/">Gift gallery</a>, <a href="/wheel/">Spin the wheel</a>, <a href="/goal/">Goals</a>, <a href="/timer/">Subathon timer</a>, <a href="/tts/">Talking pet</a>, <a href="/gifters/">Top gifters</a>, <a href="/likers/">Top likers</a>, <a href="/actions/">Actions</a>) or <a href="/start/">Quick start</a> and copy your link (or save it to the cloud). Your Plus code is included automatically so your TikTok stream routes through the dedicated 24/7 cloud server with automatic fallback to the free relay.</li>
       </ol>
 
       <h3>2. Live Cloud Overlays (<code>/o/…</code>) &amp; 1-Click Global Theme Sync</h3>
@@ -134,6 +134,14 @@
         <li>Your channel name, <strong>#1 Top Gifter / Sub</strong>, <strong>#1 Top Liker</strong>, and <strong>Gift Jar / Goal</strong> progress auto-fill from your live cloud checkpoints (you can also edit any field before downloading).</li>
         <li>Choose <strong>9:16 Vertical (TikTok Story / Reels)</strong> or <strong>16:9 Landscape (Discord / X)</strong> and pick a theme (<em>Cream &amp; Gold</em>, <em>Midnight Arcade</em>, or <em>Neon Bubblegum</em>).</li>
         <li>Click <strong>Download Recap PNG</strong> to save your Hall of Fame card and post it to TikTok Stories, Discord, or X.</li>
+      </ol>
+
+      <h3>8. Unlimited OBS Actions &amp; Full VTube Studio Controls</h3>
+      <ol>
+        <li>Open the <a href="/actions/">Actions editor</a> and connect OBS Studio (<strong>Tools &rarr; WebSocket Server Settings</strong>, port <code>4455</code>) and/or VTube Studio (<strong>Settings &rarr; General &rarr; Start API</strong>, port <code>8001</code>). <em>(Works in OBS Studio and Streamlabs Desktop—not TikTok LIVE Studio.)</em></li>
+        <li>Build unlimited <em>When &rarr; Do</em> rules past the 10-action free cap for chat commands (<code>!clip</code>, <code>!replay</code>), TikTok gifts, follows, shares, likes, and Twitch subs, bits, or raids.</li>
+        <li>For VTubers, pick any sticker shape (<strong>pastel sticky note, heart sticker, star tag, chibi paw stamp, dreamy cloud, or random</strong>) to stack unlimited named viewer stickers on your avatar’s face, and add VTube Studio hotkeys, item props, expressions, zooms, flips, or color tints.</li>
+        <li>Save to cloud (<code>/o/…</code>) or copy your Browser source link into OBS Studio or Streamlabs Desktop. Your OBS password and VTube Studio token stay strictly after <code>#</code> on your PC (if you use a <code>/o/…</code> cloud link, append <code>#obsPass=…&amp;vtsToken=…</code> inside OBS).</li>
       </ol>
 
       <h2 class="subtitle">Price and billing</h2>

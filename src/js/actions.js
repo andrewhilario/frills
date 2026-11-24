@@ -56,6 +56,15 @@ export const ACTION_TYPES = [
   ["flow.wait", "Flow · Wait (seconds)"],
 ];
 
+export const VTS_STICKY_SHAPES = [
+  ["note", "Pastel sticky note (Free)"],
+  ["heart", "Heart sticker (Plus)"],
+  ["star", "Star tag (Plus)"],
+  ["paw", "Chibi paw stamp (Plus)"],
+  ["cloud", "Dreamy cloud (Plus)"],
+  ["random", "Random sticker shape (Plus)"],
+];
+
 export const VTS_STICKY_COLORS = [
   ["yellow", "Classic yellow"],
   ["pink", "Sakura pink"],
@@ -82,9 +91,11 @@ export const VTS_MOVE_PRESETS = [
 export const isVtsStep = (step) => Boolean(step?.type?.startsWith("vts."));
 export const isFreeVtsStep = (step) => step?.type === "vts.sticky";
 export const isPlusVtsStep = (step) => isVtsStep(step) && !isFreeVtsStep(step);
+export const isPlusStickyShape = (shape) => Boolean(shape && shape !== "note");
 export const hasVtsSteps = (rules) => (rules ?? []).some((r) => r?.enabled !== false && (r.steps ?? []).some(isVtsStep));
 export const hasFreeVtsSteps = (rules) => (rules ?? []).some((r) => r?.enabled !== false && (r.steps ?? []).some(isFreeVtsStep));
 export const hasPlusVtsSteps = (rules) => (rules ?? []).some((r) => r?.enabled !== false && (r.steps ?? []).some(isPlusVtsStep));
+export const hasPlusStickyShape = (rules) => (rules ?? []).some((r) => r?.enabled !== false && (r.steps ?? []).some((s) => s?.type === "vts.sticky" && isPlusStickyShape(s.shape)));
 
 export const BANNER_FX = [
   ["none", "No effect"],
@@ -234,7 +245,7 @@ export const ACTION_STARTERS = [
       queue: true,
       trigger: { kind: "gift", giftName: "", minDiamonds: 100 },
       steps: [
-        { type: "vts.sticky", title: "{name}", subtitle: "{gift}", color: "random", pinMode: "face", artMesh: "", size: 22, rotation: -6, duration: 0 },
+        { type: "vts.sticky", title: "{name}", subtitle: "{gift}", shape: "note", color: "random", pinMode: "face", artMesh: "", size: 22, rotation: -6, duration: 0 },
         { type: "frills.sound", sound: "pop", volume: 75 },
       ],
     },
@@ -302,12 +313,14 @@ export function sanitizeStep(raw) {
     return { type, hotkey: cleanStr(s.hotkey ?? "", 80) };
   }
   if (type === "vts.sticky") {
+    const shape = VTS_STICKY_SHAPES.some(([id]) => id === s.shape) ? s.shape : "note";
     const color = VTS_STICKY_COLORS.some(([id]) => id === s.color) ? s.color : "random";
     const pinMode = VTS_STICKY_PIN_MODES.some(([id]) => id === s.pinMode) ? s.pinMode : "face";
     return {
       type,
       title: cleanStr(s.title ?? "{name}", 48) || "{name}",
       subtitle: cleanStr(s.subtitle ?? "{gift}", 48),
+      shape,
       color,
       pinMode,
       artMesh: cleanStr(s.artMesh ?? "", 80),
@@ -807,6 +820,7 @@ function hexToRgb(hex) {
 export function createVtsStepExecutor(vts, {
   previewFallback = false,
   maxStickyNotes = 0,
+  allowPlusShapes = true,
   onToast = () => {},
   onStickyPreview = null,
   renderStickyNote = renderStickyNoteBase64,
@@ -816,6 +830,7 @@ export function createVtsStepExecutor(vts, {
   const timers = new Set();
   const activeStickyIds = [];
   let stickyCap = Math.max(0, Math.round(Number(maxStickyNotes) || 0));
+  let plusShapesAllowed = Boolean(allowPlusShapes);
   const forgetStickyId = (id) => {
     const idx = activeStickyIds.indexOf(id);
     if (idx >= 0) activeStickyIds.splice(idx, 1);
@@ -840,6 +855,9 @@ export function createVtsStepExecutor(vts, {
     setMaxStickyNotes(limit) {
       stickyCap = Math.max(0, Math.round(Number(limit) || 0));
     },
+    setAllowPlusShapes(allow) {
+      plusShapesAllowed = Boolean(allow);
+    },
     clearStickyTracking() {
       activeStickyIds.length = 0;
     },
@@ -849,9 +867,10 @@ export function createVtsStepExecutor(vts, {
           if (step.type === "vts.sticky") {
             const title = formatTemplate(step.title || "{name}", ctx) || ctx.who || "Viewer";
             const subtitle = step.subtitle ? formatTemplate(step.subtitle, ctx) : "";
+            const shape = plusShapesAllowed ? (step.shape || "note") : "note";
             let base64 = "";
             try {
-              base64 = renderStickyNote({ title, subtitle, color: step.color || "random" });
+              base64 = renderStickyNote({ title, subtitle, color: step.color || "random", shape });
             } catch { /* headless fallback */ }
             if (base64 && onStickyPreview) {
               onStickyPreview({ base64, maxNotes: stickyCap, title, subtitle });
@@ -870,7 +889,10 @@ export function createVtsStepExecutor(vts, {
         await vts.ensureCustomItemPermission();
         const title = formatTemplate(step.title || "{name}", ctx) || ctx.who || "Viewer";
         const subtitle = step.subtitle ? formatTemplate(step.subtitle, ctx) : "";
-        const customDataBase64 = renderStickyNote({ title, subtitle, color: step.color || "random" });
+        const requestedShape = step.shape || "note";
+        const shape = plusShapesAllowed ? requestedShape : "note";
+        const shapeFallback = !plusShapesAllowed && isPlusStickyShape(requestedShape);
+        const customDataBase64 = renderStickyNote({ title, subtitle, color: step.color || "random", shape });
         if (customDataBase64 && onStickyPreview) {
           onStickyPreview({ base64: customDataBase64, maxNotes: stickyCap, title, subtitle });
         }
@@ -954,7 +976,8 @@ export function createVtsStepExecutor(vts, {
         }
         const where = pinned ? (pinnedMesh ? `pinned to ${pinnedMesh}` : "pinned to avatar") : "on screen";
         const capNote = evicted ? ` · ${stickyCap}/${stickyCap} free cap (oldest peeled off)` : "";
-        return { ok: true, detail: `Sticky note “${title}” ${where} (${stays ? "stays" : `${step.duration}s`})${capNote}` };
+        const shapeNote = shapeFallback ? " · Plus shape fell back to pastel note" : "";
+        return { ok: true, detail: `Sticky note “${title}” ${where} (${stays ? "stays" : `${step.duration}s`})${capNote}${shapeNote}` };
       }
 
       if (step.type === "vts.hotkey") {

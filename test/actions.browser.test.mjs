@@ -39,6 +39,7 @@ function wsDecodeFrames(buf) {
   const frames = [];
   let offset = 0;
   while (offset + 2 <= buf.length) {
+    const fin = (buf[offset] & 0x80) !== 0;
     const opcode = buf[offset] & 0x0f;
     const masked = (buf[offset + 1] & 0x80) !== 0;
     let len = buf[offset + 1] & 0x7f;
@@ -51,7 +52,7 @@ function wsDecodeFrames(buf) {
     pos += maskLen;
     const data = Buffer.from(buf.subarray(pos, pos + len));
     if (mask) for (let i = 0; i < data.length; i++) data[i] ^= mask[i & 3];
-    frames.push({ opcode, text: data.toString("utf8") });
+    frames.push({ fin, opcode, data, text: data.toString("utf8") });
     offset = pos + len;
   }
   return { frames, rest: buf.subarray(offset) };
@@ -84,15 +85,27 @@ async function startMockObs({ password = "obs-secret-42" } = {}) {
     send({ op: 0, d: { obsWebSocketVersion: "5.5.0", rpcVersion: 1, authentication: { challenge, salt } } });
 
     let pendingBuf = Buffer.alloc(0);
+    let fragParts = [];
     socket.on("data", (chunk) => {
       pendingBuf = Buffer.concat([pendingBuf, chunk]);
       const { frames, rest } = wsDecodeFrames(pendingBuf);
       pendingBuf = rest;
       for (const f of frames) {
         if (f.opcode === 8) { socket.end(); return; }
-        if (f.opcode !== 1) continue;
+        let fullText = "";
+        if (f.opcode === 1) {
+          if (f.fin) fullText = f.text;
+          else { fragParts = [f.data]; continue; }
+        } else if (f.opcode === 0 && fragParts.length) {
+          fragParts.push(f.data);
+          if (!f.fin) continue;
+          fullText = Buffer.concat(fragParts).toString("utf8");
+          fragParts = [];
+        } else {
+          continue;
+        }
         let msg;
-        try { msg = JSON.parse(f.text); } catch { continue; }
+        try { msg = JSON.parse(fullText); } catch { continue; }
         if (msg.op === 1) {
           if (msg.d?.authentication !== expectedAuth) {
             socket.write(Buffer.from([0x88, 0x02, 0x0f, 0xa9])); // close 4009
@@ -168,15 +181,27 @@ async function startMockVts() {
     socket.on("error", () => {});
     const send = (obj) => { if (!socket.destroyed) socket.write(wsEncodeText(JSON.stringify(obj))); };
     let pendingBuf = Buffer.alloc(0);
+    let fragParts = [];
     socket.on("data", (chunk) => {
       pendingBuf = Buffer.concat([pendingBuf, chunk]);
       const { frames, rest } = wsDecodeFrames(pendingBuf);
       pendingBuf = rest;
       for (const f of frames) {
         if (f.opcode === 8) { socket.end(); return; }
-        if (f.opcode !== 1) continue;
+        let fullText = "";
+        if (f.opcode === 1) {
+          if (f.fin) fullText = f.text;
+          else { fragParts = [f.data]; continue; }
+        } else if (f.opcode === 0 && fragParts.length) {
+          fragParts.push(f.data);
+          if (!f.fin) continue;
+          fullText = Buffer.concat(fragParts).toString("utf8");
+          fragParts = [];
+        } else {
+          continue;
+        }
         let msg;
-        try { msg = JSON.parse(f.text); } catch { continue; }
+        try { msg = JSON.parse(fullText); } catch { continue; }
         calls.push([msg.messageType, msg.data ?? {}]);
         const reply = (messageType, data = {}) => send({ apiName: "VTubeStudioPublicAPI", apiVersion: "1.0", requestID: msg.requestID, messageType, data });
         if (msg.messageType === "AuthenticationTokenRequest") reply("AuthenticationTokenResponse", { authenticationToken: issuedToken });
@@ -362,6 +387,17 @@ test("actions editor connects to mock VTube Studio API, runs free 5-sticky-note 
   await until(async () => mockVts.calls.filter(([t, d]) => t === "ItemPinRequest" && d.pinInfo?.artMeshID === "Face_Skin").length > beforePins);
   const editorLoad = mockVts.calls.filter(([t, d]) => t === "ItemLoadRequest" && d.customDataBase64).at(-1);
   assert.ok(editorLoad && editorLoad[1].customDataBase64.startsWith("iVBORw0KGgo"), "editor draws real base64 PNG sticky note with viewer name");
+
+  // Selecting a Plus custom sticker shape (chibi paw) renders a distinct valid base64 PNG in editor preview
+  await page.evaluate(`(() => { const r = [...document.querySelectorAll(".act-rule")][2]; const shapeSel = [...r.querySelectorAll("select")].find((s) => [...s.options].some((o) => o.value === "paw")); shapeSel.value = "paw"; shapeSel.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+  const beforePawPins = mockVts.calls.filter(([t]) => t === "ItemPinRequest").length;
+  await page.evaluate(`[...document.querySelectorAll(".act-rule")][2].querySelector(".act-rule__test").click()`);
+  await until(async () => mockVts.calls.filter(([t]) => t === "ItemPinRequest").length > beforePawPins);
+  const pawLoad = mockVts.calls.filter(([t, d]) => t === "ItemLoadRequest" && d.customDataBase64).at(-1);
+  assert.ok(pawLoad && pawLoad[1].customDataBase64.startsWith("iVBORw0KGgo"), "paw sticker renders valid base64 PNG");
+  assert.notEqual(pawLoad[1].customDataBase64, editorLoad[1].customDataBase64, "paw sticker image differs from classic pastel note");
+  // Switch back to classic note for the live overlay assertions below
+  await page.evaluate(`(() => { const r = [...document.querySelectorAll(".act-rule")][2]; const shapeSel = [...r.querySelectorAll("select")].find((s) => [...s.options].some((o) => o.value === "paw")); shapeSel.value = "note"; shapeSel.dispatchEvent(new Event("change", { bubbles: true })); })()`);
 
   // Copy link carries vtsPort in query, and vtsToken strictly in #hash (never query string)
   await type("#source-channel", "pond.pal");

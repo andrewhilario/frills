@@ -91,6 +91,7 @@ const obsExecutor = createObsStepExecutor(obs, {
 const vtsExecutor = createVtsStepExecutor(vts, {
   previewFallback: demo,
   maxStickyNotes: isPlus ? 0 : FREE_STICKY_NOTES_LIMIT,
+  allowPlusShapes: isPlus || demo,
   onToast: (t) => view.showToast(t),
 });
 

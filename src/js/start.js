@@ -59,9 +59,9 @@ const QUESTIONS = [
     hint: "This decides which overlays you can have and how they connect. Pick one, then press Next.",
     body: () => picks(
       [
-        { id: "tiktok", name: "TikTok LIVE", text: "Chat, alerts, gifts, goals and likers." },
-        { id: "twitch", name: "Twitch", text: "Chat, alerts, top gifters and rotating highlights." },
-        { id: "both", name: "Both at once", text: "One chat together, alerts, gifters and highlights for each, plus TikTok gifts, goals and likers. In beta." },
+        { id: "tiktok", name: "TikTok LIVE", text: "Chat, alerts, spin wheel, gift gallery, jars, goals and likers." },
+        { id: "twitch", name: "Twitch", text: "Chat, alerts, top gifters, rotating highlights and spin the wheel." },
+        { id: "both", name: "Both at once", text: "One chat together, alerts, gifters, highlights and spin wheel for each, plus TikTok gifts, gallery, goals and likers. In beta." },
       ],
       answers.platform, (id) => { answers.platform = id; }, (i) => titled(i.name, i.text), { label: "Where you stream" },
     ),

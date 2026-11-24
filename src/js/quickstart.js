@@ -7,8 +7,10 @@ export const OVERLAYS = [
   { id: "alerts", name: "Alerts", blurb: "A pop-up for each follow, gift or share.", overlay: "/overlay/alerts/", editor: "/alerts/", twitch: true },
   { id: "gifters", name: "Top gifters", blurb: "A live ranking of top diamond gifters, sub gifters or bit senders.", overlay: "/overlay/gifters/", editor: "/gifters/", twitch: true },
   { id: "labels", name: "Rotating highlights", blurb: "Cycles through your last gift, follower, sub, bits and top supporters.", overlay: "/overlay/labels/", editor: "/labels/", twitch: true },
+  { id: "wheel", name: "Spin the wheel", blurb: "A prize or dare wheel viewers spin with TikTok gifts, Twitch bits or subs.", overlay: "/overlay/wheel/", editor: "/wheel/", twitch: true },
   { id: "gifts", name: "Last gifts", blurb: "A list of your most recent gifts.", overlay: "/overlay/gifts/", editor: "/gifts/", twitch: false },
   { id: "jar", name: "Gift jar", blurb: "Watch TikTok gifts tumble into a themed jar until it is full.", overlay: "/overlay/jar/", editor: "/jar/", twitch: false },
+  { id: "gallery", name: "Gift gallery rotator", blurb: "Rotates through featured TikTok gifts and lights them up when sent.", overlay: "/overlay/gallery/", editor: "/gallery/", twitch: false },
   { id: "goal", name: "Goals", blurb: "A bar that fills as you gain followers, gifts or likes.", overlay: "/overlay/goal/", editor: "/goal/", twitch: false },
   { id: "likers", name: "Top likers", blurb: "A live ranking of who taps the heart the most.", overlay: "/overlay/likers/", editor: "/likers/", twitch: false },
   { id: "songs", name: "Song requests", blurb: "Viewers type !sr in chat to add songs to your queue.", overlay: "/overlay/songs/", editor: "/songs/", twitch: false },
@@ -84,7 +86,7 @@ export function buildLinks(origin, answers) {
       : query(["channel", names[reads]], ["platform", names[reads] ? reads : ""]);
     // chat in a Matcha style is fine-tuned on the Matcha page, which has its own looks
     const editor = o.id === "chat" && look.has("style") ? "/matcha/" : o.editor;
-    const previewMore = (o.id === "alerts" || o.id === "gifters" || o.id === "labels") ? [["platform", reads]] : o.id === "chat" ? (reads === "both" ? [["tiktok", "demo"], ["twitch", "demo"]] : []) : [["pace", "1100"]];
+    const previewMore = (o.id === "alerts" || o.id === "gifters" || o.id === "labels" || o.id === "wheel") ? [["platform", reads]] : o.id === "chat" ? (reads === "both" ? [["tiktok", "demo"], ["twitch", "demo"]] : []) : [["pace", "1100"]];
     return {
       id,
       name,
@@ -104,6 +106,8 @@ function noteFor(id, reads) {
   if (id === "alerts" && reads === "twitch") return "Twitch subs, gifted subs, cheers and raids work with this link. Follow alerts need one extra login: open this overlay in the editor and press the Twitch login button.";
   if (id === "labels" && reads === "twitch") return "Twitch subs, bits, top sub gifter and top bit sender work with this link. Last follower needs one extra login: open this overlay in the editor and press the Twitch login button.";
   if (id === "gifters" && reads === "twitch") return "Ranks gifted subs, bit cheers, or both together in the editor.";
+  if (id === "wheel") return "Open the editor to customize your wheel slices and pick whether gifts, bits or a spin meter trigger it.";
+  if (id === "gallery") return "Open the editor to choose your featured TikTok gifts and optional reward captions.";
   if (id === "goal") return "The follower goal starts from your real follower count once you are LIVE.";
   if (id === "timer") return "Open this overlay in the editor to press Start, Pause or add time during your stream.";
   if (id === "songs") return "Viewers type !sr and a song name in chat. Open the editor if you also want to connect Spotify.";

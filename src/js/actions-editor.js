@@ -17,6 +17,7 @@ import {
   VTS_MOVE_PRESETS,
   VTS_STICKY_COLORS,
   VTS_STICKY_PIN_MODES,
+  VTS_STICKY_SHAPES,
   cleanCommandWord,
   cleanObsPort,
   cleanVtsPort,
@@ -25,6 +26,7 @@ import {
   decodeRules,
   encodeRules,
   hasFreeVtsSteps,
+  hasPlusStickyShape,
   hasPlusVtsSteps,
   sanitizeRule,
   sanitizeRules,
@@ -459,6 +461,7 @@ startWidgetEditor({
       if (vtsPlusNote) {
         const hasPlusVts = hasPlusVtsSteps(rules);
         const hasFreeSticky = hasFreeVtsSteps(rules);
+        const hasPlusShape = hasPlusStickyShape(rules);
         const needsNotice = !plusActive && (hasPlusVts || hasFreeSticky);
         vtsPlusNote.hidden = !needsNotice;
         if (needsNotice) {
@@ -467,21 +470,31 @@ startWidgetEditor({
           if (hasPlusVts) {
             if (showPlus) {
               vtsPlusNote.append(
-                "Named sticky notes run live for free (up to 5 on your face at once). Live stream execution for VTS hotkeys, props, expressions, zooms, and tints—plus unlimited sticky notes—unlocks with ",
+                "Named pastel sticky notes run live for free (up to 5 on your face at once). Live stream execution for custom sticker shapes, VTS hotkeys, props, expressions, zooms, and tints—plus unlimited sticky notes—unlocks with ",
                 el("a", { href: "/plus/", textContent: "Frills Plus" }),
                 ".",
               );
             } else {
-              vtsPlusNote.textContent = "Named sticky notes run live for free (up to 5 on your face at once). Live stream execution for other VTube Studio actions requires Frills Plus.";
+              vtsPlusNote.textContent = "Named pastel sticky notes run live for free (up to 5 on your face at once). Live stream execution for custom sticker shapes and other VTube Studio actions requires Frills Plus.";
+            }
+          } else if (hasPlusShape) {
+            if (showPlus) {
+              vtsPlusNote.append(
+                "Heart, star, paw, and cloud sticker shapes preview free here, and free live links fall back cleanly to classic pastel notes (up to 5 at once). ",
+                el("a", { href: "/plus/", textContent: "Upgrade to Frills Plus" }),
+                " to pin custom sticker shapes + unlimited sticky notes live.",
+              );
+            } else {
+              vtsPlusNote.textContent = "Custom sticker shapes preview free here; free live links fall back cleanly to classic pastel sticky notes. Frills Plus unlocks all sticker shapes and unlimited notes live.";
             }
           } else if (showPlus) {
             vtsPlusNote.append(
-              `Free links keep up to ${FREE_STICKY_NOTES_LIMIT} sticky notes on your face at once (oldest peels off on the 6th). `,
+              `Free links keep up to ${FREE_STICKY_NOTES_LIMIT} pastel sticky notes on your face at once (oldest peels off on the 6th). `,
               el("a", { href: "/plus/", textContent: "Upgrade to Frills Plus" }),
-              " for unlimited sticky notes piling up + all VTube Studio actions.",
+              " for custom sticker shapes, unlimited sticky notes piling up + all VTube Studio actions.",
             );
           } else {
-            vtsPlusNote.textContent = `Free links keep up to ${FREE_STICKY_NOTES_LIMIT} sticky notes on your face at once (oldest peels off when a 6th arrives). Frills Plus unlocks unlimited sticky notes.`;
+            vtsPlusNote.textContent = `Free links keep up to ${FREE_STICKY_NOTES_LIMIT} pastel sticky notes on your face at once (oldest peels off when a 6th arrives). Frills Plus unlocks custom shapes and unlimited sticky notes.`;
           }
         }
       }
@@ -835,6 +848,7 @@ startWidgetEditor({
             maxLength: 48,
             onInput: (v) => { step.subtitle = v.slice(0, 48); commitRules(); },
           })),
+          fieldRow("Sticker shape", makeSelect(VTS_STICKY_SHAPES, step.shape || "note", (v) => { step.shape = v; commitRules(); })),
           fieldRow("Note color", makeSelect(VTS_STICKY_COLORS, step.color, (v) => { step.color = v; commitRules(); })),
           fieldRow("Placement", makeSelect(VTS_STICKY_PIN_MODES, step.pinMode, (v) => { step.pinMode = v; commitRules(); })),
           fieldRow("Face ArtMesh (blank = auto)", meshRow),

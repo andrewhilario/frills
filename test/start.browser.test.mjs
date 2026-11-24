@@ -109,13 +109,13 @@ test("the links page has a card for each chosen overlay, with a link, the size, 
   await walk({ all: true });
   assert.equal(await ask(), "Your links are ready");
   const list = await cards();
-  assert.deepEqual(list.map((c) => c.name), ["Chat", "Alerts", "Top gifters", "Rotating highlights", "Last gifts", "Gift jar", "Goals", "Top likers", "Song requests", "Subathon timer", "Talking pet TTS", "Viewer and like counter"]);
+  assert.deepEqual(list.map((c) => c.name), ["Chat", "Alerts", "Top gifters", "Rotating highlights", "Spin the wheel", "Last gifts", "Gift jar", "Gift gallery rotator", "Goals", "Top likers", "Song requests", "Subathon timer", "Talking pet TTS", "Viewer and like counter"]);
   assert.equal(list[0].link, `${base}/overlay/?channel=pond_pal&platform=tiktok&look=bubblegum&deco=neko&align=center`, "the name is cleaned: no @, lower case");
   assert.equal(list[1].link, `${base}/overlay/alerts/?channel=pond_pal&platform=tiktok&look=bubblegum&align=center`);
   assert.ok(list.every((c) => c.size === "1080 × 1920" && !c.copyOff));
   assert.equal(list[0].edit, list[0].link.replace("/overlay/", "/editor/"));
   assert.match(list.find((c) => c.name === "Goals").note, /real follower count/);
-  assert.equal(await page.evaluate(`document.querySelectorAll("#start .card__frame").length`), 12, "a picture of each");
+  assert.equal(await page.evaluate(`document.querySelectorAll("#start .card__frame").length`), 14, "a picture of each");
 });
 
 test("each picture is the real overlay in practice mode and draws; the pictures never connect to anything", { skip }, async () => {
@@ -162,7 +162,7 @@ test("Twitch gets the overlays that work there, and alerts/highlights note the f
   assert.equal(await ask(), "What is your Twitch channel?");
   await typeName("PondPal");
   await press("Next");
-  assert.deepEqual(await page.evaluate(`[...document.querySelectorAll("#start .pick--check .pick__name")].map((n) => n.textContent)`), ["Chat", "Alerts", "Top gifters", "Rotating highlights"]);
+  assert.deepEqual(await page.evaluate(`[...document.querySelectorAll("#start .pick--check .pick__name")].map((n) => n.textContent)`), ["Chat", "Alerts", "Top gifters", "Rotating highlights", "Spin the wheel"]);
   await press("Next");
   await choose("Dark and gamer"); await choose("A PC stream"); await choose("Left");
   await page.waitFor(`document.querySelector("#start .card")`);
@@ -181,7 +181,7 @@ test("the Edit links open each editor already set up like the link: look, alignm
   };
   const chat = await pressed(list[0].edit);
   for (const part of ["Pick a look=Bubblegum", "Text alignment=Center", "Decorations on the bubbles=Neko cafe"]) assert.ok(chat.includes(part), `chat editor: ${part} in ${chat}`);
-  for (const i of [1, 2, 3, 4]) {
+  for (const i of [1, 2, 3, 4, 7]) {
     const text = await pressed(list[i].edit);
     assert.ok(text.includes("Pick a look=Bubblegum") && text.includes("Text alignment=Center"), `${list[i].name} editor: ${text}`);
   }
@@ -231,10 +231,10 @@ test("Both: it asks for the TikTok name and the Twitch channel, checks each, and
   assert.equal(await ask(), "Which overlays do you want?", "two good names go on");
   // the overlays say which are for what
   const text = await page.evaluate(`JSON.stringify([...document.querySelectorAll("#start .pick--check .pick__body")].map((b) => b.textContent))`).then(JSON.parse);
-  assert.equal(text.length, 12, "every overlay is on offer");
+  assert.equal(text.length, 14, "every overlay is on offer");
   assert.match(text[0], /TikTok and Twitch chat together/);
-  for (const t of text.slice(1, 4)) assert.match(t, /One for TikTok and one for Twitch/);
-  for (const t of text.slice(4)) assert.match(t, /TikTok only/);
+  for (const t of text.slice(1, 5)) assert.match(t, /One for TikTok and one for Twitch/);
+  for (const t of text.slice(5)) assert.match(t, /TikTok only/);
   // going back keeps what was typed
   await press("Back");
   assert.deepEqual(await page.evaluate(`[...document.querySelectorAll("#start input[data-platform]")].map((i) => i.value)`), ["@Pond.Pal", "PondPal"]);
@@ -251,13 +251,14 @@ test("Both: the links page has one chat for both, dual overlays for each platfor
   await page.waitFor(`document.querySelector("#start .card")`);
   assert.equal(await ask(), "Your links are ready");
   const list = await cards();
-  assert.deepEqual(list.map((c) => c.name), ["Chat", "Alerts (TikTok)", "Alerts (Twitch)", "Top gifters (TikTok)", "Top gifters (Twitch)", "Rotating highlights (TikTok)", "Rotating highlights (Twitch)", "Last gifts", "Gift jar", "Goals", "Top likers", "Song requests", "Subathon timer", "Talking pet TTS", "Viewer and like counter"]);
+  assert.deepEqual(list.map((c) => c.name), ["Chat", "Alerts (TikTok)", "Alerts (Twitch)", "Top gifters (TikTok)", "Top gifters (Twitch)", "Rotating highlights (TikTok)", "Rotating highlights (Twitch)", "Spin the wheel (TikTok)", "Spin the wheel (Twitch)", "Last gifts", "Gift jar", "Gift gallery rotator", "Goals", "Top likers", "Song requests", "Subathon timer", "Talking pet TTS", "Viewer and like counter"]);
   assert.equal(list[0].link, `${base}/overlay/?tiktok=pond.pal&twitch=pondpal&look=bubblegum&deco=neko&align=center`, "one chat link names both accounts");
   assert.equal(list[1].link, `${base}/overlay/alerts/?channel=pond.pal&platform=tiktok&look=bubblegum&align=center`);
   assert.equal(list[2].link, `${base}/overlay/alerts/?channel=pondpal&platform=twitch&look=bubblegum&align=center`);
   assert.equal(list[4].link, `${base}/overlay/gifters/?channel=pondpal&platform=twitch&look=bubblegum&align=center`);
   assert.equal(list[6].link, `${base}/overlay/labels/?channel=pondpal&platform=twitch&look=bubblegum&align=center`);
-  for (const c of [list[3], list[5], ...list.slice(7)]) assert.match(c.link, /channel=pond\.pal&platform=tiktok/, `${c.name} is TikTok's`);
+  assert.equal(list[8].link, `${base}/overlay/wheel/?channel=pondpal&platform=twitch&look=bubblegum&align=center`);
+  for (const c of [list[3], list[5], list[7], ...list.slice(9)]) assert.match(c.link, /channel=pond\.pal&platform=tiktok/, `${c.name} is TikTok's`);
   assert.ok(list.every((c) => !c.copyOff && c.size === "1080 × 1920"));
   assert.match(list[0].note, /small icon/);
   assert.match(list[2].note, /follow alerts need one extra login/i);

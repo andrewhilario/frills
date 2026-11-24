@@ -15,15 +15,18 @@ import {
   FREE_ACTIONS_LIMIT,
   FREE_STICKY_NOTES_LIMIT,
   PLUS_ACTIONS_LIMIT,
+  VTS_STICKY_SHAPES,
   createObsStepExecutor,
   createVtsStepExecutor,
   decodeRules,
   encodeRules,
   formatTemplate,
   hasFreeVtsSteps,
+  hasPlusStickyShape,
   hasPlusVtsSteps,
   hasVtsSteps,
   sanitizeRules,
+  sanitizeStep,
 } from "../src/js/actions.js";
 
 test("obsAuthString matches OBS WebSocket v5 SHA-256 formula and password stays strictly in URL #hash", async () => {
@@ -326,7 +329,7 @@ test("VtsClient pairs via Allow popup, discovers hotkeys/expressions/items/meshe
   );
   assert.equal(stickyStayRes.ok, true);
   assert.match(stickyStayRes.detail, /pinned to Face_Skin \(stays\)/);
-  assert.deepEqual(renderedSticky[0], { title: "Mochi Fan", subtitle: "Galaxy", color: "random" });
+  assert.deepEqual(renderedSticky[0], { title: "Mochi Fan", subtitle: "Galaxy", color: "random", shape: "note" });
   assert.ok(sent.some((m) => m.messageType === "PermissionRequest" && m.data.requestedPermission === "LoadCustomImagesAsItems"));
   const loadSticky = sent.find((m) => m.messageType === "ItemLoadRequest" && m.data.customDataBase64);
   assert.ok(loadSticky, "sticky note loaded with customDataBase64");
@@ -432,5 +435,36 @@ test("VtsClient pairs via Allow popup, discovers hotkeys/expressions/items/meshe
   const blocked = logs.find((l) => l.ruleId === "h1");
   assert.equal(blocked?.status, "error");
   assert.match(blocked?.detail || "", /Frills Plus/);
+  // Custom sticker shapes: sanitizeStep validates shapes, Plus runs all shapes, Free gracefully falls back to pastel note
+  assert.equal(VTS_STICKY_SHAPES.length, 6);
+  assert.equal(sanitizeStep({ type: "vts.sticky", shape: "paw" }).shape, "paw");
+  assert.equal(sanitizeStep({ type: "vts.sticky", shape: "heart" }).shape, "heart");
+  assert.equal(sanitizeStep({ type: "vts.sticky", shape: "unknown-shape" }).shape, "note");
+  assert.equal(hasPlusStickyShape([{ enabled: true, steps: [{ type: "vts.sticky", shape: "star" }] }]), true);
+  assert.equal(hasPlusStickyShape([{ enabled: true, steps: [{ type: "vts.sticky", shape: "note" }] }]), false);
+
+  const shapeCalls = [];
+  const freeShapeExec = createVtsStepExecutor(capClient, {
+    maxStickyNotes: FREE_STICKY_NOTES_LIMIT,
+    allowPlusShapes: false,
+    renderStickyNote: (opts) => { shapeCalls.push(opts.shape); return "iVBORw0KGgo="; },
+  });
+  const freeFallbackRes = await freeShapeExec.run(
+    { type: "vts.sticky", title: "{name}", subtitle: "{gift}", shape: "paw", color: "pink", pinMode: "face", artMesh: "", size: 22, rotation: -6, duration: 0 },
+    { who: "Free Fan", gift: "Rose" },
+  );
+  assert.equal(freeFallbackRes.ok, true);
+  assert.match(freeFallbackRes.detail, /Plus shape fell back to pastel note/);
+  assert.deepEqual(shapeCalls, ["note"], "free live overlay gracefully renders pastel note instead of failing");
+
+  freeShapeExec.setAllowPlusShapes(true);
+  for (const sh of ["heart", "star", "paw", "cloud", "random"]) {
+    await freeShapeExec.run(
+      { type: "vts.sticky", title: "{name}", subtitle: "{gift}", shape: sh, color: "pink", pinMode: "face", artMesh: "", size: 22, rotation: -6, duration: 0 },
+      { who: "Plus Fan", gift: "Galaxy" },
+    );
+  }
+  assert.deepEqual(shapeCalls.slice(1), ["heart", "star", "paw", "cloud", "random"], "Plus live overlay passes custom sticker shapes through");
+
   client.close();
 });
