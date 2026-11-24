@@ -164,8 +164,17 @@ test("editor: Rotating Highlights has the top liker switch, label and test butto
   await page.evaluate("localStorage.clear()");
   await page.goto(`${base}/labels/`, { settle: 900 });
   const labels = await page.evaluate(`[...document.querySelectorAll(".panel .ctl__label")].map((l) => l.textContent.trim())`);
-  for (const wanted of ["Include top gifter", "Include top liker", "Top liker label"]) assert.ok(labels.includes(wanted), `${wanted} is missing`);
+  for (const wanted of ["Include top gifter", "Show top gifter’s animated gift", "Include top streak", "Include top liker", "Top liker label"]) assert.ok(labels.includes(wanted), `${wanted} is missing`);
   assert.equal(await page.evaluate(`getComputedStyle(document.querySelector('[data-test="likes"]')).display !== "none"`), true, "the test button is there on TikTok");
+  assert.equal(await page.evaluate(`getComputedStyle(document.querySelector('[data-test="streak"]')).display !== "none"`), true, "Test streak button is visible on TikTok");
+
+  // Demo seed puts Top Gifter with animated gift showcase AND Test streak shows Top Streak with fiery ×N combo badge
+  await click('[data-test="streak"]');
+  await until(async () => (await labelState())?.slot === "topStreak", 3000);
+  assert.equal(await page.evaluate(`document.querySelector(".labelcard:not(.labelcard--out)").dataset.streak`), "true");
+  assert.equal(await page.evaluate(`Boolean(document.querySelector(".labelcard:not(.labelcard--out) .labelcard__streakpill"))`), true, "top streak displays animated ×N combo pill");
+  assert.equal(await page.evaluate(`Boolean(document.querySelector(".labelcard:not(.labelcard--out) .labelcard__giftpic"))`), true, "top streak displays animated gift icon");
+
   await click('[data-test="clear"]');
   await click('[data-test="likes"]');
   await click('[data-test="next"]');
@@ -174,5 +183,26 @@ test("editor: Rotating Highlights has the top liker switch, label and test butto
   await type("#c-labelTopLiker", "Heart king");
   await until(async () => (await labelState())?.label === "Heart king", 3000);
   await page.evaluate("localStorage.clear()");
+  assert.deepEqual(page.problems, [], page.problems.join(" | "));
+});
+
+test("overlay: Top Gifter shows animated gift badge (Hand Hearts / Super GG) and Top Streak tracks multi-send combos live", { skip }, async () => {
+  const { base, made } = await withHelper();
+  await page.goto(`${base}/overlay/labels/?channel=pond_cafe&platform=tiktok&rotateSec=3&showGift=0&showFollow=0&showTopLiker=0`, { settle: 700 });
+  await until(() => made.length === 1);
+  await sleep(150);
+
+  // Send Hand Hearts (100 diamonds) -> Top Gifter showcases animated Hand Hearts gift medallion
+  made[0].emit("gift", gift("tg1", "Maya", "Hand Hearts", 100, 1));
+  await until(async () => (await labelState())?.slot === "topGifter");
+  assert.equal(await page.evaluate(`document.querySelector(".labelcard:not(.labelcard--out) .labelcard__gifttag")?.textContent?.trim()`), "Hand Hearts");
+  assert.equal(await page.evaluate(`Boolean(document.querySelector(".labelcard:not(.labelcard--out) .labelcard__giftshow:not([hidden]) .labelcard__giftpic"))`), true);
+
+  // Multi-send Rose x18 streak -> Top Streak lights up with ×18 badge
+  made[0].emit("gift", gift("ts1", "Kai", "Rose", 1, 18));
+  await until(async () => (await labelState())?.slot === "topStreak");
+  assert.equal((await labelState()).headline, "Kai");
+  assert.equal((await labelState()).detail, "18× Rose");
+  assert.equal(await page.evaluate(`document.querySelector(".labelcard:not(.labelcard--out) .labelcard__streakpill")?.textContent?.trim()`), "×18");
   assert.deepEqual(page.problems, [], page.problems.join(" | "));
 });

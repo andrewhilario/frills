@@ -1,6 +1,6 @@
-// Rotating Stream Highlights / Labels: pure settings, state tracker for Last Gift, Last Follower, Top Gifter, Top Liker (TikTok),
-// plus Last Follower, Last Sub, Last Bits, Top Sub Gifter and Top Bit Sender (Twitch), with timed card rotation and
-// optional localStorage persistence. Tested without a browser page.
+// Rotating Stream Highlights / Labels: pure settings, state tracker for Last Gift, Last Follower, Top Gifter (with animated gift badge),
+// Top Streak (highest multi-send gift combo), Top Liker (TikTok), plus Last Follower, Last Sub, Last Bits, Top Sub Gifter and Top Bit Sender (Twitch),
+// with timed card rotation and optional localStorage persistence. Tested without a browser page.
 
 import { defineWidget, chipsOf, range, selectOf, text, toggle } from "./widget-settings.js";
 import { GifterBoard } from "./gifters.js";
@@ -8,6 +8,10 @@ import { LikeBoard } from "./likers.js";
 
 const nfmt = (n) => Math.round(n || 0).toLocaleString("en-US");
 const plural = (n, one, many) => `${nfmt(n)} ${n === 1 ? one : many}`;
+const STREAK_WINDOW_MS = 15000;
+const normGiftKey = (g) => String(g ?? "").toLowerCase().replace(/\s+/g, " ").trim();
+const ANIMATED_GIFT_NAMES = new Set(["hand hearts", "super gg", "confetti", "corgi", "money gun", "swan", "galaxy", "whale diving", "lion", "universe", "panda", "sunglasses"]);
+const giftTier = (gift, diamonds = 0) => (diamonds >= 500 ? 3 : (diamonds >= 20 || ANIMATED_GIFT_NAMES.has(normGiftKey(gift)) ? 2 : 1));
 
 export const LABEL_LAYOUTS = [
   ["card", "Card: bold highlight box"],
@@ -40,6 +44,9 @@ export const LABELS = defineWidget({
     labelFollow: "Last follower",
     showTopGifter: true,
     labelTopGifter: "Top gifter",
+    showTopGiftAnim: true,
+    showTopStreak: true,
+    labelTopStreak: "Top streak",
     showTopLiker: true,
     labelTopLiker: "Top liker",
     showSub: true,
@@ -66,6 +73,9 @@ export const LABELS = defineWidget({
     { section: "labels", ...text("labelFollow", "Last follower label", 28) },
     { section: "labels", onlyPlatform: "tiktok", ...toggle("showTopGifter", "Include top gifter") },
     { section: "labels", onlyPlatform: "tiktok", ...text("labelTopGifter", "Top gifter label", 28) },
+    { section: "labels", onlyPlatform: "tiktok", ...toggle("showTopGiftAnim", "Show top gifter’s animated gift", "Displays an animated badge of the biggest gift the top gifter sent (like Hand Hearts, Super GG, or Galaxy).") },
+    { section: "labels", onlyPlatform: "tiktok", ...toggle("showTopStreak", "Include top streak", "Highest multi-send gift combo streak in this LIVE.") },
+    { section: "labels", onlyPlatform: "tiktok", ...text("labelTopStreak", "Top streak label", 28) },
     { section: "labels", onlyPlatform: "tiktok", ...toggle("showTopLiker", "Include top liker", "Whoever has tapped the most likes since the overlay connected.") },
     { section: "labels", onlyPlatform: "tiktok", ...text("labelTopLiker", "Top liker label", 28) },
     { section: "labels", onlyPlatform: "twitch", ...toggle("showSub", "Include last sub") },
@@ -98,6 +108,7 @@ export function enabledSlotIds(platform, settings) {
     settings.showGift && "lastGift",
     settings.showFollow && "lastFollower",
     settings.showTopGifter && "topGifter",
+    settings.showTopStreak && "topStreak",
     settings.showTopLiker && "topLiker",
   ].filter(Boolean);
 }
@@ -107,11 +118,12 @@ export function enabledSlotIds(platform, settings) {
  * Calls `onChange(snapshot)` whenever the displayed card, count of slides, or content updates.
  */
 export class LabelBoard {
-  constructor(settings, { platform = "tiktok", onChange, timers = globalThis, initial = null } = {}) {
+  constructor(settings, { platform = "tiktok", onChange, timers = globalThis, now = () => Date.now(), initial = null } = {}) {
     this.settings = settings;
     this.platform = platform === "twitch" ? "twitch" : "tiktok";
     this.onChange = onChange ?? (() => {});
     this.timers = timers;
+    this.now = now;
     this.timer = 0;
     this.index = 0;
     this.revision = 0;
@@ -122,6 +134,16 @@ export class LabelBoard {
     this.lastFollower = initial?.lastFollower ?? null;
     this.lastSub = initial?.lastSub ?? null;
     this.lastBits = initial?.lastBits ?? null;
+    this.topStreak = initial?.topStreak ?? null;
+    this.bestGiftByUser = new Map();
+    if (Array.isArray(initial?.bestGifts)) {
+      for (const entry of initial.bestGifts.slice(0, 100)) {
+        if (Array.isArray(entry) && typeof entry[0] === "string" && entry[1] && typeof entry[1].gift === "string") {
+          this.bestGiftByUser.set(entry[0], entry[1]);
+        }
+      }
+    }
+    this.activeStreaks = new Map();
 
     this.diamondBoard = new GifterBoard(NO_MILESTONE, { platform: "tiktok", entries: initial?.tiktokGifters ?? [] });
     this.likeBoard = new LikeBoard(TOP_ONE, { entries: initial?.tiktokLikers ?? [] });
@@ -160,6 +182,7 @@ export class LabelBoard {
         });
       } else if (id === "topGifter" && this.diamondBoard.top[0]) {
         const top = this.diamondBoard.top[0];
+        const best = this.bestGiftByUser.get(top.key) ?? null;
         out.push({
           id,
           top: true,
@@ -169,6 +192,35 @@ export class LabelBoard {
           avatar: top.avatar || "",
           picture: "",
           initialName: top.name,
+          giftBadge: best && s.showTopGiftAnim !== false ? {
+            gift: best.gift,
+            picture: best.picture || "",
+            diamonds: best.diamonds || 0,
+            count: best.count || 1,
+            tier: giftTier(best.gift, best.diamonds),
+          } : null,
+        });
+      } else if (id === "topStreak" && this.topStreak) {
+        const st = this.topStreak;
+        out.push({
+          id,
+          top: true,
+          streak: true,
+          label: s.labelTopStreak || "Top streak",
+          headline: st.name,
+          detail: `${nfmt(st.count)}× ${st.gift}`,
+          avatar: st.avatar || "",
+          picture: "",
+          initialName: st.name,
+          streakCount: st.count,
+          giftBadge: {
+            gift: st.gift,
+            picture: st.picture || "",
+            diamonds: st.diamonds || 0,
+            count: st.count,
+            streak: true,
+            tier: st.count >= 50 ? 3 : (st.count >= 10 ? 2 : giftTier(st.gift, st.diamonds)),
+          },
         });
       } else if (id === "topLiker" && this.likeBoard.top[0]) {
         const top = this.likeBoard.top[0];
@@ -322,15 +374,81 @@ export class LabelBoard {
       const name = event.name || event.user;
       const gift = event.gift || "Gift";
       if (!name) return false;
+      const userKey = String(event.user || name);
       const count = Math.max(1, Math.round(Number(event.count) || 1));
       const diamonds = Math.max(0, Math.round(Number(event.diamonds) || 0));
       const total = Math.max(0, Math.round(Number(event.total) || diamonds * count));
-      const prevTop = this.diamondBoard.top[0]?.user ?? "";
+      const prevTop = this.diamondBoard.top[0]?.key ?? "";
       this.lastGift = { name, gift, count, diamonds, total, picture: event.picture || "", avatar: event.avatar || "" };
-      this.diamondBoard.add({ ...event, total });
-      const nextTop = this.diamondBoard.top[0]?.user ?? "";
+      this.diamondBoard.add({ ...event, user: userKey, name, total });
+      const nextTop = this.diamondBoard.top[0]?.key ?? "";
       newLeader = Boolean(nextTop && nextTop !== prevTop);
-      jumpTo = this.settings.showGift ? "lastGift" : (this.settings.showTopGifter ? "topGifter" : "");
+
+      // Remember each gifter's signature / highest-tier gift so Top Gifter displays an animated showcase of what they sent
+      const prevBest = this.bestGiftByUser.get(userKey);
+      const gKey = normGiftKey(gift);
+      const bestBetter = !prevBest
+        || diamonds > (prevBest.diamonds || 0)
+        || (diamonds === (prevBest.diamonds || 0) && total >= (prevBest.total || 0));
+      if (bestBetter) {
+        this.bestGiftByUser.set(userKey, {
+          gift,
+          picture: event.picture || (prevBest && normGiftKey(prevBest.gift) === gKey ? prevBest.picture : "") || "",
+          diamonds,
+          count,
+          total,
+        });
+        if (this.bestGiftByUser.size > 200) this.bestGiftByUser.delete(this.bestGiftByUser.keys().next().value);
+      } else if (prevBest && !prevBest.picture && event.picture && normGiftKey(prevBest.gift) === gKey) {
+        prevBest.picture = event.picture;
+      }
+
+      // Track multi-send gift combo streaks (both TikTok repeatCount >= 2 and rapid back-to-back sends within 15s)
+      const comboKey = `${userKey}|${gKey}`;
+      const tNow = this.now();
+      const prevCombo = this.activeStreaks.get(comboKey);
+      let combo;
+      if (prevCombo && (tNow - prevCombo.lastAt) <= STREAK_WINDOW_MS) {
+        prevCombo.count += count;
+        prevCombo.total += total;
+        prevCombo.lastAt = tNow;
+        combo = prevCombo;
+      } else {
+        combo = { count, total, lastAt: tNow };
+        this.activeStreaks.set(comboKey, combo);
+        if (this.activeStreaks.size > 200) this.activeStreaks.delete(this.activeStreaks.keys().next().value);
+      }
+
+      let newStreakRecord = false;
+      if (combo.count >= 2) {
+        const cur = this.topStreak;
+        const beats = !cur
+          || combo.count > cur.count
+          || (combo.count === cur.count && combo.total > (cur.total || 0))
+          || (cur.user === userKey && cur.giftKey === gKey && combo.count >= cur.count);
+        if (beats) {
+          const prevHolder = cur?.user ?? "";
+          this.topStreak = {
+            user: userKey,
+            name,
+            avatar: event.avatar || (cur && cur.user === userKey ? cur.avatar : "") || "",
+            gift,
+            giftKey: gKey,
+            picture: event.picture || (cur && cur.giftKey === gKey ? cur.picture : "") || "",
+            diamonds,
+            count: combo.count,
+            total: combo.total,
+          };
+          newStreakRecord = true;
+          if (!prevHolder || prevHolder !== userKey || combo.count > (cur?.count || 0)) newLeader = true;
+        }
+      }
+
+      jumpTo = this.settings.showGift
+        ? "lastGift"
+        : (newStreakRecord && this.settings.showTopStreak)
+          ? "topStreak"
+          : (this.settings.showTopGifter ? "topGifter" : (this.settings.showTopStreak && this.topStreak ? "topStreak" : ""));
     } else if (event.kind === "like" && this.platform === "tiktok") {
       const before = this.cards().length;
       const prevTop = this.likeBoard.top[0]?.user ?? "";
@@ -397,6 +515,9 @@ export class LabelBoard {
     this.lastFollower = null;
     this.lastSub = null;
     this.lastBits = null;
+    this.topStreak = null;
+    this.bestGiftByUser.clear();
+    this.activeStreaks.clear();
     this.diamondBoard.clear();
     this.likeBoard.clear();
     this.subBoard.clear();
@@ -414,6 +535,8 @@ export class LabelBoard {
       lastFollower: this.lastFollower,
       lastSub: this.lastSub,
       lastBits: this.lastBits,
+      topStreak: this.topStreak,
+      bestGifts: [...this.bestGiftByUser.entries()].slice(0, 100),
       tiktokGifters: this.diamondBoard.entries,
       tiktokLikers: this.likeBoard.entries,
       twitchSubGifters: this.subBoard.entries,
@@ -429,11 +552,19 @@ export function loadLabels(storage, platform, channel) {
     const saved = JSON.parse(storage.getItem(labelsKey(platform, channel)) ?? "null");
     if (!saved || typeof saved !== "object") return null;
     const list = (entries) => (Array.isArray(entries) ? entries.filter((e) => e && typeof e.user === "string" && typeof e.name === "string").slice(0, 100) : []);
+    const topStreak = saved.topStreak && typeof saved.topStreak.name === "string" && typeof saved.topStreak.gift === "string" && Number.isFinite(saved.topStreak.count) && saved.topStreak.count >= 2
+      ? saved.topStreak
+      : null;
+    const bestGifts = Array.isArray(saved.bestGifts)
+      ? saved.bestGifts.filter((p) => Array.isArray(p) && typeof p[0] === "string" && p[1] && typeof p[1].gift === "string").slice(0, 100)
+      : [];
     return {
       lastGift: saved.lastGift && typeof saved.lastGift.name === "string" ? saved.lastGift : null,
       lastFollower: saved.lastFollower && typeof saved.lastFollower.name === "string" ? saved.lastFollower : null,
       lastSub: saved.lastSub && typeof saved.lastSub.name === "string" ? saved.lastSub : null,
       lastBits: saved.lastBits && typeof saved.lastBits.name === "string" ? saved.lastBits : null,
+      topStreak,
+      bestGifts,
       tiktokGifters: list(saved.tiktokGifters),
       tiktokLikers: list(saved.tiktokLikers).filter((e) => Number.isFinite(e.count) && e.count > 0),
       twitchSubGifters: list(saved.twitchSubGifters),

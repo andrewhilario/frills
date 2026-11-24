@@ -1205,6 +1205,112 @@
 .labelcard__detail { font-size: 0.78em; font-weight: 700; opacity: 0.85; }
 .labelcard__detail[hidden] { display: none; }
 
+/* Animated gift showcase on Top Gifter & fiery combo badge on Top Streak */
+.labelcard__giftshow {
+  position: relative; z-index: 2; flex: none; display: inline-flex; flex-direction: column; align-items: center; gap: 0.14em;
+  margin-left: 0.18em;
+}
+.labelcard__giftshow[hidden] { display: none; }
+.labelcard__giftbox {
+  position: relative; display: grid; place-items: center; width: 2.45em; height: 2.45em;
+}
+.labelcard__giftglow {
+  position: absolute; inset: 0.06em; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 210, 63, 0.55) 0%, rgba(255, 95, 162, 0.22) 55%, transparent 74%);
+  border: 1.5px solid rgba(255, 210, 63, 0.72);
+}
+.labelcard__giftshow[data-tier="2"] .labelcard__giftglow {
+  background: radial-gradient(circle, rgba(255, 210, 63, 0.72) 0%, rgba(168, 85, 247, 0.35) 58%, transparent 76%);
+  border-color: #ffd23f;
+}
+.labelcard__giftshow[data-tier="3"] .labelcard__giftglow {
+  background: radial-gradient(circle, rgba(255, 232, 130, 0.88) 0%, rgba(244, 63, 94, 0.45) 58%, transparent 78%);
+  border-color: #ffe066;
+}
+.labelcard__giftshow[data-streak="true"] .labelcard__giftglow {
+  background: radial-gradient(circle, rgba(255, 166, 43, 0.78) 0%, rgba(255, 77, 109, 0.38) 58%, transparent 76%);
+  border-color: #ff9f1c;
+}
+.labelcard__giftpic {
+  position: relative; z-index: 1; width: 82%; height: 82%; object-fit: contain;
+  filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.28));
+}
+.labelcard__giftorb {
+  position: absolute; z-index: 2; font-style: normal; font-size: 0.54em; line-height: 1; color: #ffd23f;
+  text-shadow: 0 0 6px rgba(255, 210, 63, 0.85); pointer-events: none;
+}
+.labelcard__giftorb--a { top: -0.15em; right: -0.1em; }
+.labelcard__giftorb--b { bottom: 0.05em; left: -0.15em; color: var(--a-pop, #ff5fc8); }
+.labelcard__gifttag {
+  max-width: 7.5em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  padding: 0.08em 0.46em; border-radius: 999px; font-size: 0.48em; font-weight: 900; letter-spacing: 0.03em;
+  background: color-mix(in srgb, var(--a-accent, #fc0) 24%, var(--a-bg, #fff)); color: var(--a-text, #222);
+  border: 1px solid color-mix(in srgb, var(--a-accent, #fc0) 58%, transparent);
+}
+.labelcard__streakpill {
+  position: absolute; right: -0.35em; bottom: -0.25em; z-index: 3;
+  padding: 0.1em 0.46em; border-radius: 999px;
+  background: linear-gradient(135deg, #ff5f6d 0%, #ff9f1c 100%); color: #fff;
+  border: 2px solid var(--a-bg, #fff); font-size: 0.56em; font-weight: 900; font-variant-numeric: tabular-nums;
+  box-shadow: 0 3px 10px rgba(255, 95, 109, 0.5);
+}
+.labelcard[data-streak="true"] .labelcard__av { box-shadow: 0 0 0 0.13em #ff9f1c; }
+.labels:not([data-anim="none"]) .labelcard[data-streak="true"] .labelcard__av { animation: label-streak-halo 1.9s ease-in-out infinite; }
+.labels:not([data-anim="none"]) .labelcard__giftpic {
+  animation: label-gift-showcase 2.4s ease-in-out infinite;
+}
+.labels:not([data-anim="none"]) .labelcard__giftshow[data-tier="2"] .labelcard__giftpic,
+.labels:not([data-anim="none"]) .labelcard__giftshow[data-tier="3"] .labelcard__giftpic {
+  animation: label-gift-showcase-hi 2.1s ease-in-out infinite;
+}
+.labels:not([data-anim="none"]) .labelcard__giftglow {
+  animation: label-gift-aura 2.2s ease-in-out infinite;
+}
+.labels:not([data-anim="none"]) .labelcard__giftorb--a { animation: label-orb-twinkle 1.6s ease-in-out infinite; }
+.labels:not([data-anim="none"]) .labelcard__giftorb--b { animation: label-orb-twinkle 1.6s 0.8s ease-in-out infinite; }
+.labels:not([data-anim="none"]) .labelcard__streakpill { animation: label-streak-pop 1.5s ease-in-out infinite; }
+
+.labels[data-layout="bar"] .labelcard__giftbox,
+.labels[data-layout="pill"] .labelcard__giftbox { width: 1.95em; height: 1.95em; }
+.labels[data-layout="bar"] .labelcard__gifttag,
+.labels[data-layout="pill"] .labelcard__gifttag { display: none; }
+.labels[data-layout="ribbon"] .labelcard__giftshow { padding-right: 0.65em; }
+.labels[data-layout="glass"] .labelcard__gifttag,
+.labels[data-layout="neon"] .labelcard__gifttag,
+.labels[data-layout="discord"] .labelcard__gifttag,
+.labels[data-layout="shell"] .labelcard__gifttag,
+.labels[data-layout="minimal"] .labelcard__gifttag {
+  background: rgba(255, 210, 63, 0.22); color: #ffe699; border-color: rgba(255, 210, 63, 0.55);
+}
+.labels[data-align="right"] .labelcard__giftshow { margin-left: 0; margin-right: 0.18em; }
+.labels[data-anim="none"] .labelcard__giftorb { display: none; }
+
+@keyframes label-gift-showcase {
+  0%, 100% { transform: translateY(0) scale(1) rotate(-3deg); }
+  50% { transform: translateY(-0.14em) scale(1.08) rotate(4deg); }
+}
+@keyframes label-gift-showcase-hi {
+  0%, 100% { transform: translateY(0) scale(1) rotate(-5deg); }
+  35% { transform: translateY(-0.18em) scale(1.16) rotate(6deg); }
+  65% { transform: translateY(-0.08em) scale(1.06) rotate(-4deg); }
+}
+@keyframes label-gift-aura {
+  0%, 100% { transform: scale(0.95); opacity: 0.72; }
+  50% { transform: scale(1.12); opacity: 1; }
+}
+@keyframes label-orb-twinkle {
+  0%, 100% { transform: scale(0.65) rotate(0deg); opacity: 0.4; }
+  50% { transform: scale(1.25) rotate(25deg); opacity: 1; }
+}
+@keyframes label-streak-pop {
+  0%, 100% { transform: scale(1) rotate(-4deg); }
+  45% { transform: scale(1.14) rotate(3deg); }
+}
+@keyframes label-streak-halo {
+  0%, 100% { box-shadow: 0 0 0 0.12em #ff9f1c, 0 0 0.35em rgba(255, 95, 109, 0.55); }
+  50% { box-shadow: 0 0 0 0.17em #ffd23f, 0 0 0.85em rgba(255, 95, 109, 0.92); }
+}
+
 .labels__dots { display: flex; align-items: center; gap: 0.35em; padding: 0.18em 0.55em; border-radius: 99px; background: var(--a-bg, #fff); border: 1px solid var(--a-accent, #fc0); }
 .labels__dots[hidden] { display: none; }
 .labels__dot { position: relative; width: 0.38em; height: 0.38em; border-radius: 99px; overflow: hidden; background: var(--a-text, #222); opacity: 0.28; transition: opacity 200ms, width 260ms ease, transform 200ms; }
@@ -1215,8 +1321,10 @@
 
 @media (prefers-reduced-motion: reduce) {
   .labelcard--in, .labelcard--out, .labelcard--bump, .labelcard__sheen, .labelcard__crown, .labelcard__gift, .labelcard__spark, .labels__dotfill,
+  .labelcard__giftpic, .labelcard__giftglow, .labelcard__giftorb, .labelcard__streakpill,
   .labels[data-anim="pulse"] .labelcard, .labels[data-anim="float"] .labelcard, .labels[data-anim="shine"] .labelcard[data-top="true"],
-  .labels:not([data-anim="none"]) .labelcard[data-top="true"] .labelcard__av { animation: none; }
+  .labels:not([data-anim="none"]) .labelcard[data-top="true"] .labelcard__av,
+  .labels:not([data-anim="none"]) .labelcard[data-streak="true"] .labelcard__av { animation: none; }
   .labels__dotfill { transform: scaleX(1); }
 }
 

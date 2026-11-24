@@ -10,6 +10,7 @@ import { fillTemplate } from "./alerts.js";
 import { lookVars } from "./widget-settings.js";
 import { decoPieces, hasDeco, seedOf } from "./decor.js";
 import { createJarCanvas } from "./jar-canvas.js";
+import { catalogGift } from "./gallery.js";
 
 const reducedMotion = () => globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
 
@@ -950,10 +951,50 @@ export function createLabelsView(host) {
     fxTimers.add(tid);
   }
 
+  function populateGiftBadge(hostEl, card) {
+    hostEl.replaceChildren();
+    const gb = card.giftBadge;
+    const show = Boolean(gb && !card.empty && (card.streak || settings?.showTopGiftAnim !== false));
+    hostEl.hidden = !show;
+    if (!show) return;
+    hostEl.dataset.tier = String(gb.tier || 1);
+    hostEl.dataset.streak = gb.streak ? "true" : "false";
+
+    const stageBox = el("span", { className: "labelcard__giftbox" });
+    stageBox.append(
+      el("span", { className: "labelcard__giftglow" }),
+      el("i", { className: "labelcard__giftorb labelcard__giftorb--a", textContent: "✦" }),
+      el("i", { className: "labelcard__giftorb labelcard__giftorb--b", textContent: "✧" }),
+    );
+    const cat = catalogGift(gb.gift);
+    const pic = safePic(gb.picture);
+    if (pic) {
+      const img = el("img", { className: "labelcard__giftpic", src: pic, alt: "", referrerPolicy: "no-referrer" });
+      img.addEventListener("error", () => {
+        const fallback = galleryArtSvg(cat.icon, cat.color);
+        fallback.setAttribute("class", "labelcard__giftpic");
+        img.replaceWith(fallback);
+      }, { once: true });
+      stageBox.append(img);
+    } else {
+      const svg = galleryArtSvg(cat.icon, cat.color);
+      svg.setAttribute("class", "labelcard__giftpic");
+      stageBox.append(svg);
+    }
+    if (gb.streak && gb.count >= 2) {
+      stageBox.append(el("span", { className: "labelcard__streakpill", textContent: `×${Math.round(gb.count).toLocaleString("en-US")}` }));
+    }
+    hostEl.append(stageBox);
+    if (!gb.streak && gb.gift) {
+      hostEl.append(el("span", { className: "labelcard__gifttag", textContent: gb.gift }));
+    }
+  }
+
   function buildCard(card) {
     const node = el("div", { className: "labelcard labelcard--in" });
     node.dataset.slot = card.id || "idle";
     node.dataset.top = card.top ? "true" : "false";
+    node.dataset.streak = card.streak ? "true" : "false";
 
     const clip = el("span", { className: "labelcard__clip" }, el("i", { className: "labelcard__sheen" }));
     clip.setAttribute("aria-hidden", "true");
@@ -977,10 +1018,17 @@ export function createLabelsView(host) {
     detail.hidden = !card.detail;
 
     const body = el("span", { className: "labelcard__body" }, kicker, headline, detail);
-    node.append(clip, fxHost, media, body);
+    const giftShow = el("span", { className: "labelcard__giftshow" });
+    giftShow.setAttribute("aria-hidden", "true");
+    populateGiftBadge(giftShow, card);
+
+    node.append(clip, fxHost, media, body, giftShow);
     node.addEventListener("animationend", (e) => {
       if (e.target === node) node.classList.remove("labelcard--in", "labelcard--bump");
     });
+    const badgeKey = card.giftBadge
+      ? `${card.giftBadge.gift}|${card.giftBadge.picture}|${card.giftBadge.count}|${card.giftBadge.tier}|${Boolean(card.giftBadge.streak)}|${Boolean(settings?.showTopGiftAnim !== false)}`
+      : "";
     return {
       node,
       fxHost,
@@ -988,7 +1036,9 @@ export function createLabelsView(host) {
       headline,
       detail,
       media,
+      giftShow,
       hasMedia,
+      badgeKey,
       mediaKey: `${card.picture || ""}|${card.avatar || ""}|${card.initialName || ""}|${Boolean(card.top)}`,
     };
   }
@@ -1045,7 +1095,15 @@ export function createLabelsView(host) {
         } else {
           currentCard.media.hidden = !(Boolean(settings?.avatar) && currentCard.hasMedia);
         }
+        const nextBadgeKey = snapshot.card.giftBadge
+          ? `${snapshot.card.giftBadge.gift}|${snapshot.card.giftBadge.picture}|${snapshot.card.giftBadge.count}|${snapshot.card.giftBadge.tier}|${Boolean(snapshot.card.giftBadge.streak)}|${Boolean(settings?.showTopGiftAnim !== false)}`
+          : "";
+        if (nextBadgeKey !== currentCard.badgeKey) {
+          populateGiftBadge(currentCard.giftShow, snapshot.card);
+          currentCard.badgeKey = nextBadgeKey;
+        }
         currentCard.node.dataset.top = snapshot.card.top ? "true" : "false";
+        currentCard.node.dataset.streak = snapshot.card.streak ? "true" : "false";
         currentCard.label.textContent = snapshot.card.label || "";
         currentCard.headline.textContent = snapshot.card.headline || "";
         currentCard.detail.textContent = snapshot.card.detail || "";
@@ -1823,6 +1881,24 @@ function galleryArtSvg(icon, color = "#ff5c8a") {
   } else if (icon === "heart") {
     add("path", { d: "M32 45 C22 37 17 31 17 24.5 C17 19.8 20.8 16.5 25.2 16.5 C28.2 16.5 30.6 18 32 20.5 C33.4 18 35.8 16.5 38.8 16.5 C43.2 16.5 47 19.8 47 24.5 C47 31 42 37 32 45 Z", fill: "#ffffff" });
     add("path", { d: "M32 41 C24.5 35 21 30.2 21 25.2 C21 22.3 23.2 20.4 25.8 20.4 C28 20.4 30 21.8 32 24.2 C34 21.8 36 20.4 38.2 20.4 C40.8 20.4 43 22.3 43 25.2 C43 30.2 39.5 35 32 41 Z", fill: "#ff2e63" });
+  } else if (icon === "handhearts") {
+    add("path", { d: "M32 47 C21 38 15 31 15 24 C15 18.8 19.2 15 24.4 15 C27.8 15 30.6 16.8 32 19.6 C33.4 16.8 36.2 15 39.6 15 C44.8 15 49 18.8 49 24 C49 31 43 38 32 47 Z", fill: "#fff0f5", stroke: "#ff2e63", "stroke-width": "2.4" });
+    add("path", { d: "M32 40.5 C25 35 21 30.4 21 25.6 C21 22.6 23.4 20.4 26.2 20.4 C28.3 20.4 30.2 21.7 32 24 C33.8 21.7 35.7 20.4 37.8 20.4 C40.6 20.4 43 22.6 43 25.6 C43 30.4 39 35 32 40.5 Z", fill: "#ff2e63" });
+    add("circle", { cx: "21", cy: "17", r: "2.4", fill: "#fde047" });
+    add("circle", { cx: "45", cy: "42", r: "2.2", fill: "#fde047" });
+  } else if (icon === "supergg") {
+    add("path", { d: "M32 12 L36.8 22.4 L48 23.6 L39.8 31.4 L42 42.6 L32 37 L22 42.6 L24.2 31.4 L16 23.6 L27.2 22.4 Z", fill: "#fde047", stroke: "#581c87", "stroke-width": "2.2", "stroke-linejoin": "round" });
+    add("circle", { cx: "32", cy: "31", r: "11.5", fill: "#581c87" });
+    const txt = document.createElementNS(SVG, "text");
+    txt.setAttribute("x", "32");
+    txt.setAttribute("y", "35.5");
+    txt.setAttribute("text-anchor", "middle");
+    txt.setAttribute("fill", "#fef08a");
+    txt.setAttribute("font-size", "13");
+    txt.setAttribute("font-weight", "900");
+    txt.setAttribute("font-family", "sans-serif");
+    txt.textContent = "GG";
+    svg.append(txt);
   } else if (icon === "doughnut") {
     add("circle", { cx: "32", cy: "32", r: "15", fill: "#fde68a" });
     add("circle", { cx: "32", cy: "32", r: "13", fill: "#ff7eb6" });

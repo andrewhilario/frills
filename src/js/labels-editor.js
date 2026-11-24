@@ -4,7 +4,7 @@
 import { LABELS, LabelBoard } from "./labels.js";
 import { createLabelsView } from "./widgets-view.js";
 import { startWidgetEditor } from "./widget-editor.js";
-import { demoLabelEvents, fakeAlert, fakeLike } from "./fake-alerts.js";
+import { demoLabelEvents, fakeAlert, fakeLike, fakeStreak } from "./fake-alerts.js";
 import { mountFollowBox } from "./twitch-follow-box.js";
 
 let board = null;
@@ -48,6 +48,11 @@ const editor = startWidgetEditor({
       onEvent: (event) => board.add(event),
       tests: {
         gift: () => board.add(fakeAlert("gift")),
+        streak: () => {
+          const cur = board.topStreak?.count || 0;
+          board.add(fakeStreak({ count: Math.max(15, cur + 5) }));
+          board.select("topStreak");
+        },
         follow: () => board.add(fakeAlert("follow")),
         likes: () => board.add(fakeLike({ count: 25 })),
         sub: () => board.add(fakeAlert("sub", { resub: Math.random() < 0.45 })),

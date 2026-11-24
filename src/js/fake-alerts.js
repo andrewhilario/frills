@@ -3,7 +3,16 @@
 
 export const practiceName = () => NAMES[Math.floor(Math.random() * NAMES.length)]; // a made-up name, for the practice events
 const NAMES = ["Pond Pal", "Mochi Bun", "frogfan 🐸", "Mattcha", "Little Lily", "Croaker", "Nori Neko", "Sunny Side", "Bubbletea", "Kero-chan"];
-const GIFTS = [["Rose", 1, "#ff5f86"], ["Finger Heart", 5, "#ffb347"], ["Heart", 20, "#ff4d6d"], ["Panda", 100, "#6c7a89"], ["Galaxy", 1000, "#7b61ff"], ["Lion", 29999, "#e8a33d"]];
+const GIFTS = [
+  ["Rose", 1, "#ff5f86"],
+  ["Finger Heart", 5, "#ffb347"],
+  ["Heart", 20, "#ff4d6d"],
+  ["Hand Hearts", 100, "#f43f5e"],
+  ["Super GG", 100, "#7c3aed"],
+  ["Panda", 100, "#6c7a89"],
+  ["Galaxy", 1000, "#7b61ff"],
+  ["Lion", 29999, "#e8a33d"],
+];
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 let counter = 0;
 
@@ -26,9 +35,29 @@ export function fakeAlert(kind, { size, name, resub = false } = {}) {
   if (kind === "sub") return { ...base, resub, count: resub ? 2 + Math.floor(Math.random() * 30) : 1, tier: "1000" };
   if (kind === "subgift" || kind === "bits" || kind === "raid") return { ...base, count: pickAmount(kind, size) };
   if (kind !== "gift") return base;
-  const [gift, diamonds, color] = pick(GIFTS.filter((_, i) => !size || (size === 1 ? i < 3 : size === 2 ? i === 3 : i >= 4)));
+  const [gift, diamonds, color] = pick(GIFTS.filter(([, d]) => !size || (size === 1 ? d < 100 : size === 2 ? (d >= 100 && d < 1000) : d >= 1000)));
   const count = diamonds >= 100 ? 1 : 1 + Math.floor(Math.random() * 5);
   return { ...base, gift, picture: giftPicture(color), diamonds, count, total: diamonds * count };
+}
+
+/** One made-up multi-send TikTok gift combo streak (e.g. Rose ×25 or Hand Hearts ×12) for testing Top Streak. */
+export function fakeStreak({ name, count } = {}) {
+  const who = name ?? pick(NAMES);
+  const pool = [["Rose", 1], ["Finger Heart", 5], ["Hand Hearts", 100], ["Super GG", 100]];
+  const [gift, diamonds] = pick(pool);
+  const streakCount = count ?? (diamonds >= 100 ? 5 + Math.floor(Math.random() * 12) : 15 + Math.floor(Math.random() * 45));
+  return {
+    kind: "gift",
+    id: `practice-streak-${++counter}`,
+    user: who,
+    name: who,
+    avatar: "",
+    gift,
+    picture: "",
+    diamonds,
+    count: streakCount,
+    total: diamonds * streakCount,
+  };
 }
 
 /** A crowd of follows (or shares) arriving together, to see them join. */
@@ -214,7 +243,8 @@ export function demoLabelEvents(platform = "tiktok") {
     ];
   }
   return [
-    fakeAlert("gift", { name: "Mochi Bun", size: 2 }),
+    { kind: "gift", id: `practice-seed-${++counter}`, user: "Mochi Bun", name: "Mochi Bun", avatar: "", gift: "Hand Hearts", picture: "", diamonds: 100, count: 1, total: 100 },
+    { kind: "gift", id: `practice-seed-${++counter}`, user: "Mattcha", name: "Mattcha", avatar: "", gift: "Rose", picture: "", diamonds: 1, count: 25, total: 25 },
     fakeAlert("follow", { name: "Pond Pal" }),
     fakeLike({ name: "frogfan 🐸", count: 340 }),
   ];
