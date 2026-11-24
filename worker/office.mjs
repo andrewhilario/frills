@@ -1,6 +1,7 @@
 // Virtual Office backend (/api/admin/office/*): manages the 4 Frills operator desks (Mochi Ops, Yuzu Growth,
-// Boba Community, Kero QA), their task & approval queue in D1, and real-time operational pulse (relay fleet,
-// Frills Plus subscriber counts, unread /feedback/ queue, and media storage). Protected by ADMIN_KEY in admin.mjs.
+// Boba Community, Kero QA), their task & approval queue in D1, real-time operational pulse (relay fleet,
+// Frills Plus subscriber counts, unread /feedback/ queue, media storage), and real approval execution hooks
+// (auto-resolving linked /feedback/ items + optional Discord Ops / Announcements webhook publishing).
 
 import { MEDIA } from "./media.mjs";
 import { checkRelays } from "./stats-report.mjs";
@@ -13,6 +14,7 @@ export const OFFICE_AGENTS = [
     mascot: "frog",
     room: "Server Bay",
     accent: "mint",
+    embedColor: 0x7fd694,
     playbook: "ops/agents/mochi-ops.md",
     summary: "Watches live TikTok relays, Plus subscriber counts, media storage, and daily site health.",
   },
@@ -23,6 +25,7 @@ export const OFFICE_AGENTS = [
     mascot: "neko",
     room: "Content Studio",
     accent: "sakura",
+    embedColor: 0xff9ec6,
     playbook: "ops/agents/yuzu-growth.md",
     summary: "Drafts TikTok/Shorts viral demo scripts, X release posts, and VTuber creator outreach for founder approval.",
   },
@@ -33,6 +36,7 @@ export const OFFICE_AGENTS = [
     mascot: "bunny",
     room: "Help Lounge",
     accent: "lavender",
+    embedColor: 0xc2a8ff,
     playbook: "ops/agents/boba-community.md",
     summary: "Triages live /feedback/ submissions, prepares Discord FAQ answers, and tracks top creator requests.",
   },
@@ -43,17 +47,21 @@ export const OFFICE_AGENTS = [
     mascot: "hamster",
     room: "Test Lab",
     accent: "butter",
+    embedColor: 0xffd166,
     playbook: "ops/agents/kero-qa.md",
     summary: "Guards the 22.5 KB /overlay/ budget, runs automated browser tests, and prototypes community-voted features.",
   },
 ];
 
 export const AGENT_IDS = new Set(OFFICE_AGENTS.map((a) => a.id));
+export const AGENT_BY_ID = new Map(OFFICE_AGENTS.map((a) => [a.id, a]));
 export const AGENT_STATUSES = ["idle", "working", "waiting", "alert"];
 export const TASK_STATUSES = ["queued", "working", "needs_review", "approved", "done", "archived"];
 export const TASK_KINDS = ["ops", "content", "support", "qa", "outreach"];
 export const TASK_PRIORITIES = ["normal", "high", "urgent"];
 export const TASK_SOURCES = ["founder", "agent", "schedule", "feedback"];
+
+const DISCORD_WEBHOOK_RE = /^https:\/\/(?:(?:canary|ptb)\.)?discord(?:app)?\.com\/api\/webhooks\/\d{15,24}\/[A-Za-z0-9_-]{20,120}$/;
 
 const STARTER_TASKS = [
   {
@@ -128,6 +136,48 @@ const json = (status, body, extra = {}) =>
 
 const cleanText = (v, max = 200) => String(v ?? "").replace(/\r\n/g, "\n").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]+/g, "").trim().slice(0, max);
 
+/** Validates that a configured secret is strictly a real Discord webhook URL (prevents SSRF). */
+export function validDiscordWebhook(raw) {
+  const s = String(raw ?? "").trim();
+  return DISCORD_WEBHOOK_RE.test(s) ? s : "";
+}
+
+async function sendDiscordWebhook(webhookUrl, { agent, title, body, output, channelLabel }, { fetchImpl } = {}) {
+  const safeUrl = validDiscordWebhook(webhookUrl);
+  if (!safeUrl) return { ok: false, detail: "Invalid Discord webhook URL format" };
+  const descParts = [];
+  if (output) descParts.push(output.slice(0, 3500));
+  else if (body) descParts.push(body.slice(0, 3500));
+  const payload = {
+    username: `${agent?.name || "Frills"} · Frills HQ`,
+    embeds: [
+      {
+        title: title.slice(0, 250),
+        description: descParts.join("\n\n") || "Approved in Frills Virtual Office.",
+        color: agent?.embedColor ?? 0x7fd694,
+        footer: { text: `Frills Virtual Office · ${agent?.role || "Operator"} · ${channelLabel}` },
+        timestamp: new Date().toISOString(),
+      },
+    ],
+  };
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 5000);
+  try {
+    const res = await fetchImpl(safeUrl, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: ctrl.signal,
+    });
+    if (res.ok) return { ok: true, detail: `Posted to Discord (${channelLabel})` };
+    return { ok: false, detail: `Discord webhook returned HTTP ${res.status}` };
+  } catch {
+    return { ok: false, detail: "Could not reach Discord webhook" };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function ensureOfficeTables(db, now) {
   await db.prepare(`CREATE TABLE IF NOT EXISTS office_agents (
     id TEXT PRIMARY KEY,
@@ -148,9 +198,19 @@ async function ensureOfficeTables(db, now) {
     priority TEXT NOT NULL DEFAULT 'normal',
     status TEXT NOT NULL DEFAULT 'queued',
     source TEXT NOT NULL DEFAULT 'founder',
+    feedback_id INTEGER,
+    action_log TEXT NOT NULL DEFAULT '',
     created_at INTEGER NOT NULL,
     updated_at INTEGER NOT NULL
   )`).run();
+
+  // Safely upgrade existing office_tasks tables created before approval hooks existed
+  for (const alter of [
+    "ALTER TABLE office_tasks ADD COLUMN feedback_id INTEGER",
+    "ALTER TABLE office_tasks ADD COLUMN action_log TEXT NOT NULL DEFAULT ''",
+  ]) {
+    try { await db.prepare(alter).run(); } catch { /* column already exists */ }
+  }
 
   await db.prepare("CREATE INDEX IF NOT EXISTS office_tasks_agent ON office_tasks (agent_id, status, updated_at)").run();
 
@@ -175,7 +235,7 @@ async function ensureOfficeTables(db, now) {
         const t = STARTER_TASKS[i];
         const ts = now - (STARTER_TASKS.length - i) * 60_000;
         await db.prepare(
-          "INSERT INTO office_tasks (agent_id, title, body, output, kind, priority, status, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          "INSERT INTO office_tasks (agent_id, title, body, output, kind, priority, status, source, feedback_id, action_log, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, '', ?, ?)",
         ).bind(t.agent_id, t.title, t.body, t.output, t.kind, t.priority, t.status, t.source, ts, ts).run();
       }
     }
@@ -276,6 +336,29 @@ async function collectPulse(env, { fetchImpl, probeRelays = true } = {}) {
     feedback: { total: feedbackTotal, new: feedbackNew, recentNew },
     accounts: { total: accountsTotal, plusActive, cloudOverlays },
     media: { count: mediaCount, bytes: mediaBytes, limit: MEDIA.totalBytes },
+    hooks: {
+      feedbackAutoResolve: true,
+      discordOffice: Boolean(validDiscordWebhook(env?.DISCORD_OFFICE_WEBHOOK)),
+      discordAnnounce: Boolean(validDiscordWebhook(env?.DISCORD_ANNOUNCE_WEBHOOK)),
+    },
+  };
+}
+
+function serializeTask(r) {
+  return {
+    id: r.id,
+    agentId: r.agent_id,
+    title: r.title,
+    body: r.body,
+    output: r.output,
+    kind: r.kind,
+    priority: r.priority,
+    status: r.status,
+    source: r.source,
+    feedbackId: r.feedback_id ? Number(r.feedback_id) : null,
+    actionLog: String(r.action_log ?? ""),
+    createdAt: r.created_at,
+    updatedAt: r.updated_at,
   };
 }
 
@@ -298,7 +381,7 @@ async function readOfficeState(env, url, { now, fetchImpl }) {
   }
   const limit = Math.min(100, Math.max(1, Math.round(Number(url.searchParams.get("limit"))) || 60));
   const taskRows = (await env.DB.prepare(
-    `SELECT id, agent_id, title, body, output, kind, priority, status, source, created_at, updated_at
+    `SELECT id, agent_id, title, body, output, kind, priority, status, source, feedback_id, action_log, created_at, updated_at
      FROM office_tasks ${where.length ? "WHERE " + where.join(" AND ") : ""}
      ORDER BY CASE status WHEN 'needs_review' THEN 0 WHEN 'working' THEN 1 WHEN 'queued' THEN 2 WHEN 'approved' THEN 3 WHEN 'done' THEN 4 ELSE 5 END,
               CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 ELSE 2 END,
@@ -338,23 +421,9 @@ async function readOfficeState(env, url, { now, fetchImpl }) {
     };
   });
 
-  const tasks = taskRows.map((r) => ({
-    id: r.id,
-    agentId: r.agent_id,
-    title: r.title,
-    body: r.body,
-    output: r.output,
-    kind: r.kind,
-    priority: r.priority,
-    status: r.status,
-    source: r.source,
-    createdAt: r.created_at,
-    updatedAt: r.updated_at,
-  }));
-
   const skipProbe = url.searchParams.get("probe") === "0";
   const pulse = await collectPulse(env, { fetchImpl, probeRelays: !skipProbe });
-  return json(200, { ok: true, now, agents, tasks, counts, pulse });
+  return json(200, { ok: true, now, agents, tasks: taskRows.map(serializeTask), counts, pulse });
 }
 
 async function updateAgent(id, request, env, now) {
@@ -390,10 +459,11 @@ async function createTask(request, env, now) {
   const priority = TASK_PRIORITIES.includes(body?.priority) ? body.priority : "normal";
   const status = TASK_STATUSES.includes(body?.status) ? body.status : "queued";
   const source = TASK_SOURCES.includes(body?.source) ? body.source : "founder";
+  const feedbackId = Number.isInteger(Number(body?.feedbackId)) && Number(body.feedbackId) > 0 ? Number(body.feedbackId) : null;
 
   const inserted = await env.DB.prepare(
-    "INSERT INTO office_tasks (agent_id, title, body, output, kind, priority, status, source, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
-  ).bind(agentId, title, desc, output, kind, priority, status, source, now, now).first();
+    "INSERT INTO office_tasks (agent_id, title, body, output, kind, priority, status, source, feedback_id, action_log, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?) RETURNING id",
+  ).bind(agentId, title, desc, output, kind, priority, status, source, feedbackId, now, now).first();
   const id = Number(inserted?.id) || 0;
 
   if (status === "needs_review" || status === "working") {
@@ -405,11 +475,11 @@ async function createTask(request, env, now) {
 
   return json(201, {
     ok: true,
-    task: { id, agentId, title, body: desc, output, kind, priority, status, source, createdAt: now, updatedAt: now },
+    task: { id, agentId, title, body: desc, output, kind, priority, status, source, feedbackId, actionLog: "", createdAt: now, updatedAt: now },
   });
 }
 
-async function updateTask(id, request, env, now) {
+async function updateTask(id, request, env, now, { fetchImpl } = {}) {
   await ensureOfficeTables(env.DB, now);
   const row = await env.DB.prepare("SELECT * FROM office_tasks WHERE id = ?").bind(id).first();
   if (!row) return json(404, { ok: false, error: "not_found" });
@@ -427,9 +497,53 @@ async function updateTask(id, request, env, now) {
   const status = body?.status !== undefined ? String(body.status) : row.status;
   if (!TASK_STATUSES.includes(status)) return json(400, { ok: false, error: "bad_status" });
 
+  const feedbackId = row.feedback_id ? Number(row.feedback_id) : null;
+  const actions = [];
+  const becomingApproved = status === "approved" && row.status !== "approved";
+  const becomingFinished = (status === "approved" || status === "done") && row.status !== "approved" && row.status !== "done";
+
+  // 1. Auto-resolve linked /feedback/ entry in D1 when Boba's task is approved or marked done
+  if (feedbackId && becomingFinished) {
+    try {
+      const fb = await env.DB.prepare("SELECT id, status FROM feedback WHERE id = ?").bind(feedbackId).first();
+      if (fb && fb.status !== "done") {
+        await env.DB.prepare("UPDATE feedback SET status = 'done' WHERE id = ?").bind(feedbackId).run();
+        actions.push({ kind: "feedback_resolved", ok: true, detail: `Marked feedback #${feedbackId} done in /admin/` });
+      }
+    } catch {
+      actions.push({ kind: "feedback_resolved", ok: false, detail: `Could not update feedback #${feedbackId}` });
+    }
+  }
+
+  // 2. Real Discord webhook dispatch when approved (or explicitly requested via publishDiscord: "office" | "announce")
+  const requestedDiscord = body?.publishDiscord; // "office" | "announce" | "none" | undefined
+  const shouldPostDiscord = requestedDiscord === "office" || requestedDiscord === "announce"
+    || (becomingApproved && requestedDiscord !== "none" && Boolean(validDiscordWebhook(env?.DISCORD_OFFICE_WEBHOOK)));
+
+  if (shouldPostDiscord && fetchImpl) {
+    const channel = requestedDiscord === "announce" ? "announce" : "office";
+    const webhookUrl = channel === "announce" ? env?.DISCORD_ANNOUNCE_WEBHOOK : env?.DISCORD_OFFICE_WEBHOOK;
+    const channelLabel = channel === "announce" ? "#announcements" : "#founder-ops";
+    if (validDiscordWebhook(webhookUrl)) {
+      const sent = await sendDiscordWebhook(
+        webhookUrl,
+        { agent: AGENT_BY_ID.get(agentId), title, body: desc, output, channelLabel },
+        { fetchImpl },
+      );
+      actions.push({ kind: "discord", channel, ...sent });
+    } else if (requestedDiscord === "announce" || requestedDiscord === "office") {
+      actions.push({ kind: "discord", channel, ok: false, detail: `Set ${channel === "announce" ? "DISCORD_ANNOUNCE_WEBHOOK" : "DISCORD_OFFICE_WEBHOOK"} secret in Cloudflare` });
+    }
+  }
+
+  const receipt = actions.length
+    ? actions.map((a) => `${a.ok ? "✓" : "⚠"} ${a.detail}`).join(" · ")
+    : "";
+  const nextLog = receipt ? `${receipt} (${new Date(now).toISOString().slice(11, 16)} UTC)`.slice(0, 320) : String(row.action_log ?? "");
+
   await env.DB.prepare(
-    "UPDATE office_tasks SET agent_id = ?, title = ?, body = ?, output = ?, kind = ?, priority = ?, status = ?, updated_at = ? WHERE id = ?",
-  ).bind(agentId, title, desc, output, kind, priority, status, now, id).run();
+    "UPDATE office_tasks SET agent_id = ?, title = ?, body = ?, output = ?, kind = ?, priority = ?, status = ?, action_log = ?, updated_at = ? WHERE id = ?",
+  ).bind(agentId, title, desc, output, kind, priority, status, nextLog, now, id).run();
 
   // Keep the assigned bot's desk beacon accurate automatically
   const pending = await env.DB.prepare(
@@ -443,7 +557,8 @@ async function updateTask(id, request, env, now) {
 
   return json(200, {
     ok: true,
-    task: { id, agentId, title, body: desc, output, kind, priority, status, source: row.source, createdAt: row.created_at, updatedAt: now },
+    actions,
+    task: { id, agentId, title, body: desc, output, kind, priority, status, source: row.source, feedbackId, actionLog: nextLog, createdAt: row.created_at, updatedAt: now },
   });
 }
 
@@ -453,6 +568,28 @@ async function deleteTask(id, env, now) {
   if (!row) return json(404, { ok: false, error: "not_found" });
   await env.DB.prepare("DELETE FROM office_tasks WHERE id = ?").bind(id).run();
   return json(200, { ok: true });
+}
+
+async function testDiscordHook(request, env, { fetchImpl } = {}) {
+  let body;
+  try { body = await request.json(); } catch { body = {}; }
+  const channel = body?.channel === "announce" ? "announce" : "office";
+  const secretName = channel === "announce" ? "DISCORD_ANNOUNCE_WEBHOOK" : "DISCORD_OFFICE_WEBHOOK";
+  const webhookUrl = channel === "announce" ? env?.DISCORD_ANNOUNCE_WEBHOOK : env?.DISCORD_OFFICE_WEBHOOK;
+  if (!validDiscordWebhook(webhookUrl)) {
+    return json(400, { ok: false, error: "webhook_not_configured", detail: `Set the ${secretName} secret in Cloudflare Workers first.` });
+  }
+  const sent = await sendDiscordWebhook(
+    webhookUrl,
+    {
+      agent: AGENT_BY_ID.get("ops"),
+      title: "Frills Virtual Office Connected!",
+      output: "Mochi, Yuzu, Boba, and Kero can now publish approved deliverables straight to this Discord channel.",
+      channelLabel: channel === "announce" ? "#announcements" : "#founder-ops",
+    },
+    { fetchImpl },
+  );
+  return json(sent.ok ? 200 : 502, { ok: sent.ok, channel, detail: sent.detail });
 }
 
 async function runLiveOpsScan(env, { now, fetchImpl }) {
@@ -508,9 +645,19 @@ async function runLiveOpsScan(env, { now, fetchImpl }) {
   const reportStatus = issues.length ? "needs_review" : "done";
   const reportPriority = issues.length ? "urgent" : "normal";
 
+  let actionLog = "";
+  if (issues.length && validDiscordWebhook(env?.DISCORD_OFFICE_WEBHOOK) && fetchImpl) {
+    const sent = await sendDiscordWebhook(
+      env.DISCORD_OFFICE_WEBHOOK,
+      { agent: AGENT_BY_ID.get("ops"), title: reportTitle, body: reportBody, output: opsSummary, channelLabel: "#founder-ops" },
+      { fetchImpl },
+    );
+    actionLog = `${sent.ok ? "✓" : "⚠"} ${sent.detail}`;
+  }
+
   const inserted = await env.DB.prepare(
-    "INSERT INTO office_tasks (agent_id, title, body, output, kind, priority, status, source, created_at, updated_at) VALUES (?, ?, ?, ?, 'ops', ?, ?, 'agent', ?, ?) RETURNING id",
-  ).bind("ops", reportTitle, reportBody, opsSummary, reportPriority, reportStatus, now, now).first();
+    "INSERT INTO office_tasks (agent_id, title, body, output, kind, priority, status, source, feedback_id, action_log, created_at, updated_at) VALUES (?, ?, ?, ?, 'ops', ?, ?, 'agent', NULL, ?, ?, ?) RETURNING id",
+  ).bind("ops", reportTitle, reportBody, opsSummary, reportPriority, reportStatus, actionLog, now, now).first();
 
   return json(200, {
     ok: true,
@@ -518,6 +665,7 @@ async function runLiveOpsScan(env, { now, fetchImpl }) {
     taskId: Number(inserted?.id) || 0,
     issues,
     summary: opsSummary,
+    actionLog,
     pulse,
   });
 }
@@ -539,6 +687,11 @@ export async function handleOffice(request, env, subParts = [], { now = Date.now
       ? await runLiveOpsScan(env, { now, fetchImpl })
       : json(405, { ok: false, error: "method" }, { allow: "POST" });
   }
+  if (section === "hooks" && idRaw === "test") {
+    return method === "POST"
+      ? await testDiscordHook(request, env, { fetchImpl })
+      : json(405, { ok: false, error: "method" }, { allow: "POST" });
+  }
   if (section === "agents" && idRaw) {
     return method === "PATCH"
       ? await updateAgent(idRaw, request, env, now)
@@ -552,7 +705,7 @@ export async function handleOffice(request, env, subParts = [], { now = Date.now
     }
     const id = Number(idRaw);
     if (!Number.isInteger(id) || id < 1) return json(404, { ok: false, error: "not_found" });
-    if (method === "PATCH") return await updateTask(id, request, env, now);
+    if (method === "PATCH") return await updateTask(id, request, env, now, { fetchImpl });
     if (method === "DELETE") return await deleteTask(id, env, now);
     return json(405, { ok: false, error: "method" }, { allow: "PATCH, DELETE" });
   }

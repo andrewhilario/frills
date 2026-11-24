@@ -180,6 +180,8 @@ CREATE TABLE IF NOT EXISTS office_tasks (
   priority TEXT NOT NULL DEFAULT 'normal',
   status TEXT NOT NULL DEFAULT 'queued',
   source TEXT NOT NULL DEFAULT 'founder',
+  feedback_id INTEGER,
+  action_log TEXT NOT NULL DEFAULT '',
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );

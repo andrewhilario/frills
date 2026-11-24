@@ -93,10 +93,12 @@
       <div class="office__board-head">
         <div>
           <h2 class="admin__h office__h" id="board-title">Tasks &amp; Approval Queue</h2>
-          <p class="admin__note">Bots drop ready-to-post drafts, support triage, and ops briefings here for 1-click copy or approval.</p>
+          <p class="admin__note">Approving a card executes connected actions (auto-resolves linked <code>/feedback/</code>, posts to Discord webhooks when configured, and logs a receipt).</p>
         </div>
         <button class="btn btn--sm" type="button" id="toggle-composer">+ Assign Task</button>
       </div>
+
+      <div class="office__hooks" id="office-hooks" aria-label="Connected approval automations"></div>
 
       <form class="office__composer" id="task-form" hidden>
         <div class="office__composer-grid">

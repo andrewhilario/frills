@@ -471,13 +471,15 @@ function renderInspector() {
               agentId: "community",
               kind: "support",
               priority: fb.kind === "broken" ? "high" : "normal",
-              status: "queued",
+              status: "needs_review",
               source: "feedback",
+              feedbackId: fb.id,
               title: `Triage feedback #${fb.id} (${fb.kind})`,
               body: `${fb.message}${fb.contact ? `\nContact: ${fb.contact}` : ""}${fb.app ? `\nApp: ${fb.app}` : ""}`,
+              output: `Suggested reply / action for #${fb.id}: review user message and mark Approved to auto-resolve feedback #${fb.id} in /admin/.`,
             });
             await refresh(false);
-            say($("office-status"), `Queued feedback #${fb.id} on Boba’s desk.`);
+            say($("office-status"), `Queued feedback #${fb.id} on Boba’s desk — approving it will auto-resolve #${fb.id} in /admin/.`);
           } catch (err) {
             if (err instanceof Wrong) say($("office-status"), err.message, true);
           } finally {
@@ -509,9 +511,60 @@ function renderInspector() {
   host.replaceChildren(head, statusRow, summaryBox, btnRow, extra);
 }
 
+function renderHooks() {
+  const host = $("office-hooks");
+  if (!host || !state?.pulse?.hooks) return;
+  const h = state.pulse.hooks;
+
+  const hookPill = (title, on, detail, testChannel = "") => {
+    const badge = el("span", { className: "office__hook-state", textContent: on ? "ACTIVE" : "OPTIONAL" });
+    badge.dataset.on = on ? "true" : "false";
+    const row = el(
+      "div",
+      { className: "office__hook" },
+      el("div", { className: "office__hook-top" }, el("strong", { textContent: title }), badge),
+      el("span", { className: "office__hook-sub", textContent: detail }),
+    );
+    if (on && testChannel) {
+      const btn = el("button", { type: "button", className: "btn btn--soft btn--sm", textContent: "Test Ping" });
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        try {
+          const res = await api("POST", "office/hooks/test", { channel: testChannel });
+          say($("office-status"), res.detail || "Sent Discord test ping.");
+        } catch (err) {
+          if (err instanceof Wrong) say($("office-status"), err.message, true);
+        } finally {
+          btn.disabled = false;
+        }
+      });
+      row.append(btn);
+    }
+    return row;
+  };
+
+  host.replaceChildren(
+    hookPill("Auto-Resolve /feedback/", true, "Approving Boba’s linked support cards automatically marks them Done in /admin/."),
+    hookPill(
+      "Discord #founder-ops",
+      h.discordOffice,
+      h.discordOffice ? "Approved tasks & urgent relay alerts post automatically." : "Add DISCORD_OFFICE_WEBHOOK secret in Cloudflare to post on Approve.",
+      "office",
+    ),
+    hookPill(
+      "Discord #announcements",
+      h.discordAnnounce,
+      h.discordAnnounce ? "Unlocks 1-click Approve & Announce on Yuzu & Boba cards." : "Optional: add DISCORD_ANNOUNCE_WEBHOOK secret for public posts.",
+      "announce",
+    ),
+    hookPill("T3 Agent Sync CLI", true, "Run scripts/office-sync.mjs locally or via /schedule to check in 3D & deliver drafts."),
+  );
+}
+
 function renderTasks() {
   const host = $("office-tasks");
   const agentsById = new Map(state.agents.map((a) => [a.id, a]));
+  const hooks = state.pulse?.hooks ?? {};
   const items = state.tasks.filter((t) => {
     if (scopeFilter === "selected" && t.agentId !== selectedAgent) return false;
     if (statusFilter === "needs_review") return t.status === "needs_review";
@@ -537,13 +590,14 @@ function renderTasks() {
       el("span", { className: "office__agent-tag", textContent: owner ? `${owner.name} · ${owner.room}` : task.agentId }),
       el("span", { className: "office__status-pill", textContent: TASK_STATUS_LABELS[task.status] || task.status }),
       ...(task.priority !== "normal" ? [el("span", { className: "office__prio", textContent: task.priority.toUpperCase() })] : []),
+      ...(task.feedbackId ? [el("span", { className: "office__fb-pill", textContent: `Feedback #${task.feedbackId} (auto-resolves)` })] : []),
       el("span", { className: "item__meta item__id", textContent: `#${task.id} · ${fmtTime(task.updatedAt)}` }),
     );
 
     const title = el("h3", { className: "office__task-title", textContent: task.title });
     const body = task.body ? el("p", { className: "office__task-body", textContent: task.body }) : null;
-
     const outputPre = task.output ? el("pre", { className: "office__output", textContent: task.output }) : null;
+    const receipt = task.actionLog ? el("p", { className: "office__receipt", textContent: task.actionLog }) : null;
 
     // Inline editor box for updating output
     const editBox = el("div", { className: "office__edit", hidden: true });
@@ -574,13 +628,20 @@ function renderTasks() {
       actions.append(copyOut);
     }
 
-    const moveBtn = (label, nextStatus) => {
-      const b = el("button", { type: "button", className: "btn btn--soft btn--sm", textContent: label });
+    const moveBtn = (label, nextStatus, extra = {}, cls = "btn btn--soft btn--sm") => {
+      const b = el("button", { type: "button", className: cls, textContent: label });
       b.addEventListener("click", async () => {
         b.disabled = true;
         try {
-          await api("PATCH", `office/tasks/${task.id}`, { status: nextStatus });
+          const res = await api("PATCH", `office/tasks/${task.id}`, { status: nextStatus, ...extra });
+          if (nextStatus === "approved" || nextStatus === "done") office3d?.celebrate(task.agentId);
           await refresh(false);
+          if (res.actions?.length) {
+            const msg = res.actions.map((a) => `${a.ok ? "✓" : "⚠"} ${a.detail}`).join(" · ");
+            say($("office-status"), msg, res.actions.some((a) => !a.ok));
+          } else if (nextStatus === "approved") {
+            say($("office-status"), `Approved “${task.title}”.`);
+          }
         } catch (err) {
           if (err instanceof Wrong) say($("office-status"), err.message, true);
         } finally {
@@ -590,10 +651,25 @@ function renderTasks() {
       return b;
     };
 
-    if (task.status === "needs_review") actions.append(moveBtn("Approve", "approved"), moveBtn("Mark Done", "done"));
-    else if (task.status === "queued" || task.status === "working") actions.append(moveBtn("Send to Review", "needs_review"), moveBtn("Mark Done", "done"));
-    else if (task.status === "approved") actions.append(moveBtn("Mark Done", "done"));
-    else actions.append(moveBtn("Reopen", "queued"));
+    if (task.status === "needs_review") {
+      const approveLabel = hooks.discordOffice
+        ? (task.feedbackId ? `Approve · Discord & Resolve #${task.feedbackId}` : "Approve & Send to Discord")
+        : (task.feedbackId ? `Approve & Resolve #${task.feedbackId}` : "Approve");
+      actions.append(moveBtn(approveLabel, "approved", {}, "btn btn--sm"));
+      if (hooks.discordAnnounce && (task.agentId === "growth" || task.agentId === "community")) {
+        actions.append(moveBtn("Approve & Announce", "approved", { publishDiscord: "announce" }));
+      }
+      if (hooks.discordOffice) {
+        actions.append(moveBtn("Approve only", "approved", { publishDiscord: "none" }));
+      }
+      actions.append(moveBtn("Mark Done", "done"));
+    } else if (task.status === "queued" || task.status === "working") {
+      actions.append(moveBtn("Send to Review", "needs_review"), moveBtn(task.feedbackId ? `Done & Resolve #${task.feedbackId}` : "Mark Done", "done"));
+    } else if (task.status === "approved") {
+      actions.append(moveBtn("Mark Done", "done"));
+    } else {
+      actions.append(moveBtn("Reopen", "queued"));
+    }
 
     const editBtn = el("button", { type: "button", className: "btn btn--soft btn--sm", textContent: task.output ? "Edit Output" : "+ Add Output" });
     editBtn.addEventListener("click", () => { editBox.hidden = !editBox.hidden; if (!editBox.hidden) editArea.focus(); });
@@ -607,6 +683,7 @@ function renderTasks() {
     card.append(head, title);
     if (body) card.append(body);
     if (outputPre) card.append(outputPre);
+    if (receipt) card.append(receipt);
     card.append(editBox, actions);
     return card;
   }));
@@ -674,6 +751,7 @@ function renderAll() {
   renderRibbon();
   renderFloor();
   renderInspector();
+  renderHooks();
   statusChips.mark();
   scopeChips.mark();
   renderTasks();

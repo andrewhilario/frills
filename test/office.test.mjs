@@ -6,7 +6,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { handleAdmin } from "../worker/admin.mjs";
 import { handleFeedback } from "../worker/feedback.mjs";
-import { OFFICE_AGENTS } from "../worker/office.mjs";
+import { OFFICE_AGENTS, validDiscordWebhook } from "../worker/office.mjs";
 import { localDatabase } from "../scripts/lib/d1-sqlite.mjs";
 
 const SITE = "https://frills.example";
@@ -113,4 +113,85 @@ test("POST /api/admin/office/scan reads real unread feedback & relays, flagging 
   const alertTask = state.tasks.find((t) => t.id === alertScan.body.taskId);
   assert.equal(alertTask?.status, "needs_review");
   assert.equal(alertTask?.priority, "urgent");
+});
+
+test("approving tasks executes real hooks: auto-resolves linked /feedback/, posts Discord embeds safely, and blocks bad webhook URLs", async () => {
+  const OFFICE_HOOK = "https://discord.com/api/webhooks/123456789012345678/abcdefghijklmnopqrstuvwxyz0123456789";
+  const ANNOUNCE_HOOK = "https://discord.com/api/webhooks/987654321098765432/zyxwvutsrqponmlkjihgfedcba9876543210";
+  assert.equal(validDiscordWebhook(OFFICE_HOOK), OFFICE_HOOK);
+  assert.equal(validDiscordWebhook("https://evil.test/api/webhooks/1/2"), "");
+
+  const env = fresh({ DISCORD_OFFICE_WEBHOOK: OFFICE_HOOK, DISCORD_ANNOUNCE_WEBHOOK: ANNOUNCE_HOOK });
+  await handleFeedback(new Request(`${SITE}/api/feedback`, {
+    method: "POST",
+    headers: { origin: SITE, "content-type": "application/json" },
+    body: JSON.stringify({ kind: "idea", app: "obs", message: "Please add a paw print sticker!", contact: "@mochi", website: "", took: 4000 }),
+  }), env, { now: Date.UTC(2026, 10, 24, 9, 0, 0) });
+
+  const posted = [];
+  const hookFetch = async (url, init) => {
+    if (String(url).startsWith("https://discord.com/")) {
+      posted.push({ url, body: JSON.parse(init.body) });
+      return new Response(null, { status: 204 });
+    }
+    return mockRelaysOk(url);
+  };
+
+  const init = await call(env, "GET", "/api/admin/office?probe=0", { fetchImpl: hookFetch });
+  assert.deepEqual(init.body.pulse.hooks, { feedbackAutoResolve: true, discordOffice: true, discordAnnounce: true });
+
+  // Queue Boba task linked to feedback #1
+  const created = await call(env, "POST", "/api/admin/office/tasks", {
+    body: { agentId: "community", title: "Reply to feedback #1", output: "Chibi paw stamps are now live in /actions/!", status: "needs_review", feedbackId: 1 },
+    fetchImpl: hookFetch,
+  });
+  assert.equal(created.body.task.feedbackId, 1);
+
+  // Approve -> auto-resolves feedback #1 in D1 AND posts to #founder-ops Discord webhook
+  const approved = await call(env, "PATCH", `/api/admin/office/tasks/${created.body.task.id}`, {
+    body: { status: "approved" },
+    fetchImpl: hookFetch,
+  });
+  assert.equal(approved.status, 200);
+  assert.equal(approved.body.actions.length, 2);
+  assert.equal(approved.body.actions[0].kind, "feedback_resolved");
+  assert.equal(approved.body.actions[0].ok, true);
+  assert.equal(approved.body.actions[1].kind, "discord");
+  assert.equal(approved.body.actions[1].channel, "office");
+  assert.equal(approved.body.actions[1].ok, true);
+  assert.match(approved.body.task.actionLog, /Marked feedback #1 done/);
+  assert.match(approved.body.task.actionLog, /Posted to Discord \(#founder-ops\)/);
+  assert.equal(posted.length, 1);
+  assert.equal(posted[0].url, OFFICE_HOOK);
+  assert.equal(posted[0].body.embeds[0].title, "Reply to feedback #1");
+
+  // Feedback #1 is genuinely marked done in /admin/feedback!
+  const fbCheck = await call(env, "GET", "/api/admin/feedback?status=new", { fetchImpl: hookFetch });
+  assert.equal(fbCheck.body.items.length, 0, "feedback #1 is now resolved");
+
+  // Publish to #announcements + test ping + skip Discord with publishDiscord:"none"
+  const growth = await call(env, "POST", "/api/admin/office/tasks", {
+    body: { agentId: "growth", title: "New Feature Announcement", output: "Custom VTS sticker shapes are live!", status: "needs_review" },
+    fetchImpl: hookFetch,
+  });
+  await call(env, "PATCH", `/api/admin/office/tasks/${growth.body.task.id}`, {
+    body: { status: "approved", publishDiscord: "announce" },
+    fetchImpl: hookFetch,
+  });
+  assert.equal(posted.length, 2);
+  assert.equal(posted[1].url, ANNOUNCE_HOOK);
+
+  const silent = await call(env, "POST", "/api/admin/office/tasks", {
+    body: { agentId: "qa", title: "Quiet internal check", status: "needs_review" },
+    fetchImpl: hookFetch,
+  });
+  await call(env, "PATCH", `/api/admin/office/tasks/${silent.body.task.id}`, {
+    body: { status: "approved", publishDiscord: "none" },
+    fetchImpl: hookFetch,
+  });
+  assert.equal(posted.length, 2, "publishDiscord:none skips Discord cleanly");
+
+  const ping = await call(env, "POST", "/api/admin/office/hooks/test", { body: { channel: "office" }, fetchImpl: hookFetch });
+  assert.equal(ping.status, 200);
+  assert.equal(posted.length, 3);
 });

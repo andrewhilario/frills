@@ -13,6 +13,13 @@ This directory holds the standing operating procedures (SOPs) for the four speci
 
 ## How to Run a Bot
 
-1. **Live in the browser:** Open `https://frills.valwidgets.live/admin/office/`, unlock with `ADMIN_KEY`, click any desk, and press **Run Live Scan** or **Copy Agent Prompt**.
-2. **In T3 Code / Antigravity:** Paste a desk's prompt (or ask *"Run Yuzu to draft this week's TikTok script"* / *"Run Kero to check tests & overlay size"*). The agent reads its playbook file in `ops/agents/` and produces ready-to-approve outputs.
-3. **On a schedule:** Use `/schedule` in T3 Code to run Mochi (daily ops check) or Yuzu (weekly growth pack) automatically.
+1. **Live in the browser:** Open `https://frills.valwidgets.live/admin/office/`, unlock with `ADMIN_KEY`, click any 3D desk, and press **Run Live Scan**, **Approve**, or **Copy `<Bot>` Prompt**.
+2. **Real Execution on Approve:**
+   - **Auto-resolve `/feedback/`:** Approving or finishing any Boba task queued from unread feedback automatically marks that feedback message as **Done** in `/admin/`.
+   - **Discord Webhooks:** Set `DISCORD_OFFICE_WEBHOOK` (private `#founder-ops`) and/or `DISCORD_ANNOUNCE_WEBHOOK` (public `#announcements`) as Cloudflare Worker secrets. Approving a card publishes an embedded message straight to Discord; Mochi’s Live Ops Scan also pings `#founder-ops` automatically on relay outages.
+3. **Autonomous T3 Agent Sync CLI (`scripts/office-sync.mjs`):**
+   Set `FRILLS_ADMIN_KEY` in your shell or scheduled run, then:
+   - `node scripts/office-sync.mjs pull --status queued` — read queued assignments from live D1
+   - `node scripts/office-sync.mjs checkin growth working "Drafting weekly TikTok script"` — animate Yuzu typing live at her 3D desk
+   - `node scripts/office-sync.mjs deliver <id> --status needs_review --file draft.txt` — drop finished work into your Approval Queue
+   - `node scripts/office-sync.mjs scan` — run Mochi’s live relay & feedback check on a schedule (via `/schedule`)

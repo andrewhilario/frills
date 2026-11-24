@@ -523,7 +523,7 @@ function buildDeskStation(agentDef, cfg) {
   // Tag every child mesh with agentId so raycasting hits cleanly on any part of the desk
   group.traverse((obj) => { obj.userData.agentId = agentDef.id; });
 
-  return { group, chair, mascot, screenMat, deskLight, selectRing, beacon, beaconMat, extraRefs, status: "idle" };
+  return { group, chair, mascot, screenMat, deskLight, selectRing, beacon, beaconMat, extraRefs, status: "idle", celebrateUntil: 0 };
 }
 
 /**
@@ -841,26 +841,41 @@ export function mountOffice3D({ canvasHost, overlayHost, agents, onSelect }) {
       idx += 1;
       const phase = t * 2.4 + idx * 1.3;
       if (!reducedMotion) {
-        if (st.status === "working") {
-          st.mascot.root.position.y = 0.52 + Math.abs(Math.sin(t * 7 + idx)) * 0.05;
-          st.mascot.head.rotation.z = Math.sin(t * 4 + idx) * 0.07;
-          st.mascot.leftPaw.position.y = 0.48 + Math.sin(t * 14) * 0.04;
-          st.mascot.rightPaw.position.y = 0.48 - Math.sin(t * 14) * 0.04;
-          st.chair.rotation.y = Math.sin(t * 2 + idx) * 0.06;
-        } else if (st.status === "waiting" || st.status === "alert") {
-          st.mascot.root.position.y = 0.52 + Math.sin(phase) * 0.03;
-          st.mascot.head.rotation.y = Math.sin(t * 1.8 + idx) * 0.16;
-          st.mascot.leftPaw.position.y = 0.48;
-          st.mascot.rightPaw.position.y = 0.48;
+        if (st.celebrateUntil > t) {
+          const hop = Math.abs(Math.sin((t - (st.celebrateUntil - 1.8)) * 9.5));
+          st.mascot.root.position.y = 0.52 + hop * 0.24;
+          st.mascot.head.rotation.z = Math.sin(t * 14) * 0.16;
+          st.mascot.leftPaw.position.y = 0.56 + hop * 0.14;
+          st.mascot.rightPaw.position.y = 0.56 + hop * 0.14;
+          st.beaconMat.color.setHex(0x34d399);
+          st.beaconMat.emissive.setHex(0x34d399);
+          st.beacon.rotation.y = t * 8;
+          st.beacon.position.y = 2.68 + hop * 0.22;
         } else {
-          st.mascot.root.position.y = 0.52 + Math.sin(t * 1.4 + idx) * 0.015;
-          st.mascot.head.rotation.z = Math.sin(t * 0.9 + idx) * 0.04;
-          st.mascot.head.rotation.y = Math.sin(t * 0.6 + idx) * 0.08;
-        }
+          if (st.status === "working") {
+            st.mascot.root.position.y = 0.52 + Math.abs(Math.sin(t * 7 + idx)) * 0.05;
+            st.mascot.head.rotation.z = Math.sin(t * 4 + idx) * 0.07;
+            st.mascot.leftPaw.position.y = 0.48 + Math.sin(t * 14) * 0.04;
+            st.mascot.rightPaw.position.y = 0.48 - Math.sin(t * 14) * 0.04;
+            st.chair.rotation.y = Math.sin(t * 2 + idx) * 0.06;
+          } else if (st.status === "waiting" || st.status === "alert") {
+            st.mascot.root.position.y = 0.52 + Math.sin(phase) * 0.03;
+            st.mascot.head.rotation.y = Math.sin(t * 1.8 + idx) * 0.16;
+            st.mascot.leftPaw.position.y = 0.48;
+            st.mascot.rightPaw.position.y = 0.48;
+          } else {
+            st.mascot.root.position.y = 0.52 + Math.sin(t * 1.4 + idx) * 0.015;
+            st.mascot.head.rotation.z = Math.sin(t * 0.9 + idx) * 0.04;
+            st.mascot.head.rotation.y = Math.sin(t * 0.6 + idx) * 0.08;
+          }
 
-        // Beacon spin + bob
-        st.beacon.rotation.y = t * (st.status === "alert" ? 4.2 : 1.8) + idx;
-        st.beacon.position.y = 2.52 + Math.sin(t * (st.status === "waiting" || st.status === "alert" ? 4.5 : 2.1) + idx) * 0.11;
+          // Beacon spin + bob
+          const baseCol = STATUS_COLORS[st.status] ?? STATUS_COLORS.idle;
+          st.beaconMat.color.setHex(baseCol);
+          st.beaconMat.emissive.setHex(baseCol);
+          st.beacon.rotation.y = t * (st.status === "alert" ? 4.2 : 1.8) + idx;
+          st.beacon.position.y = 2.52 + Math.sin(t * (st.status === "waiting" || st.status === "alert" ? 4.5 : 2.1) + idx) * 0.11;
+        }
         if (st.selectRing.visible) {
           const s = 1 + Math.sin(t * 3.2) * 0.025;
           st.selectRing.scale.set(s, s, 1);
@@ -894,10 +909,16 @@ export function mountOffice3D({ canvasHost, overlayHost, agents, onSelect }) {
   };
   animate();
 
+  const celebrate = (id) => {
+    const st = stations.get(id);
+    if (st) st.celebrateUntil = clock.getElapsedTime() + 1.8;
+  };
+
   return {
     sync,
     focusAgent,
     resetOverview,
+    celebrate,
     setNight,
     isNight: () => nightMode,
     resize,

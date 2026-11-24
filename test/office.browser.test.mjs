@@ -86,6 +86,14 @@ test("Virtual Office enforces ADMIN_KEY, renders 4 mascot desks, queues real fee
   await click(".office__fb-row button");
   await page.waitFor(`document.getElementById("office-status").textContent.includes("Queued feedback #1")`);
 
+  // Approve Boba's feedback task -> automatically resolves feedback #1 in D1 & renders execution receipt!
+  await page.evaluate(`(() => {
+    const card = [...document.querySelectorAll(".office__task")].find((c) => c.querySelector(".office__task-title").textContent.includes("Triage feedback #1"));
+    [...card.querySelectorAll("button")].find((b) => b.textContent.includes("Approve")).click();
+  })()`);
+  await page.waitFor(`document.getElementById("rib-feedback").textContent === "0 unread of 1"`, { timeout: 6000 });
+  assert.ok(await page.evaluate(`[...document.querySelectorAll(".office__receipt")].some((r) => r.textContent.includes("Marked feedback #1 done"))`), "shows green execution receipt on approved card");
+
   // Assign a new task to Yuzu and approve it
   await click("#toggle-composer");
   await page.evaluate(`(() => {
