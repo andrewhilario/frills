@@ -11,6 +11,8 @@ const DESK_LAYOUT = {
   growth:    { x:  2.45, z: -2.05, yaw: -0.25, accent: 0xff9ec6, matHex: "#ff9ec6", screenBg: "#251420", screenAccent: "#ff85bd" },
   community: { x: -2.45, z:  2.15, yaw: 0.35,  accent: 0xc2a8ff, matHex: "#c2a8ff", screenBg: "#1a162b", screenAccent: "#bda4ff" },
   qa:        { x:  2.45, z:  2.15, yaw: -0.35, accent: 0xffd166, matHex: "#ffd166", screenBg: "#241d10", screenAccent: "#ffd166" },
+  // The sales counter sits in the middle of the room on a smaller mat (mat: 0.72), so it clears the other four.
+  sales:     { x:  0,    z: -0.05, yaw: 0,     accent: 0x7ec8ff, matHex: "#7ec8ff", screenBg: "#10202b", screenAccent: "#7ec8ff", mat: 0.72 },
 };
 
 const STATUS_COLORS = {
@@ -88,6 +90,20 @@ function makeMonitorTexture(agentId, bg, accent) {
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(16, 138); ctx.lineTo(68, 138); ctx.lineTo(84, 124); ctx.lineTo(100, 146); ctx.lineTo(122, 134); ctx.lineTo(240, 134);
+    ctx.stroke();
+  } else if (agentId === "sales") {
+    // A funnel: bars getting shorter, and a line that climbs
+    for (let i = 0; i < 4; i++) {
+      const w = 190 - i * 42;
+      ctx.fillStyle = i === 3 ? "#ffd34d" : accent;
+      ctx.globalAlpha = 0.9 - i * 0.12;
+      ctx.fillRect(128 - w / 2, 34 + i * 22, w, 15);
+    }
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(22, 146); ctx.lineTo(70, 138); ctx.lineTo(112, 142); ctx.lineTo(160, 124); ctx.lineTo(236, 112);
     ctx.stroke();
   } else if (agentId === "growth") {
     // Video timeline + play preview
@@ -239,8 +255,8 @@ function buildPlant(scale = 1) {
 /** Builds a cute 3D kawaii mascot seated in a chair, returning animated limb references. */
 function buildMascot(kind) {
   const root = new THREE.Group();
-  const bodyColor = { frog: 0x8fd694, neko: 0xfff0f6, bunny: 0xf4edff, hamster: 0xffe49e }[kind] ?? 0x8fd694;
-  const bellyColor = { frog: 0xe7fad9, neko: 0xffd4e4, bunny: 0xe6d6ff, hamster: 0xfff8e1 }[kind] ?? 0xffffff;
+  const bodyColor = { frog: 0x8fd694, neko: 0xfff0f6, bunny: 0xf4edff, hamster: 0xffe49e, duck: 0xffe27a }[kind] ?? 0x8fd694;
+  const bellyColor = { frog: 0xe7fad9, neko: 0xffd4e4, bunny: 0xe6d6ff, hamster: 0xfff8e1, duck: 0xfff3bf }[kind] ?? 0xffffff;
   const inkMat = mat(0x262834, { roughness: 0.3 });
   const blushMat = mat(0xf792b2, { roughness: 0.7 });
   const bodyMat = mat(bodyColor, { roughness: 0.55 });
@@ -329,6 +345,18 @@ function buildMascot(kind) {
     const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.02, 0.02), inkMat);
     bridge.position.set(0, 0.03, 0.375);
     head.add(bridge);
+  } else if (kind === "duck") {
+    // A flat orange beak and a little tuft of feathers
+    const beak = addShadow(new THREE.Mesh(new THREE.SphereGeometry(0.11, 14, 10), mat(0xff9d3d, { roughness: 0.45 })));
+    beak.scale.set(1.45, 0.55, 1.1);
+    beak.position.set(0, -0.08, 0.4);
+    head.add(beak);
+    for (const [tx, ty, tilt] of [[-0.05, 0.45, -0.3], [0.04, 0.5, 0.1], [0.12, 0.44, 0.4]]) {
+      const tuft = addShadow(new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.16, 8), bodyMat));
+      tuft.position.set(tx, ty, 0.02);
+      tuft.rotation.z = tilt;
+      head.add(tuft);
+    }
   }
   root.add(head);
 
@@ -353,14 +381,14 @@ function buildDeskStation(agentDef, cfg) {
   group.userData.agentId = agentDef.id;
 
   // Pastel floor mat under the workstation
-  const floorMat = new THREE.Mesh(new THREE.CylinderGeometry(1.75, 1.82, 0.04, 28), mat(cfg.accent, { roughness: 0.85 }));
+  const floorMat = new THREE.Mesh(new THREE.CylinderGeometry(1.75 * (cfg.mat ?? 1), 1.82 * (cfg.mat ?? 1), 0.04, 28), mat(cfg.accent, { roughness: 0.85 }));
   floorMat.position.y = 0.02;
   floorMat.receiveShadow = true;
   group.add(floorMat);
 
   // Selection glow ring (visible when desk is selected)
   const ringMat = new THREE.MeshBasicMaterial({ color: cfg.accent, transparent: true, opacity: 0.85 });
-  const selectRing = new THREE.Mesh(new THREE.TorusGeometry(1.88, 0.065, 12, 40), ringMat);
+  const selectRing = new THREE.Mesh(new THREE.TorusGeometry(1.88 * (cfg.mat ?? 1), 0.065, 12, 40), ringMat);
   selectRing.rotation.x = Math.PI / 2;
   selectRing.position.y = 0.07;
   selectRing.visible = false;
@@ -507,6 +535,13 @@ function buildDeskStation(agentDef, cfg) {
     holo.position.set(-0.78, 1.32, -0.52);
     group.add(holo);
     extraRefs.holoCube = holo;
+  } else if (agentDef.id === "sales") {
+    // A little stack of gold coins on the desk
+    for (let i = 0; i < 4; i++) {
+      const coin = addShadow(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.035, 16), mat(0xffd34d, { roughness: 0.3, metalness: 0.5 })));
+      coin.position.set(0.82, 1.045 + i * 0.037, -0.52);
+      group.add(coin);
+    }
   }
 
   // Floating 3D status diamond beacon above the desk

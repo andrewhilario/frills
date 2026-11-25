@@ -1,5 +1,5 @@
 // Unit tests for the Frills Virtual Office API (/api/admin/office/*):
-// ADMIN_KEY auth & CSRF origin protection, lazy D1 table creation + starter seed, 4 specialist desks,
+// ADMIN_KEY auth & CSRF origin protection, lazy D1 table creation + starter seed, 5 specialist desks,
 // agent status updates, task CRUD + auto-beacon sync, and live Ops Scan with real D1 + mock relays.
 
 import test from "node:test";
@@ -26,7 +26,7 @@ async function call(env, method, path, { key = KEY, origin = SITE, body, now = D
   return { status: res.status, body: await res.json(), res };
 }
 
-test("office API requires ADMIN_KEY + same-origin on mutations, auto-seeds 4 desks and starter tasks", async () => {
+test("office API requires ADMIN_KEY + same-origin on mutations, auto-seeds 5 desks and starter tasks", async () => {
   const env = fresh();
   assert.equal((await call(env, "GET", "/api/admin/office", { key: false })).status, 401);
   assert.equal((await call(env, "POST", "/api/admin/office/tasks", { origin: "https://evil.test", body: { agentId: "ops", title: "Bad" } })).status, 403);
@@ -35,7 +35,7 @@ test("office API requires ADMIN_KEY + same-origin on mutations, auto-seeds 4 des
   assert.equal(init.status, 200);
   assert.equal(init.body.ok, true);
   assert.equal(init.body.agents.length, OFFICE_AGENTS.length);
-  assert.deepEqual(init.body.agents.map((a) => a.id), ["ops", "growth", "community", "qa"]);
+  assert.deepEqual(init.body.agents.map((a) => a.id), ["ops", "growth", "community", "qa", "sales"]);
   assert.equal(init.body.tasks.length, 4, "seeds 4 practical Month-2 starter tasks on first boot");
   assert.equal(init.body.counts.needsReview, 2);
   assert.equal(init.body.pulse.relays.length, 2);

@@ -1,8 +1,8 @@
 # Frills Virtual Office (Operator Playbooks)
 
-This directory holds the standing operating procedures (SOPs) for the four specialist desks shown in the private Virtual Office dashboard (`/admin/office/`).
+This directory holds the standing operating procedures (SOPs) for the five specialist desks shown in the private Virtual Office dashboard (`/admin/office/`).
 
-## The 4 Desks
+## The 5 Desks
 
 | Desk | Name | Mascot | Playbook | Focus |
 |---|---|---|---|---|
@@ -10,6 +10,9 @@ This directory holds the standing operating procedures (SOPs) for the four speci
 | `growth` | **Yuzu** | Neko | [yuzu-growth.md](agents/yuzu-growth.md) | TikTok/Shorts demo scripts, X posts, VTuber outreach & changelogs |
 | `community` | **Boba** | Bunny | [boba-community.md](agents/boba-community.md) | `/feedback/` triage, Discord FAQ macros, OBS/VTS troubleshooting & feature votes |
 | `qa` | **Kero** | Hamster | [kero-qa.md](agents/kero-qa.md) | Automated regression tests, `/overlay/` 22.5 KB gzip gate, CSP & SEO audits |
+| `sales` | **Mango** | Duck | [mango-plus-sales.md](agents/mango-plus-sales.md) | Frills Plus funnel brief, broken-checkout and refund alerts, one vetted public Plus tip a week. **Runs by itself, no approval.** |
+
+> **Mango runs on its own.** The other four desks wait for you; Mango works inside the Cloudflare Worker (daily at 15:17 UTC) and its rules, its limits and its off switch (`PLUS_AGENT=off`) are in [mango-plus-sales.md](agents/mango-plus-sales.md).
 
 ## How to Run a Bot
 

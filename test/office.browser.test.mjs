@@ -1,5 +1,5 @@
 // Virtual Office (/admin/office/) in real headless Chrome against scripts/serve.mjs:
-// ADMIN_KEY login gate, 4 animated operator desks under CSP with zero console errors, desk selection,
+// ADMIN_KEY login gate, 5 animated operator desks under CSP with zero console errors, desk selection,
 // live feedback-to-task triage on Boba's desk, task creation/approval/deletion, Live Ops Scan, and 320px/1280px layout.
 
 import test, { after, before } from "node:test";
@@ -52,7 +52,7 @@ const visible = (sel) => page.evaluate(`(() => { const n = document.querySelecto
 const click = (sel) => page.evaluate(`document.querySelector(${JSON.stringify(sel)}).click()`);
 const text = (sel) => page.evaluate(`document.querySelector(${JSON.stringify(sel)})?.textContent.trim() ?? ""`);
 
-test("Virtual Office enforces ADMIN_KEY, renders 4 mascot desks, queues real feedback, creates/approves tasks, and fits 320px & 1280px", { skip }, async () => {
+test("Virtual Office enforces ADMIN_KEY, renders 5 mascot desks, queues real feedback, creates/approves tasks, and fits 320px & 1280px", { skip }, async () => {
   await page.goto(base + "/admin/office/", { settle: 700 });
   assert.equal(await visible("#login"), true);
   assert.equal(await visible("#dash"), false);
@@ -65,14 +65,14 @@ test("Virtual Office enforces ADMIN_KEY, renders 4 mascot desks, queues real fee
 
   // Unlock with real ADMIN_KEY
   await page.evaluate(`(() => { document.getElementById("key").value = ${JSON.stringify(KEY)}; document.getElementById("login-form").requestSubmit(); })()`);
-  await page.waitFor(`document.querySelectorAll("#office-floor .office__desk").length === 4`, { timeout: 10000 });
+  await page.waitFor(`document.querySelectorAll("#office-floor .office__desk").length === 5`, { timeout: 10000 });
   assert.equal(await visible("#dash"), true);
   assert.equal(await text("#rib-feedback"), "1 unread of 1");
   assert.ok((await page.evaluate(`document.querySelectorAll("#office-tasks .office__task").length`)) >= 4);
   // 3D space mounts cleanly (or falls back gracefully when WebGL is off) and supports Day/Night + 2D toggle
   const has3dCanvas = await page.evaluate(`Boolean(document.querySelector("#office-3d-canvas canvas"))`);
   if (has3dCanvas) {
-    assert.equal(await page.evaluate(`document.querySelectorAll("#office-3d-labels .office3d__tag").length`), 4, "all 4 floating 3D desk badges mounted");
+    assert.equal(await page.evaluate(`document.querySelectorAll("#office-3d-labels .office3d__tag").length`), 5, "all 5 floating 3D desk badges mounted");
     await click("#office-theme");
     assert.equal(await text("#office-theme"), "Sunny Day");
     await click("#office-theme");

@@ -1,5 +1,5 @@
-// Frills Virtual Office (/admin/office/): cozy interactive studio floor with 4 specialist operator desks
-// (Mochi Ops, Yuzu Growth, Boba Community, Kero QA), live relay & feedback telemetry, 1-click Ops Scan,
+// Frills Virtual Office (/admin/office/): cozy interactive studio floor with 5 specialist operator desks
+// (Mochi Ops, Yuzu Growth, Boba Community, Kero QA, Mango Plus Sales), live relay & feedback telemetry, 1-click Ops Scan,
 // copyable T3 agent prompts, and a D1-backed founder task & approval queue. Strictly textContent for user/DB text.
 
 import { el } from "./feed.js";
@@ -75,6 +75,17 @@ const MASCOT_SVGS = {
     <ellipse cx="68" cy="55" rx="5.5" ry="3.2" fill="#f79ec1" opacity="0.85"/>
     <path d="M44 54q4 4 8 0" fill="none" stroke="#2d2247" stroke-width="2.8" stroke-linecap="round"/>
   </svg>`,
+  duck: `<svg viewBox="0 0 96 84" aria-hidden="true">
+    <ellipse cx="48" cy="76" rx="34" ry="6" fill="rgba(26,28,36,0.12)"/>
+    <path d="M46 24q-3-11 7-9" fill="none" stroke="#3b2a05" stroke-width="3.5" stroke-linecap="round"/>
+    <ellipse cx="48" cy="50" rx="31" ry="24" fill="#ffe27a" stroke="#3b2a05" stroke-width="3.5"/>
+    <ellipse cx="48" cy="60" rx="20" ry="11" fill="#fff3bf"/>
+    <circle cx="36" cy="44" r="4.3" fill="#3b2a05"/><circle cx="34.6" cy="42.6" r="1.5" fill="#fff"/>
+    <circle cx="60" cy="44" r="4.3" fill="#3b2a05"/><circle cx="58.6" cy="42.6" r="1.5" fill="#fff"/>
+    <path d="M37 52q11-7 22 0q-2 10-11 10t-11-10z" fill="#ff9d3d" stroke="#3b2a05" stroke-width="3" stroke-linejoin="round"/>
+    <ellipse cx="25" cy="52" rx="5.5" ry="3.2" fill="#f79ec1" opacity="0.85"/>
+    <ellipse cx="71" cy="52" rx="5.5" ry="3.2" fill="#f79ec1" opacity="0.85"/>
+  </svg>`,
   hamster: `<svg viewBox="0 0 96 84" aria-hidden="true">
     <ellipse cx="48" cy="76" rx="34" ry="6" fill="rgba(26,28,36,0.12)"/>
     <circle cx="24" cy="28" r="10" fill="#ffd97d" stroke="#3c2814" stroke-width="3.5"/>
@@ -93,6 +104,10 @@ const MASCOT_SVGS = {
 };
 
 const QUICK_BRIEFS = {
+  sales: [
+    ["+ Check Funnel Now", "Review the Plus funnel and what changed this week", "Read Mango's last brief in the log, compare it with /admin/stats/, and name the one thing to change."],
+    ["+ Write New Tips", "Write 3 new public Plus tips for the library in worker/plus-agent.mjs", "Facts from /plus/ only, ending with the exact PUBLIC_TAIL line, no hype words. The tests lint every one."],
+  ],
   growth: [
     ["+ TikTok VTS Clip", "Draft 30s TikTok clip: VTuber Sticky Notes & Paw Stamps", "Focus on free 5 pastel notes -> Plus chibi paw/heart/cloud shapes in /actions/."],
     ["+ X Launch Thread", "Draft 4-post X thread: Frills Plus 1-Link Master Scene", "Highlight 1-click theme switching + crash-proof subathon memory for $5.99/mo."],

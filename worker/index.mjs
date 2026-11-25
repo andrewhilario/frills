@@ -20,6 +20,8 @@ import { checkProRegion, handleProStatus } from "./region.mjs";
 import { handleDevPass, handleTts, handleVoiceSample, handleCohost } from "./tts.mjs";
 import { countOverlay, handleEvent } from "./stats.mjs";
 import { handlePublicStatus } from "./stats-report.mjs";
+import { runPlusAgent } from "./plus-agent.mjs";
+const PLUS_AGENT_CRON = "17 15 * * *"; // keep in step with "triggers" in wrangler.jsonc
 
 /** How long the edge keeps a file it has already read from the database. Short, so a deleted or reported file is gone within the hour. */
 const EDGE_SECONDS = 3600;
@@ -113,6 +115,8 @@ export default {
     ctx.waitUntil(Promise.all([
       pruneSpotify(env),
       env?.DB ? sweep(env.DB).catch(() => {}) : Promise.resolve(),
+      // Mango, the Plus sales agent, runs on the afternoon schedule only (15:17 UTC: daytime in the US and Europe). It never throws.
+      event?.cron === PLUS_AGENT_CRON ? runPlusAgent(env).catch(() => {}) : Promise.resolve(),
     ]));
   },
 };

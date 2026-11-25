@@ -1,5 +1,5 @@
-// Virtual Office backend (/api/admin/office/*): manages the 4 Frills operator desks (Mochi Ops, Yuzu Growth,
-// Boba Community, Kero QA), their task & approval queue in D1, real-time operational pulse (relay fleet,
+// Virtual Office backend (/api/admin/office/*): manages the 5 Frills operator desks (Mochi Ops, Yuzu Growth,
+// Boba Community, Kero QA, Mango Plus Sales), their task & approval queue in D1, real-time operational pulse (relay fleet,
 // Frills Plus subscriber counts, unread /feedback/ queue, media storage), and real approval execution hooks
 // (auto-resolving linked /feedback/ items + optional Discord Ops / Announcements webhook publishing).
 
@@ -50,6 +50,17 @@ export const OFFICE_AGENTS = [
     embedColor: 0xffd166,
     playbook: "ops/agents/kero-qa.md",
     summary: "Guards the 22.5 KB /overlay/ budget, runs automated browser tests, and prototypes community-voted features.",
+  },
+  {
+    id: "sales",
+    name: "Mango",
+    role: "Frills Plus Sales Agent",
+    mascot: "duck",
+    room: "Sales Counter",
+    accent: "sky",
+    embedColor: 0x7ec8ff,
+    playbook: "ops/agents/mango-plus-sales.md",
+    summary: "Runs on its own every day: watches the Frills Plus funnel, posts a vetted Plus tip each week, and flags a broken checkout or a refund spike.",
   },
 ];
 
@@ -178,7 +189,7 @@ async function sendDiscordWebhook(webhookUrl, { agent, title, body, output, chan
   }
 }
 
-async function ensureOfficeTables(db, now) {
+export async function ensureOfficeTables(db, now) {
   await db.prepare(`CREATE TABLE IF NOT EXISTS office_agents (
     id TEXT PRIMARY KEY,
     status TEXT NOT NULL DEFAULT 'idle',
@@ -239,6 +250,13 @@ async function ensureOfficeTables(db, now) {
         ).bind(t.agent_id, t.title, t.body, t.output, t.kind, t.priority, t.status, t.source, ts, ts).run();
       }
     }
+  }
+
+  // An agent added after the first seed (a database that already has the others) gets its row here.
+  for (const a of OFFICE_AGENTS) {
+    await db.prepare(
+      "INSERT OR IGNORE INTO office_agents (id, status, current_task, last_summary, last_run_at, updated_at) VALUES (?, 'idle', ?, ?, 0, ?)",
+    ).bind(a.id, a.id === "sales" ? "Watching the Plus funnel" : "", a.summary, now).run();
   }
 }
 
@@ -455,7 +473,7 @@ async function createTask(request, env, now) {
   if (!title) return json(400, { ok: false, error: "missing_title" });
   const desc = cleanText(body?.body, 1500);
   const output = cleanText(body?.output, 8000);
-  const kind = TASK_KINDS.includes(body?.kind) ? body.kind : (agentId === "growth" ? "content" : agentId === "community" ? "support" : agentId === "qa" ? "qa" : "ops");
+  const kind = TASK_KINDS.includes(body?.kind) ? body.kind : (agentId === "growth" ? "content" : agentId === "community" ? "support" : agentId === "qa" ? "qa" : agentId === "sales" ? "outreach" : "ops");
   const priority = TASK_PRIORITIES.includes(body?.priority) ? body.priority : "normal";
   const status = TASK_STATUSES.includes(body?.status) ? body.status : "queued";
   const source = TASK_SOURCES.includes(body?.source) ? body.source : "founder";

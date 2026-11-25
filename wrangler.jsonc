@@ -37,5 +37,5 @@
   //   npx wrangler secret put SPOTIFY_TOKEN_KEY
   // and paste 32 random bytes in base64 (make them with: node -e "console.log(require('crypto').randomBytes(32).toString('base64'))").
   // Until it is set, the Spotify step on /songs/ says it cannot keep a login yet, and nothing else changes.
-  "triggers": { "crons": ["17 3 * * *"] }
+  "triggers": { "crons": ["17 3 * * *", "17 15 * * *"] }
 }
