@@ -6,7 +6,7 @@ export const LEADERBOARD_LAYOUTS = [
   ["pill", "Pill: rounded capsule badges"],
   ["glass", "Glass: frosted translucent cards"],
   ["neon", "Neon: glowing dark arcade frame"],
-  ["macos", "macOS: desktop window frame"],
+  ["macos", "Window: a framed card with a title strip"],
   ["shell", "Shell: retro terminal console"],
   ["kawaii", "Kawaii: double pastel border"],
   ["minimal", "Minimal: floating text only"],

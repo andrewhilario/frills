@@ -1,4 +1,4 @@
-/*! Hallmark · genre: playful · macrostructure: Workbench · theme: Hum (tuned for Frills) · enrichment: Tier-B SVG character · nav: N1b · footer: Ft8 */
+/*! Hallmark · genre: playful · macrostructure: Narrative Workflow (with Catalogue sections) · theme: Hum (tuned for Frills) · enrichment: Tier-B SVG character · nav: N1b · footer: Ft8 */
 /* Hallmark · pre-emit critique: P5 H4 E4 S5 R4 V4 */
 /* Frills design tokens. Every color, font, size, space, radius and curve on the site comes from a name in this file. */
 
@@ -41,6 +41,14 @@
   --color-focus: oklch(48% 0.20 265);
   --color-error: oklch(50% 0.20 25);
   --color-success: oklch(46% 0.10 155);
+  --color-warn: oklch(74% 0.15 85);
+  /* The seasonal looks (Halloween, Christmas) and the lighter text colors on the dark action log. */
+  --color-halloween: oklch(66% 0.17 55);
+  --color-halloween-tint: oklch(96% 0.04 70);
+  --color-christmas: oklch(50% 0.20 25);
+  --color-christmas-tint: oklch(95% 0.03 150);
+  --color-log-error: oklch(78% 0.13 10);
+  --color-log-warn: oklch(88% 0.12 90);
 
   /* The dark "game" the demos sit on, so a chat can be judged against something. */
   --color-stage: oklch(24% 0.035 275);

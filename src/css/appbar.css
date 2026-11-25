@@ -12,13 +12,25 @@
 /* App bar: the brand, and a way back. */
 .appbar { position: sticky; top: 0; z-index: var(--z-sticky-nav); background: var(--color-paper); border-bottom: 2px dashed var(--color-rule); }
 .appbar__inner { padding-inline: var(--page-gutter); display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); min-height: var(--appbar-height); }
-.appbar__links { display: flex; flex-wrap: wrap; gap: 0 var(--space-xs); }
+/* Wide screens: the links sit in the bar. Narrow ones: they fold into a Menu (a plain <details>, so it works without script), and the bar stays one row. */
+.appbar__links { display: none; flex-wrap: wrap; gap: 0 var(--space-xs); }
+.appbar__menu > summary { list-style: none; }
+.appbar__menu > summary::-webkit-details-marker { display: none; }
+.appbar__toggle { display: inline-flex; align-items: center; min-height: 44px; padding: 0 1rem; border-radius: var(--radius-pill); border: 1px solid var(--color-rule-2); background: var(--color-paper); font-size: var(--text-sm); font-weight: 600; cursor: pointer; }
+.appbar__menu[open] > .appbar__toggle { background: var(--color-paper-2); border-color: var(--color-ink); }
+@media (hover: hover) { .appbar__toggle:hover { background: var(--color-paper-2); } }
+.appbar__sheet { position: absolute; inset-inline: 0; top: 100%; display: grid; gap: var(--space-3xs); padding: var(--space-xs) var(--page-gutter) var(--space-lg); background: var(--color-paper); border-bottom: 2px dashed var(--color-rule); }
+.appbar__sheet .nav__link { min-height: 48px; font-size: var(--text-base); }
+@media (min-width: 40rem) {
+  .appbar__links { display: flex; }
+  .appbar__menu { display: none; }
+}
 
 /* ── Sticky Announcement Banner ───────────────────────────────────────────────────────────────────────────── */
 .announcement {
   background: var(--color-ink);
   color: var(--color-paper);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  border-bottom: 1px solid color-mix(in oklch, var(--color-paper) 15%, transparent);
   font-size: var(--text-xs);
   line-height: 1.35;
 }
@@ -40,7 +52,7 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   background: var(--color-accent-3);
-  color: #10141a;
+  color: var(--color-ink);
   border-radius: var(--radius-pill);
 }
 .announcement__text {
@@ -48,6 +60,9 @@
   color: var(--color-paper-2);
 }
 .announcement__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.75rem;
   font-weight: 700;
   color: var(--color-accent);
   text-decoration: underline;
@@ -60,8 +75,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.4rem;
-  height: 1.4rem;
+  width: 1.75rem;
+  height: 1.75rem;
   margin-left: 0.25rem;
   padding: 0;
   border: 0;
@@ -74,5 +89,6 @@
 }
 .announcement__close:hover {
   color: var(--color-paper);
-  background: rgba(255, 255, 255, 0.12);
+  background: color-mix(in oklch, var(--color-paper) 12%, transparent);
 }
+@media (max-width: 30rem) { .announcement__badge { display: none; } }

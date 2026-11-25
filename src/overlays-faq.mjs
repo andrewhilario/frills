@@ -38,7 +38,7 @@ export function overlaysFaq({ kb = 19, relayUrl = "", plus = false } = {}) {
     },
     {
       q: "How do follow alerts work on Twitch, and why do they need a login?",
-      a: "Twitch only tells a logged-in streamer who follows them, so Frills cannot see follows from public chat the way it sees subs and bits. Open <a href=\"/twitch/\">the Twitch follows page</a>, log in with Twitch once (it asks for one permission: seeing who follows your channel), and keep that page open while you stream. Each new follower becomes an alert. In the alerts editor, pick Twitch and tick \"Show Twitch follows in my alerts link\", then copy the link into your streaming app. Twitch logins end after a while, and the page tells you when you need to log in again.",
+      a: "Twitch only tells a logged-in streamer who follows them, so Frills cannot see follows from public chat the way it sees subs and bits. Open <a href=\"/twitch/\">the Twitch follows page</a>, log in with Twitch once (it asks for one permission: seeing who follows your channel), and keep that page open while you stream. Each new follower becomes an alert. In the alerts editor, pick Twitch and tick “Show Twitch follows in my alerts link”, then copy the link into your streaming app. Twitch logins end after a while, and the page tells you when you need to log in again.",
     },
     {
       q: "Is my Twitch login safe?",
@@ -54,7 +54,7 @@ export function overlaysFaq({ kb = 19, relayUrl = "", plus = false } = {}) {
     },
     {
       q: "How do the goals and the top likers count?",
-      a: "They count what they see from the moment they connect. The follower goal can start from the account’s real follower count when TikTok tells the relay, while gift and like goals start from zero. Top likers adds up each person’s taps and ranks them live. If the page reloads the goals and the ranking start again, unless you turn on \"remember\" in their editor, which keeps the count in your own browser or streaming app and nowhere else.",
+      a: "They count what they see from the moment they connect. The follower goal can start from the account’s real follower count when TikTok tells the relay, while gift and like goals start from zero. Top likers adds up each person’s taps and ranks them live. If the page reloads the goals and the ranking start again, unless you turn on “remember” in their editor, which keeps the count in your own browser or streaming app and nowhere else.",
     },
     {
       q: "What happens if the relay restarts or is busy?",

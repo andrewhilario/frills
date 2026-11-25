@@ -194,9 +194,9 @@ test("overlays page: the live and beta ones link to their editors, and the comin
   const { base } = await withHelper();
   await page.goto(base + "/overlays/", { settle: 600 });
   const links = await page.evaluate(`[...document.querySelectorAll(".tool:not(.tool--soon) a.btn")].map((a) => a.getAttribute("href"))`);
-  assert.deepEqual(links, ["/editor/", "/alerts/", "/gifts/", "/jar/", "/wheel/", "/actions/", "/goal/", "/likers/", "/gifters/", "/labels/", "/counter/", "/timer/", "/tts/", "/editor/", "/songs/", "/songs/#spotify-step"], "includes Gift jar, Spin the wheel, Actions, Top gifters, Rotating highlights, and Spotify step");
-  const beta = await page.evaluate(`[...document.querySelectorAll(".tool:has(.tool__badge--beta) .subtitle")].map((t) => t.textContent)`);
-  assert.deepEqual(beta, ["Alerts", "Last gifts", "Gift jar", "Spin the wheel", "Actions", "Goals", "Top likers", "Top gifters", "Rotating highlights", "Viewer and like counter", "Subathon timer", "Talking pet TTS", "TikTok and Twitch chat together", "Song requests", "Spotify player"], "it is marked Beta, like the others that are new");
+  assert.deepEqual(links, ["/editor/", "/alerts/", "/gifts/", "/jar/", "/wheel/", "/actions/", "/goal/", "/likers/", "/gifters/", "/labels/", "/gallery/", "/counter/", "/timer/", "/tts/", "/editor/", "/songs/", "/songs/#spotify-step"], "includes Gift jar, Spin the wheel, Actions, Top gifters, Rotating highlights, Gift gallery and the Spotify step");
+  const beta = await page.evaluate(`[...document.querySelectorAll('.tool[data-status="beta"] .subtitle')].map((t) => t.textContent)`);
+  assert.deepEqual(beta, ["Alerts", "Last gifts", "Gift jar", "Spin the wheel", "Actions", "Goals", "Top likers", "Top gifters", "Rotating highlights", "Gift gallery rotator", "Viewer and like counter", "Subathon timer", "Talking pet TTS", "TikTok and Twitch chat together", "Song requests", "Spotify player"], "every overlay but the chat one is marked beta (once, in the list's own words, not on each row)");
   const soon = await page.evaluate(`[...document.querySelectorAll("#coming-soon + ul .tool--soon")].map((t) => [t.querySelector(".subtitle").textContent, t.querySelectorAll("a").length])`);
   assert.deepEqual(soon.map((s) => s[0]), ["Free sound library", "Like and subscriber alerts", "Starting soon, Be right back and Stream ending screens", "Your own layout", "Pets that move"]);
   assert.ok(soon.every((s) => s[1] === 0), "a coming-soon card links nowhere");

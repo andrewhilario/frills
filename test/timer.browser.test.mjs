@@ -201,6 +201,6 @@ test("editor: the gifts are a list of rows to pick or type, with a time each, an
 
 test("the overlays page lists the timer, marked beta", { skip }, async () => {
   await page.goto(served + "/overlays/", { settle: 500 });
-  const card = await page.evaluate(`[...document.querySelectorAll(".tool")].filter((t) => t.querySelector("a[href='/timer/']")).map((t) => t.querySelector(".tool__badge")?.textContent.trim())`);
-  assert.deepEqual(card, ["Beta"]);
+  const card = await page.evaluate(`[...document.querySelectorAll(".tool")].filter((t) => t.querySelector("a[href='/timer/']")).map((t) => t.dataset.status)`);
+  assert.deepEqual(card, ["beta"]);
 });

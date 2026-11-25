@@ -29,6 +29,9 @@
 .step-card__aside { margin-left: auto; }
 .step-card__title { font-size: var(--text-md); font-weight: 700; letter-spacing: -0.015em; }
 .stack { display: grid; gap: var(--space-md); }
+/* A small heading above each run of controls (Colors, Bubble and text, Placement, Decorations): the first has no rule above it. */
+.stack__group { margin: var(--space-xs) 0 calc(-1 * var(--space-xs)); padding-top: var(--space-sm); border-top: 2px dashed var(--color-rule); font-size: var(--text-sm); font-weight: 800; letter-spacing: 0.02em; color: var(--color-ink-2); }
+.stack > .stack__group:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
 
 /* One control: a label, and the thing you change. */
 .ctl { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: var(--space-2xs) var(--space-sm); }
@@ -132,8 +135,8 @@
 .act-log__time { font-family: var(--font-label); font-size: 0.7rem; opacity: 0.65; }
 .act-log__rule { font-weight: 700; }
 .act-log__detail { opacity: 0.9; }
-.act-log__item[data-status="error"] .act-log__detail { color: #ff8ca1; }
-.act-log__item[data-status="skipped"] .act-log__detail { color: #ffd97d; }
+.act-log__item[data-status="error"] .act-log__detail { color: var(--color-log-error); }
+.act-log__item[data-status="skipped"] .act-log__detail { color: var(--color-log-warn); }
 
 /* a text box beside its label would push the label under it on a phone: stack them */
 @media (max-width: 30rem) { .ctl:has(> input[type="text"]) { grid-template-columns: minmax(0, 1fr); } .ctl > input[type="text"] { width: 100%; } }
@@ -214,7 +217,8 @@
 
 /* A small link at the top of each editor to the setup clip, for people who have not used it before. */
 .watch { margin: 0 0 var(--space-md); font-size: var(--text-sm); }
-.watch a { display: inline-flex; align-items: center; gap: var(--space-xs); font-weight: 600; }
+.watch a { display: inline-flex; align-items: center; gap: var(--space-xs); min-height: 1.75rem; font-weight: 600; }
+@media (pointer: coarse) { .watch a { min-height: 44px; } }
 
 /* The heading and one line at the top of an editor's panel, and a short explanation at the bottom of it: words for people, and for search engines. */
 .panel__intro { display: grid; gap: var(--space-xs); }

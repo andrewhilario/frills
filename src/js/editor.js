@@ -71,11 +71,20 @@ presetChips = chips(
 );
 
 const rows = {};
+let lastGroup = "";
 for (const control of CONTROLS) {
   const { row, write } = buildControl(control, settings[control.key], (value) => change(control.key, value));
   writers[control.key] = write;
   rows[control.key] = row;
-  $(control.where === "main" ? "main-controls" : "more-controls").append(row);
+  const host = $(control.where === "main" ? "main-controls" : "more-controls");
+  if (control.group && control.group !== lastGroup) { // a small heading above each run of up-front controls, so the long panel reads as four short ones
+    const heading = document.createElement("h3");
+    heading.className = "stack__group";
+    heading.textContent = control.group;
+    host.append(heading);
+    lastGroup = control.group;
+  }
+  host.append(row);
 }
 /** The settings that only matter once something is picked (the decoration's size and place) are hidden until it is. */
 function showNeeded() {

@@ -117,6 +117,6 @@ test("editor: the test buttons move the numbers, and the link carries the change
 test("the overlays page lists the counter, marked beta", { skip }, async () => {
   const { base } = await withHelper();
   await page.goto(base + "/overlays/", { settle: 500 });
-  const card = await page.evaluate(`[...document.querySelectorAll(".tool")].filter((t) => t.querySelector("a[href='/counter/']")).map((t) => t.querySelector(".tool__badge")?.textContent.trim())`);
-  assert.deepEqual(card, ["Beta"]);
+  const card = await page.evaluate(`[...document.querySelectorAll(".tool")].filter((t) => t.querySelector("a[href='/counter/']")).map((t) => t.dataset.status)`);
+  assert.deepEqual(card, ["beta"]);
 });

@@ -374,9 +374,9 @@
 .songs[data-layout="compact"] .song--now .song__art { width: 2.6em; height: 2.6em; border-radius: calc(var(--a-radius, 20px) * 0.4); }
 .songs[data-layout="compact"] .song--now .song__progress { height: 0.22em; margin-top: 0.25em; }
 
-/* macos: a desktop window with traffic light buttons */
+/* macos (shown as "Window"): a framed card with a title strip. The id stays so saved links keep working. */
 .songs[data-layout="macos"] .song--now { position: relative; padding: 1.8em 0.9em 0.6em 0.6em; font-size: 1.05em; border-radius: 12px; }
-.songs[data-layout="macos"] .song--now::before { content: ""; position: absolute; left: 0.8em; top: 0.65em; width: 0.55em; height: 0.55em; border-radius: 50%; background: #ff5f56; box-shadow: 0.85em 0 0 #ffbd2e, 1.7em 0 0 #27c93f; }
+.songs[data-layout="macos"] .song--now::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1.25em; border-bottom: 1px solid rgba(128, 128, 128, 0.35); background: rgba(128, 128, 128, 0.12); border-radius: 12px 12px 0 0; }
 .songs[data-layout="macos"] .song--now .song__art { width: 3.4em; height: 3.4em; border-radius: 8px; }
 .songs[data-layout="macos"] .song--now .song__progress { margin-top: 0.35em; height: 0.22em; }
 
@@ -391,15 +391,15 @@
 .songs[data-layout="shell"] .song--now .song__progress { background: rgba(255, 255, 255, 0.15); height: 0.25em; }
 .songs[data-layout="shell"] .song--now .song__progress i { background: #38bdf8; }
 
-/* discord: dark rich presence card */
-.songs[data-layout="discord"] .song--now { position: relative; padding: 0.75em 1em 0.7em 0.7em; font-size: 1.05em; background: #2b2d31; color: #dbdee1; border: 1px solid #1e1f22; border-radius: 8px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4); }
-.songs[data-layout="discord"] .song--now .song__label { color: #23a55a; font-weight: 800; font-size: 0.65em; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.15em; }
+/* discord (shown as "Presence"): a dark status card in Frills' own colours. The id stays so saved links keep working. */
+.songs[data-layout="discord"] .song--now { position: relative; padding: 0.75em 1em 0.7em 0.7em; font-size: 1.05em; background: #20252e; color: #dfe4ee; border: 1px solid #161a21; border-radius: 8px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4); }
+.songs[data-layout="discord"] .song--now .song__label { color: #7db4ff; font-weight: 800; font-size: 0.65em; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 0.15em; }
 .songs[data-layout="discord"] .song--now .song__title { color: #ffffff; font-weight: 700; }
-.songs[data-layout="discord"] .song--now .song__artist { color: #949ba4; opacity: 1; }
-.songs[data-layout="discord"] .song--now .song__by { color: #949ba4; opacity: 0.85; }
+.songs[data-layout="discord"] .song--now .song__artist { color: #9aa5b8; opacity: 1; }
+.songs[data-layout="discord"] .song--now .song__by { color: #9aa5b8; opacity: 0.85; }
 .songs[data-layout="discord"] .song--now .song__art { width: 3.6em; height: 3.6em; border-radius: 6px; }
-.songs[data-layout="discord"] .song--now .song__progress { background: #4e5058; height: 0.24em; }
-.songs[data-layout="discord"] .song--now .song__progress i { background: #ffffff; }
+.songs[data-layout="discord"] .song--now .song__progress { background: #3a4252; height: 0.24em; }
+.songs[data-layout="discord"] .song--now .song__progress i { background: #7db4ff; }
 
 /* cover blur on any layout: a blurred copy of the cover behind the card (glass has it always) */
 .songs[data-blur="true"] .song--now { position: relative; overflow: hidden; background: rgba(18, 20, 26, 0.42); border-color: rgba(255, 255, 255, 0.28); }
@@ -856,8 +856,7 @@
 }
 .likers[data-layout="macos"] .likers__title::before {
   content: ""; width: 0.48em; height: 0.48em; border-radius: 50%; flex: none;
-  background: #ff5f57; margin-right: 1.15em;
-  box-shadow: 0.72em 0 0 #febc2e, 1.44em 0 0 #28c840;
+  background: currentColor; opacity: 0.5; margin-right: 0.15em;
 }
 .likers[data-layout="macos"] .liker { border-radius: 0.6em; border-width: 1px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.16); }
 
@@ -1065,8 +1064,7 @@
   padding-top: 1.35em; border-radius: 0.65em; border-width: 1px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
 }
 .labels[data-layout="macos"] .labelcard::before {
-  content: ""; position: absolute; left: 0.7em; top: 0.45em; width: 0.46em; height: 0.46em; border-radius: 50%;
-  background: #ff5f57; box-shadow: 0.7em 0 0 #febc2e, 1.4em 0 0 #28c840;
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 1em; border-bottom: 1px solid rgba(128, 128, 128, 0.35); background: rgba(128, 128, 128, 0.12); border-radius: 0.65em 0.65em 0 0;
 }
 
 .labels[data-layout="shell"] .labelcard,
@@ -1080,12 +1078,12 @@
 .labels[data-layout="shell"] .labels__dot { background: #7ef7a3; }
 
 .labels[data-layout="discord"] .labelcard {
-  background: #2b2d31; color: #f2f3f5; border: 0; border-left: 0.28em solid #5865f2;
+  background: #20252e; color: #eef1f7; border: 1px solid #3a4252;
   border-radius: 0.5em; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
 }
-.labels[data-layout="discord"] .labelcard__label { color: #949cf7; }
-.labels[data-layout="discord"] .labels__dots { background: #2b2d31; border-color: #5865f2; }
-.labels[data-layout="discord"] .labels__dot { background: #b5bac1; }
+.labels[data-layout="discord"] .labelcard__label { color: #7db4ff; }
+.labels[data-layout="discord"] .labels__dots { background: #20252e; border-color: #7db4ff; }
+.labels[data-layout="discord"] .labels__dot { background: #aab4c6; }
 
 .labels[data-layout="kawaii"] .labelcard {
   border-style: dashed; box-shadow: 0 0 0 0.16em var(--a-bg, #fff), 0 0 0 0.26em var(--a-pop, #f48), var(--a-shadow, none);
