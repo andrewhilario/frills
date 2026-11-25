@@ -167,7 +167,7 @@ Frills Plus stays restricted to **Tier-1 regions** (`US, CA, AU, NZ, GB, IE, EU-
   # Save IPv4 (and IPv6 comma-separated if present) into Cloudflare Worker secrets:
   npx wrangler secret put PRO_ALLOW_IPS
   ```
-- **API / `curl` testing override:** You can also set `PRO_DEV_KEY` (`npx wrangler secret put PRO_DEV_KEY`) and pass `-H "x-frills-dev: YOUR_PRO_DEV_KEY"` (browsers cannot send this header).
+- **API / `curl` testing override:** You can also set `PRO_DEV_KEY` (`npx wrangler secret put PRO_DEV_KEY`) and pass `-H "x-frills-dev: YOUR_PRO_DEV_KEY"` (it must be at least 16 characters, and it is a separate secret: the admin password is never accepted here) (browsers cannot send this header).
 
 ---
 

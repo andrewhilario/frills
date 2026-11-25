@@ -111,18 +111,29 @@ export function clientIp(request) {
   return String(request.headers.get("cf-connecting-ip") ?? "").trim().toLowerCase();
 }
 
+/** The shortest PRO_DEV_KEY that is accepted. Anyone can try this header on a public route with no lockout, so a short key would be guessable. */
+export const MIN_DEV_KEY = 16;
+
+/** Whether two strings are equal, looking at every character either way, so the time taken does not say how much of a guess was right. */
+export function sameSecret(a, b) {
+  const x = new TextEncoder().encode(String(a ?? ""));
+  const y = new TextEncoder().encode(String(b ?? ""));
+  let difference = x.length ^ y.length;
+  for (let i = 0; i < Math.max(x.length, y.length); i++) difference |= (x[i] ?? 0) ^ (y[i] ?? 0);
+  return difference === 0;
+}
+
 /**
  * Checks whether the current request is allowed to purchase or use paid features.
- * Allows local dev ("DEV"), the owner's override header (`x-frills-dev`), an edge-verified IP listed in `PRO_ALLOW_IPS`, or a country in the allowed set.
+ * Allows local dev ("DEV"), the owner's override header (`x-frills-dev`, which must match PRO_DEV_KEY), an edge-verified IP listed in `PRO_ALLOW_IPS`, or a country in the allowed set.
+ * The admin password is never accepted here: this check runs on public routes with no lockout, and the admin password has to stay behind its own.
  */
 export function checkProRegion(request, env) {
   const country = regionOf(request, env);
   if (country === "DEV") return { eligible: true, country, reason: "local_dev" };
 
-  const devHeader = request.headers.get("x-frills-dev");
   const devSecret = String(env?.PRO_DEV_KEY ?? "").trim();
-  const adminSecret = String(env?.ADMIN_KEY ?? "").trim();
-  if ((devSecret && devHeader === devSecret) || (adminSecret && request.headers.get("x-frills-dev") === adminSecret)) {
+  if (devSecret.length >= MIN_DEV_KEY && sameSecret(request.headers.get("x-frills-dev") ?? "", devSecret)) {
     return { eligible: true, country, reason: "dev_override" };
   }
 

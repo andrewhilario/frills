@@ -6,7 +6,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { localDatabase } from "../scripts/lib/d1-sqlite.mjs";
 import { COOKIE, handleAccount } from "../worker/account-routes.mjs";
-import { checkProRegion, handleProStatus, regionOf } from "../worker/region.mjs";
+import { checkProRegion, sameSecret, handleProStatus, regionOf } from "../worker/region.mjs";
 import { handleDevPass, handleTts, handleVoiceSample, handleCohost, sanitizeCohostReply } from "../worker/tts.mjs";
 import { handleAdmin } from "../worker/admin.mjs";
 import worker from "../worker/index.mjs";
@@ -50,9 +50,25 @@ test("region lock allows Tier-1 countries, localhost DEV, PRO_COUNTRIES override
   assert.deepEqual(checkProRegion(new Request("http://localhost:8765/api/pro/status"), {}), { eligible: true, country: "DEV", reason: "local_dev" });
 
   // The owner's override works from any country, only as a header (a web page cannot send it)
-  const bypassed = checkProRegion(reqWithCf(`${SITE}/`, { headers: { "x-frills-dev": "owner-dev-key" } }, "PH"), { PRO_DEV_KEY: "owner-dev-key" });
+  const bypassed = checkProRegion(reqWithCf(`${SITE}/`, { headers: { "x-frills-dev": "owner-dev-key-0123" } }, "PH"), { PRO_DEV_KEY: "owner-dev-key-0123" });
   assert.equal(bypassed.eligible, true);
   assert.equal(bypassed.reason, "dev_override");
+
+  // The admin password is NOT a way past the region check: this header is tried on public routes with no lockout, so it must not open anything but the dev key.
+  const adminKey = "admin-password-0123456789";
+  const viaAdmin = checkProRegion(reqWithCf(`${SITE}/`, { headers: { "x-frills-dev": adminKey } }, "PH"), { ADMIN_KEY: adminKey });
+  assert.deepEqual([viaAdmin.eligible, viaAdmin.reason], [false, "region_unavailable"], "the admin key in x-frills-dev does nothing");
+  const viaBoth = checkProRegion(reqWithCf(`${SITE}/`, { headers: { "x-frills-dev": adminKey } }, "PH"), { ADMIN_KEY: adminKey, PRO_DEV_KEY: "owner-dev-key-0123" });
+  assert.equal(viaBoth.eligible, false, "even when a dev key is set, the admin key is not accepted");
+  // A dev key that is too short is ignored (it could be guessed), a near miss and the wrong length are refused, and a missing header is refused
+  assert.equal(checkProRegion(reqWithCf(`${SITE}/`, { headers: { "x-frills-dev": "short" } }, "PH"), { PRO_DEV_KEY: "short" }).eligible, false, "a short key is ignored");
+  assert.equal(checkProRegion(reqWithCf(`${SITE}/`, { headers: { "x-frills-dev": "owner-dev-key-0124" } }, "PH"), { PRO_DEV_KEY: "owner-dev-key-0123" }).eligible, false, "one character off");
+  assert.equal(checkProRegion(reqWithCf(`${SITE}/`, { headers: { "x-frills-dev": "owner-dev-key-012" } }, "PH"), { PRO_DEV_KEY: "owner-dev-key-0123" }).eligible, false, "a prefix of the key");
+  assert.equal(checkProRegion(reqWithCf(`${SITE}/`, {}, "PH"), { PRO_DEV_KEY: "owner-dev-key-0123" }).eligible, false, "no header");
+  assert.equal(sameSecret("abc", "abc"), true);
+  assert.equal(sameSecret("abc", "abd"), false);
+  assert.equal(sameSecret("abc", "abcd"), false);
+  assert.equal(sameSecret("", ""), true);
 
   // PRO_ALLOW_IPS allows exact edge-verified cf-connecting-ip (IPv4, normalized IPv6, or IPv6 /64 prefix); spoofed x-forwarded-for and non-/64 CIDRs are ignored
   const allowEnv = { PRO_ALLOW_IPS: "198.51.100.42, 2001:0DB8::1, 2001:4455:907a:e000::/64, 0.0.0.0/0" };
@@ -109,13 +125,13 @@ test("handleTts: wrong origin, no account, a locked region, credits spent one by
 });
 
 test("the older ways in are gone: a key sent as x-pass or in the body, and the owner's dev key as a pass, bring nothing; /api/pro/activate and /api/admin/passes are not there", async () => {
-  const env = { DB: localDatabase(":memory:"), OPENAI_TTS_KEY: "sk-openai-mock", PRO_DEV_KEY: "owner-dev-key", ADMIN_KEY: "a".repeat(16), REQUIRE_PRO_PASS: "1" };
+  const env = { DB: localDatabase(":memory:"), OPENAI_TTS_KEY: "sk-openai-mock", PRO_DEV_KEY: "owner-dev-key-0123", ADMIN_KEY: "a".repeat(16), REQUIRE_PRO_PASS: "1" };
   let calls = 0;
   const fakeFetch = async () => { calls += 1; return new Response(new Uint8Array([1]), { status: 200, headers: { "content-type": "audio/mpeg" } }); };
   for (const [name, init, body] of [
     ["a key in the x-pass header", { headers: { "x-pass": "frills_pro_abc" } }, '{"text":"hi"}'],
-    ["the owner's dev key as a pass", { headers: { "x-pass": "owner-dev-key" } }, '{"text":"hi"}'],
-    ["a key in the body", {}, '{"text":"hi","pass":"owner-dev-key"}'],
+    ["the owner's dev key as a pass", { headers: { "x-pass": "owner-dev-key-0123" } }, '{"text":"hi"}'],
+    ["a key in the body", {}, '{"text":"hi","pass":"owner-dev-key-0123"}'],
   ]) {
     const res = await handleTts(speak(init, "US", body), env, { fetchFn: fakeFetch, now: T0 });
     assert.deepEqual([res.status, (await res.json()).error], [401, "no_pass"], name);
