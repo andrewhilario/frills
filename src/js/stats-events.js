@@ -17,6 +17,10 @@ export const MODES = ["live", "demo"];
 export const PLATFORMS = ["tiktok", "twitch", "both"];
 /** The Frills Plus ideas a streamer can click to express interest in. */
 export const PLUS_FEATURES = ["remote_link", "custom_upload", "scene_link", "plus_pack"];
+/** The moments a Frills Plus prompt can show up in: the free-actions limit, the note about Plus-only sticker and VTube Studio actions, the tip under an editor, the checkout button. */
+export const PLUS_MOMENTS = ["action_limit", "vts_locked", "editor_tip", "checkout"];
+/** What happened to a prompt: it was seen, or it was clicked. */
+export const PLUS_STEPS = ["shown", "clicked"];
 
 export const EVENTS = {
   /** A new visit to the site, once per browser tab session: the page it started on, and where it came from. */
@@ -27,6 +31,8 @@ export const EVENTS = {
   overlay_load: { first: LOADS, second: MODES },
   /** Someone clicked a Frills Plus feature preview or button: which feature, and optionally on which page. */
   plus_interest: { first: PLUS_FEATURES, second: PAGES, optionalSecond: true },
+  /** A Frills Plus prompt was seen or clicked: which moment, and which of the two. Together they say how often a limit is reached and how often the offer beside it is taken up. */
+  plus_prompt: { first: PLUS_MOMENTS, second: PLUS_STEPS },
 };
 
 const isEventName = (event) => Object.prototype.hasOwnProperty.call(EVENTS, event);

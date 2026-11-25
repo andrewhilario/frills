@@ -91,6 +91,10 @@ const NAMES = {
   custom_upload: "Custom Sound & Sticker Kit",
   scene_link: "All-in-One Scene Link",
   plus_pack: "Collector Art Packs",
+  action_limit: "Reached the 10 free actions",
+  vts_locked: "Sticker & VTube Studio note",
+  editor_tip: "Tip under an editor",
+  checkout: "Opened the checkout",
 };
 const nameOf = (label) => NAMES[label] ?? label;
 
@@ -721,6 +725,13 @@ function site(host, id, title, data, { frills = false } = {}) {
   if (frills && plus?.byFeature?.length) {
     tables.append(table("Frills Plus Interest Clicks", plus.byFeature, plus.byFeatureWeek, plus.total));
   }
+  // Seen next to clicked, so that "how many reached a limit" and "how many then took the offer" are read side by side.
+  if (frills && (data.prompts?.shown?.length || data.prompts?.clicked?.length)) {
+    tables.append(
+      table("Frills Plus Prompts Seen", data.prompts.shown, data.prompts.shownWeek, data.prompts.shownTotal),
+      table("Frills Plus Prompts Clicked", data.prompts.clicked, data.prompts.clickedWeek, data.prompts.clickedTotal),
+    );
+  }
   tablesPane.append(tables);
   if (data.others?.length) tablesPane.append(el("p", { className: "admin__note", textContent: "Other counts (28 days): " + data.others.map((o) => `${nameOf(o.label)} ${number(o.n)}`).join(", ") + "." }));
 
@@ -883,6 +894,8 @@ function exportCsv() {
     dumpSplit("Links Copied by Tool", f.copies?.byOverlay, f.copies?.byOverlayWeek);
     dumpSplit("Links Copied by Platform", f.copies?.byPlatform, f.copies?.byPlatformWeek);
     dumpSplit("Frills Plus Clicks", f.plus?.byFeature, f.plus?.byFeatureWeek);
+    dumpSplit("Frills Plus Prompts Seen", f.prompts?.shown, f.prompts?.shownWeek);
+    dumpSplit("Frills Plus Prompts Clicked", f.prompts?.clicked, f.prompts?.clickedWeek);
     lines.push("");
   }
 

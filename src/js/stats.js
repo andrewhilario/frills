@@ -34,6 +34,21 @@ export function countPlus(feature) {
   count("plus_interest", feature, pageOf(location.pathname));
 }
 
+const promptsSeen = new Set();
+/** A Frills Plus prompt was seen ("shown") or clicked. "Shown" counts once per moment for each tab session, however often the page redraws the prompt, so it means people, not redraws. */
+export function countPrompt(moment, step) {
+  if (step === "shown") {
+    if (promptsSeen.has(moment)) return;
+    promptsSeen.add(moment);
+    try {
+      const key = "frills:prompt:" + moment;
+      if (sessionStorage.getItem(key) === "1") return;
+      sessionStorage.setItem(key, "1");
+    } catch { /* storage can be blocked: then it counts once for each page load, which is only a bit too many */ }
+  }
+  count("plus_prompt", moment, step);
+}
+
 let counted = false;
 /** A new visit, once per tab session: the page it started on and where it came from. */
 function visit() {

@@ -14,7 +14,7 @@ const post = (body, { origin = SITE, headers = {} } = {}) => new Request(`${SITE
 const sink = () => ({ points: [], writeDataPoint(p) { this.points.push(p); } });
 
 test("only the events and labels on the fixed lists can be counted, and an event survives the wire exactly", () => {
-  assert.deepEqual(Object.keys(EVENTS), ["visit", "link_copied", "overlay_load", "plus_interest"]);
+  assert.deepEqual(Object.keys(EVENTS), ["visit", "link_copied", "overlay_load", "plus_interest", "plus_prompt"]);
   assert.equal(labelsValid("visit", "home", "tiktok"), true);
   assert.equal(labelsValid("visit", "home", "somewhere"), false, "a label that is not on the list");
   assert.equal(labelsValid("visit", "home"), false, "a visit needs where it came from");
@@ -25,9 +25,14 @@ test("only the events and labels on the fixed lists can be counted, and an event
   assert.equal(labelsValid("plus_interest", "remote_link"), true);
   assert.equal(labelsValid("plus_interest", "remote_link", "editor"), true);
   assert.equal(labelsValid("plus_interest", "unknown_feature"), false);
+  assert.equal(labelsValid("plus_prompt", "action_limit", "shown"), true);
+  assert.equal(labelsValid("plus_prompt", "checkout", "clicked"), true);
+  assert.equal(labelsValid("plus_prompt", "action_limit"), false, "a prompt needs to say whether it was seen or clicked");
+  assert.equal(labelsValid("plus_prompt", "action_limit", "paid"), false, "only seen or clicked: payment is known by the server, not counted here");
+  assert.equal(labelsValid("plus_prompt", "somewhere_else", "shown"), false);
   assert.equal(labelsValid("overlay_load", "chat", "live"), true);
   assert.equal(labelsValid("nothing", "a", ""), false);
-  for (const [event, first, second] of [["visit", "editor", "reddit"], ["link_copied", "songs", ""], ["link_copied", "chat", "tiktok"], ["plus_interest", "remote_link", "editor"]]) assert.deepEqual(parseEvent(encodeEvent(event, first, second)), { event, first, second });
+  for (const [event, first, second] of [["visit", "editor", "reddit"], ["link_copied", "songs", ""], ["link_copied", "chat", "tiktok"], ["plus_interest", "remote_link", "editor"], ["plus_prompt", "vts_locked", "shown"]]) assert.deepEqual(parseEvent(encodeEvent(event, first, second)), { event, first, second });
   for (const bad of ["", "not json", "[]", "null", '{"e":"visit","a":"home","b":"tiktok","c":"extra"}', '{"e":"visit","a":1}', '{"e":"visit","a":"home","b":5}', '{"e":"visit","a":"home","b":"<script>"}']) assert.equal(parseEvent(bad), null, bad);
   assert.deepEqual(toDataPoint({ event: "visit", first: "home", second: "tiktok" }), { indexes: ["visit"], blobs: ["visit", "home", "tiktok", ""], doubles: [1] });
 });
@@ -118,6 +123,7 @@ test("the report: visits, copies and overlays this week against the week before,
     row("link_copied", "chat", "tiktok", 1, 3), row("link_copied", "chat", "twitch", 1, 1), row("link_copied", "goal", "", 9, 8),
     row("overlay_load", "chat", "live", 3, 7), row("overlay_load", "chat", "demo", 3, 50), row("overlay_load", "alerts", "live", 10, 2),
     row("plus_interest", "remote_link", "editor", 2, 5),
+    row("plus_prompt", "action_limit", "shown", 1, 20), row("plus_prompt", "action_limit", "clicked", 1, 4), row("plus_prompt", "editor_tip", "shown", 9, 30), row("plus_prompt", "checkout", "clicked", 2, 3),
     row("pro_click", "footer", "", 4, 3), row("visit", "home", "tiktok", 40, 99), // (older than 28 days: ignored)
   ], T);
   assert.deepEqual([s.visits.today, s.visits.yesterday, s.visits.week, s.visits.before, s.visits.total], [10, 0, 15, 6, 21]);
@@ -131,8 +137,12 @@ test("the report: visits, copies and overlays this week against the week before,
   assert.deepEqual([s.loads.live.week, s.loads.live.before, s.loads.demo.week], [7, 2, 50], "practice openings are counted apart from real ones");
   assert.deepEqual(s.loads.byKind, [{ label: "chat", n: 7 }, { label: "alerts", n: 2 }]);
   assert.deepEqual(s.plus.byFeature, [{ label: "remote_link", n: 5 }]);
+  assert.deepEqual(s.prompts.shown, [{ label: "editor_tip", n: 30 }, { label: "action_limit", n: 20 }]);
+  assert.deepEqual(s.prompts.shownWeek, [{ label: "action_limit", n: 20 }], "the editor tip was seen 9 days ago, so it is not in the week");
+  assert.deepEqual(s.prompts.clicked, [{ label: "action_limit", n: 4 }, { label: "checkout", n: 3 }]);
+  assert.deepEqual([s.prompts.shownTotal, s.prompts.clickedTotal], [50, 7]);
   assert.equal(Math.round(s.funnel.week.copyRate * 100), 27);
-  assert.deepEqual(s.others, [{ label: "pro_click", n: 3 }]);
+  assert.deepEqual(s.others, [{ label: "pro_click", n: 3 }], "plus_prompt is a known event, so it is not listed under other counts");
 });
 
 test("different overlays this week, how many came back from the week before, and the scorecard for Frills Plus", () => {

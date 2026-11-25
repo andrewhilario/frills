@@ -3,6 +3,7 @@
 
 import { clearPlusCode, clearRelayTicketCache, savePlusCode, savedPlusCode } from "./plus-relay.js";
 import { initNav } from "./nav.js";
+import { countPrompt } from "./stats.js";
 
 initNav();
 
@@ -48,6 +49,7 @@ const askLogin = async (address) => {
 };
 const canBuy = (me) => Boolean(me.checkout) && !me.plus?.active && !["paused", "unpaid"].includes(me.plus?.status);
 const launchCheckout = async (button, note) => {
+  countPrompt("checkout", "clicked"); // the last step before the payment page: how many who were offered Plus went this far
   button.disabled = true;
   note.hidden = false;
   note.dataset.state = "";
@@ -130,6 +132,7 @@ if ($("acct-form")) {
     try {
       await post("logout");
       clearPlusCode();
+      forgetSetup();
       clearRelayTicketCache();
       show("acct-form");
       email.focus();
@@ -163,7 +166,76 @@ if ($("acct-form")) {
     return { text: "Off", tone: "off" };
   };
   const canBuyAccount = (me) => canBuy(me);
+
+  // The "Get Frills Plus working in OBS" checklist. Paying changes nothing in a streaming app on its own: a link copied before paying has no Plus code, so it keeps using the free
+  // connection until the streamer copies it again and pastes it over the old one. Each step is "done" only from something this page can know (the code on this browser, a saved
+  // cloud link); pasting into OBS cannot be seen from here, so that one step is the streamer's own tick, remembered on this browser only.
+  const SETUP = { pasted: "frills:plus:setup:pasted", hidden: "frills:plus:setup:hidden" };
+  const flag = (key) => { try { return localStorage.getItem(key) === "1"; } catch { return false; } };
+  const setFlag = (key, on) => { try { if (on) localStorage.setItem(key, "1"); else localStorage.removeItem(key); } catch { /* storage can be blocked */ } };
+  const forgetSetup = () => { setFlag(SETUP.pasted, false); setFlag(SETUP.hidden, false); };
+  let lastMe = null;
+  let cloudCount = null; // how many live cloud links are saved (null until asked)
+  const node = (tag, props = {}, ...kids) => { const n = Object.assign(document.createElement(tag), props); n.append(...kids); return n; };
+  const setupSteps = (me) => {
+    const activated = Boolean(savedPlusCode()) && Boolean(me.overlayLink);
+    return [
+      { title: "Frills Plus is on", done: true, text: "Your account is switched on. AI voices and the cloud tools below are yours to use." },
+      {
+        title: "Use your Plus connection in this browser",
+        done: activated,
+        text: me.overlayLink && !savedPlusCode()
+          ? "A Plus code was made in another browser. Press the button to make a new one here; the older code stops working."
+          : "This makes a private code that TikTok overlay links carry, so they use your own always-on connection and can speak AI voices.",
+        action: activated ? null : node("button", { className: "btn btn--sm", type: "button", textContent: me.overlayLink ? "Make a new code here" : "Activate on this browser", onclick: () => $("acct-code-make")?.click() }),
+      },
+      {
+        title: "Copy your links again and paste them over the old ones",
+        done: flag(SETUP.pasted),
+        text: "A link you copied before paying still uses the free connection. Copy it again from Quick start or any editor and replace it in OBS or TikTok LIVE Studio.",
+        action: node("span", { className: "acct-row" },
+          node("a", { className: "btn btn--sm", href: "/start/", textContent: "Open Quick start" }),
+          node("button", { className: "btn btn--outline btn--sm", type: "button", disabled: !activated, textContent: flag(SETUP.pasted) ? "Not done yet" : "I pasted them", onclick: () => { setFlag(SETUP.pasted, !flag(SETUP.pasted)); renderSetup(lastMe); } })),
+        locked: !activated,
+      },
+      {
+        title: "Optional: save a link online so you never paste again",
+        done: cloudCount > 0,
+        optional: true,
+        text: "Press Create live link in any editor and paste its /o/… link into OBS once. After that, looks and themes you change here update in OBS by themselves.",
+        action: cloudCount > 0 ? null : node("a", { className: "btn btn--outline btn--sm", href: "/editor/", textContent: "Open the Chat editor" }),
+      },
+    ];
+  };
+  const renderSetup = (me) => {
+    const card = $("acct-setup");
+    if (!card || !me) return;
+    const on = Boolean(me.plus?.active);
+    card.hidden = !on || flag(SETUP.hidden);
+    if (card.hidden) return;
+    const steps = setupSteps(me);
+    const required = steps.filter((s) => !s.optional);
+    const finished = required.filter((s) => s.done).length;
+    const count = $("acct-setup-count");
+    count.hidden = false;
+    count.textContent = finished === required.length ? "All set" : `${finished} / ${required.length}`;
+    count.dataset.tone = finished === required.length ? "on" : "soon";
+    const list = $("acct-setup-list");
+    list.replaceChildren(...steps.map((step, i) => {
+      const mark = node("span", { className: "acct-step__mark", textContent: step.done ? "✓" : String(i + 1) });
+      mark.setAttribute("aria-hidden", "true");
+      const li = node("li", { className: "acct-step" }, mark,
+        node("p", { className: "acct-step__title", textContent: `${step.title}${step.done ? " (done)" : ""}` }),
+        node("p", { className: "form__hint", textContent: step.text }));
+      if (step.action) li.append(step.action);
+      li.dataset.done = String(step.done);
+      if (step.locked) li.dataset.locked = "true";
+      return li;
+    }));
+    $("acct-setup-hide").textContent = finished === required.length ? "Done, hide this checklist" : "Hide this checklist";
+  };
   const showPlus = (me) => {
+    lastMe = me;
     $("acct-plus-state").textContent = plusWords(me);
     const badge = badgeOf(me);
     $("acct-badge").hidden = !badge;
@@ -206,6 +278,7 @@ if ($("acct-form")) {
         $("acct-code-off").hidden = !(mine || me.overlayLink);
       }
     }
+    renderSetup(me);
     loadCloudOverlays(Boolean(me.plus?.active));
   };
 
@@ -221,6 +294,7 @@ if ($("acct-form")) {
       if (!res.ok) { section.hidden = true; return; }
       const data = await res.json();
       const items = Array.isArray(data?.overlays) ? data.overlays : [];
+      if (cloudCount !== items.length) { cloudCount = items.length; renderSetup(lastMe); }
       section.hidden = !plusOn && !items.length;
       if (section.hidden) return;
       if (count) {
@@ -761,7 +835,14 @@ if ($("acct-form")) {
       await new Promise((resolve) => setTimeout(resolve, 2000));
       try {
         const me = await (await fetch("/api/account/me", { credentials: "same-origin" })).json();
-        if (me.signedIn && me.plus?.active) { showPlus(me); note.textContent = "Your payment is confirmed. Frills Plus is on."; return; }
+        if (me.signedIn && me.plus?.active) {
+          showPlus(me);
+          note.textContent = "Your payment is confirmed. Frills Plus is on. Follow the steps below to switch it on in OBS.";
+          // A new subscriber with no code yet gets one now: one less step to forget. (With a code already made somewhere else, making another would end it, so that stays a button.)
+          if (!me.overlayLink) $("acct-code-make")?.click();
+          $("acct-setup")?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+          return;
+        }
       } catch { /* try again */ }
     }
     note.dataset.state = "error";
@@ -795,6 +876,8 @@ if ($("acct-form")) {
       btn.disabled = false;
     }
   });
+
+  $("acct-setup-hide")?.addEventListener("click", () => { setFlag(SETUP.hidden, true); renderSetup(lastMe); });
 
   $("acct-buy").addEventListener("click", () => void launchCheckout($("acct-buy"), $("acct-buy-status")));
 
@@ -868,6 +951,7 @@ if ($("acct-form")) {
     try {
       await post("logout-all");
       clearPlusCode();
+      forgetSetup();
       clearRelayTicketCache();
       show("acct-form");
       say("You were signed out on every device.");
@@ -891,6 +975,7 @@ if ($("acct-form")) {
       const res = await post("delete", { email: typed });
       if (res.ok && res.body.ok === true) {
         clearPlusCode();
+      forgetSetup();
         clearRelayTicketCache();
         $("acct-delete-email").value = "";
         $("acct-delete").open = false;

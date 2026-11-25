@@ -36,7 +36,7 @@ export function summarize(rows, now = Date.now()) {
   });
   const daily = (ev, extra) => Array.from({ length: DAYS }, (_, i) => ({ day: isoDay(today - (DAYS - 1 - i) * DAY), n: total(ev, DAYS - 1 - i, DAYS - 1 - i, extra) }));
   const perDay = daily("visit");
-  const shared = ["visit", "link_copied", "overlay_load", "plus_interest"];
+  const shared = ["visit", "link_copied", "overlay_load", "plus_interest", "plus_prompt"];
   const others = {};
   for (const r of parsed) if (!shared.includes(r.ev)) others[r.ev] = (others[r.ev] ?? 0) + r.n;
   const live = (r) => r.b === "live";
@@ -44,6 +44,16 @@ export function summarize(rows, now = Date.now()) {
   const copies = { ...trio("link_copied"), perDay: daily("link_copied"), byOverlay: split("link_copied", "a"), byOverlayWeek: split("link_copied", "a", () => true, 6), byPlatform: split("link_copied", "b", (r) => Boolean(r.b)), byPlatformWeek: split("link_copied", "b", (r) => Boolean(r.b), 6) };
   const loads = { live: trio("overlay_load", live), demo: trio("overlay_load", (r) => r.b === "demo"), livePerDay: daily("overlay_load", live), byKind: split("overlay_load", "a", live), byKindWeek: split("overlay_load", "a", live, 6) };
   const plus = { ...trio("plus_interest"), byFeature: split("plus_interest", "a"), byFeatureWeek: split("plus_interest", "a", () => true, 6) };
+  // Each moment a Plus prompt shows up in, seen and clicked. Only the moments with something in them are listed, busiest first.
+  const stepOf = (step, maxAge) => split("plus_prompt", "a", (r) => r.b === step, maxAge);
+  const prompts = {
+    shown: stepOf("shown"),
+    shownWeek: stepOf("shown", 6),
+    clicked: stepOf("clicked"),
+    clickedWeek: stepOf("clicked", 6),
+    shownTotal: total("plus_prompt", 0, DAYS - 1, (r) => r.b === "shown"),
+    clickedTotal: total("plus_prompt", 0, DAYS - 1, (r) => r.b === "clicked"),
+  };
   const rate = (num, den) => (den > 0 ? num / den : null);
   const funnel = {
     week: { visits: visits.week, copies: copies.week, live: loads.live.week, copyRate: rate(copies.week, visits.week), liveRate: rate(loads.live.week, copies.week) },
@@ -54,6 +64,7 @@ export function summarize(rows, now = Date.now()) {
     copies,
     loads,
     plus,
+    prompts,
     funnel,
     others: Object.entries(others).sort((x, y) => y[1] - x[1]).map(([label, n]) => ({ label, n })),
   };

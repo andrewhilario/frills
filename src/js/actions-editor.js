@@ -2,6 +2,7 @@
 // Public API v1.0, auto-discover live scenes/sources/filters/hotkeys/VTS items & expressions, 1-click Replay Cam
 // setup, visual "When → Do" rule builder (10 actions free · unlimited + live VTS with Frills Plus), and live log.
 
+import { countPrompt } from "./stats.js";
 import {
   ACTIONS,
   ACTION_STARTERS,
@@ -420,6 +421,8 @@ startWidgetEditor({
     const rulesHost = $("act-rules");
     const countBadge = $("act-count");
     const limitNote = $("act-limit-note");
+    limitNote?.addEventListener("click", (event) => { if (event.target.closest?.('a[href="/plus/"]')) countPrompt("action_limit", "clicked"); });
+    $("vts-plus-note")?.addEventListener("click", (event) => { if (event.target.closest?.('a[href="/plus/"]')) countPrompt("vts_locked", "clicked"); });
     const addBlankBtn = $("act-add-blank");
     const exportBtn = $("act-export");
     const importBtn = $("act-import");
@@ -448,6 +451,7 @@ startWidgetEditor({
           limitNote.replaceChildren();
           const showPlus = document.body?.dataset?.plusAccounts === "on" && plusEligible;
           if (showPlus) {
+            countPrompt("action_limit", "shown");
             limitNote.append(
               `You’ve used all ${FREE_ACTIONS_LIMIT} free actions. `,
               el("a", { href: "/plus/", textContent: "Upgrade to Frills Plus" }),
@@ -467,6 +471,7 @@ startWidgetEditor({
         if (needsNotice) {
           vtsPlusNote.replaceChildren();
           const showPlus = document.body?.dataset?.plusAccounts === "on" && plusEligible;
+          if (showPlus) countPrompt("vts_locked", "shown");
           if (hasPlusVts) {
             if (showPlus) {
               vtsPlusNote.append(

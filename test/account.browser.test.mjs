@@ -264,6 +264,111 @@ test("the Frills Plus card shows the status badge, the credits and Manage or can
   assert.deepEqual(page.problems, [], page.problems.join(" | "));
 });
 
+const stored = (key) => page.evaluate(`localStorage.getItem(${JSON.stringify(key)})`);
+const setupCount = () => text("#acct-setup-count");
+const setupButtons = () => page.evaluate(`[...document.querySelectorAll("#acct-setup-list button")].map((b) => [b.textContent.trim(), b.disabled])`);
+
+test("the set-up checklist: hidden until Plus is on, then walks through the code and the re-paste, remembers the tick, can be hidden, and is forgotten on sign out", { skip }, async () => {
+  const id = await signInAs("setup@example.com");
+  await page.goto(`${served}/account/`, { settle: 400 });
+  await signedInView();
+  assert.equal(await visible("acct-setup"), false, "nothing bought: no checklist");
+
+  await notice({ name: "subscription_created", account: id, subscription: "9101", order: "9201" });
+  await page.goto(`${served}/account/`, { settle: 500 });
+  await signedInView();
+  assert.equal(await visible("acct-setup"), true);
+  assert.equal(await setupCount(), "1 / 3");
+  assert.deepEqual(await setupButtons(), [["Activate on this browser", false], ["I pasted them", true]], "re-pasting cannot be ticked before the code is on this browser");
+
+  await page.evaluate(`document.querySelector("#acct-setup-list button").click()`);
+  await page.waitFor(`document.getElementById("acct-setup-count").textContent === "2 / 3"`, { timeout: 8000 });
+  assert.match(await stored("frills:plus:code"), /^[0-9a-f]{32}$/, "the code is kept on this browser");
+  assert.deepEqual((await setupButtons())[0], ["I pasted them", false]);
+
+  await page.evaluate(`[...document.querySelectorAll("#acct-setup-list button")].find((b) => b.textContent === "I pasted them").click()`);
+  assert.equal(await setupCount(), "All set");
+  assert.equal(await page.evaluate(`document.getElementById("acct-setup-count").dataset.tone`), "on");
+  assert.equal(await stored("frills:plus:setup:pasted"), "1");
+  await page.goto(`${served}/account/`, { settle: 500 });
+  await signedInView();
+  assert.equal(await setupCount(), "All set", "the tick survives a reload");
+
+  await page.evaluate(`document.getElementById("acct-setup-hide").click()`);
+  assert.equal(await visible("acct-setup"), false);
+  await page.goto(`${served}/account/`, { settle: 500 });
+  await signedInView();
+  assert.equal(await visible("acct-setup"), false, "hidden stays hidden");
+
+  await page.evaluate(`document.getElementById("acct-out").click()`);
+  await formView();
+  assert.deepEqual([await stored("frills:plus:setup:pasted"), await stored("frills:plus:setup:hidden"), await stored("frills:plus:code")], [null, null, null], "signing out forgets all of it");
+  assert.deepEqual(page.problems, [], page.problems.join(" | "));
+});
+
+test("coming back from paying: a new subscriber gets the Plus code without pressing anything, and the checklist is on screen", { skip }, async () => {
+  const id = await signInAs("fresh@example.com");
+  await page.evaluate(`localStorage.clear()`);
+  await page.goto(`${served}/account/?welcome=1`, { settle: 500 });
+  await signedInView();
+  assert.equal(await visible("acct-setup"), false, "before the payment notice there is nothing to set up");
+  await notice({ name: "subscription_created", account: id, subscription: "9102", order: "9202" });
+  await page.waitFor(`document.getElementById("acct-setup-count").textContent === "2 / 3"`, { timeout: 15000 });
+  assert.match(await text("#acct-buy-status"), /Follow the steps below/);
+  assert.match(await stored("frills:plus:code"), /^[0-9a-f]{32}$/);
+  assert.deepEqual((await setupButtons())[0], ["I pasted them", false], "only the re-paste is left");
+  assert.deepEqual(page.problems, [], page.problems.join(" | "));
+});
+
+test("Plus prompts are counted anonymously: seen once for each moment in a tab, clicked when taken, and nothing at all for Do Not Track", { skip }, async () => {
+  const beacons = () => page.evaluate(`window.__beacons.map((b) => b.body)`);
+  // One pretend beacon for the whole test; Do Not Track is switched on by a note in localStorage (the script cannot be swapped part-way: Chrome forgets it after a link is followed)
+  const installed = (await page.send("Page.addScriptToEvaluateOnNewDocument", { source: `(() => {
+    window.__beacons = [];
+    navigator.sendBeacon = (url, body) => { window.__beacons.push({ url, body: String(body) }); return true; };
+    try { if (localStorage.getItem("__dnt") === "1") Object.defineProperty(navigator, "doNotTrack", { value: "1", configurable: true }); } catch {}
+  })()` })).identifier;
+  const prompt = (moment, step) => JSON.stringify({ e: "plus_prompt", a: moment, b: step });
+  await page.goto(`${served}/timer/`, { settle: 200 });
+  await page.evaluate(`fetch("/api/account/logout", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })`); // (a Plus account sees the full cloud bar, not the offer)
+  await page.evaluate("sessionStorage.clear(); localStorage.clear()");
+  try {
+    // the tip under an editor, for a visitor who could buy Plus: seen once, and not again after a reload in the same tab
+    await page.goto(`${served}/timer/`, { settle: 800 });
+    await page.waitFor(`Boolean(document.querySelector(".cloud-tip"))`, { timeout: 8000 });
+    assert.equal((await beacons()).filter((b) => b === prompt("editor_tip", "shown")).length, 1);
+    await page.goto(`${served}/timer/`, { settle: 800 });
+    await page.waitFor(`Boolean(document.querySelector(".cloud-tip"))`, { timeout: 8000 });
+    assert.equal((await beacons()).filter((b) => b === prompt("editor_tip", "shown")).length, 0, "a reload in the same tab is not a new person seeing it");
+    assert.deepEqual(await page.evaluate(`(() => { document.querySelector(".cloud-tip a").click(); return window.__beacons.map((b) => b.body).filter((b) => b.includes("clicked")); })()`), [prompt("editor_tip", "clicked")]);
+
+    // the free-actions limit: seen when the 10th action is added, clicked on the Plus link in the note
+    await page.goto(`${served}/actions/`, { settle: 800 });
+    await page.waitFor(`Boolean(document.getElementById("act-add-blank"))`, { timeout: 8000 });
+    for (let i = 0; i < 10; i++) await page.evaluate(`(() => { const b = document.getElementById("act-add-blank"); if (!b.disabled) b.click(); })()`);
+    await page.waitFor(`document.getElementById("act-count").textContent.startsWith("10 / 10")`, { timeout: 8000 });
+    assert.equal(await page.evaluate(`document.getElementById("act-limit-note").hidden`), false);
+    assert.equal((await beacons()).filter((b) => b === prompt("action_limit", "shown")).length, 1, "redrawing the note does not count again");
+    assert.deepEqual(await page.evaluate(`(() => { document.querySelector('#act-limit-note a[href="/plus/"]').click(); return window.__beacons.map((b) => b.body).filter((b) => b.includes("action_limit") && b.includes("clicked")); })()`), [prompt("action_limit", "clicked")]);
+
+    // the checkout button: counted as the click happens, before the page leaves for the payment page
+    await signInAs("prompt@example.com");
+    await page.goto(`${served}/account/`, { settle: 500 });
+    await signedInView();
+    assert.deepEqual(await page.evaluate(`(() => { document.getElementById("acct-buy").click(); return window.__beacons.map((b) => b.body).filter((b) => b.includes("checkout")); })()`), [prompt("checkout", "clicked")]);
+
+    // Do Not Track: the prompt is still shown, nothing is sent
+    await page.evaluate('sessionStorage.clear(); localStorage.setItem("__dnt", "1")');
+    await page.goto(`${served}/timer/`, { settle: 800 });
+    await page.waitFor(`Boolean(document.querySelector(".cloud-tip"))`, { timeout: 8000 });
+    assert.deepEqual(await beacons(), [], "Do Not Track: nothing is counted");
+  } finally {
+    await page.evaluate('localStorage.removeItem("__dnt")').catch(() => {});
+    await page.send("Page.removeScriptToEvaluateOnNewDocument", { identifier: installed }).catch(() => {}); // (so a failed check above is what gets reported)
+  }
+  assert.deepEqual(page.problems, [], page.problems.join(" | "));
+});
+
 test("sign out everywhere ends this browser's session and says so", { skip }, async () => {
   await signInAs("everywhere@example.com");
   await page.goto(`${served}/account/`, { settle: 400 });

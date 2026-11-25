@@ -4,6 +4,7 @@
 //   - Press "Save live update" anytime to push new colors, themes, fonts, rules, or channel names live to OBS within seconds.
 
 import { copyButton } from "./ui.js";
+import { countPrompt } from "./stats.js";
 
 const ID_RE = /^[A-Za-z0-9_-]{12}$/;
 
@@ -290,6 +291,7 @@ export function mountCloudSave({ kind, storeKey, anchor, getUrl, defaultName = "
     link.href = "/plus/";
     link.textContent = "See Frills Plus";
     text.append(link, ".");
+    link.addEventListener("click", () => countPrompt("editor_tip", "clicked"));
 
     const close = document.createElement("button");
     close.type = "button";
@@ -303,6 +305,7 @@ export function mountCloudSave({ kind, storeKey, anchor, getUrl, defaultName = "
 
     tip.append(text, close);
     anchor.insertAdjacentElement("afterend", tip);
+    countPrompt("editor_tip", "shown");
   };
 
   // Probe account + Plus status silently (probe=1 returns 200 when signed out so DevTools stays error-free);
