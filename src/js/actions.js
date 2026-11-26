@@ -4,10 +4,11 @@
 // filters, audio mute, media playback, text updates, hotkeys, plus Frills sounds, banners, and timed delays.
 // Pure logic & URL encoding so it is unit-tested without a browser.
 
-import { defineWidget, number, range, text, toggle } from "./widget-settings.js";
+import { defineWidget, number, range, selectOf, text, toggle } from "./widget-settings.js";
 import { SOUNDS } from "./alerts-settings.js";
 import { HEX } from "./color.js";
 import { cleanObsPort } from "./obs-ws.js";
+import { cleanSlobsPort } from "./slobs-ws.js";
 import { cleanVtsPort, renderStickyNoteBase64 } from "./vts-ws.js";
 
 /** Free visitors get up to 10 actions & up to 5 live VTS sticky notes at once with no account; Frills Plus unlocks unlimited. */
@@ -510,6 +511,7 @@ export function formatTemplate(tpl, ctx = {}) {
 
 export const ACTIONS = defineWidget({
   defaults: {
+    obsApp: "obs",
     obsPort: 4455,
     obsAutoStart: true,
     replaySource: "Frills Replay Cam",
@@ -519,8 +521,9 @@ export const ACTIONS = defineWidget({
     rules: DEFAULT_RULES_ENCODED,
   },
   controls: [
-    { section: "actions", ...number("obsPort", "OBS WebSocket port", 1, 65535), hidden: true },
-    { section: "actions", ...toggle("obsAutoStart", "Auto-start Replay Buffer when OBS connects"), hidden: true },
+    { section: "actions", ...selectOf("obsApp", "Streaming app", [["obs", "OBS Studio"], ["slobs", "Streamlabs Desktop"]]), hidden: true },
+    { section: "actions", ...number("obsPort", "OBS / Streamlabs port", 1, 65535), hidden: true },
+    { section: "actions", ...toggle("obsAutoStart", "Auto-start Replay Buffer when connected"), hidden: true },
     { section: "actions", ...text("replaySource", "Default OBS Replay Cam source name", 60), hidden: true },
     { section: "actions", ...number("vtsPort", "VTube Studio API port", 1, 65535), hidden: true },
     { section: "actions", ...toggle("showToasts", "Show on-screen toast when an action fires") },
@@ -633,11 +636,12 @@ export function createObsStepExecutor(obs, {
       const cur = await obs.call("GetCurrentProgramScene");
       scene = cur?.currentProgramSceneName || "";
     }
-    if (!scene) throw new Error("No active OBS scene.");
+    if (!scene) throw new Error(obs?.kind === "slobs" ? "No active Streamlabs scene." : "No active OBS scene.");
     try {
       const found = await obs.call("GetSceneItemId", { sceneName: scene, sourceName });
-      return { sceneName: scene, sceneItemId: found.sceneItemId };
-    } catch {
+      return { sceneName: found?.sceneName || scene, sceneItemId: found.sceneItemId };
+    } catch (err) {
+      if (obs?.kind === "slobs") throw err;
       const created = await obs.call("CreateSceneItem", { sceneName: scene, sourceName, sceneItemEnabled: false });
       return { sceneName: scene, sceneItemId: created.sceneItemId };
     }
@@ -645,12 +649,13 @@ export function createObsStepExecutor(obs, {
 
   return {
     async run(step, ctx) {
+      const appLabel = obs?.kind === "slobs" ? "Streamlabs Desktop" : "OBS";
       if (!obs?.connected) {
         if (previewFallback) {
           if (step.type === "obs.clip") {
             const msg = formatTemplate(step.toast || "Clip saved · {name}", ctx);
             onToast({ title: "Clip saved (preview)", text: msg, fx: "sparkles" });
-            return { ok: true, simulated: true, detail: "Simulated clip (connect OBS to save real clips)" };
+            return { ok: true, simulated: true, detail: `Simulated clip (connect ${appLabel} to save real clips)` };
           }
           if (step.type === "obs.replay") {
             onReplayStart({ badge: step.badge || "REPLAY", who: ctx.who, label: ctx.label });
@@ -658,10 +663,10 @@ export function createObsStepExecutor(obs, {
             onReplayEnd();
             return { ok: true, simulated: true, detail: "Simulated replay cam (connect OBS to play real clips)" };
           }
-          onToast({ title: ctx.ruleName || "Action (preview)", text: `${step.type.replace("obs.", "OBS ")} · ${ctx.who}`, fx: "sparkles" });
-          return { ok: true, simulated: true, detail: `Simulated ${step.type} (connect OBS to run live)` };
+          onToast({ title: ctx.ruleName || "Action (preview)", text: `${step.type.replace("obs.", `${appLabel} `)} · ${ctx.who}`, fx: "sparkles" });
+          return { ok: true, simulated: true, detail: `Simulated ${step.type} (connect ${appLabel} to run live)` };
         }
-        return { ok: false, detail: "OBS not connected" };
+        return { ok: false, detail: `${appLabel} not connected` };
       }
 
       if (step.type === "obs.clip") {
@@ -669,7 +674,7 @@ export function createObsStepExecutor(obs, {
         await obs.call("SaveReplayBuffer");
         await waitSaved;
         if (step.toast) onToast({ title: "Clip saved", text: formatTemplate(step.toast, ctx), fx: "sparkles" });
-        return { ok: true, detail: "Saved OBS Replay Buffer" };
+        return { ok: true, detail: `Saved ${appLabel} Replay Buffer` };
       }
 
       if (step.type === "obs.replay") {
@@ -1275,4 +1280,4 @@ export class ActionEngine {
   }
 }
 
-export { cleanObsPort, cleanVtsPort };
+export { cleanObsPort, cleanSlobsPort, cleanVtsPort };

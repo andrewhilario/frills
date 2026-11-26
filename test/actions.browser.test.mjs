@@ -451,6 +451,116 @@ test("actions editor connects to mock VTube Studio API, runs free 5-sticky-note 
   assert.deepEqual(page.problems, [], page.problems.join(" | "));
 });
 
+test("Streamlabs Desktop: connect via SockJS Remote Control API, auto-start Replay Buffer, and run automatic !clip in live overlay", { skip }, async () => {
+  const rpcCalls = [];
+  const token = "slobs-secret-token-99";
+  let replayStatus = "offline";
+  const sockets = new Set();
+
+  const server = http.createServer((_req, res) => { res.writeHead(426); res.end(); });
+  server.on("upgrade", (req, socket) => {
+    const key = req.headers["sec-websocket-key"];
+    const accept = createHash("sha1").update(key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11").digest("base64");
+    socket.write(
+      "HTTP/1.1 101 Switching Protocols\r\n" +
+      "Upgrade: websocket\r\n" +
+      "Connection: Upgrade\r\n" +
+      `Sec-WebSocket-Accept: ${accept}\r\n\r\n`,
+    );
+    sockets.add(socket);
+    socket.on("error", () => {});
+    const sendRaw = (text) => { if (!socket.destroyed) socket.write(wsEncodeText(text)); };
+    const sendRpc = (obj) => sendRaw("a" + JSON.stringify([JSON.stringify(obj)]));
+    sendRaw("o");
+
+    let pendingBuf = Buffer.alloc(0);
+    socket.on("data", (chunk) => {
+      pendingBuf = Buffer.concat([pendingBuf, chunk]);
+      const { frames, rest } = wsDecodeFrames(pendingBuf);
+      pendingBuf = rest;
+      for (const f of frames) {
+        if (f.opcode === 8) { socket.end(); return; }
+        if (f.opcode !== 1) continue;
+        let batch;
+        try { batch = JSON.parse(f.text); } catch { continue; }
+        for (const item of Array.isArray(batch) ? batch : [batch]) {
+          let msg;
+          try { msg = typeof item === "string" ? JSON.parse(item) : item; } catch { continue; }
+          const { id, method, params } = msg;
+          const res = params?.resource;
+          const args = params?.args ?? [];
+          rpcCalls.push([res, method, args]);
+          if (res === "TcpServerService" && method === "auth") {
+            sendRpc({ jsonrpc: "2.0", id, result: args[0] === token });
+          } else if (res === "ScenesService" && method === "getScenes") {
+            sendRpc({ jsonrpc: "2.0", id, result: [{ id: "sc1", name: "Bawowant", nodes: [{ id: "n1", sceneId: "sc1", sceneItemId: "i1", sourceId: "s1", sceneNodeType: "item", name: "Model", visible: true }] }] });
+          } else if (res === "ScenesService" && method === "activeScene") {
+            sendRpc({ jsonrpc: "2.0", id, result: { id: "sc1", name: "Bawowant" } });
+          } else if (res === "AudioService" && method === "getSources") {
+            sendRpc({ jsonrpc: "2.0", id, result: [{ sourceId: "mic1", name: "Mic/Aux", muted: false }] });
+          } else if (res === "StreamingService" && method === "getModel") {
+            sendRpc({ jsonrpc: "2.0", id, result: { streamingStatus: "live", recordingStatus: "offline", replayBufferStatus: replayStatus } });
+          } else if (res === "StreamingService" && method === "startReplayBuffer") {
+            replayStatus = "running";
+            sendRpc({ jsonrpc: "2.0", id, result: null });
+          } else if (res === "StreamingService" && method === "saveReplay") {
+            sendRpc({ jsonrpc: "2.0", id, result: null });
+          } else {
+            sendRpc({ jsonrpc: "2.0", id, result: null });
+          }
+        }
+      }
+    });
+    socket.on("close", () => sockets.delete(socket));
+  });
+  await new Promise((r) => server.listen(0, "127.0.0.1", r));
+  const slobsPort = server.address().port;
+
+  try {
+    const { base, made } = await withHelper();
+    await page.viewport(1280, 900);
+    await page.goto(base + "/actions/", { settle: 700 });
+    await page.evaluate("localStorage.clear()");
+    await page.goto(base + "/actions/", { settle: 700 });
+
+    // Switch Streaming app to Streamlabs Desktop, fill port + token, and connect
+    await page.evaluate(`(() => { const s = document.getElementById("obs-app"); s.value = "slobs"; s.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+    assert.equal(await page.evaluate(`document.getElementById("obs-port").value`), "59650", "defaults to Streamlabs port 59650");
+    assert.equal(await page.evaluate(`document.getElementById("obs-replay-sub").hidden`), true, "OBS-only Replay Cam creator hidden on Streamlabs");
+    await type("#obs-port", String(slobsPort));
+    await type("#obs-pass", token);
+    await click("#obs-connect");
+    await until(async () => /Connected to Streamlabs Desktop/.test(await page.evaluate(`document.getElementById("obs-status").textContent`)));
+    assert.ok(rpcCalls.some(([r, m]) => r === "StreamingService" && m === "startReplayBuffer"), "auto-started Streamlabs Replay Buffer");
+
+    // Generate live overlay link -> obsApp=slobs in query, token strictly in #obsPass hash
+    await type("#source-channel", "ainz");
+    const rawLink = await page.evaluate(`document.getElementById("link").value`);
+    const parsed = new URL(rawLink);
+    assert.equal(parsed.searchParams.get("obsApp"), "slobs");
+    assert.equal(parsed.searchParams.get("obsPort"), String(slobsPort));
+    assert.equal(parsed.searchParams.has("obsPass"), false);
+    assert.equal(new URLSearchParams(parsed.hash.slice(1)).get("obsPass"), token);
+
+    // Open overlay in headless Chrome and fire !clip from TikTok chat -> triggers StreamingService.saveReplay automatically!
+    const savesBefore = rpcCalls.filter(([r, m]) => r === "StreamingService" && m === "saveReplay").length;
+    await page.goto(parsed.href.replace(parsed.origin, base), { settle: 800 });
+    await until(() => made.length >= 1 && rpcCalls.filter(([r, m]) => r === "TcpServerService" && m === "auth").length >= 2);
+    await sleep(150);
+    made[made.length - 1].emit("chat", {
+      common: { msgId: "slobs-clip-1" },
+      user: { id: "u1", displayId: "mod_pal", nickname: "Mod Pal" },
+      content: "!clip",
+      userIdentity: { isModeratorOfAnchor: true },
+    });
+    await until(() => rpcCalls.filter(([r, m]) => r === "StreamingService" && m === "saveReplay").length > savesBefore);
+    assert.deepEqual(page.problems, [], page.problems.join(" | "));
+  } finally {
+    for (const s of sockets) s.destroy();
+    await new Promise((r) => server.close(r));
+  }
+});
+
 test("actions editor has no sideways scrolling or wrapped buttons at 320px and 1280px", { skip }, async () => {
   const { base } = await withHelper();
   for (const width of [320, 1280]) {

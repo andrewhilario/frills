@@ -16,6 +16,7 @@ import {
   hasVtsSteps,
 } from "./actions.js";
 import { ObsClient, localSecretsFromHash } from "./obs-ws.js";
+import { SlobsClient } from "./slobs-ws.js";
 import { VtsClient } from "./vts-ws.js";
 import { createActionsView } from "./widgets-view.js";
 import { bothFromParams, channelFromParams, connectEvents, platformFromParams } from "./widget-overlay.js";
@@ -42,24 +43,23 @@ const view = createActionsView(document.getElementById("actions"));
 view.apply(settings);
 
 const needsObs = rules.some((r) => r.enabled && r.steps.some((s) => s.type.startsWith("obs.")));
+const isSlobs = settings.obsApp === "slobs";
 let obs = null;
 if (!demo && needsObs) {
-  obs = new ObsClient({
-    port: settings.obsPort,
-    password: obsPassword,
-    reconnect: true,
-    onStatus: async ({ state, detail }) => {
-      if (state === "connected") {
-        say("");
-        if (settings.obsAutoStart) {
-          const st = await obs.call("GetReplayBufferStatus").catch(() => null);
-          if (st && !st.outputActive) obs.call("StartReplayBuffer").catch(() => {});
-        }
-      } else if (state === "auth-error") {
-        say(detail || "OBS WebSocket password was rejected.");
+  const onStudioStatus = async ({ state, detail }) => {
+    if (state === "connected") {
+      say("");
+      if (settings.obsAutoStart) {
+        const st = await obs.call("GetReplayBufferStatus").catch(() => null);
+        if (st && !st.outputActive) obs.call("StartReplayBuffer").catch(() => {});
       }
-    },
-  });
+    } else if (state === "auth-error") {
+      say(detail || (isSlobs ? "Streamlabs API token was rejected." : "OBS WebSocket password was rejected."));
+    }
+  };
+  obs = isSlobs
+    ? new SlobsClient({ port: settings.obsPort, token: obsPassword, reconnect: true, onStatus: onStudioStatus })
+    : new ObsClient({ port: settings.obsPort, password: obsPassword, reconnect: true, onStatus: onStudioStatus });
   obs.connect().catch(() => {});
 }
 

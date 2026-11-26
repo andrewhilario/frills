@@ -7,6 +7,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { ObsClient, cleanObsPort, localSecretsFromHash, obsAuthString, obsPassFromHash, withLocalSecretsHash, withObsPassHash } from "../src/js/obs-ws.js";
+import { SLOBS_DEFAULT_PORT, SlobsClient, cleanSlobsPort } from "../src/js/slobs-ws.js";
 import { VtsClient, cleanVtsPort, pickFaceMeshName } from "../src/js/vts-ws.js";
 import {
   ACTIONS,
@@ -467,4 +468,140 @@ test("VtsClient pairs via Allow popup, discovers hotkeys/expressions/items/meshe
   assert.deepEqual(shapeCalls.slice(1), ["heart", "star", "paw", "cloud", "random"], "Plus live overlay passes custom sticker shapes through");
 
   client.close();
+});
+
+test("SlobsClient speaks SockJS JSON-RPC, authenticates, resolves PROMISE emitters, discovers scenes/audio, and runs !clip/scene/source/mute", async () => {
+  assert.equal(SLOBS_DEFAULT_PORT, 59650);
+  assert.equal(cleanSlobsPort("59650"), 59650);
+  assert.equal(cleanSlobsPort("0"), 59650);
+  assert.equal(cleanSlobsPort("59700"), 59700);
+
+  // URL round-trip preserves obsApp=slobs and port 59650
+  const slobsSettings = ACTIONS.sanitize({ ...ACTIONS.defaults, obsApp: "slobs", obsPort: 59650 });
+  const slobsUrl = new URL(ACTIONS.url("https://frills.example/overlay/actions/", { channel: "ainz", settings: slobsSettings }));
+  assert.equal(slobsUrl.searchParams.get("obsApp"), "slobs");
+  assert.equal(slobsUrl.searchParams.get("obsPort"), "59650");
+  assert.deepEqual(ACTIONS.sanitize(ACTIONS.fromParams(slobsUrl.searchParams)), slobsSettings);
+
+  // Missing token fails fast with auth-error
+  const statuses = [];
+  const noTok = new SlobsClient({ port: 59650, token: "", reconnect: false, onStatus: (s) => statuses.push(s.state) });
+  await assert.rejects(() => noTok.connect(), /API token/i);
+  assert.equal(statuses.at(-1), "auth-error");
+
+  const rpcCalls = [];
+  let replayStatus = "offline";
+  let muted = false;
+  let itemVisible = false;
+
+  class FakeSlobsWS {
+    constructor(url) {
+      this.url = url;
+      this.readyState = 1;
+      this.listeners = new Map();
+      assert.match(url, /^ws:\/\/127\.0\.0\.1:59650\/api\/\d{3}\/[a-z0-9]{8}\/websocket$/);
+      queueMicrotask(() => this._emit("message", { data: "o" }));
+    }
+    addEventListener(ev, fn) {
+      if (!this.listeners.has(ev)) this.listeners.set(ev, new Set());
+      this.listeners.get(ev).add(fn);
+    }
+    _emit(ev, payload) {
+      for (const fn of this.listeners.get(ev) ?? []) fn(payload);
+    }
+    _sendSock(obj) {
+      this._emit("message", { data: "a" + JSON.stringify([JSON.stringify(obj)]) });
+    }
+    send(raw) {
+      const batch = JSON.parse(raw);
+      assert.ok(Array.isArray(batch), "client sends SockJS array frames");
+      const msg = JSON.parse(batch[0]);
+      const { id, method, params } = msg;
+      const resource = params?.resource;
+      const args = params?.args ?? [];
+      rpcCalls.push([resource, method, args]);
+
+      if (resource === "TcpServerService" && method === "auth") {
+        this._sendSock({ jsonrpc: "2.0", id, result: args[0] === "good-token" });
+      } else if (resource === "ScenesService" && method === "getScenes") {
+        this._sendSock({
+          jsonrpc: "2.0",
+          id,
+          result: [
+            {
+              id: "scene_1",
+              name: "Bawowant",
+              nodes: [{ id: "node_1", sceneId: "scene_1", sceneItemId: "item_1", sourceId: "src_cam", sceneNodeType: "item", name: "Model", visible: itemVisible }],
+            },
+            { id: "scene_2", name: "Wiwim", nodes: [] },
+          ],
+        });
+      } else if (resource === "ScenesService" && method === "activeScene") {
+        this._sendSock({ jsonrpc: "2.0", id, result: { id: "scene_1", name: "Bawowant" } });
+      } else if (resource === "ScenesService" && method === "makeSceneActive") {
+        this._sendSock({ jsonrpc: "2.0", id, result: true });
+      } else if (resource === "AudioService" && method === "getSources") {
+        this._sendSock({ jsonrpc: "2.0", id, result: [{ sourceId: "mic_1", name: "Mic/Aux", muted }] });
+      } else if (resource === "StreamingService" && method === "getModel") {
+        this._sendSock({ jsonrpc: "2.0", id, result: { streamingStatus: "live", recordingStatus: "offline", replayBufferStatus: replayStatus } });
+      } else if (resource === "StreamingService" && method === "startReplayBuffer") {
+        replayStatus = "running";
+        // Exercise async PROMISE emitter completion path
+        this._sendSock({ jsonrpc: "2.0", id, result: { _type: "SUBSCRIPTION", emitter: "PROMISE", resourceId: "promise_rb" } });
+        queueMicrotask(() => this._sendSock({ jsonrpc: "2.0", id: null, result: { _type: "EVENT", emitter: "PROMISE", resourceId: "promise_rb", data: true } }));
+      } else if (resource === "StreamingService" && method === "saveReplay") {
+        this._sendSock({ jsonrpc: "2.0", id, result: null });
+      } else if (resource.startsWith("SceneItem[") && method === "setVisibility") {
+        itemVisible = Boolean(args[0]);
+        this._sendSock({ jsonrpc: "2.0", id, result: null });
+      } else if (resource === 'AudioSource["mic_1"]' && method === "setMuted") {
+        muted = Boolean(args[0]);
+        this._sendSock({ jsonrpc: "2.0", id, result: null });
+      } else {
+        this._sendSock({ jsonrpc: "2.0", id, result: null });
+      }
+    }
+    close() {
+      this.readyState = 3;
+      this._emit("close", { code: 1000 });
+    }
+  }
+
+  // Bad token triggers auth-error
+  const bad = new SlobsClient({ port: 59650, token: "wrong-token", reconnect: false, WebSocketCtor: FakeSlobsWS });
+  await assert.rejects(() => bad.connect(), /Wrong Streamlabs API token/i);
+
+  // Good token connects, discovers, auto-starts Replay Buffer, and executes !clip, scene switch, source toggle, audio mute
+  const slobs = new SlobsClient({ port: 59650, token: "good-token", reconnect: false, WebSocketCtor: FakeSlobsWS });
+  await slobs.connect();
+  assert.equal(slobs.connected, true);
+
+  const info = await slobs.discover();
+  assert.deepEqual(info.scenes, ["Bawowant", "Wiwim"]);
+  assert.ok(info.sources.includes("Model"));
+  assert.ok(info.inputs.includes("Mic/Aux"));
+  assert.equal(info.replayBufferSupported, true);
+  assert.equal(info.replayBufferActive, false);
+
+  await slobs.call("StartReplayBuffer");
+  assert.equal((await slobs.call("GetReplayBufferStatus")).outputActive, true);
+
+  const toasts = [];
+  const exec = createObsStepExecutor(slobs, { onToast: (t) => toasts.push(t) });
+  const clipRes = await exec.run({ type: "obs.clip", toast: "Clip saved · {name}" }, { who: "Ainz" });
+  assert.equal(clipRes.ok, true);
+  assert.match(clipRes.detail, /Streamlabs/);
+  assert.equal(toasts[0].text, "Clip saved · Ainz");
+  assert.ok(rpcCalls.some(([r, m]) => r === "StreamingService" && m === "saveReplay"));
+
+  await exec.run({ type: "obs.scene", scene: "Wiwim", duration: 0 }, { who: "Ainz" });
+  assert.ok(rpcCalls.some(([r, m, a]) => r === "ScenesService" && m === "makeSceneActive" && a[0] === "scene_2"));
+
+  await exec.run({ type: "obs.source", scene: "Bawowant", source: "Model", mode: "show", duration: 0 }, { who: "Ainz" });
+  assert.equal(itemVisible, true);
+
+  await exec.run({ type: "obs.mute", source: "Mic/Aux", mode: "mute", duration: 0 }, { who: "Ainz" });
+  assert.equal(muted, true);
+
+  slobs.close();
 });

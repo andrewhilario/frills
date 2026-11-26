@@ -36,7 +36,8 @@ import {
 } from "./actions.js";
 import { COMMON_GIFTS } from "./timer.js";
 import { SOUNDS } from "./alerts-settings.js";
-import { ObsClient, withLocalSecretsHash } from "./obs-ws.js";
+import { OBS_DEFAULT_PORT, ObsClient, withLocalSecretsHash } from "./obs-ws.js";
+import { SLOBS_DEFAULT_PORT, SlobsClient, cleanSlobsPort } from "./slobs-ws.js";
 import { VtsClient } from "./vts-ws.js";
 import { createActionsView } from "./widgets-view.js";
 import { startWidgetEditor } from "./widget-editor.js";
@@ -47,6 +48,7 @@ import { el } from "./feed.js";
 
 const $ = (id) => document.getElementById(id);
 const PASS_STORE_KEY = "frills:actions:obs-pass:v1";
+const SLOBS_TOKEN_STORE_KEY = "frills:actions:slobs-token:v1";
 const VTS_TOKEN_STORE_KEY = "frills:actions:vts-token:v1";
 const sounds = createSounds();
 
@@ -61,7 +63,10 @@ function saveStored(key, val) {
 }
 
 let obsPass = loadStored(PASS_STORE_KEY);
+let slobsToken = loadStored(SLOBS_TOKEN_STORE_KEY);
 let vtsToken = loadStored(VTS_TOKEN_STORE_KEY);
+let activeObsApp = "obs";
+const activeStudioSecret = () => (activeObsApp === "slobs" ? slobsToken : obsPass);
 let latestRefreshLink = () => {};
 
 startWidgetEditor({
@@ -80,7 +85,7 @@ startWidgetEditor({
     : p === "both"
       ? "Type your TikTok @name and Twitch channel so commands and gifts from both trigger your actions."
       : "Type your TikTok name, or frills_demo for made-up events. Every Test button works without connecting."),
-  urlTransform: (url) => withLocalSecretsHash(url, { obsPass, vtsToken }),
+  urlTransform: (url) => withLocalSecretsHash(url, { obsPass: activeStudioSecret(), vtsToken }),
   create(host, settings, ctx) {
     let current = settings;
     let plusActive = false;
@@ -111,13 +116,19 @@ startWidgetEditor({
       }));
     };
 
-    // ── Live OBS WebSocket connection & auto-discovery ──────────────────────────────────────────────────────────
+    // ── Live OBS Studio / Streamlabs Desktop connection & auto-discovery ───────────────────────────────────────
+    activeObsApp = settings.obsApp === "slobs" ? "slobs" : "obs";
+    const obsAppSelect = $("obs-app");
+    const obsPortLabel = $("obs-port-label");
+    const obsPassLabel = $("obs-pass-label");
     const obsStatusEl = $("obs-status");
     const obsConnectBtn = $("obs-connect");
     const obsToolsEl = $("obs-tools");
+    const obsReplaySub = $("obs-replay-sub");
     const obsRbText = $("obs-rb-text");
     const obsRbStartBtn = $("obs-start-rb");
     const obsReplayMsg = $("obs-replay-msg");
+    const obsRefreshBtn = $("obs-refresh");
 
     const setObsMsg = (text, state = "") => {
       if (!obsStatusEl) return;
@@ -132,50 +143,87 @@ startWidgetEditor({
     };
     fillDatalist("obs-gifts-dl", COMMON_GIFTS);
 
-    const obs = new ObsClient({
-      port: settings.obsPort,
+    const idleStudioMsg = () => (activeObsApp === "slobs"
+      ? "Not connected. Open Streamlabs Desktop → Settings → Mobile (or Remote Control) → click QR code → Show Details → copy API Token."
+      : "Not connected. Open OBS → Tools → WebSocket Server Settings to connect.");
+    const studioConnectLabel = (connected) => (activeObsApp === "slobs"
+      ? (connected ? "Disconnect Streamlabs" : "Connect Streamlabs")
+      : (connected ? "Disconnect OBS" : "Connect OBS"));
+
+    const handleStudioStatus = (kind) => ({ state, detail }) => {
+      if (kind !== activeObsApp) return;
+      if (state === "connected") {
+        setObsMsg(detail, "connected");
+        if (obsConnectBtn) obsConnectBtn.textContent = studioConnectLabel(true);
+        if (obsToolsEl) obsToolsEl.hidden = false;
+      } else if (state === "connecting") {
+        setObsMsg(detail, "");
+        if (obsConnectBtn) obsConnectBtn.textContent = "Connecting…";
+      } else if (state === "auth-error" || state === "error") {
+        setObsMsg(detail, "error");
+        if (obsConnectBtn) obsConnectBtn.textContent = studioConnectLabel(false);
+        if (obsToolsEl) obsToolsEl.hidden = true;
+      } else {
+        setObsMsg(detail || idleStudioMsg(), "");
+        if (obsConnectBtn) obsConnectBtn.textContent = studioConnectLabel(false);
+        if (obsToolsEl) obsToolsEl.hidden = true;
+      }
+    };
+
+    const obsClient = new ObsClient({
+      port: settings.obsApp === "slobs" ? OBS_DEFAULT_PORT : settings.obsPort,
       password: obsPass,
       reconnect: false,
-      onStatus: ({ state, detail }) => {
-        if (state === "connected") {
-          setObsMsg(detail, "connected");
-          if (obsConnectBtn) obsConnectBtn.textContent = "Disconnect OBS";
-          if (obsToolsEl) obsToolsEl.hidden = false;
-        } else if (state === "connecting") {
-          setObsMsg(detail, "");
-          if (obsConnectBtn) obsConnectBtn.textContent = "Connecting…";
-        } else if (state === "auth-error" || state === "error") {
-          setObsMsg(detail, "error");
-          if (obsConnectBtn) obsConnectBtn.textContent = "Connect OBS";
-          if (obsToolsEl) obsToolsEl.hidden = true;
-        } else {
-          setObsMsg(detail || "Not connected. Open OBS → Tools → WebSocket Server Settings to connect.", "");
-          if (obsConnectBtn) obsConnectBtn.textContent = "Connect OBS";
-          if (obsToolsEl) obsToolsEl.hidden = true;
-        }
-      },
+      onStatus: handleStudioStatus("obs"),
     });
+    const slobsClient = new SlobsClient({
+      port: settings.obsApp === "slobs" ? settings.obsPort : SLOBS_DEFAULT_PORT,
+      token: slobsToken,
+      reconnect: false,
+      onStatus: handleStudioStatus("slobs"),
+    });
+    const activeClient = () => (activeObsApp === "slobs" ? slobsClient : obsClient);
+    const obs = {
+      get kind() { return activeObsApp; },
+      get connected() { return activeClient().connected; },
+      get version() { return activeClient().version; },
+      call: (...args) => activeClient().call(...args),
+      waitForEvent: (...args) => activeClient().waitForEvent(...args),
+      discover: (...args) => activeClient().discover(...args),
+      getFilters: (...args) => activeClient().getFilters(...args),
+      ensureReplayCam: (...args) => activeClient().ensureReplayCam(...args),
+      connect: () => activeClient().connect(),
+      close: () => activeClient().close(),
+    };
 
     const refreshObsDiscovery = async () => {
-      if (!obs.connected) return;
+      const client = activeClient();
+      if (!client.connected) return;
       try {
-        const info = await obs.discover();
+        const info = await client.discover();
         fillDatalist("obs-scenes-dl", info.scenes);
         fillDatalist("obs-sources-dl", info.sources);
         fillDatalist("obs-inputs-dl", info.inputs);
         fillDatalist("obs-media-dl", info.mediaInputs.length ? info.mediaInputs : info.sources);
         fillDatalist("obs-text-dl", info.textInputs.length ? info.textInputs : info.sources);
         fillDatalist("obs-hotkeys-dl", info.hotkeys);
-        setObsMsg(`Connected to OBS ${obs.version || "v5"} · ${info.scenes.length} scene(s), ${info.sources.length} source(s) loaded.`, "connected");
+        const appName = activeObsApp === "slobs" ? "Streamlabs Desktop" : `OBS ${client.version || "v5"}`;
+        setObsMsg(`Connected to ${appName} · ${info.scenes.length} scene(s), ${info.sources.length} source(s) loaded.`, "connected");
         if (obsRbText && obsRbStartBtn) {
           if (!info.replayBufferSupported) {
-            obsRbText.textContent = "Replay Buffer is off in OBS Settings → Output → Replay Buffer.";
+            obsRbText.textContent = activeObsApp === "slobs"
+              ? "Replay Buffer is off in Streamlabs Settings → Output → Replay Buffer."
+              : "Replay Buffer is off in OBS Settings → Output → Replay Buffer.";
             obsRbStartBtn.hidden = true;
           } else if (info.replayBufferActive) {
-            obsRbText.textContent = "Replay Buffer is running and ready for !clip & !replay.";
+            obsRbText.textContent = activeObsApp === "slobs"
+              ? "Replay Buffer is running and ready for automatic !clip."
+              : "Replay Buffer is running and ready for !clip & !replay.";
             obsRbStartBtn.hidden = true;
           } else {
-            obsRbText.textContent = "Replay Buffer is enabled in OBS, but stopped right now.";
+            obsRbText.textContent = activeObsApp === "slobs"
+              ? "Replay Buffer is enabled in Streamlabs, but stopped right now."
+              : "Replay Buffer is enabled in OBS, but stopped right now.";
             obsRbStartBtn.hidden = false;
           }
         }
@@ -282,24 +330,58 @@ startWidgetEditor({
     const obsReplayLayout = $("obs-replay-layout");
 
     const syncDeviceInputs = () => {
-      if (obsPortInput) obsPortInput.value = String(current.obsPort ?? 4455);
-      if (obsPassInput) obsPassInput.value = obsPass;
+      activeObsApp = current.obsApp === "slobs" ? "slobs" : "obs";
+      const isSlobs = activeObsApp === "slobs";
+      if (obsAppSelect) obsAppSelect.value = activeObsApp;
+      if (obsPortLabel) obsPortLabel.textContent = isSlobs ? "Streamlabs API port" : "OBS WebSocket port";
+      if (obsPassLabel) obsPassLabel.textContent = isSlobs ? "API Token (stays on your PC)" : "Password (stays on your PC)";
+      if (obsPortInput) obsPortInput.value = String(current.obsPort ?? (isSlobs ? SLOBS_DEFAULT_PORT : OBS_DEFAULT_PORT));
+      if (obsPassInput) {
+        obsPassInput.value = isSlobs ? slobsToken : obsPass;
+        obsPassInput.placeholder = isSlobs ? "Paste token from Settings → Mobile → Show Details" : "Leave blank if off";
+      }
       if (obsAutoStartInput) obsAutoStartInput.checked = current.obsAutoStart !== false;
       if (obsReplayInput) obsReplayInput.value = current.replaySource || "Frills Replay Cam";
+      if (obsReplaySub) obsReplaySub.hidden = isSlobs;
+      if (obsRefreshBtn) obsRefreshBtn.textContent = isSlobs ? "Refresh Streamlabs lists" : "Refresh OBS lists";
+      if (obsConnectBtn) obsConnectBtn.textContent = studioConnectLabel(activeClient().connected);
+      if (obsToolsEl) obsToolsEl.hidden = !activeClient().connected;
+      if (!activeClient().connected) setObsMsg(idleStudioMsg(), "");
       if (vtsPortInput) vtsPortInput.value = String(current.vtsPort ?? 8001);
     };
     syncDeviceInputs();
 
+    obsAppSelect?.addEventListener("change", () => {
+      const prev = activeObsApp;
+      const next = obsAppSelect.value === "slobs" ? "slobs" : "obs";
+      if (next === prev) return;
+      activeClient().close();
+      current.obsApp = next;
+      activeObsApp = next;
+      if (next === "slobs" && Number(current.obsPort) === OBS_DEFAULT_PORT) current.obsPort = SLOBS_DEFAULT_PORT;
+      else if (next === "obs" && Number(current.obsPort) === SLOBS_DEFAULT_PORT) current.obsPort = OBS_DEFAULT_PORT;
+      syncDeviceInputs();
+      ctx.refresh();
+      ctx.save();
+      latestRefreshLink();
+    });
+
     obsPortInput?.addEventListener("input", () => {
-      current.obsPort = cleanObsPort(obsPortInput.value);
-      obs.configure({ port: current.obsPort });
+      current.obsPort = activeObsApp === "slobs" ? cleanSlobsPort(obsPortInput.value) : cleanObsPort(obsPortInput.value);
+      activeClient().configure({ port: current.obsPort });
       ctx.refresh();
       ctx.save();
     });
     obsPassInput?.addEventListener("input", () => {
-      obsPass = obsPassInput.value;
-      saveStored(PASS_STORE_KEY, obsPass);
-      obs.configure({ password: obsPass });
+      if (activeObsApp === "slobs") {
+        slobsToken = obsPassInput.value.trim();
+        saveStored(SLOBS_TOKEN_STORE_KEY, slobsToken);
+        slobsClient.configure({ token: slobsToken });
+      } else {
+        obsPass = obsPassInput.value;
+        saveStored(PASS_STORE_KEY, obsPass);
+        obsClient.configure({ password: obsPass });
+      }
       ctx.refresh();
       latestRefreshLink();
     });
@@ -320,18 +402,23 @@ startWidgetEditor({
       ctx.save();
     });
     obsConnectBtn?.addEventListener("click", async () => {
-      if (obs.connected) {
-        obs.close();
+      const client = activeClient();
+      if (client.connected) {
+        client.close();
         return;
       }
-      obs.configure({ port: current.obsPort, password: obsPass });
+      if (activeObsApp === "slobs") {
+        slobsClient.configure({ port: current.obsPort, token: slobsToken });
+      } else {
+        obsClient.configure({ port: current.obsPort, password: obsPass });
+      }
       try {
-        await obs.connect();
+        await client.connect();
         await refreshObsDiscovery();
         if (current.obsAutoStart) {
-          const st = await obs.call("GetReplayBufferStatus").catch(() => null);
+          const st = await client.call("GetReplayBufferStatus").catch(() => null);
           if (st && !st.outputActive) {
-            await obs.call("StartReplayBuffer").catch(() => {});
+            await client.call("StartReplayBuffer").catch(() => {});
             await refreshObsDiscovery();
           }
         }
@@ -339,10 +426,10 @@ startWidgetEditor({
     });
     obsRbStartBtn?.addEventListener("click", async () => {
       try {
-        await obs.call("StartReplayBuffer");
+        await activeClient().call("StartReplayBuffer");
         await refreshObsDiscovery();
       } catch (err) {
-        if (obsRbText) obsRbText.textContent = err?.message || "Could not start Replay Buffer in OBS.";
+        if (obsRbText) obsRbText.textContent = err?.message || "Could not start Replay Buffer.";
       }
     });
     $("obs-make-replay")?.addEventListener("click", async () => {
@@ -1193,9 +1280,11 @@ startWidgetEditor({
 
     return {
       apply(next) {
+        const appChanged = (next.obsApp === "slobs" ? "slobs" : "obs") !== activeObsApp;
         current = next;
         view.apply(next);
         engine.setChannel(ctx.channel());
+        if (appChanged) syncDeviceInputs();
       },
       onReset(next) {
         current = next;
@@ -1288,8 +1377,8 @@ startWidgetEditor({
   },
 });
 
-// Keep link refresh handle updated when local OBS password or VTS token changes
+// Keep link refresh handle updated when local OBS password / Streamlabs token or VTS token changes
 latestRefreshLink = () => {
   const linkEl = $("link");
-  if (linkEl?.value) linkEl.value = withLocalSecretsHash(linkEl.value, { obsPass, vtsToken });
+  if (linkEl?.value) linkEl.value = withLocalSecretsHash(linkEl.value, { obsPass: activeStudioSecret(), vtsToken });
 };

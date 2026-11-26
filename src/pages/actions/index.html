@@ -61,17 +61,26 @@
     <section class="step-card" aria-labelledby="s2">
       <div class="step-card__head">
         <span class="step-card__num" aria-hidden="true">2</span>
-        <h2 class="step-card__title" id="s2">Connect OBS &amp; VTube Studio</h2>
+        <h2 class="step-card__title" id="s2">Connect OBS, Streamlabs &amp; VTube Studio</h2>
       </div>
-      <p class="ctl__hint"><strong>OBS Studio (28+) &amp; Streamlabs Desktop only—not TikTok LIVE Studio.</strong> OBS control steps (clips, replay cam, scenes, sources, filters, mute, hotkeys) require OBS Studio’s built-in WebSocket (port 4455). In Streamlabs Desktop, skip OBS WebSocket and use sound, banner, and VTube Studio actions via a Browser Source.</p>
+      <p class="ctl__hint"><strong>OBS Studio (28+) &amp; Streamlabs Desktop supported—not TikTok LIVE Studio.</strong> Pick your streaming app below: OBS Studio uses built-in WebSocket (port <code>4455</code>); Streamlabs Desktop uses Remote Control (<strong>Settings → Mobile → click QR code → Show Details</strong>, port <code>59650</code>) for automatic <code>!clip</code>, scene switching, source show/hide, and mic mute.</p>
       <div class="act-obs">
         <div class="act-grid">
           <label class="act-field">
-            <span class="act-field__label">OBS WebSocket port</span>
-            <input type="number" id="obs-port" min="1" max="65535" inputmode="numeric" value="4455">
+            <span class="act-field__label">Streaming app</span>
+            <select id="obs-app">
+              <option value="obs">OBS Studio (WebSocket v5)</option>
+              <option value="slobs">Streamlabs Desktop (Remote Control)</option>
+            </select>
           </label>
           <label class="act-field">
-            <span class="act-field__label">Password (stays on your PC)</span>
+            <span class="act-field__label" id="obs-port-label">OBS WebSocket port</span>
+            <input type="number" id="obs-port" min="1" max="65535" inputmode="numeric" value="4455">
+          </label>
+        </div>
+        <div class="act-grid">
+          <label class="act-field">
+            <span class="act-field__label" id="obs-pass-label">Password (stays on your PC)</span>
             <span class="act-pass-row">
               <input type="password" id="obs-pass" autocomplete="off" spellcheck="false" placeholder="Leave blank if off">
               <button class="btn btn--soft btn--sm" type="button" id="obs-pass-toggle">Show</button>
@@ -95,7 +104,7 @@
               <button class="btn btn--soft btn--sm" type="button" id="obs-refresh">Refresh OBS lists</button>
             </div>
           </div>
-          <div class="act-obs__sub">
+          <div class="act-obs__sub" id="obs-replay-sub">
             <div class="act-grid">
               <label class="act-field">
                 <span class="act-field__label">Replay Cam source name</span>
