@@ -90,7 +90,7 @@ test("the Spotify page has the share step, hidden until logged in, and it never 
   assert.equal(await page.evaluate('document.getElementById("sp-link-box").hidden'), true);
 });
 
-test("the Song requests editor puts the Spotify code in the link by itself while Frills keeps a login for it, shows no box for it, and leaves it out otherwise", { skip }, async () => {
+test("the Song requests editor always puts this browser's Spotify code in the link (so a link copied before connecting Spotify still works later), and shows no box for it", { skip }, async () => {
   // This server has only files, no Worker: a fetch stub plays the Worker's answer to "is a login kept for this code?"
   const asWorker = (connected) => `(() => { const real = window.fetch.bind(window); window.fetch = async (input, options) => String(input).includes("/api/spotify/") ? new Response(JSON.stringify(${connected} ? { ok: true, connected: true, state: "ok", name: "T", share: true, queue: false, log: [] } : { ok: true, connected: false }), { status: 200, headers: { "content-type": "application/json" } }) : real(input, options); })()`;
   const typeChannel = () => page.evaluate(`(() => { const i = document.getElementById("source-channel"); i.value = "pond_cafe"; i.dispatchEvent(new Event("input", { bubbles: true })); })()`);
@@ -106,7 +106,7 @@ test("the Song requests editor puts the Spotify code in the link by itself while
   const none = await page.send("Page.addScriptToEvaluateOnNewDocument", { source: asWorker(false) });
   await page.goto(`${base}/songs/`, { settle: 900 });
   await typeChannel();
-  assert.equal(await spotifyParam(), null, "no login kept: no code");
+  assert.equal(await spotifyParam(), CODE, "no login kept yet: the code is still in the link, so this link works once Spotify is connected");
   await page.send("Page.removeScriptToEvaluateOnNewDocument", { identifier: none.identifier });
 });
 

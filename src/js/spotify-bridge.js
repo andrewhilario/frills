@@ -85,9 +85,10 @@ export class Publisher {
  * progressMs, at } where `progressMs` is where the song is right now (counted forward from the reading when it is playing), or null when
  * nothing has been posted lately (the tab was closed). `at` is this page's clock, so the position can be drawn from it.
  */
-export function watchSpotify(code, onSong, { fetchImpl = globalThis.fetch?.bind(globalThis), now = () => Date.now(), everyMs = 2500, staleMs = 90000, setTimer = setTimeout, clearTimer = clearTimeout } = {}) {
+export function watchSpotify(code, onSong, { fetchImpl = globalThis.fetch?.bind(globalThis), now = () => Date.now(), everyMs = 2500, idleMs = 30000, staleMs = 90000, setTimer = setTimeout, clearTimer = clearTimeout } = {}) {
   let stopped = false;
   let timer = 0;
+  let misses = 0; // readings in a row with nothing: a code whose streamer has not connected Spotify (yet) is asked only every idleMs
   const poll = async () => {
     if (stopped) return;
     let song = null;
@@ -100,8 +101,9 @@ export function watchSpotify(code, onSong, { fetchImpl = globalThis.fetch?.bind(
         song = { ...d, progressMs: Math.min(d.durationMs || Infinity, d.progressMs + (d.playing ? since : 0)), at: now() };
       }
     } catch { song = null; }
+    misses = song ? 0 : misses + 1;
     if (!stopped) onSong(song);
-    if (!stopped) timer = setTimer(poll, everyMs);
+    if (!stopped) timer = setTimer(poll, misses >= 3 ? idleMs : everyMs);
   };
   poll();
   return { stop() { stopped = true; clearTimer(timer); } };

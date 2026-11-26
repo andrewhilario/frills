@@ -312,7 +312,7 @@ test("song requests: when Frills cannot keep logins yet, the step says so and do
   assert.equal(await shown("login", "keep", "logout", "on", "keep-note"), "false,false,false,false,false");
 });
 
-test("song requests: Disconnect deletes what Frills keeps and drops the code from the link", { skip }, async () => {
+test("song requests: Disconnect deletes what Frills keeps (the code stays in the link, with nothing behind it)", { skip }, async () => {
   await open("/songs/", { server: {} });
   await connected();
   await typeChannel("pond_cafe");
@@ -322,7 +322,7 @@ test("song requests: Disconnect deletes what Frills keeps and drops the code fro
   assert.equal((await worker("login")).filter((c) => c.method === "DELETE").length, 1);
   assert.equal(await shown("login", "keep", "logout", "on"), "true,false,false,false");
   assert.equal(await page.evaluate('localStorage.getItem("frills:spotify:sharing")'), "0");
-  assert.equal((await link()).searchParams.has("spotify"), false);
+  assert.equal((await link()).searchParams.has("spotify"), true, "the code stays: connecting again later makes the same link work");
 });
 
 test("the login brings the person back to the Song requests editor when they started there, and to the test page otherwise", { skip }, async () => {

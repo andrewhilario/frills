@@ -40,6 +40,23 @@ layer.render();
 // (the Worker adds the song to the streamer's Spotify queue, if the streamer switched that on in the editor). The editor's own preview does not.
 const forward = !demo && channel && validCode(settings.spotify) ? new SpotifyForward({ code: settings.spotify, channel, settings, cooldownMs: 2500 }) : null;
 setInterval(() => { if (!layer.playing) queue.tick(); }, 1000); // with Spotify playing, the song moves on by itself
+
+/**
+ * What Frills said about a viewer's !sr, applied to the list on screen: the exact song Spotify queued is remembered, so the request leaves the list
+ * when Spotify plays it (the viewer's words and Spotify's title often differ); a request Spotify did not take (not found, just queued by someone
+ * else, or Spotify refused) leaves at once, because it will never play and would otherwise block the list. With Spotify not connected, or adding
+ * to the queue switched off, the list works as it always did.
+ */
+function settle(key, answer) {
+  const item = queue.items.find((i) => i.key === key);
+  if (!item || !answer) return;
+  if (answer.added && answer.title) {
+    item.playsAs = { title: String(answer.title), artist: String(answer.artist ?? "") };
+    return;
+  }
+  const refused = answer.ignored === "not_found" || answer.ignored === "recent" || ["spotify", "too_fast", "too_many"].includes(answer.error);
+  if (refused) queue.remove(key);
+}
 // Tell Frills this overlay is open (now, and every minute), so the editor can show the streamer that viewers' requests have a way to reach Spotify.
 if (forward) { forward.hello(); setInterval(() => forward.hello(), 60000); }
 
@@ -59,7 +76,8 @@ if (demo) {
     onChat: (message) => {
       fonts.then(() => {
         const out = queue.handle(message, channel);
-        if (out.kind === "request" || out.kind === "next" || out.why === "nothing playing") forward?.handle(message);
+        if (out.kind === "request") forward?.handle(message, (answer) => settle(out.key, answer));
+        else if (out.kind === "next" || out.why === "nothing playing") forward?.handle(message);
       });
     },
     say,

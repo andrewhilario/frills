@@ -183,3 +183,32 @@ test("the editor's client, the overlay's forwarder and the Worker agree on every
   assert.deepEqual(await editor.status().then((s) => s.connected), false);
   assert.equal(env.DB.raw.prepare("SELECT COUNT(*) AS n FROM spotify_logins").get().n, 0, "gone");
 });
+
+// ── several viewers at once, and what Frills said ──────────────────────────────────────────────────────────────────────
+
+test("two viewers' !sr within 2 seconds both reach Frills: the second waits its turn and tries again instead of being lost", async () => {
+  let n = 0;
+  const waits = [];
+  const rec = recorder(() => (++n === 2 ? answer({ ok: false, error: "too_fast" }, 429, { "retry-after": "2" }) : answer({ ok: true, added: true, title: "Song " + n })));
+  const f = new SpotifyForward({ code: CODE, channel: "pond_cafe", fetchImpl: rec.fetchImpl, wait: async (ms) => { waits.push(ms); } });
+  const said = [];
+  const [a, b] = await Promise.all([
+    f.handle(chat("!sr first song", { user: "v1" }), (x) => said.push(["v1", x.added, x.title])),
+    f.handle(chat("!sr second song", { user: "v2" }), (x) => said.push(["v2", x.added, x.title])),
+  ]);
+  assert.deepEqual([a, b], ["sent", "sent"]);
+  assert.deepEqual(rec.calls.map((c) => c.body.query), ["first song", "second song", "second song"], "one after the other, and the second again after the wait");
+  assert.deepEqual(waits, [2000]);
+  assert.deepEqual(said, [["v1", true, "Song 1"], ["v2", true, "Song 3"]], "each viewer's answer goes back with their request");
+});
+
+test("the overlay is told when Spotify found nothing, and a hello says whether Frills heard", async () => {
+  const rec = recorder(() => answer({ ok: true, ignored: "not_found" }));
+  const f = new SpotifyForward({ code: CODE, channel: "pond_cafe", fetchImpl: rec.fetchImpl });
+  let told = null;
+  assert.equal(await f.handle(chat("!sr zzzz nothing"), (x) => { told = x; }), "sent");
+  assert.equal(told.ignored, "not_found");
+  assert.equal(await f.hello(), true);
+  const down = new SpotifyForward({ code: CODE, fetchImpl: async () => { throw new TypeError("Failed to fetch"); } });
+  assert.equal(await down.hello(), false);
+});

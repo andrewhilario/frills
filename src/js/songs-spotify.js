@@ -9,6 +9,7 @@ import { validCode, watchSpotify } from "./spotify-bridge.js";
 export function isPlaying(item, song) {
   if (!song?.title) return false;
   const title = same(song.title);
+  if (title && item.playsAs?.title && same(item.playsAs.title) === title) return true; // the exact song Spotify said it queued for this request
   if (title && same(item.title) === title) return true;
   const words = same(item.query);
   return words.length > 2 && same(`${song.title} ${song.artist}`).includes(words);
@@ -28,8 +29,12 @@ export function withSpotify(items, song, { max = 5 } = {}) {
  * Connects a queue and its drawing to the post box. `apply(settings)` starts (or stops) reading when the code in the settings changes;
  * `render()` draws what there is now. Use it in place of view.render(queue.view).
  */
-export function spotifyLayer({ queue, view, watch = watchSpotify }) {
+/** How long a request may wait while Spotify is playing before it leaves the list anyway (so one that never plays cannot fill the list forever). */
+export const WAIT_MAX_MS = 90 * 60 * 1000;
+
+export function spotifyLayer({ queue, view, watch = watchSpotify, now = () => Date.now(), waitMaxMs = WAIT_MAX_MS }) {
   let song = null;
+  const firstSeen = new Map(); // request key -> when this page first saw it waiting
   let code = "";
   let watcher = null;
   let anchor = { title: "", playing: false, start: 0 };
@@ -54,7 +59,13 @@ export function spotifyLayer({ queue, view, watch = watchSpotify }) {
         if (code) {
           watcher = watch(code, (reading) => {
             song = reading ? smooth(reading) : null;
-            if (song) for (const item of queue.items.filter((i) => isPlaying(i, song))) queue.remove(item.key); // reached: it is no longer waiting
+            if (song) {
+              for (const item of queue.items.filter((i) => isPlaying(i, song))) queue.remove(item.key); // reached: it is no longer waiting
+              const t = now();
+              for (const item of queue.items) if (!firstSeen.has(item.key)) firstSeen.set(item.key, t);
+              for (const item of queue.items.filter((i) => t - firstSeen.get(i.key) > waitMaxMs)) queue.remove(item.key); // waited too long: it will not play
+              for (const key of firstSeen.keys()) if (!queue.items.some((i) => i.key === key)) firstSeen.delete(key);
+            }
             render();
           });
         }

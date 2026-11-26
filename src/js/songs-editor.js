@@ -5,7 +5,7 @@ import { createSongsView } from "./widgets-view.js";
 import { startWidgetEditor } from "./widget-editor.js";
 import { fakeLookup, fakeRequest } from "./fake-alerts.js";
 import { spotifyLayer } from "./songs-spotify.js";
-import { sharedCode } from "./spotify-bridge.js";
+import { bridgeIdentity, sharedCode } from "./spotify-bridge.js";
 import { mountSpotify } from "./spotify-connect.js";
 
 // Adopt the streamer's Spotify code if they enabled sharing on the /spotify/ page
@@ -39,14 +39,17 @@ startWidgetEditor({
     const spotify = mountSpotify(document.getElementById("spotify-step"), { hear: (message) => queue.handle(message, ctx.channel()), refresh: ctx.refresh });
     if (location.hash === "#spotify-step") requestAnimationFrame(() => document.getElementById("spotify-step")?.scrollIntoView()); // the step stays hidden until it is mounted, so the browser’s own jump to the address missed it
     spotify.setSettings(settings);
-    settings.spotify = sharedCode(); // sharing what is playing is turned on in the Spotify step; its code rides in the link by itself
+    // The Spotify code always rides in the link, even before Spotify is connected: a link copied first then starts working by itself once the
+    // streamer connects (it used to be added only after connecting, so links copied earlier never reached Spotify). The key stays in this browser.
+    const spotifyCode = () => { try { return bridgeIdentity().code; } catch { return ""; } };
+    settings.spotify = spotifyCode();
     layer = spotifyLayer({ queue, view });
     view.apply(settings);
-    layer.apply(settings);
+    layer.apply({ ...settings, spotify: sharedCode() }); // the preview reads Spotify only while Frills keeps a login (the link has the code anyway)
     layer.render();
     setInterval(() => { if (!layer.playing) queue.tick(); }, 1000);
     return {
-      apply(next) { next.spotify = sharedCode(); view.apply(next); queue.setSettings(next); layer.apply(next); spotify.setSettings(next); },
+      apply(next) { next.spotify = spotifyCode(); view.apply(next); queue.setSettings(next); layer.apply({ ...next, spotify: sharedCode() }); spotify.setSettings(next); },
       onChat: (message) => { queue.handle(message, ctx.channel()); spotify.handle(message); },
       tests: {
         one: () => queue.request({ ...fakeRequest({ avoid: queue.items.map((i) => i.query), busy: queue.items.map((i) => i.name) }), via: fakeLookup }),

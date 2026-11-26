@@ -251,3 +251,37 @@ test("what the song list did with a pretend viewer's message is said in plain wo
   assert.match(onScreenWords({ kind: "ignored", why: "something new" }), /Nothing happened/, "an unknown reason still gets words");
   assert.equal(onScreenWords(null), null);
 });
+
+test("a request leaves the list when Spotify plays the exact song it queued for it, even when the viewer's words were different", () => {
+  const item = { key: "q1", title: "espresso by sabrina", query: "espresso by sabrina", artist: "", playsAs: { title: "Espresso", artist: "Sabrina Carpenter" } };
+  assert.equal(isPlaying({ ...item, playsAs: undefined }, { title: "Espresso", artist: "Sabrina Carpenter" }), false, "the words alone do not match");
+  assert.equal(isPlaying(item, { title: "Espresso", artist: "Sabrina Carpenter" }), true);
+  assert.equal(isPlaying(item, { title: "Levitating", artist: "Dua Lipa" }), false);
+});
+
+test("while Spotify is playing, a request that never plays leaves the list after a long wait, so it cannot fill the list forever", () => {
+  let t = 0;
+  const queue = { items: [{ key: "q1", title: "Never Played", query: "never played", artist: "", name: "Ann", state: "ready" }], settings: { max: 5 }, get view() { return { now: this.items[0] ?? null, next: this.items.slice(1), total: this.items.length, startedAt: 0, at: 0 }; }, remove(key) { this.items = this.items.filter((i) => i.key !== key); } };
+  let push;
+  const layer = spotifyLayer({ queue, view: { render() {} }, watch: (code, onSong) => { push = onSong; return { stop() {} }; }, now: () => t, waitMaxMs: 60000 });
+  layer.apply({ spotify: CODE });
+  push({ ...song(), at: 0 });
+  t = 59000; push({ ...song(), at: t });
+  assert.equal(queue.items.length, 1, "still waiting");
+  t = 61000; push({ ...song(), at: t });
+  assert.equal(queue.items.length, 0, "waited longer than allowed: gone");
+});
+
+test("a Spotify code with nothing behind it is asked slowly, and fast again as soon as there is a song", async () => {
+  let reply = null;
+  const delays = [];
+  const timers = [];
+  watchSpotify(CODE, () => {}, { fetchImpl: async () => ({ ok: Boolean(reply), json: async () => reply }), setTimer: (fn, ms) => { timers.push(fn); delays.push(ms); return 1; }, clearTimer() {} });
+  await new Promise((r) => setTimeout(r, 0));
+  await timers.shift()();
+  await timers.shift()();
+  assert.deepEqual(delays, [2500, 2500, 30000], "three empty readings in a row: every 30 seconds");
+  reply = { ok: true, now: 10000, updatedAt: 9000, data: song() };
+  await timers.shift()();
+  assert.equal(delays.at(-1), 2500, "a song: every 2.5 seconds again");
+});
