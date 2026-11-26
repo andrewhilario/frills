@@ -210,7 +210,7 @@ test("the relay's address gives a readable page to a browser and the numbers as 
   assert.match(page.headers["content-security-policy"], /default-src 'none'/);
   assert.equal((await ask("/", { Accept: "text/html" })).status, 200, "the bare address works too");
   const json = JSON.parse((await ask("/health", { Accept: "application/json" })).body);
-  assert.deepEqual([json.name, json.version, json.free, json.level, json.slots], ["frills-relay", "0.7.1", 50, "ok", { used: 0, max: 50, waiting: 0 }]);
+  assert.deepEqual([json.name, json.version, json.free, json.level, json.slots], ["frills-relay", "0.7.2", 50, "ok", { used: 0, max: 50, waiting: 0 }]);
   assert.ok(json.features.includes("status"));
   assert.ok(json.capacity.estimate >= 1 && json.capacity.estimate <= 500);
   assert.equal(JSON.parse((await ask("/health")).body).free, 50, "no Accept header at all: JSON, as before");
@@ -283,7 +283,7 @@ test("the list of who is connected shows names, LIVE or not, and how long, only 
     const local = JSON.parse((await ask("/health", { Accept: "application/json" })).body);
     assert.deepEqual(local.roster.accounts.map((a) => a.user).sort(), ["mochi_bun", "pond.cafe"]);
     const one = local.roster.accounts.find((a) => a.user === "mochi_bun");
-    assert.deepEqual(Object.keys(one).sort(), ["counts", "detail", "endedS", "followers", "forS", "lastError", "lastS", "leavesInS", "live", "pages", "state", "user"]);
+    assert.deepEqual(Object.keys(one).sort(), ["connectMs", "counts", "detail", "endedS", "followers", "forS", "lastError", "lastS", "leavesInS", "live", "pages", "retryInS", "state", "user"]);
     assert.equal(one.pages, 1);
     assert.ok(one.forS >= 0);
     assert.deepEqual(local.roster.waiting, []);

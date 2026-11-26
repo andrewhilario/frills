@@ -28,7 +28,7 @@ import { handleProStatus } from "../worker/region.mjs";
 import { handleDevPass, handleTts } from "../worker/tts.mjs";
 import { validTicketSecret, verifyRelayTicket } from "../worker/relay-ticket.mjs";
 
-const VERSION = "0.7.1";
+const VERSION = "0.7.2";
 /** What this program can do, so a page can tell an old one ("chat" only) from one that sends alerts. */
 const FEATURES = ["chat", "alerts", "info", "roles", "status", "viewers"];
 
@@ -79,14 +79,16 @@ export async function realFactory(user, { apiKey, allowEulerRoomIdFallback = tru
   syncConnectorSignKey(library, apiKey);
   // processInitialData: false skips the little history TikTok sends on joining, so an overlay shows new chat only.
   const conn = new library.TikTokLiveConnection(user, { processInitialData: false, ...(apiKey ? { signApiKey: apiKey } : {}) });
-  // Attach single-shot direct TikTok check (`api-live/user/room/`): returns BOTH `{ live, roomId }` in 1 request with 0 Euler calls.
+  // Attach single-shot direct TikTok check (`api-live/user/room/`): returns `{ live, roomId, followers, viewers }` in 1 request with 0 Euler calls.
   if (typeof library.fetchRoomInfoFromApiLiveRoute === "function") {
     conn.checkLiveDirect = async () => {
       const data = await library.fetchRoomInfoFromApiLiveRoute({ webClient: conn.webClient, uniqueId: conn.uniqueId });
       const status = data?.data?.liveRoom?.status;
       const roomId = data?.data?.user?.roomId ? String(data.data.user.roomId) : "";
-      if (status === undefined) return { live: null, roomId };
-      return { live: status !== 4, roomId };
+      const followers = Math.round(Number(data?.data?.stats?.followerCount ?? data?.data?.user?.stats?.followerCount ?? 0)) || 0;
+      const viewers = Math.round(Number(data?.data?.liveRoom?.liveRoomStats?.userCount ?? 0)) || 0;
+      if (status === undefined) return { live: null, roomId, followers, viewers };
+      return { live: status !== 4, roomId, followers, viewers };
     };
   }
   return conn;
@@ -125,7 +127,7 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", apiK
   const shared = relay
     ? {
         queue: true,
-        connectAtOnce: 2,
+        connectAtOnce: 3,
         idleStopMs: 300000,
         offlineIdleStopMs: 45000,
         offlineWaitMs: 45000,

@@ -111,6 +111,8 @@ export class Room {
     this.cachedRoomAt = 0;
     this.hadLive = false;
     this.lastError = ""; // concise owner-facing explanation of the most recent connection error
+    this.connectMs = null; // how long the most recent connect took (ms)
+    this.nextTryAt = 0; // when the next offline/retry check is scheduled (ms, 0 when connected/stopped)
   }
 
   add(client) {
@@ -149,8 +151,8 @@ export class Room {
     }, wait);
   }
 
-  /** Reads the follower count from the room details TikTok gave when we connected, and tells the pages. */
-  readInfo(conn) {
+  /** Reads the follower count and live status from TikTok's room details (falling back to our direct api-live probe if TikTok omitted fields). */
+  readInfo(conn, directProbe = null) {
     let followers = 0;
     let status = 0;
     let currentViewers = 0;
@@ -160,8 +162,14 @@ export class Room {
       status = Number(room.status);
       currentViewers = Math.round(Number(room.user_count));
     } catch { /* no details: pages keep the number the streamer typed */ }
+    if (!(Number.isFinite(followers) && followers > 0 && followers < 1e10) && directProbe?.followers > 0) {
+      followers = Math.round(Number(directProbe.followers));
+    }
+    if (!(Number.isFinite(currentViewers) && currentViewers > 0 && currentViewers < 1e9) && directProbe?.viewers > 0) {
+      currentViewers = Math.round(Number(directProbe.viewers));
+    }
     this.base = Number.isFinite(followers) && followers > 0 && followers < 1e10 ? followers : 0;
-    this.live = status === 2;
+    this.live = status === 2 || (status !== 4 && directProbe?.live === true);
     if (this.live) this.liveEndedAt = 0;
     if (this.live && !this.viewers && Number.isFinite(currentViewers) && currentViewers > 0 && currentViewers < 1e9) this.viewers = currentViewers;
     this.followed = 0;
@@ -328,9 +336,10 @@ export class Room {
     }
 
     // 1. Direct TikTok live pre-check (0 Euler calls!):
-    //    - If `checkLiveDirect()` exists (real TikTok connection), ONE direct api-live call returns both `{ live, roomId }`.
+    //    - If `checkLiveDirect()` exists (real TikTok connection), ONE direct api-live call returns `{ live, roomId, followers, viewers }`.
     //      Offline -> skip Euler completely! Live -> reuse `roomId` straight in `conn.connect(roomId)` so we don't hit TikTok twice!
     //    - Otherwise fall back to `conn.fetchIsLive()` when provided by a custom factory / test double.
+    let directProbe = null;
     if (!conn.pretend && !freshRoomId) {
       if (typeof conn.checkLiveDirect === "function") {
         try {
@@ -341,8 +350,9 @@ export class Room {
             this.hub.opts.onOfflineSaved?.();
             return { kind: "offline" };
           }
-          if (probe?.live === true && probe?.roomId) {
-            freshRoomId = String(probe.roomId);
+          if (probe?.live === true) {
+            directProbe = probe;
+            if (probe.roomId) freshRoomId = String(probe.roomId);
           }
         } catch {
           /* direct api-live 403/glitch — fall through to conn.connect() */
@@ -402,6 +412,9 @@ export class Room {
       return { kind: "stopped" };
     }
     this.lastError = "";
+    this.nextTryAt = 0;
+    const tookMs = Math.max(0, Date.now() - began);
+    this.connectMs = tookMs;
     const resolvedRoomId = String(conn.roomId ?? conn.state?.roomId ?? "").trim();
     if (resolvedRoomId) {
       this.cachedRoomId = resolvedRoomId;
@@ -410,8 +423,8 @@ export class Room {
     const isReconnect = this.hadLive;
     this.hadLive = true;
     if (!conn.pretend) this.hub.signed({ reconnect: isReconnect }); // (the practice account makes chat up: it never asked the signing service)
-    this.hub.log(`@${this.user}: connected in ${((Date.now() - began) / 1000).toFixed(1)} s`);
-    this.readInfo(conn);
+    this.hub.log(`@${this.user}: connected in ${(tookMs / 1000).toFixed(1)} s`);
+    this.readInfo(conn, directProbe);
     this.setStatus("connected", conn.pretend ? "Practice chat made up by Frills. Nothing comes from TikTok." : "");
     const watch = this.watchSilence(finish);
     const how = await ended;
@@ -457,9 +470,11 @@ export class Room {
   }
 
   sleep(ms) {
+    this.nextTryAt = ms > 0 ? Date.now() + ms : 0;
     return new Promise((resolve) => {
-      const timer = setTimeout(() => { this.sleeper = null; resolve(); }, ms);
-      this.sleeper = () => { clearTimeout(timer); this.sleeper = null; resolve(); };
+      const done = () => { this.sleeper = null; this.nextTryAt = 0; resolve(); };
+      const timer = setTimeout(done, ms);
+      this.sleeper = () => { clearTimeout(timer); done(); };
     });
   }
 
@@ -672,6 +687,8 @@ export class Hub {
       state: room.status.state,
       detail: room.status.detail || "",
       lastError: room.lastError || "",
+      connectMs: room.connectMs,
+      retryInS: room.nextTryAt > now ? Math.max(1, Math.round((room.nextTryAt - now) / 1000)) : null,
       live: room.live,
       pages: room.clients.size,
       followers: room.info().followers,

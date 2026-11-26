@@ -323,7 +323,7 @@ export function statusPage(s) {
 <style>
 :root{--paper:#f8f5ec;--paper2:#efe9d6;--ink:#1c1a15;--ink2:#5a5547;--ok:#2f9e63;--low:#e0a100;--full:#d6455d;--line:#d9d2bd}
 *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;padding:24px 16px 48px}
-main{max-width:640px;margin:0 auto}h1{font-size:1.4rem;margin:0 0 4px}.sub{color:var(--ink2);margin:0 0 20px}
+main{max-width:860px;margin:0 auto}h1{font-size:1.4rem;margin:0 0 4px}.sub{color:var(--ink2);margin:0 0 20px}
 .banner{display:none;margin:0 0 16px;padding:14px 16px;border-radius:14px;background:var(--full);color:#fff;font-weight:700}.banner[data-on="true"]{display:block}
 .big{border:2px solid var(--ink);border-radius:20px;background:#fff;padding:20px;box-shadow:0 5px 0 var(--ink)}
 .num{font-size:4.5rem;font-weight:800;line-height:1;letter-spacing:-.03em}.of{color:var(--ink2);font-size:1.1rem}
@@ -382,12 +382,14 @@ function drawWho(r){
     const tr=document.createElement("tr"),td=document.createElement("td"),link=document.createElement("a");
     link.textContent="@"+a.user;link.href="https://www.tiktok.com/@"+encodeURIComponent(a.user)+"/live";link.target="_blank";link.rel="noopener noreferrer";td.append(link);tr.append(td);
     // A page open is what makes it "in use". With none, the account is only kept briefly (the last page may be back), and says so.
+    const took = typeof a.connectMs === "number" ? "Connected in " + (a.connectMs / 1000).toFixed(1) + " s" : "";
+    const retry = typeof a.retryInS === "number" ? "Next check in " + forText(a.retryInS) : "";
     const st=a.pages===0?["No page open"+(a.live?" (still LIVE)":"")+", leaves in "+forText(a.leavesInS||0),"gone",""]
-      :a.state==="connected"?(a.live?["LIVE now","live",""]:["Connected, not LIVE yet","wait",""])
-      :a.state==="offline"?[a.endedS!=null?"LIVE ended "+forText(a.endedS)+" ago, waiting":"Waiting for their LIVE","wait",a.detail&&/stopped looking|Looking again/.test(a.detail)?a.detail:""]
-      :a.state==="limited"?["Rate limited / paused","err",a.lastError||a.detail||"Waiting for signing quota or cooldown"]
-      :a.state==="error"?["Error","err",a.lastError||a.detail||"Could not connect to TikTok"]
-      :[a.state,"wait",a.detail||""];
+      :a.state==="connected"?(a.live?["LIVE now","live",took]:["Connected, not LIVE yet","wait",took])
+      :a.state==="offline"?[a.endedS!=null?"LIVE ended "+forText(a.endedS)+" ago, waiting":"Waiting for their LIVE","wait",[retry,a.detail&&/stopped looking|Looking again/.test(a.detail)?a.detail:""].filter(Boolean).join(" · ")]
+      :a.state==="limited"?["Rate limited / paused","err",[a.lastError||a.detail||"Waiting for signing quota or cooldown",retry].filter(Boolean).join(" · ")]
+      :a.state==="error"?["Error","err",[a.lastError||a.detail||"Could not connect to TikTok",retry].filter(Boolean).join(" · ")]
+      :[a.state,"wait",[a.detail||"",retry].filter(Boolean).join(" · ")];
     const sc=document.createElement("td"),pill=document.createElement("span");pill.className="pill";pill.dataset.s=st[1];pill.textContent=st[0];sc.append(pill);
     if(st[2]){const sub=document.createElement("div");sub.className="st-sub";if(st[1]==="err")sub.dataset.err="true";sub.textContent=st[2];sc.append(sub);}
     tr.append(sc);
