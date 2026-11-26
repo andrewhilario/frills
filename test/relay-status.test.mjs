@@ -210,7 +210,7 @@ test("the relay's address gives a readable page to a browser and the numbers as 
   assert.match(page.headers["content-security-policy"], /default-src 'none'/);
   assert.equal((await ask("/", { Accept: "text/html" })).status, 200, "the bare address works too");
   const json = JSON.parse((await ask("/health", { Accept: "application/json" })).body);
-  assert.deepEqual([json.name, json.version, json.free, json.level, json.slots], ["frills-relay", "0.7.3", 50, "ok", { used: 0, max: 50, waiting: 0 }]);
+  assert.deepEqual([json.name, json.version, json.free, json.level, json.slots], ["frills-relay", "0.7.4", 50, "ok", { used: 0, max: 50, waiting: 0 }]);
   assert.ok(json.features.includes("status"));
   assert.ok(json.capacity.estimate >= 1 && json.capacity.estimate <= 500);
   assert.equal(JSON.parse((await ask("/health")).body).free, 50, "no Accept header at all: JSON, as before");
@@ -532,6 +532,7 @@ test("configureConnectorRoutes skips dead HTML scrape and paid Euler roomId fall
   assert.equal(offRes.live, false);
 
   await assert.rejects(() => probeTikTokLiveDirect("mochi", { fetchImpl: async () => new Response("", { status: 403 }) }), (e) => e.status === 403);
+  await assert.rejects(() => probeTikTokLiveDirect("typo_user", { fetchImpl: async () => new Response(JSON.stringify({ statusCode: 19881007, message: "user_not_found" }), { status: 200 }) }), (e) => e.name === "InvalidUniqueIdError");
 
   const fakeClient = { id: "first" };
   assert.equal(syncConnectorSignKey(lib, "key_one"), true);

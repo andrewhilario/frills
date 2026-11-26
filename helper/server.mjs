@@ -28,7 +28,7 @@ import { handleProStatus } from "../worker/region.mjs";
 import { handleDevPass, handleTts } from "../worker/tts.mjs";
 import { validTicketSecret, verifyRelayTicket } from "../worker/relay-ticket.mjs";
 
-const VERSION = "0.7.3";
+const VERSION = "0.7.4";
 /** What this program can do, so a page can tell an old one ("chat" only) from one that sends alerts. */
 const FEATURES = ["chat", "alerts", "info", "roles", "status", "viewers"];
 
@@ -59,6 +59,11 @@ export async function probeTikTokLiveDirect(uniqueId, { fetchImpl = globalThis.f
     if (!res.ok) throw Object.assign(new Error(`TikTok /api-live/user/room/ returned HTTP ${res.status}`), { status: res.status });
     const body = await res.json().catch(() => null);
     if (!body || typeof body !== "object") return null;
+    if (body.statusCode === 19881007 || /user_not_found/i.test(String(body.message ?? ""))) {
+      const err = new Error("TikTok doesn't know that name. Check the spelling.");
+      err.name = "InvalidUniqueIdError";
+      throw err;
+    }
     const status = body?.data?.liveRoom?.status;
     const roomId = body?.data?.user?.roomId ? String(body.data.user.roomId) : "";
     const followers = Math.round(Number(body?.data?.stats?.followerCount ?? body?.data?.user?.stats?.followerCount ?? 0)) || 0;

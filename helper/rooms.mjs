@@ -56,7 +56,9 @@ export function classify(err) {
   const subText = subErrs.map((e) => String(e?.message ?? e ?? "")).join(" ");
   if (is("SetupError")) return { kind: "fatal", detail: message, reason: message };
   if (is("UserOfflineError")) return { kind: "offline" };
-  if (is("InvalidUniqueIdError")) return { kind: "fatal", detail: "TikTok doesn't know that name. Check the spelling.", reason: "Unknown TikTok username" };
+  if (is("InvalidUniqueIdError") || /\b19881007\b|user_not_found/i.test(message) || /\b19881007\b|user_not_found/i.test(subText)) {
+    return { kind: "fatal", detail: "TikTok doesn't know that name. Check the spelling.", reason: "TikTok user not found (check spelling)" };
+  }
   if (names.some((n) => /RateLimit/i.test(n)) || /\b429\b|rate.?limit/i.test(message) || /\b429\b|rate.?limit/i.test(subText) || err?.response?.statusCode === 429) {
     return { kind: "limited", reason: describeError(err) };
   }
@@ -365,6 +367,11 @@ export class Room {
             if (probe.roomId) freshRoomId = String(probe.roomId);
           }
         } catch (err) {
+          if (err?.name === "InvalidUniqueIdError" || /\b19881007\b|user_not_found/i.test(String(err?.message ?? ""))) {
+            give();
+            this.letGo(conn);
+            return classify(err);
+          }
           const status = err?.status ?? err?.response?.statusCode ?? 0;
           if (status === 403 || status === 429) {
             const waitMs = this.hub.directBlocked(status);
