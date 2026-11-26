@@ -127,7 +127,7 @@ async function removeMedia(id, env) {
   return json(200, { ok: true });
 }
 
-const EULER_ACTIONS = new Set(["reset", "rotate", "refill", "sync"]);
+const EULER_ACTIONS = new Set(["sync", "refill"]);
 
 async function controlEuler(request, env, { fetchImpl = globalThis.fetch?.bind(globalThis) } = {}) {
   let body;

@@ -6,8 +6,6 @@ import os from "node:os";
 
 export const ALERT_AT = 10; // "this many spots left or fewer" raises the alarm
 export const EULER_DEFAULT_CAP = 1500;
-export const EULER_DEFAULT_RESETS = 3;
-export const EULER_POOL_SIZE = 3;
 export const EULER_RATE_LIMITS_URL = "https://tiktok.eulerstream.com/accounts/me/rate_limits";
 
 /** How full it is: "ok", "low" (the alarm number or fewer left) or "full" (nobody else fits). */
@@ -32,260 +30,242 @@ export function capacity({ freeMem, rss, baseRss, rooms, cpuFraction }) {
 }
 
 /**
- * Keeps a short record of when the free signing service said "busy", how many requests were used in 1h/24h,
- * and (when Euler keys are configured) manages up to 3 Euler key accounts with a per-key 1,500 request cap
- * and 3 resets per key before failing over to the next backup account.
+ * Tracks Euler Stream signing usage for one compliant Euler account (default 1,500 requests/day),
+ * enforces an optional daily budget guard/reserve so free traffic never starves Frills Plus or
+ * hammers Euler with doomed 429 retries, and records leak-shield savings (offline checks skipped,
+ * cached roomId reconnects, live connects vs reconnects).
  */
 export class Signing {
-  constructor(now = () => Date.now(), { keys = [], resetUrls = [], cap = EULER_DEFAULT_CAP, maxResets = EULER_DEFAULT_RESETS, onReset = null, onRotate = null } = {}) {
+  constructor(now = () => Date.now(), { key = "", keys = [], cap = EULER_DEFAULT_CAP, reserve = 0, onBudgetPause = null } = {}) {
     this.now = now;
     this.times = [];
     this.uses = [];
     const list = (Array.isArray(keys) ? keys : [keys]).map((k) => String(k ?? "").trim()).filter(Boolean);
-    const urls = (Array.isArray(resetUrls) ? resetUrls : [resetUrls]).map((u) => String(u ?? "").trim());
+    const singleKey = String(key ?? "").trim() || list[0] || "";
+    this.key = singleKey;
     this.cap = Math.max(1, Number(cap) || EULER_DEFAULT_CAP);
-    this.maxResets = Math.max(0, Number.isFinite(Number(maxResets)) ? Number(maxResets) : EULER_DEFAULT_RESETS);
-    this.onReset = typeof onReset === "function" ? onReset : null;
-    this.onRotate = typeof onRotate === "function" ? onRotate : null;
+    this.reserve = Math.max(0, Math.min(this.cap - 1, Math.round(Number(reserve) || 0)));
+    this.onBudgetPause = typeof onBudgetPause === "function" ? onBudgetPause : null;
+    this.used = 0;
+    this.totalUsed = 0;
+    this.exhausted = false;
+    this.pauseUntil = 0;
+    this.remote = null;
     this.lastLimitActionAt = 0;
-    this.hasPool = list.length > 0;
-    this.slots = this.hasPool
-      ? Array.from({ length: Math.max(EULER_POOL_SIZE, list.length) }, (_, i) => {
-          const key = list[i] ?? "";
-          const configured = Boolean(key);
-          return {
-            slot: i + 1,
-            label: i === 0 ? "Account 1 (Primary)" : `Account ${i + 1} (Backup ${i})`,
-            key,
-            resetUrl: urls[i] ?? "",
-            configured,
-            used: 0,
-            totalUsed: 0,
-            cap: this.cap,
-            resetsUsed: 0,
-            resetsLeft: configured ? this.maxResets : 0,
-            maxResets: this.maxResets,
-            exhausted: false,
-            lastResetAt: null,
-            remote: null,
-          };
-        })
-      : [];
-    this.activeIndex = this.hasPool ? Math.max(0, this.slots.findIndex((s) => s.configured)) : 0;
+    this.metrics = {
+      liveConnects: 0,
+      reconnects: 0,
+      offlineSaved: 0,
+      roomIdCacheHits: 0,
+      budgetBlocked: 0,
+      rateLimited: 0,
+    };
   }
 
   note() { this.times.push(this.now()); if (this.times.length > 200) this.times.shift(); }
   recent(windowMs = 10 * 60 * 1000) { const from = this.now() - windowMs; return this.times.filter((t) => t >= from).length; }
-  hasKeys() { return Boolean(this.hasPool && this.slots.some((s) => s.configured)); }
+  hasKeys() { return Boolean(this.key); }
+  currentKey() { return this.key && !this.exhausted ? this.key : ""; }
 
-  /** Queries Euler Stream's `/accounts/me/rate_limits` endpoint for each configured key slot and syncs quotas & exhaustion state. */
+  noteOfflineSaved() { this.metrics.offlineSaved += 1; }
+  noteCacheHit() { this.metrics.roomIdCacheHits += 1; }
+  noteBudgetBlocked() { this.metrics.budgetBlocked += 1; }
+
+  /** Effective daily cap from Euler's live /rate_limits response if synced, otherwise configured local cap. */
+  effectiveCap() {
+    return this.remote?.ok && this.remote.day?.max > 0 ? this.remote.day.max : this.cap;
+  }
+
+  /** Remaining daily requests before hitting the hard cap (respects synced Euler quota when present). */
+  remainingDaily() {
+    const cap = this.effectiveCap();
+    const localLeft = Math.max(0, cap - this.used);
+    if (this.remote?.ok && typeof this.remote.day?.remaining === "number") {
+      return Math.min(localLeft, Math.max(0, this.remote.day.remaining));
+    }
+    return localLeft;
+  }
+
+  /** Remaining requests available for new connects after honoring `reserve`. */
+  availableBudget() {
+    if (!this.key) return Infinity;
+    if (this.exhausted) return 0;
+    if (this.pauseUntil > this.now()) return 0;
+    if (this.remote?.ok && this.remote.hour && this.remote.hour.remaining <= 0) {
+      const hourReset = Date.parse(this.remote.hour.reset_at ?? "");
+      if (!Number.isFinite(hourReset) || hourReset > this.now()) return 0;
+    }
+    return Math.max(0, this.remainingDaily() - this.reserve);
+  }
+
+  /** True when this relay is allowed to open a new Euler-signed WebSocket connection right now. */
+  canSign() {
+    if (!this.key) return true;
+    // Auto-clear time-bounded pause once its reset window has elapsed
+    if (this.pauseUntil > 0 && this.now() >= this.pauseUntil) {
+      this.pauseUntil = 0;
+      this.exhausted = false;
+      this.used = 0;
+    }
+    return this.availableBudget() > 0;
+  }
+
+  /** Next reset timestamp (ms) reported by Euler, or 0 if unknown. */
+  nextResetAt() {
+    const candidates = [this.pauseUntil];
+    if (this.remote?.ok) {
+      const hr = Date.parse(this.remote.hour?.reset_at ?? "");
+      const dy = Date.parse(this.remote.day?.reset_at ?? "");
+      if (this.remote.hour?.remaining <= 0 && Number.isFinite(hr)) candidates.push(hr);
+      if (this.remote.day?.remaining <= this.reserve && Number.isFinite(dy)) candidates.push(dy);
+    }
+    const valid = candidates.filter((t) => Number.isFinite(t) && t > this.now());
+    return valid.length ? Math.min(...valid) : 0;
+  }
+
+  /** Queries Euler Stream's `/accounts/me/rate_limits` for the single configured key and updates pause/quota state. */
   async syncRemoteLimits({ fetchImpl = globalThis.fetch?.bind(globalThis), url = EULER_RATE_LIMITS_URL } = {}) {
-    if (!this.hasKeys() || typeof fetchImpl !== "function") return null;
-    await Promise.all(
-      this.slots.map(async (s) => {
-        if (!s.configured || !s.key) return;
-        try {
-          const res = await fetchImpl(url, { method: "GET", headers: { "x-api-key": s.key, accept: "application/json" } });
-          if (!res.ok) {
-            s.remote = { ok: false, status: res.status, syncedAt: this.now() };
-            return;
-          }
-          const body = await res.json().catch(() => null);
-          if (!body || typeof body !== "object") {
-            s.remote = { ok: false, status: 502, syncedAt: this.now() };
-            return;
-          }
-          const day = body.day && typeof body.day === "object" ? { max: Number(body.day.max) || 0, remaining: Number(body.day.remaining) || 0, reset_at: body.day.reset_at ?? null } : null;
-          const hour = body.hour && typeof body.hour === "object" ? { max: Number(body.hour.max) || 0, remaining: Number(body.hour.remaining) || 0, reset_at: body.hour.reset_at ?? null } : null;
-          const minute = body.minute && typeof body.minute === "object" ? { max: Number(body.minute.max) || 0, remaining: Number(body.minute.remaining) || 0, reset_at: body.minute.reset_at ?? null } : null;
-          s.remote = { ok: true, day, hour, minute, syncedAt: this.now() };
-          if (day && day.max > 0) {
-            if (s.exhausted && day.remaining > 0 && (!hour || hour.remaining > 0)) {
-              s.exhausted = false;
-              s.used = Math.max(0, Math.min(s.cap, day.max - day.remaining));
-            } else if (!s.exhausted && (day.remaining <= 0 || (hour && hour.remaining <= 0))) {
-              if (this.slots[this.activeIndex]?.slot === s.slot && s.resetUrl && s.resetsLeft > 0) {
-                this.consumeReset(s.slot);
-              } else {
-                s.exhausted = true;
-                s.used = s.cap;
-              }
-            } else if (day.max === s.cap) {
-              s.used = Math.max(s.used, Math.max(0, Math.min(s.cap, day.max - day.remaining)));
-            }
-          }
-        } catch {
-          s.remote = { ok: false, status: 0, syncedAt: this.now() };
+    if (!this.key || typeof fetchImpl !== "function") return null;
+    try {
+      const res = await fetchImpl(url, { method: "GET", headers: { "x-api-key": this.key, accept: "application/json" } });
+      if (!res.ok) {
+        this.remote = { ok: false, status: res.status, syncedAt: this.now() };
+        return this.quotaSummary();
+      }
+      const body = await res.json().catch(() => null);
+      if (!body || typeof body !== "object") {
+        this.remote = { ok: false, status: 502, syncedAt: this.now() };
+        return this.quotaSummary();
+      }
+      const day = body.day && typeof body.day === "object" ? { max: Number(body.day.max) || 0, remaining: Number(body.day.remaining) || 0, reset_at: body.day.reset_at ?? null } : null;
+      const hour = body.hour && typeof body.hour === "object" ? { max: Number(body.hour.max) || 0, remaining: Number(body.hour.remaining) || 0, reset_at: body.hour.reset_at ?? null } : null;
+      const minute = body.minute && typeof body.minute === "object" ? { max: Number(body.minute.max) || 0, remaining: Number(body.minute.remaining) || 0, reset_at: body.minute.reset_at ?? null } : null;
+      this.remote = { ok: true, day, hour, minute, syncedAt: this.now() };
+      if (day && day.max > 0) {
+        this.used = Math.max(0, Math.min(day.max, day.max - day.remaining));
+        const dayExhausted = day.remaining <= this.reserve;
+        const hourExhausted = Boolean(hour && hour.remaining <= 0);
+        if (dayExhausted || hourExhausted) {
+          this.exhausted = true;
+          const resetMs = Date.parse((hourExhausted ? hour?.reset_at : day?.reset_at) ?? "");
+          this.pauseUntil = Number.isFinite(resetMs) && resetMs > this.now() ? resetMs : this.now() + 15 * 60 * 1000;
+          this.onBudgetPause?.({ reason: hourExhausted ? "hour_limit" : "day_budget", pauseUntil: this.pauseUntil });
+        } else {
+          this.exhausted = false;
+          this.pauseUntil = 0;
         }
-      }),
-    );
-    if (this.slots[this.activeIndex]?.exhausted) {
-      this.#advance(this.slots[this.activeIndex].slot);
+      }
+    } catch {
+      this.remote = { ok: false, status: 0, syncedAt: this.now() };
     }
-    return this.poolSummary();
+    return this.quotaSummary();
   }
 
-  /** Returns the active Euler API key, or "" if none is configured or all accounts are exhausted. */
-  currentKey() {
-    if (!this.hasPool) return "";
-    const cur = this.slots[this.activeIndex];
-    if (cur && cur.configured && !cur.exhausted) return cur.key;
-    const nextIdx = this.slots.findIndex((s) => s.configured && !s.exhausted);
-    if (nextIdx >= 0) {
-      this.activeIndex = nextIdx;
-      return this.slots[nextIdx].key;
-    }
-    return "";
+  /** Resets the local daily counter and clears any budget pause (e.g. after Euler's daily quota resets). */
+  refillKey() {
+    if (!this.key) return false;
+    this.used = 0;
+    this.exhausted = false;
+    this.pauseUntil = 0;
+    return true;
   }
 
-  /** Advance activeIndex to the next configured, non-exhausted key account. Returns { from, to } or null. */
-  #advance(fromSlot) {
-    const after = this.slots.findIndex((c, idx) => idx > this.activeIndex && c.configured && !c.exhausted);
-    const any = after >= 0 ? after : this.slots.findIndex((c, idx) => idx !== this.activeIndex && c.configured && !c.exhausted);
-    if (any >= 0) {
-      this.activeIndex = any;
-      const ev = { from: fromSlot, to: this.slots[any].slot, label: this.slots[any].label };
-      this.onRotate?.(ev);
-      return ev;
-    }
-    const ev = { from: fromSlot, to: null, label: null };
-    this.onRotate?.(ev);
-    return ev;
-  }
-
-  /** Consume a reset on a slot (defaults to active slot), resetting cycle usage to 0. If no resets left, marks exhausted and rotates to the next backup key. */
-  consumeReset(slotNumber = null) {
-    if (!this.hasPool) return null;
-    const idx = slotNumber == null ? this.activeIndex : Number(slotNumber) - 1;
-    const s = this.slots[idx];
-    if (!s || !s.configured) return null;
-    if (s.resetsLeft > 0) {
-      s.resetsUsed += 1;
-      s.resetsLeft -= 1;
-      s.used = 0;
-      s.exhausted = false;
-      s.lastResetAt = this.now();
-      const info = { action: "reset", slot: s.slot, label: s.label, resetsUsed: s.resetsUsed, resetsLeft: s.resetsLeft, resetUrl: s.resetUrl };
-      this.onReset?.(info);
-      return info;
-    }
-    s.exhausted = true;
-    const rotated = idx === this.activeIndex ? this.#advance(s.slot) : { from: s.slot, to: this.slots[this.activeIndex]?.slot ?? null };
-    return { action: "exhausted", slot: s.slot, label: s.label, rotatedTo: rotated?.to ?? null };
-  }
-
-  /** Switch to a specific configured slot number (1..3) or the next available configured backup key. */
-  rotateKey(toSlotNumber = null) {
-    if (!this.hasPool) return null;
-    const fromSlot = this.slots[this.activeIndex]?.slot ?? null;
-    if (toSlotNumber != null) {
-      const idx = Number(toSlotNumber) - 1;
-      const target = this.slots[idx];
-      if (!target || !target.configured || target.exhausted) return null;
-      this.activeIndex = idx;
-      const ev = { from: fromSlot, to: target.slot, label: target.label };
-      this.onRotate?.(ev);
-      return ev;
-    }
-    return this.#advance(fromSlot);
-  }
-
-  /** Refill one key slot or "all" configured slots back to 0 used and full resets (e.g. after a daily Euler quota refresh or dashboard reset). */
-  refillKey(slotNumber = "all") {
-    if (!this.hasPool) return false;
-    let changed = false;
-    for (const s of this.slots) {
-      if (!s.configured) continue;
-      if (slotNumber !== "all" && s.slot !== Number(slotNumber)) continue;
-      s.used = 0;
-      s.resetsUsed = 0;
-      s.resetsLeft = this.maxResets;
-      s.exhausted = false;
-      changed = true;
-    }
-    if (changed) {
-      const firstReady = this.slots.findIndex((s) => s.configured && !s.exhausted);
-      if (firstReady >= 0 && (slotNumber === "all" || this.slots[this.activeIndex]?.exhausted)) this.activeIndex = firstReady;
-    }
-    return changed;
-  }
-
-  /** Called when the upstream signing service reports HTTP 429 rate-limit despite local tracking (debounced so concurrent rooms don't burn multiple resets at once). */
+  /** Called when Euler reports HTTP 429 rate-limit despite local tracking (debounced to avoid log/pause storms). */
   limitHit() {
     this.note();
-    if (!this.hasKeys()) return null;
+    this.metrics.rateLimited += 1;
+    if (!this.key) return null;
     const now = this.now();
     if (now - this.lastLimitActionAt < 5000) return null;
     this.lastLimitActionAt = now;
-    const cur = this.slots[this.activeIndex];
-    if (cur && cur.configured && !cur.resetUrl) {
-      // Without an automated reset webhook, a live HTTP 429 means this key is exhausted right now:
-      // immediately fail over to the next backup key instead of retrying the same rate-limited key.
-      cur.exhausted = true;
-      cur.used = cur.cap;
-      const rotated = this.#advance(cur.slot);
-      return { action: "exhausted", slot: cur.slot, label: cur.label, rotatedTo: rotated?.to ?? null };
-    }
-    return this.consumeReset();
+    this.exhausted = true;
+    const resetAt = this.nextResetAt();
+    this.pauseUntil = resetAt || now + 5 * 60 * 1000;
+    this.onBudgetPause?.({ reason: "rate_limited", pauseUntil: this.pauseUntil });
+    return { action: "paused", pauseUntil: this.pauseUntil };
   }
 
-  /** One connection that went through the signing service (each one is a request to it, which a free key only allows so many of a day). */
-  use() {
+  /** Records one signed TikTok WebSocket connection through Euler. */
+  use({ reconnect = false } = {}) {
     this.uses.push(this.now());
     if (this.uses.length > 5000) this.uses.shift();
-    if (!this.hasKeys()) return;
-    let s = this.slots[this.activeIndex];
-    if (!s || !s.configured || s.exhausted) {
-      const nextIdx = this.slots.findIndex((c) => c.configured && !c.exhausted);
-      if (nextIdx < 0) return;
-      this.activeIndex = nextIdx;
-      s = this.slots[nextIdx];
+    if (reconnect) this.metrics.reconnects += 1;
+    else this.metrics.liveConnects += 1;
+    if (!this.key) return;
+    this.used += 1;
+    this.totalUsed += 1;
+    if (this.remote?.ok && this.remote.day && this.remote.day.remaining > 0) {
+      this.remote.day.remaining = Math.max(0, this.remote.day.remaining - 1);
     }
-    s.used += 1;
-    s.totalUsed += 1;
-    if (s.used >= s.cap) {
-      this.consumeReset(s.slot);
+    if (this.remote?.ok && this.remote.hour && this.remote.hour.remaining > 0) {
+      this.remote.hour.remaining = Math.max(0, this.remote.hour.remaining - 1);
+    }
+    if (this.remainingDaily() <= this.reserve) {
+      this.exhausted = true;
+      const resetAt = this.nextResetAt();
+      this.pauseUntil = resetAt || this.now() + 15 * 60 * 1000;
+      this.onBudgetPause?.({ reason: "day_budget", pauseUntil: this.pauseUntil });
     }
   }
 
   usedIn(windowMs) { const from = this.now() - windowMs; return this.uses.filter((t) => t >= from).length; }
 
-  /** Safe telemetry summary of the 3-account key pool (never exposes raw API keys). */
-  poolSummary() {
-    if (!this.hasPool) return null;
-    const cur = this.slots[this.activeIndex];
-    const activeSlot = cur && cur.configured && !cur.exhausted ? cur.slot : null;
-    const totalRemainingRequests = this.slots.reduce((sum, s) => {
-      if (!s.configured || s.exhausted) return sum;
-      const cycleLeft = s.remote?.ok && typeof s.remote?.day?.remaining === "number"
-        ? Math.min(Math.max(0, s.cap - s.used), Math.max(0, s.remote.day.remaining))
-        : Math.max(0, s.cap - s.used);
-      const resetCap = s.remote?.ok && s.remote?.day?.max > 0 ? s.remote.day.max : s.cap;
-      return sum + cycleLeft + s.resetsLeft * resetCap;
-    }, 0);
+  /** Safe telemetry summary for the single compliant Euler key (never exposes the raw API key). */
+  quotaSummary() {
+    if (!this.key) return null;
+    const cap = this.effectiveCap();
+    const remaining = this.remainingDaily();
+    const available = this.availableBudget();
+    const paused = !this.canSign();
+    const state = paused ? (remaining <= 0 ? "exhausted" : "reserved") : "active";
+    const resetAt = this.nextResetAt();
     return {
-      activeSlot,
-      cap: this.cap,
-      maxResets: this.maxResets,
-      configuredCount: this.slots.filter((s) => s.configured).length,
-      exhaustedCount: this.slots.filter((s) => s.configured && s.exhausted).length,
-      totalRemainingRequests,
-      accounts: this.slots.map((s, idx) => ({
-        slot: s.slot,
-        label: s.label,
-        configured: s.configured,
-        active: idx === this.activeIndex && s.configured && !s.exhausted,
-        exhausted: s.exhausted,
-        state: !s.configured ? "unconfigured" : s.exhausted ? "exhausted" : idx === this.activeIndex ? "active" : "standby",
-        used: s.used,
-        totalUsed: s.totalUsed,
-        cap: s.cap,
-        resetsUsed: s.resetsUsed,
-        resetsLeft: s.resetsLeft,
-        maxResets: s.maxResets,
-        lastResetAt: s.lastResetAt,
-        remote: s.remote ?? null,
-      })),
+      mode: "single",
+      configured: true,
+      state,
+      used: this.used,
+      totalUsed: this.totalUsed,
+      cap,
+      reserve: this.reserve,
+      remaining,
+      available,
+      resetAt: resetAt ? new Date(resetAt).toISOString() : (this.remote?.day?.reset_at ?? null),
+      remote: this.remote ?? null,
+      metrics: { ...this.metrics },
+    };
+  }
+
+  /** Compatibility alias returning the single-account summary in the legacy `pool` shape for older monitors. */
+  poolSummary() {
+    const q = this.quotaSummary();
+    if (!q) return null;
+    return {
+      mode: "single",
+      activeSlot: q.state === "active" ? 1 : null,
+      cap: q.cap,
+      reserve: q.reserve,
+      configuredCount: 1,
+      exhaustedCount: q.state === "active" ? 0 : 1,
+      totalRemainingRequests: q.available,
+      metrics: q.metrics,
+      accounts: [
+        {
+          slot: 1,
+          label: "Primary Euler Account",
+          configured: true,
+          active: q.state === "active",
+          exhausted: q.state !== "active",
+          state: q.state,
+          used: q.used,
+          totalUsed: q.totalUsed,
+          cap: q.cap,
+          reserve: q.reserve,
+          remaining: q.remaining,
+          available: q.available,
+          resetAt: q.resetAt,
+          remote: q.remote,
+        },
+      ],
     };
   }
 }
@@ -293,11 +273,21 @@ export class Signing {
 /** Everything the page and the alerts need. `device` (processor, memory) is added only for someone on the device itself. */
 export function snapshot({ stats, startedAt, now, version, features, signing, estimate, streams = null, alertAt = ALERT_AT, device = null, roster = null, ownerLogin = false, keyed = null, actions = null }) {
   const free = Math.max(0, stats.max - stats.used);
+  const quota = typeof signing.quotaSummary === "function" ? signing.quotaSummary() : null;
   const pool = typeof signing.poolSummary === "function" ? signing.poolSummary() : null;
+  const metrics = signing.metrics ? { ...signing.metrics } : null;
   return {
     ok: true, name: "frills-relay", version, features, slots: stats,
     free, level: level(stats, alertAt), alertAt, uptimeS: Math.max(0, Math.round((now - startedAt) / 1000)),
-    signing: { busyRecently: signing.recent(), busy: signing.recent(2 * 60 * 1000) > 0, ...(signing.usedIn ? { connectsHour: signing.usedIn(3600000), connectsDay: signing.usedIn(86400000) } : {}), ...(keyed === null ? {} : { key: keyed }), ...(pool ? { pool } : {}) },
+    signing: {
+      busyRecently: signing.recent(),
+      busy: signing.recent(2 * 60 * 1000) > 0,
+      ...(signing.usedIn ? { connectsHour: signing.usedIn(3600000), connectsDay: signing.usedIn(86400000) } : {}),
+      ...(keyed === null ? {} : { key: keyed }),
+      ...(metrics ? { metrics } : {}),
+      ...(quota ? { quota } : {}),
+      ...(pool ? { pool } : {}),
+    },
     capacity: estimate,
     // the pages listening right now, the most one internet address may hold, how many pages were turned away because of it (and how long ago the last was),
     // and how many came back and replaced their own earlier stream; only counts, like everything else here
@@ -362,7 +352,7 @@ td a{font-weight:700;color:var(--ink)}.pill{display:inline-block;padding:2px 10p
 <div class="card"><b id="away">-</b><span id="awaynote">pages turned away</span></div>
 </div>
 <div class="card"><b id="cap">-</b><span id="capnote"></span></div>
-<section class="card own" id="euler" hidden><b>Euler Signing Key Pool (3 Accounts · 1,500 Cap · 3 Resets Each)</b><p class="note" id="eulernote"></p><div class="grid" id="eulergrid"></div><div class="ownrow" id="eulerctl" hidden><button id="euler-reset" type="button">Use 1 reset on active key</button><button id="euler-rotate" type="button">Rotate to backup key</button><button id="euler-refill" type="button">Refill all (after daily reset)</button><button id="euler-sync" type="button">Sync live Euler quota</button></div><p class="note" id="eulermsg" role="status"></p></section>
+<section class="card own" id="euler" hidden><b>Euler Signing Quota (Single Account · Leak Shield)</b><p class="note" id="eulernote"></p><div class="grid" id="eulergrid"></div><div class="ownrow" id="eulerctl" hidden><button id="euler-sync" type="button">Sync live Euler quota</button><button id="euler-refill" type="button">Reset local counter</button></div><p class="note" id="eulermsg" role="status"></p></section>
 <section class="alarm"><label>Warn me when <input type="number" id="at" min="0" max="500" value="${esc(s.alertAt)}"> or fewer spots are left <button id="allow" type="button">Turn on notifications</button></label>
 <p class="note" id="allownote">The warning also shows here as a red bar, and plays a short sound. Keep this page open to get it. Your phone can warn you by itself too (Termux notification), see the guide.</p></section>
 <section class="card dev" id="dev"><b>This device</b><span id="devtext"></span></section>
@@ -409,19 +399,25 @@ function draw(s){
   $("free").textContent=free;$("of").textContent="free spots of "+s.slots.max;$("waiting").textContent=s.slots.waiting;$("used").textContent=s.slots.used;$("up").textContent=asText(s.uptimeS);
   $("fill").style.width=Math.min(100,100*s.slots.used/Math.max(1,s.slots.max))+"%";
   $("state").textContent=s.slots.waiting>0?s.slots.waiting+" "+(s.slots.waiting===1?"person is":"people are")+" waiting for a spot":free===0?"Full: nobody else fits":low?"Getting full: "+free+" left":"Plenty of room";
-  const pool = s.signing.pool;
-  const poolNote = pool ? (pool.activeSlot ? " · Pool Key #" + pool.activeSlot + " (" + pool.accounts[pool.activeSlot - 1].used + "/" + pool.cap + ", " + pool.accounts[pool.activeSlot - 1].resetsLeft + "/" + pool.maxResets + " resets left)" : " · ALL POOL KEYS EXHAUSTED") : "";
-  $("signing").textContent=(s.signing.busy?"Busy right now":s.signing.busyRecently?"OK (busy "+s.signing.busyRecently+"x lately)":"OK")+(s.signing.key===undefined?"":s.signing.key?" · own key":" · NO key (shared limits)")+poolNote+(s.signing.connectsDay===undefined?"":" · "+s.signing.connectsDay+" connects in 24 h");
-  if(pool){
+  const q = s.signing.quota;
+  const qNote = q ? (q.state === "active" ? " · " + q.available.toLocaleString() + "/" + q.cap.toLocaleString() + " left today" : " · QUOTA PAUSED (" + q.state.toUpperCase() + ")") : "";
+  $("signing").textContent=(s.signing.busy?"Busy right now":s.signing.busyRecently?"OK (busy "+s.signing.busyRecently+"x lately)":"OK")+(s.signing.key===undefined?"":s.signing.key?" · own key":" · NO key (shared limits)")+qNote+(s.signing.connectsDay===undefined?"":" · "+s.signing.connectsDay+" connects in 24 h");
+  if(q){
     $("euler").hidden=false;
-    $("eulernote").textContent=pool.configuredCount+" of "+pool.accounts.length+" keys configured · "+pool.totalRemainingRequests.toLocaleString()+" estimated requests remaining in pool.";
+    const remote=q.remote&&q.remote.ok&&q.remote.day?"Euler live: "+q.remote.day.remaining.toLocaleString()+" / "+q.remote.day.max.toLocaleString()+" day"+(q.remote.hour?" · "+q.remote.hour.remaining+"/"+q.remote.hour.max+" hr":""):"Press Sync live Euler quota to read Euler directly";
+    $("eulernote").textContent="State: "+q.state.toUpperCase()+" · "+remote+(q.reserve?" · "+q.reserve+" reserved":"");
     const g=$("eulergrid");g.replaceChildren();
-    for(const a of pool.accounts){
+    const m=q.metrics||{};
+    const cells=[
+      [q.available.toLocaleString()+" / "+q.cap.toLocaleString(),"daily budget left ("+q.used+" used locally)"],
+      [(m.offlineSaved||0).toLocaleString(),"offline checks saved (0 Euler calls)"],
+      [(m.liveConnects||0)+" live · "+(m.reconnects||0)+" reconn","signed WebSocket connects"],
+      [(m.roomIdCacheHits||0)+" cache · "+(m.budgetBlocked||0)+" guarded","roomId cache hits · budget pauses"],
+    ];
+    for(const [val,lbl] of cells){
       const box=document.createElement("div");box.className="card";
-      const b=document.createElement("b");b.textContent=a.label+": "+a.state.toUpperCase();
-      const sp=document.createElement("span");
-      const remote=a.remote&&a.remote.ok&&a.remote.day?" · Euler live: "+a.remote.day.remaining+"/"+a.remote.day.max+" day":"";
-      sp.textContent=a.configured?a.used+" / "+a.cap+" reqs · "+a.resetsLeft+" / "+a.maxResets+" resets left · "+a.totalUsed+" total"+remote:"Not configured (set EULER_API_KEYS or EULER_API_KEY_"+a.slot+")";
+      const b=document.createElement("b");b.textContent=val;
+      const sp=document.createElement("span");sp.textContent=lbl;
       box.append(b,sp);g.append(box);
     }
     $("eulerctl").hidden=!(s.actions||s.device);
@@ -468,16 +464,14 @@ $("restart").addEventListener("click",async()=>{
   }catch{$("ctlmsg").textContent="Cannot reach the relay right now.";$("restart").disabled=false}
 });
 async function eulerAction(action){
-  $("eulermsg").textContent="Updating key pool...";
+  $("eulermsg").textContent="Updating Euler quota...";
   try{
     const r=await fetch("/owner/euler",{method:"POST",headers:{"content-type":"application/json",...(OWNER?{authorization:"Bearer "+OWNER}:{})},body:JSON.stringify({action}),cache:"no-store"});
     const j=await r.json().catch(()=>({}));
-    if(r.ok){$("eulermsg").textContent="Updated key pool ("+action+").";tick()}
+    if(r.ok){$("eulermsg").textContent="Updated Euler quota ("+action+").";tick()}
     else{$("eulermsg").textContent="Action failed ("+(j.error||r.status)+")."}
   }catch{$("eulermsg").textContent="Cannot reach the relay right now."}
 }
-$("euler-reset").addEventListener("click",()=>eulerAction("reset"));
-$("euler-rotate").addEventListener("click",()=>eulerAction("rotate"));
 $("euler-refill").addEventListener("click",()=>eulerAction("refill"));
 $("euler-sync").addEventListener("click",()=>eulerAction("sync"));
 draw(${JSON.stringify(s).replace(/</g, "\\u003c")});setInterval(tick,5000);if(OWNER)tick();

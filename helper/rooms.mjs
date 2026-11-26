@@ -57,6 +57,9 @@ export class Room {
     this.emptySince = Date.now(); // when the last page left (a room with no page is only waiting out idleStopMs)
     this.lastEventAt = 0; // when anything last came from TikTok on the connection we have
     this.silentFor = 0; // how long a silence is put up with before the connection is replaced (grows after a silence that changed nothing)
+    this.cachedRoomId = ""; // cached live roomId so short hiccups skip fetchRoomId()
+    this.cachedRoomAt = 0;
+    this.hadLive = false;
   }
 
   add(client) {
@@ -114,10 +117,15 @@ export class Room {
     if (this.base > 0 || this.live) this.broadcast("info", this.info());
   }
 
+  idleWindowMs() {
+    const offMs = this.hub.opts.offlineIdleStopMs;
+    return !this.live && Number.isFinite(offMs) && offMs > 0 ? Math.min(offMs, this.hub.opts.idleStopMs) : this.hub.opts.idleStopMs;
+  }
+
   remove(client) {
     this.clients.delete(client);
     if (!this.clients.size) this.emptySince = Date.now();
-    if (!this.clients.size && !this.stopped) this.idleTimer = setTimeout(() => this.hub.drop(this), this.hub.opts.idleStopMs);
+    if (!this.clients.size && !this.stopped) this.idleTimer = setTimeout(() => this.hub.drop(this), this.idleWindowMs());
   }
 
   broadcast(event, data) {
@@ -162,9 +170,9 @@ export class Room {
   }
 
   wire(conn, finish) {
-    // Any sign of life from TikTok (a chat line, a like, someone joining, the viewer count that comes every few seconds) shows the connection is not dead.
+    // Any sign of life from TikTok (chat, likes, viewers, raw WebSocket packets/heartbeats) shows the connection is alive.
     const heard = () => { this.lastEventAt = Date.now(); this.silentFor = this.hub.opts.silentMs; };
-    for (const name of ["chat", "emote", "gift", "like", "follow", "share", "imDelete", "roomUser", "member"]) conn.on(name, heard);
+    for (const name of ["chat", "emote", "gift", "like", "follow", "share", "imDelete", "roomUser", "member", "social", "enterRoom", "websocketData"]) conn.on(name, heard);
     conn.on("chat", (d) => {
       const m = mapChat(d);
       this.noteEmotes(d, m);
@@ -194,7 +202,11 @@ export class Room {
       for (const id of ids) this.broadcast("remove", { id });
       for (const user of users) this.broadcast("clear", { user });
     });
-    conn.on("streamEnd", () => finish({ kind: "offline", detail: "The LIVE ended. Waiting for the next one…", wasConnected: true }));
+    conn.on("streamEnd", () => {
+      this.cachedRoomId = "";
+      this.cachedRoomAt = 0;
+      finish({ kind: "offline", detail: "The LIVE ended. Waiting for the next one…", wasConnected: true });
+    });
     conn.on("disconnected", () => finish({ kind: "dropped", wasConnected: true }));
     conn.on("error", (err) => this.hub.log(`@${this.user}: ${String(err?.constructor?.name ?? "error")} ${String(err?.message ?? "").slice(0, 120)}`));
   }
@@ -252,15 +264,61 @@ export class Room {
       give();
       return classify(err);
     }
+    if (this.stopped) {
+      give();
+      this.letGo(conn);
+      return { kind: "stopped" };
+    }
+    const cacheTtlMs = this.hub.opts.roomIdCacheMs ?? 600000;
+    const freshRoomId = this.cachedRoomId && (Date.now() - this.cachedRoomAt) <= cacheTtlMs ? this.cachedRoomId : "";
+    if (!freshRoomId) {
+      this.cachedRoomId = "";
+      this.cachedRoomAt = 0;
+    }
+
+    // 1. Direct TikTok live pre-check (0 Euler calls when skipFetchRoomIdFromEulerRoute is on):
+    //    if TikTok says the account is offline, skip conn.connect() completely so Euler is never touched.
+    if (!conn.pretend && !freshRoomId && typeof conn.fetchIsLive === "function") {
+      try {
+        const isLive = await conn.fetchIsLive();
+        if (isLive === false) {
+          give();
+          this.letGo(conn);
+          this.hub.opts.onOfflineSaved?.();
+          return { kind: "offline" };
+        }
+      } catch {
+        /* direct check inconclusive — fall through to conn.connect() which still enforces route config */
+      }
+    }
+
+    // 2. Daily Euler budget guard: avoid firing doomed 429 requests when the single account's quota is paused/reserved.
+    if (!conn.pretend && typeof this.hub.opts.canSign === "function" && !this.hub.opts.canSign()) {
+      give();
+      this.letGo(conn);
+      this.hub.opts.onBudgetBlocked?.();
+      this.hub.busy();
+      return { kind: "limited", detail: "Daily TikTok signing budget reached. Waiting for quota reset…" };
+    }
+
     this.conn = conn;
     let finish;
     const ended = new Promise((resolve) => { finish = resolve; });
     this.wire(conn, finish);
     try {
-      await conn.connect();
+      if (freshRoomId) {
+        this.hub.opts.onCacheHit?.();
+        await conn.connect(freshRoomId);
+      } else {
+        await conn.connect();
+      }
     } catch (err) {
       give();
       this.letGo(conn);
+      if (freshRoomId) {
+        this.cachedRoomId = "";
+        this.cachedRoomAt = 0;
+      }
       const how = classify(err);
       if (how.kind === "limited") this.hub.busy();
       return how;
@@ -270,7 +328,14 @@ export class Room {
       this.letGo(conn);
       return { kind: "stopped" };
     }
-    if (!conn.pretend) this.hub.signed(); // (the practice account makes chat up: it never asked the signing service)
+    const resolvedRoomId = String(conn.roomId ?? conn.state?.roomId ?? "").trim();
+    if (resolvedRoomId) {
+      this.cachedRoomId = resolvedRoomId;
+      this.cachedRoomAt = Date.now();
+    }
+    const isReconnect = this.hadLive;
+    this.hadLive = true;
+    if (!conn.pretend) this.hub.signed({ reconnect: isReconnect }); // (the practice account makes chat up: it never asked the signing service)
     this.hub.log(`@${this.user}: connected in ${((Date.now() - began) / 1000).toFixed(1)} s`);
     this.readInfo(conn);
     this.setStatus("connected", conn.pretend ? "Practice chat made up by Frills. Nothing comes from TikTok." : "");
@@ -362,8 +427,8 @@ export class Room {
         this.setStatus("offline", every > offlineWaitMs ? `Not live yet. Looking again every ${lengthOf(every)}. Opening this link again looks right away.` : how.detail ?? "");
         await this.sleep(every);
       } else if (how.kind === "limited") {
-        this.setStatus("limited");
-        this.hub.opts.onLimited?.();
+        this.setStatus("limited", how.detail ?? "");
+        if (!how.detail) this.hub.opts.onLimited?.();
         await this.sleep(Math.min(this.hub.cooldownLeft(), 1000)); // the shared pause is waited out in Hub.turn at the next attempt
       } else {
         if (how.kind === "failed") this.setStatus("error", how.detail);
@@ -436,7 +501,7 @@ class Waiting {
 
 export class Hub {
   constructor(opts = {}) {
-    this.opts = { factory: null, apiKey: "", maxRooms: 3, queue: false, queueGraceMs: 20000, idleStopMs: 30000, offlineWaitMs: 20000, limitedWaitMs: 60000, limitedMaxMs: 600000, connectAtOnce: 5, offlineGiveUpMs: 0, offlineSlowSteps: [], wakeGapMs: 30000, backoffMs: [3000, 6000, 12000, 30000, 60000], silentMs: 120000, silentMaxMs: 600000, ...opts };
+    this.opts = { factory: null, apiKey: "", maxRooms: 3, queue: false, queueGraceMs: 20000, idleStopMs: 30000, offlineIdleStopMs: null, offlineWaitMs: 20000, limitedWaitMs: 60000, limitedMaxMs: 600000, connectAtOnce: 5, offlineGiveUpMs: 0, offlineSlowSteps: [], wakeGapMs: 30000, backoffMs: [3000, 6000, 12000, 30000, 60000], silentMs: 300000, silentMaxMs: 1800000, roomIdCacheMs: 600000, ...opts };
     this.log = opts.log ?? (() => {});
     this.rooms = new Map();
     this.waiting = new Map(); // accounts in line for a spot, oldest first
@@ -476,9 +541,9 @@ export class Hub {
   }
 
   /** A connection went through: the signing service is fine, so the pauses start over, and this counts as one use of it. */
-  signed() {
+  signed(info = {}) {
     this.strikes = 0;
-    this.opts.onSigned?.();
+    this.opts.onSigned?.(info);
   }
 
   /** Waits for a turn to connect: until any pause is over, and until fewer than `connectAtOnce` attempts are under way. Give it back with release(). */
@@ -531,7 +596,7 @@ export class Hub {
       counts: { ...room.counts },
       endedS: secondsSince(room.liveEndedAt), // how long ago the LIVE ended (null: not since we started watching)
       lastS: secondsSince(room.lastSeenAt), // how long ago a chat line, gift, follow or share last came through (null: none yet)
-      leavesInS: room.clients.size ? null : Math.max(0, Math.round((room.emptySince + this.opts.idleStopMs - now) / 1000)), // no page open: when it is let go
+      leavesInS: room.clients.size ? null : Math.max(0, Math.round((room.emptySince + room.idleWindowMs() - now) / 1000)), // no page open: when it is let go
     }));
     // In use first (LIVE with a page open), then a page waiting for a LIVE, then rooms with no page that are only waiting to be let go.
     const rank = (a) => (a.pages === 0 ? 2 : a.live ? 0 : 1);

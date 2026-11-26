@@ -112,7 +112,7 @@ test("it answers a ping, serves the built site with its security headers, and sa
   await start(scripted().factory);
   const ping = await raw("/tiktok/ping");
   assert.equal(ping.status, 200);
-  assert.deepEqual(JSON.parse(ping.body), { ok: true, name: "frills-helper", version: "0.6.0", features: ["chat", "alerts", "info", "roles", "status", "viewers"] });
+  assert.deepEqual(JSON.parse(ping.body), { ok: true, name: "frills-helper", version: "0.7.0", features: ["chat", "alerts", "info", "roles", "status", "viewers"] });
   const editor = await raw("/editor/");
   assert.equal(editor.status, 200);
   assert.match(editor.body, /Connect your chat/);
@@ -434,15 +434,87 @@ test("the relay writes how long each connection to TikTok took", async () => {
   await helper.close();
 });
 
-test("the shared relay looks for an account that is not LIVE often at first and less often later, and never gives up", () => {
+test("the shared relay enforces leak-shield defaults: slower offline backoff, 4h offline cap, fast offline idle cleanup, and 5m silence threshold", () => {
   const relay = createHelper({ relay: { origins: ["https://site.test"], slots: 3, maxPerIp: 5, trustProxy: false }, factory: async () => ({}) });
-  const { offlineWaitMs, offlineGiveUpMs, offlineSlowSteps } = relay.hub.opts;
-  assert.equal(offlineWaitMs, 20000, "every 20 seconds at first, when a streamer has just opened the overlay and is about to go LIVE");
-  assert.deepEqual(offlineSlowSteps, [[900000, 30000], [3600000, 60000], [14400000, 180000]], "30 seconds after 15 minutes, a minute after an hour, 3 minutes after 4 hours (a streamer who sets the scene up in TikTok LIVE Studio before going LIVE is found within half a minute)");
-  assert.ok(offlineSlowSteps[0][0] >= 600000, "the quick looks last at least 10 minutes: scene setup before Go LIVE takes a few minutes");
-  assert.ok(offlineSlowSteps[0][1] <= 30000, "and the first slower step is still at most 30 seconds");
-  assert.equal(offlineGiveUpMs, 0, "never gives up while a page listens");
+  const { offlineWaitMs, offlineGiveUpMs, offlineSlowSteps, idleStopMs, offlineIdleStopMs, silentMs, wakeGapMs } = relay.hub.opts;
+  assert.equal(offlineWaitMs, 45000, "every 45 seconds at first to save quota while still catching Go LIVE quickly");
+  assert.deepEqual(offlineSlowSteps, [[600000, 120000], [1800000, 300000], [7200000, 600000]], "2m after 10m, 5m after 30m, 10m after 2h");
+  assert.equal(offlineGiveUpMs, 14400000, "stops polling after 4 hours continuously offline until reopened");
+  assert.equal(idleStopMs, 300000, "keeps live rooms warm 5 minutes on refresh");
+  assert.equal(offlineIdleStopMs, 45000, "drops abandoned offline rooms after 45 seconds");
+  assert.equal(silentMs, 300000, "waits 5 minutes of complete silence before reconnecting");
+  assert.equal(wakeGapMs, 60000, "throttles manual wake-ups to once per minute");
   assert.ok(offlineSlowSteps.every(([after, every], i) => every > (offlineSlowSteps[i - 1]?.[1] ?? offlineWaitMs) && after > (offlineSlowSteps[i - 1]?.[0] ?? 0)), "each step is later and slower than the one before");
+});
+
+test("leak shield: fetchIsLive() === false skips conn.connect() completely, cached roomId speeds reconnects, websocketData prevents false silence reconnects, and offlineIdleStopMs drops offline rooms fast", async () => {
+  // 1. Direct fetchIsLive() === false never calls conn.connect() and counts offlineSaved
+  let connectCalls = 0;
+  let liveFlag = false;
+  const connectRoomIds = [];
+  const factory = async () => {
+    const c = new EventEmitter();
+    c.roomId = "room_999";
+    c.fetchIsLive = async () => liveFlag;
+    c.connect = async (rid) => {
+      connectCalls += 1;
+      connectRoomIds.push(rid ?? null);
+      c.roomInfo = { data: { status: 2 } };
+    };
+    c.disconnect = () => { c.gone = true; c.emit("disconnected"); };
+    return c;
+  };
+  await start(factory, { offlineWaitMs: 30, offlineGiveUpMs: 0, silentMs: 120, idleStopMs: 400, offlineIdleStopMs: 60 });
+  const p = listen("shield.user");
+  await p.until(() => p.states().includes("offline"), 2000);
+  await sleep(80);
+  assert.equal(connectCalls, 0, "conn.connect() is never called while fetchIsLive() says offline");
+  assert.ok(helper.signing.metrics.offlineSaved >= 1, "tracks saved offline checks");
+
+  // 2. When offline tab closes, offlineIdleStopMs (60ms) drops the room fast instead of waiting idleStopMs (400ms)
+  await p.close();
+  await sleep(140);
+  assert.equal(helper.hub.rooms.has("shield.user"), false, "abandoned offline room dropped quickly");
+
+  // 3. When user goes live, conn.connect() runs, caches roomId, and websocketData prevents silence reconnects
+  liveFlag = true;
+  const p2 = listen("shield.user");
+  await p2.until(() => p2.states().includes("connected"), 2000);
+  assert.equal(connectCalls, 1);
+  assert.equal(connectRoomIds[0], null);
+  const firstConn = helper.hub.rooms.get("shield.user").conn;
+  const pulse = setInterval(() => firstConn.emit("websocketData", Buffer.from("hb")), 35);
+  await sleep(280);
+  clearInterval(pulse);
+  assert.equal(connectCalls, 1, "raw websocketData heartbeats keep quiet live room from reconnecting");
+
+  // 4. On unexpected drop, reconnect passes cached roomId directly to conn.connect(roomId)
+  firstConn.emit("disconnected");
+  await p2.until(() => connectCalls >= 2, 2000);
+  assert.equal(connectRoomIds[1], "room_999", "reuses cached roomId on reconnect");
+  assert.equal(helper.signing.metrics.roomIdCacheHits, 1);
+  assert.equal(helper.signing.metrics.liveConnects, 1);
+  assert.equal(helper.signing.metrics.reconnects, 1);
+
+  await p2.close();
+  await helper.close();
+
+  // 5. Daily budget guard pauses before firing doomed Euler requests when cap - reserve is reached
+  let blockedConnects = 0;
+  await start(async () => {
+    const c = new EventEmitter();
+    c.connect = async () => { blockedConnects += 1; };
+    c.disconnect = () => {};
+    return c;
+  }, { apiKey: "single_key", eulerCap: 2, eulerReserve: 1, limitedWaitMs: 60000 });
+  helper.signing.use(); // 1 used of 2 cap with 1 reserved -> 0 available
+  assert.equal(helper.signing.canSign(), false);
+  const p3 = listen("guarded.user");
+  await p3.until(() => p3.states().includes("limited"), 2000);
+  assert.equal(blockedConnects, 0, "budget guard stops conn.connect() before touching Euler");
+  assert.ok(helper.signing.metrics.budgetBlocked >= 1);
+  await p3.close();
+  await helper.close();
 });
 
 test("a chat message with emotes, and an emote-only message, reach a page as pictures with their places", async () => {

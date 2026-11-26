@@ -93,7 +93,7 @@ const T = Date.now();
 const day = (age) => new Date(T - age * 86400000).toISOString().slice(0, 19).replace("T", " "); // (a time of day is fine: the report counts whole days)
 const rows = [{ ev: "visit", a: "home", b: "tiktok", d: day(0), n: 30 }, { ev: "visit", a: "editor", b: "reddit", d: day(1), n: 12 }, { ev: "visit", a: "home", b: "tiktok", d: day(9), n: 20 }, { ev: "link_copied", a: "chat", b: "tiktok", d: day(1), n: 7 }, { ev: "overlay_load", a: "chat", b: "live", d: day(2), n: 40 }, { ev: "overlay_load", a: "chat", b: "demo", d: day(2), n: 90 }, { ev: "plus_interest", a: "remote_link", b: "editor", d: day(1), n: 5 }];
 const ids = [{ id: "a", d: day(0) }, { id: "b", d: day(1) }, { id: "a", d: day(8) }];
-const REPORT = (() => { const summary = summarize(rows, T); const active = activeOverlays(ids, T); return { ok: true, now: T, relays: [{ url: "https://relay.valwidgets.live", host: "relay.valwidgets.live", label: "Relay 1", ok: true, latencyMs: 18, version: "0.6.0", level: "ok", free: 24, slots: { used: 6, max: 30, waiting: 0 }, uptimeS: 3600, signing: { busy: false, busyRecently: 0, connectsHour: 12, connectsDay: 140, key: true, pool: { activeSlot: 1, cap: 1500, maxResets: 3, configuredCount: 3, totalRemainingRequests: 17860, accounts: [{ slot: 1, label: "Account 1 (Primary)", configured: true, active: true, state: "active", used: 140, totalUsed: 140, cap: 1500, resetsUsed: 0, resetsLeft: 3, maxResets: 3, remote: { ok: true, day: { max: 1500, remaining: 1360, reset_at: "2026-11-24T00:00:00.000Z" }, hour: { max: 300, remaining: 290, reset_at: null } } }, { slot: 2, label: "Account 2 (Backup 1)", configured: true, active: false, state: "standby", used: 0, totalUsed: 0, cap: 1500, resetsUsed: 0, resetsLeft: 3, maxResets: 3, remote: null }, { slot: 3, label: "Account 3 (Backup 2)", configured: true, active: false, state: "standby", used: 0, totalUsed: 0, cap: 1500, resetsUsed: 0, resetsLeft: 3, maxResets: 3, remote: null }] } } }], frills: { ...summary, active, scorecard: scorecard(summary, active), idsReadable: true }, valwidgets: summarize([{ ev: "visit", a: "rank", b: "search", d: day(0), n: 5 }, { ev: "pro_click", a: "footer", b: "", d: day(0), n: 2 }], T) }; })();
+const REPORT = (() => { const summary = summarize(rows, T); const active = activeOverlays(ids, T); return { ok: true, now: T, relays: [{ url: "https://relay.valwidgets.live", host: "relay.valwidgets.live", label: "Relay 1", ok: true, latencyMs: 18, version: "0.7.0", level: "ok", free: 24, slots: { used: 6, max: 30, waiting: 0 }, uptimeS: 3600, signing: { busy: false, busyRecently: 0, connectsHour: 12, connectsDay: 140, key: true, metrics: { liveConnects: 132, reconnects: 8, offlineSaved: 940, roomIdCacheHits: 6, budgetBlocked: 0, rateLimited: 0 }, quota: { mode: "single", configured: true, state: "active", used: 140, totalUsed: 140, cap: 1500, reserve: 0, remaining: 1360, available: 1360, resetAt: "2026-11-27T00:00:00.000Z", remote: { ok: true, day: { max: 1500, remaining: 1360, reset_at: "2026-11-27T00:00:00.000Z" }, hour: { max: 300, remaining: 290, reset_at: null } }, metrics: { liveConnects: 132, reconnects: 8, offlineSaved: 940, roomIdCacheHits: 6, budgetBlocked: 0, rateLimited: 0 } } } }], frills: { ...summary, active, scorecard: scorecard(summary, active), idsReadable: true }, valwidgets: summarize([{ ev: "visit", a: "rank", b: "search", d: day(0), n: 5 }, { ev: "pro_click", a: "footer", b: "", d: day(0), n: 2 }], T) }; })();
 
 /** The stats page with a pretend Worker: what /api/admin/stats and /api/admin/euler answer are mocked. */
 async function stats(reply, { signedIn = true } = {}) {
@@ -133,11 +133,11 @@ test("stats page: it draws both sites, the Frills Plus check with yes and not ye
   // Command center view switcher switches between compact views without stacking everything vertically
   await page.evaluate(`document.querySelector('[data-view-target="relays"]').click()`);
   const relaysText = await page.evaluate(`document.getElementById("relays").textContent`);
-  assert.match(relaysText, /Euler Signing Key Pool Authority/);
-  assert.match(relaysText, /Account 1 \(Primary\)/);
+  assert.match(relaysText, /Euler Signing Quota & Leak Shield/);
+  assert.match(relaysText, /Primary Euler Account/);
   assert.match(relaysText, /Euler Live Quota: 1,360 \/ 1,500 day/);
-  assert.match(relaysText, /Account 2 \(Backup 1\)/);
-  assert.match(relaysText, /Account 3 \(Backup 2\)/);
+  assert.match(relaysText, /Leak Shield Savings/);
+  assert.match(relaysText, /940offline checks blocked/);
   assert.equal(await page.evaluate(`getComputedStyle(document.getElementById("valwidgets")).display`), "none");
 
   await page.evaluate(`document.querySelector('[data-euler-action="sync"]').click()`);

@@ -21,20 +21,31 @@ import { cleanTikTokUser } from "../src/js/tiktok.js";
 import { Hub } from "./rooms.mjs";
 import { ALERT_KINDS } from "./map.mjs";
 import { DEMO_USER, DemoConnection } from "./demo.mjs";
-import { ALERT_AT, EULER_DEFAULT_CAP, EULER_DEFAULT_RESETS, Signing, capacity, deviceFacts, snapshot, statusPage } from "./status.mjs";
+import { ALERT_AT, EULER_DEFAULT_CAP, Signing, capacity, deviceFacts, snapshot, statusPage } from "./status.mjs";
 import { SlotAlerts, termuxNotifier } from "./alerts.mjs";
 import { OWNER, ownerGate } from "./owner.mjs";
 import { handleProStatus } from "../worker/region.mjs";
 import { handleDevPass, handleTts } from "../worker/tts.mjs";
 import { validTicketSecret, verifyRelayTicket } from "../worker/relay-ticket.mjs";
 
-const VERSION = "0.6.0";
+const VERSION = "0.7.0";
 /** What this program can do, so a page can tell an old one ("chat" only) from one that sends alerts. */
 const FEATURES = ["chat", "alerts", "info", "roles", "status", "viewers"];
 
 /**
- * Updates `tiktok-live-connector`'s global `SignConfig` and clears its cached Euler client whenever the active pool key
- * rotates. Without clearing `cachedInstance`, v2.5 keeps reusing the very first key's `EulerStreamApiClient` forever.
+ * Configures `tiktok-live-connector` route fallbacks so offline/room-ID checks never silently burn Euler quota.
+ * Direct TikTok HTML + api-live routes stay enabled; Euler is reserved strictly for signing live WebSockets
+ * unless `allowEulerRoomIdFallback` is explicitly enabled via env.
+ */
+export function configureConnectorRoutes(library, { allowEulerRoomIdFallback = false } = {}) {
+  const skip = !allowEulerRoomIdFallback;
+  if (library?.RoomIdRouteConfig) library.RoomIdRouteConfig.skipFetchRoomIdFromEulerRoute = skip;
+  if (library?.IsLiveRouteConfig) library.IsLiveRouteConfig.skipFetchRoomIdFromEulerRoute = skip;
+  return { skipEulerRoomIdFallback: skip };
+}
+
+/**
+ * Updates `tiktok-live-connector`'s global `SignConfig` and clears its cached Euler client whenever the key changes.
  */
 export function syncConnectorSignKey(library, apiKey = "") {
   const cfg = library?.SignConfig;
@@ -47,7 +58,7 @@ export function syncConnectorSignKey(library, apiKey = "") {
 }
 
 /** Makes a connection to TikTok for one account. The library is loaded only now, so everything else works (and is tested) without it. */
-export async function realFactory(user, { apiKey } = {}) {
+export async function realFactory(user, { apiKey, allowEulerRoomIdFallback = false } = {}) {
   let library;
   try {
     library = await import("tiktok-live-connector");
@@ -56,27 +67,27 @@ export async function realFactory(user, { apiKey } = {}) {
     error.name = "SetupError";
     throw error;
   }
+  configureConnectorRoutes(library, { allowEulerRoomIdFallback });
   syncConnectorSignKey(library, apiKey);
   // processInitialData: false skips the little history TikTok sends on joining, so an overlay shows new chat only.
   return new library.TikTokLiveConnection(user, { processInitialData: false, ...(apiKey ? { signApiKey: apiKey } : {}) });
 }
 
 /**
- * Reads up to 3 Euler Stream signing keys (`EULER_API_KEYS` comma-separated, or `EULER_API_KEY`, `EULER_API_KEY_2`, `EULER_API_KEY_3`),
- * optional reset webhook URLs (`EULER_RESET_URLS` or `EULER_RESET_URL[_2|_3]`), and cap/reset settings (`EULER_KEY_CAP`, `EULER_KEY_RESETS`).
+ * Reads the single compliant Euler Stream key (`EULER_API_KEY`; if legacy `EULER_API_KEYS` is present, uses ONLY the first key),
+ * daily cap (`EULER_KEY_CAP`, default 1,500), optional daily reserve (`EULER_DAILY_RESERVE`, default 0), and room-ID fallback toggle.
  */
 export function parseEulerConfig(env = process.env) {
-  const fromList = String(env.EULER_API_KEYS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
-  const fromNamed = [env.EULER_API_KEY, env.EULER_API_KEY_2, env.EULER_API_KEY_3].map((s) => String(s ?? "").trim()).filter(Boolean);
-  const keys = fromList.length ? fromList : fromNamed;
-  const urlsFromList = String(env.EULER_RESET_URLS ?? "").split(",").map((s) => s.trim());
-  const urlsFromNamed = [env.EULER_RESET_URL, env.EULER_RESET_URL_2, env.EULER_RESET_URL_3].map((s) => String(s ?? "").trim());
-  const resetUrls = urlsFromList.some(Boolean) ? urlsFromList : urlsFromNamed;
+  const explicit = String(env.EULER_API_KEY ?? "").trim();
+  const legacyList = String(env.EULER_API_KEYS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const key = explicit || legacyList[0] || "";
+  const ignoredExtraKeys = explicit
+    ? [env.EULER_API_KEY_2, env.EULER_API_KEY_3].filter((s) => String(s ?? "").trim()).length
+    : Math.max(0, legacyList.length - 1);
   const cap = Math.max(1, Number(env.EULER_KEY_CAP) || EULER_DEFAULT_CAP);
-  const maxResets = env.EULER_KEY_RESETS !== undefined && env.EULER_KEY_RESETS !== "" && Number.isFinite(Number(env.EULER_KEY_RESETS))
-    ? Math.max(0, Number(env.EULER_KEY_RESETS))
-    : EULER_DEFAULT_RESETS;
-  return { keys, resetUrls, cap, maxResets };
+  const reserve = Math.max(0, Math.min(cap - 1, Math.round(Number(env.EULER_DAILY_RESERVE) || 0)));
+  const allowEulerRoomIdFallback = env.EULER_ALLOW_ROOM_ID_FALLBACK === "1" || env.EULER_ALLOW_ROOM_ID_FALLBACK === "true";
+  return { key, keys: key ? [key] : [], ignoredExtraKeys, cap, reserve, allowEulerRoomIdFallback };
 }
 
 /**
@@ -87,44 +98,47 @@ export function parseEulerConfig(env = process.env) {
  * answers pages on those other addresses (the website), has `slots` spots and a line for them, limits how many streams (and how many
  * different accounts) one visitor address can hold open, and serves no site of its own unless a folder is given.
  */
-export function createHelper({ distDir, factory = realFactory, apiKey = "", apiKeys = null, resetUrls = [], eulerCap = EULER_DEFAULT_CAP, eulerResets = EULER_DEFAULT_RESETS, onEulerReset = null, log = () => {}, demoPace, relay = null, ...tuning } = {}) {
+export function createHelper({ distDir, factory = realFactory, apiKey = "", apiKeys = null, eulerCap = EULER_DEFAULT_CAP, eulerReserve = 0, allowEulerRoomIdFallback = false, log = () => {}, demoPace, relay = null, ...tuning } = {}) {
   // The one built-in account, frills_demo, never reaches TikTok: it makes up chat so the whole chain can be tested without a LIVE.
-  const make = (user, options) => (user === DEMO_USER ? new DemoConnection({ pace: demoPace }) : factory(user, options));
-  const resolvedKeys = Array.isArray(apiKeys) && apiKeys.length
-    ? apiKeys.map((k) => String(k ?? "").trim()).filter(Boolean)
-    : typeof apiKey === "string" && apiKey.includes(",")
-      ? apiKey.split(",").map((k) => k.trim()).filter(Boolean)
-      : String(apiKey ?? "").trim()
-        ? [String(apiKey).trim()]
-        : [];
-  const triggerResetHook = (info) => {
-    log(`Euler key #${info.slot} hit cap (${eulerCap}): consumed reset ${info.resetsUsed}/${eulerResets} (${info.resetsLeft} left)`);
-    onEulerReset?.(info);
-    if (info.resetUrl && /^https?:\/\//i.test(info.resetUrl)) {
-      fetch(info.resetUrl, { method: "POST" }).catch(() => {});
-    }
-  };
-  const shared = relay ? { queue: true, idleStopMs: 600000, offlineWaitMs: 20000, offlineGiveUpMs: 0, offlineSlowSteps: [[900000, 30000], [3600000, 60000], [14400000, 180000]], maxRooms: relay.slots ?? 30 } : {};
+  const make = (user, options) => (user === DEMO_USER ? new DemoConnection({ pace: demoPace }) : factory(user, { allowEulerRoomIdFallback, ...options }));
+  const singleKey = String(apiKey ?? "").trim().split(",")[0].trim()
+    || (Array.isArray(apiKeys) ? apiKeys.map((k) => String(k ?? "").trim()).find(Boolean) ?? "" : "");
+  const shared = relay
+    ? {
+        queue: true,
+        idleStopMs: 300000,
+        offlineIdleStopMs: 45000,
+        offlineWaitMs: 45000,
+        offlineGiveUpMs: 14400000,
+        offlineSlowSteps: [[600000, 120000], [1800000, 300000], [7200000, 600000]],
+        wakeGapMs: 60000,
+        silentMs: 300000,
+        silentMaxMs: 1800000,
+        maxRooms: relay.slots ?? 30,
+      }
+    : {};
   const ticketSecret = relay ? String(relay.ticketSecret ?? "").trim() : "";
   let hub = null;
   const signing = new Signing(Date.now, {
-    keys: resolvedKeys,
-    resetUrls,
+    key: singleKey,
     cap: eulerCap,
-    maxResets: eulerResets,
-    onReset: triggerResetHook,
-    onRotate: ({ from, to }) => {
-      if (to) hub?.clearBusy();
-      log(to ? `Euler key #${from} exhausted — rotated to Backup Account #${to}` : `All ${resolvedKeys.length} Euler key accounts are exhausted`);
+    reserve: eulerReserve,
+    onBudgetPause: ({ reason, pauseUntil }) => {
+      const until = pauseUntil ? new Date(pauseUntil).toISOString().slice(11, 16) + " UTC" : "quota reset";
+      log(`Euler signing budget guard paused new connects (${reason}) until ${until}`);
     },
   });
   const startedAt = Date.now();
   hub = new Hub({
     factory: make,
     apiKey: () => signing.currentKey(),
+    canSign: () => signing.canSign(),
     log,
     onLimited: () => signing.limitHit(),
-    onSigned: () => signing.use(),
+    onSigned: (info) => signing.use(info),
+    onOfflineSaved: () => signing.noteOfflineSaved(),
+    onCacheHit: () => signing.noteCacheHit(),
+    onBudgetBlocked: () => signing.noteBudgetBlocked(),
     ...shared,
     ...tuning,
   });
@@ -264,26 +278,15 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", apiK
       let body = {};
       try { body = JSON.parse(Buffer.concat(chunks).toString("utf8") || "{}"); } catch { return json(res, 400, { ok: false, error: "bad_json" }); }
       const action = body?.action;
-      const slot = body?.slot ?? null;
-      if (action === "reset") {
-        const result = signing.consumeReset(slot);
-        if (result) hub.clearBusy();
-        return json(res, result ? 200 : 400, { ok: Boolean(result), result, pool: signing.poolSummary() });
-      }
-      if (action === "rotate") {
-        const result = signing.rotateKey(slot);
-        if (result?.to) hub.clearBusy();
-        return json(res, result ? 200 : 400, { ok: Boolean(result), result, pool: signing.poolSummary() });
-      }
       if (action === "refill") {
-        const ok = signing.refillKey(slot ?? "all");
+        const ok = signing.refillKey();
         if (ok) hub.clearBusy();
-        return json(res, ok ? 200 : 400, { ok, pool: signing.poolSummary() });
+        return json(res, ok ? 200 : 400, { ok, action: "refill", quota: signing.quotaSummary(), pool: signing.poolSummary() });
       }
       if (action === "sync") {
-        const pool = await signing.syncRemoteLimits();
-        if (pool?.activeSlot) hub.clearBusy();
-        return json(res, pool ? 200 : 502, { ok: Boolean(pool), action: "sync", pool });
+        const quota = await signing.syncRemoteLimits();
+        if (quota?.state === "active") hub.clearBusy();
+        return json(res, quota ? 200 : 502, { ok: Boolean(quota), action: "sync", quota, pool: signing.poolSummary() });
       }
       return json(res, 400, { ok: false, error: "bad_action" });
     }
@@ -477,9 +480,9 @@ async function mainRelay() {
   const port = numberOr(process.argv.find((a) => a.startsWith("--port="))?.slice(7) ?? process.env.PORT, 8765);
   const bind = process.env.RELAY_BIND ?? "127.0.0.1"; // behind a tunnel nothing else may reach it
   const euler = parseEulerConfig(process.env);
-  const helper = createHelper({ relay, apiKeys: euler.keys, resetUrls: euler.resetUrls, eulerCap: euler.cap, eulerResets: euler.maxResets, log: say });
+  const helper = createHelper({ relay, apiKey: euler.key, eulerCap: euler.cap, eulerReserve: euler.reserve, allowEulerRoomIdFallback: euler.allowEulerRoomIdFallback, log: say });
   if (helper.signing.hasKeys()) {
-    // Check real Euler quotas before opening the server so an already-exhausted primary key rotates immediately to a healthy backup key.
+    // Sync live Euler quota before opening the server so budget guards reflect real remaining requests immediately.
     await Promise.race([
       helper.signing.syncRemoteLimits(),
       new Promise((resolve) => setTimeout(resolve, 4000).unref?.()),
@@ -492,10 +495,10 @@ async function mainRelay() {
     process.exit(1);
   }
   import("tiktok-live-connector").catch(() => {}); // warm it up now: the first account to connect should not wait for the library to load
-  const eulerDesc = euler.keys.length
-    ? `${euler.keys.length} account(s) configured (${euler.cap} req cap · ${euler.maxResets} resets each · ${euler.keys.length * (euler.maxResets + 1) * euler.cap} total pool capacity)`
+  const eulerDesc = euler.key
+    ? `single compliant key configured (${euler.cap}/day cap${euler.reserve ? ` · ${euler.reserve} reserved` : ""} · Euler roomId fallback ${euler.allowEulerRoomIdFallback ? "ON" : "OFF (leak shield)"}${euler.ignoredExtraKeys ? ` · NOTE: ${euler.ignoredExtraKeys} extra key(s) in env ignored` : ""})`
     : "NOT set: the limits are shared with everyone, and TikTok will often be busy at night";
-  console.log(`\nFrills relay ${VERSION} is running on ${bind}:${port}.\n  Spots: ${slots}. Allowed website addresses: ${origins.join(", ")}.\n  Status page: http://${bind}:${port}/health (open it in a browser)\n  Warns you when ${alertAt} spots or fewer are left${process.env.RELAY_ALERTS === "0" ? " (alerts are off)" : ""}.\n  Owner password (to see who is connected from your PC): ${ownerState(ownerKey)}.\n  Plus ticket lock (RELAY_TICKET_SECRET): ${ticketSecret ? "on (dedicated Frills Plus relay)" : "off (shared free relay)"}.\n  Signing service pool (EULER_API_KEYS): ${eulerDesc}.\n  Pages one internet address may keep open: ${relay.maxPerIp} (RELAY_PER_IP), for at most ${relay.maxAccountsPerIp} different accounts (RELAY_ACCOUNTS_PER_IP).\n`);
+  console.log(`\nFrills relay ${VERSION} is running on ${bind}:${port}.\n  Spots: ${slots}. Allowed website addresses: ${origins.join(", ")}.\n  Status page: http://${bind}:${port}/health (open it in a browser)\n  Warns you when ${alertAt} spots or fewer are left${process.env.RELAY_ALERTS === "0" ? " (alerts are off)" : ""}.\n  Owner password (to see who is connected from your PC): ${ownerState(ownerKey)}.\n  Plus ticket lock (RELAY_TICKET_SECRET): ${ticketSecret ? "on (dedicated Frills Plus relay)" : "off (shared free relay)"}.\n  Signing service (EULER_API_KEY): ${eulerDesc}.\n  Pages one internet address may keep open: ${relay.maxPerIp} (RELAY_PER_IP), for at most ${relay.maxAccountsPerIp} different accounts (RELAY_ACCOUNTS_PER_IP).\n`);
   console.log(`  Restart from the status page: ${ownerKey && ownerKey.length >= OWNER.minKey ? (supervised ? "on" : "off (start the relay with npm run relay, or under systemd, so that something starts it again)") : "off (it needs the owner password)"}`);
   if (process.env.RELAY_ALERTS !== "0") {
     const alerts = new SlotAlerts({ stats: () => helper.hub.stats(), signing: helper.signing, alertAt, notify: termuxNotifier({ log: say }), log: say });
@@ -532,7 +535,7 @@ async function main() {
   const portArg = process.argv.find((a) => a.startsWith("--port="));
   const wanted = Number(portArg?.slice(7) ?? process.env.PORT ?? 8765);
   const euler = parseEulerConfig(process.env);
-  const helper = createHelper({ distDir, apiKeys: euler.keys, resetUrls: euler.resetUrls, eulerCap: euler.cap, eulerResets: euler.maxResets, log: say });
+  const helper = createHelper({ distDir, apiKey: euler.key, eulerCap: euler.cap, eulerReserve: euler.reserve, allowEulerRoomIdFallback: euler.allowEulerRoomIdFallback, log: say });
   let port;
   try {
     port = await helper.listen(wanted);

@@ -138,38 +138,43 @@ function kpiCard(title, big, badge, metaItems) {
   return el("div", { className: "stats__card" }, top, el("b", { className: "stats__big", textContent: big }), meta);
 }
 
-/** Draws the 3-Account Euler Key Pool Authority Matrix inside Relays view. */
+/** Draws the Single-Account Euler Signing Quota & Leak Shield Panel inside Relays view. */
 function drawEulerPoolPanel(relays) {
-  const poolRelay = relays.find((r) => r.ok && r.signing?.pool);
-  const pool = poolRelay?.signing?.pool;
+  const quotaRelay = relays.find((r) => r.ok && (r.signing?.quota || r.signing?.pool));
+  const legacyAcc = quotaRelay?.signing?.pool?.accounts?.[0];
+  const quota = quotaRelay?.signing?.quota ?? (legacyAcc ? {
+    configured: Boolean(legacyAcc.configured),
+    state: legacyAcc.state || "active",
+    used: legacyAcc.used ?? 0,
+    totalUsed: legacyAcc.totalUsed ?? 0,
+    cap: legacyAcc.cap ?? 1500,
+    reserve: legacyAcc.reserve ?? 0,
+    remaining: legacyAcc.remaining ?? Math.max(0, (legacyAcc.cap ?? 1500) - (legacyAcc.used ?? 0)),
+    available: legacyAcc.available ?? Math.max(0, (legacyAcc.cap ?? 1500) - (legacyAcc.used ?? 0)),
+    remote: legacyAcc.remote ?? null,
+    metrics: quotaRelay?.signing?.metrics ?? quotaRelay?.signing?.pool?.metrics ?? {},
+  } : null);
 
-  const accounts = pool?.accounts ?? [1, 2, 3].map((slot) => ({
-    slot,
-    label: slot === 1 ? "Account 1 (Primary)" : `Account ${slot} (Backup ${slot - 1})`,
-    configured: slot === 1 && Boolean(relays.some((r) => r.ok && r.signing?.key)),
-    active: slot === 1 && Boolean(relays.some((r) => r.ok && r.signing?.key)),
-    state: slot === 1 && relays.some((r) => r.ok && r.signing?.key) ? "active" : "standby",
-    used: 0,
-    totalUsed: 0,
-    cap: 1500,
-    resetsUsed: 0,
-    resetsLeft: 3,
-    maxResets: 3,
-  }));
-
-  const cap = pool?.cap ?? 1500;
-  const maxResets = pool?.maxResets ?? 3;
-  const configuredCount = pool?.configuredCount ?? accounts.filter((a) => a.configured).length;
-  const totalCapacity = 3 * cap * (maxResets + 1);
-  const remaining = pool?.totalRemainingRequests ?? totalCapacity;
+  const hasKey = Boolean(quota?.configured || relays.some((r) => r.ok && r.signing?.key));
+  const cap = quota?.cap ?? 1500;
+  const used = quota?.used ?? 0;
+  const remaining = quota?.remaining ?? Math.max(0, cap - used);
+  const available = quota?.available ?? remaining;
+  const reserve = quota?.reserve ?? 0;
+  const state = !hasKey ? "unconfigured" : (quota?.state || "active");
+  const metrics = quota?.metrics ?? quotaRelay?.signing?.metrics ?? {};
 
   const badge = el("span", {
     className: "stats__delta",
-    textContent: pool
-      ? (pool.activeSlot ? `KEY #${pool.activeSlot} ACTIVE · ${number(remaining)} REQS LEFT` : "ALL KEYS EXHAUSTED")
-      : (configuredCount ? "SINGLE KEY MODE · UPGRADE TO 3-KEY POOL" : "ENV STANDBY · 3 KEYS × 1,500 × 3 RESETS"),
+    textContent: !hasKey
+      ? "NO KEY SET · SHARED LIMITS"
+      : state === "active"
+        ? `KEY ACTIVE · ${number(available)} / ${number(cap)} LEFT`
+        : state === "reserved"
+          ? `BUDGET GUARD PAUSED (${number(reserve)} RESERVED)`
+          : "DAILY QUOTA PAUSED · WAITING RESET",
   });
-  badge.dataset.tone = pool ? (pool.activeSlot ? "up" : "down") : "flat";
+  badge.dataset.tone = !hasKey ? "flat" : state === "active" ? "up" : "down";
 
   const head = el(
     "div",
@@ -177,63 +182,59 @@ function drawEulerPoolPanel(relays) {
     el(
       "div",
       { className: "stats__panel-title-group" },
-      el("h3", { className: "stats__panel-title", textContent: "Euler Signing Key Pool Authority (3 Accounts · 1,500 Cap · 3 Resets Each)" }),
+      el("h3", { className: "stats__panel-title", textContent: "Euler Signing Quota & Leak Shield (Single Account · 1,500/day)" }),
       el("span", {
         className: "stats__panel-sub",
-        textContent: `Failover Chain: Key 1 (1,500 × 4 cycles) → Backup Key 2 (1,500 × 4) → Backup Key 3 (1,500 × 4) = ${number(totalCapacity)} total requests · ${configuredCount}/3 keys live`,
+        textContent: "Offline checks bypass Euler directly · cached roomIds skip re-lookups · budget guard prevents 429 storms.",
       }),
     ),
     badge,
   );
 
-  const cards = el("div", { className: "stats__euler-grid" });
-  for (const acc of accounts) {
-    const stateLabel = {
-      active: "ACTIVE KEY",
-      standby: acc.configured ? "BACKUP STANDBY" : "NOT SET IN ENV",
-      exhausted: "EXHAUSTED",
-      unconfigured: "NOT SET IN ENV",
-    }[acc.state] ?? acc.state.toUpperCase();
+  const pctUsed = cap > 0 ? Math.min(100, Math.round((used / cap) * 100)) : 0;
+  const fill = el("i", {});
+  fill.style.width = Math.max(3, pctUsed) + "%";
+  const track = el("div", { className: "stats__funnel-track stats__relay-bar" }, fill);
+  track.dataset.level = pctUsed >= 90 || state !== "active" ? "full" : pctUsed >= 70 ? "low" : "ok";
 
-    const tone = acc.state === "active" ? "up" : acc.state === "exhausted" ? "down" : "flat";
-    const pill = el("span", { className: "stats__delta", textContent: stateLabel });
-    pill.dataset.tone = tone;
+  const stateLabel = {
+    active: "ACTIVE KEY",
+    reserved: "BUDGET GUARD",
+    exhausted: "QUOTA EXHAUSTED",
+    unconfigured: "NOT SET IN ENV",
+  }[state] ?? state.toUpperCase();
+  const statePill = el("span", { className: "stats__delta", textContent: stateLabel });
+  statePill.dataset.tone = state === "active" ? "up" : state === "unconfigured" ? "flat" : "down";
 
-    const pctUsed = acc.cap > 0 ? Math.min(100, Math.round((acc.used / acc.cap) * 100)) : 0;
-    const fill = el("i", {});
-    fill.style.width = Math.max(3, pctUsed) + "%";
-    const track = el("div", { className: "stats__funnel-track stats__relay-bar" }, fill);
-    track.dataset.level = pctUsed >= 90 || acc.state === "exhausted" ? "full" : pctUsed >= 70 ? "low" : "ok";
+  const primaryCard = el(
+    "div",
+    { className: "stats__euler-card" },
+    el("div", { className: "stats__card-top" }, el("strong", { textContent: "Primary Euler Account" }), statePill),
+    el("div", { className: "stats__euler-nums" }, el("b", { textContent: `${number(used)} / ${number(cap)}` }), el("span", { textContent: `used today · ${number(available)} available${reserve ? ` (${number(reserve)} reserved)` : ""}` })),
+    track,
+    el("p", {
+      className: "stats__euler-remote",
+      textContent: quota?.remote?.ok && quota.remote.day
+        ? `Euler Live Quota: ${number(quota.remote.day.remaining)} / ${number(quota.remote.day.max)} day · ${number(quota.remote.hour?.remaining ?? 0)} / ${number(quota.remote.hour?.max ?? 0)} hr`
+        : hasKey
+          ? "Euler Live Quota: press Sync Live Euler Quota"
+          : "Euler Live Quota: key not configured",
+    }),
+  );
+  primaryCard.dataset.state = state;
 
-    const resetsRow = el("div", { className: "stats__reset-dots" });
-    for (let i = 0; i < acc.maxResets; i++) {
-      const dot = el("span", {
-        className: "stats__reset-dot",
-        textContent: i < acc.resetsLeft ? `Reset ${i + 1}: READY` : `Reset ${i + 1}: USED`,
-      });
-      dot.dataset.avail = i < acc.resetsLeft ? "true" : "false";
-      resetsRow.append(dot);
-    }
+  const shieldCard = el(
+    "div",
+    { className: "stats__euler-card" },
+    el("div", { className: "stats__card-top" }, el("strong", { textContent: "Leak Shield Savings" }), el("span", { className: "stats__delta", textContent: "0-EULER OFFLINE" })),
+    el("div", { className: "stats__euler-nums" }, el("b", { textContent: number(metrics.offlineSaved ?? 0) }), el("span", { textContent: "offline checks blocked from hitting Euler" })),
+    el("p", {
+      className: "stats__euler-remote",
+      textContent: `Live connects: ${number(metrics.liveConnects ?? 0)} · Reconnects: ${number(metrics.reconnects ?? 0)} · Cached roomId hits: ${number(metrics.roomIdCacheHits ?? 0)} · Budget pauses: ${number(metrics.budgetBlocked ?? 0)}`,
+    }),
+  );
 
-    const card = el(
-      "div",
-      { className: "stats__euler-card" },
-      el("div", { className: "stats__card-top" }, el("strong", { textContent: acc.label }), pill),
-      el("div", { className: "stats__euler-nums" }, el("b", { textContent: `${number(acc.used)} / ${number(acc.cap)}` }), el("span", { textContent: `reqs this cycle · ${number(acc.totalUsed)} lifetime` })),
-      track,
-      el("p", {
-        className: "stats__euler-remote",
-        textContent: acc.remote?.ok && acc.remote.day
-          ? `Euler Live Quota: ${number(acc.remote.day.remaining)} / ${number(acc.remote.day.max)} day · ${number(acc.remote.hour?.remaining ?? 0)} / ${number(acc.remote.hour?.max ?? 0)} hr`
-          : acc.configured
-            ? "Euler Live Quota: press Sync Live Euler Quota"
-            : "Euler Live Quota: key not configured",
-      }),
-      resetsRow,
-    );
-    card.dataset.state = acc.state;
-    cards.append(card);
-  }
+  const cards = el("div", { className: "stats__euler-grid" }, primaryCard, shieldCard);
 
   const actionStatus = el("span", { className: "admin__note", id: "euler-action-msg", role: "status" });
   const eulerBtn = (action, label, variant = "btn btn--soft btn--sm") => {
@@ -247,7 +248,7 @@ function drawEulerPoolPanel(relays) {
         const res = await fetch("/api/admin/euler", {
           method: "POST",
           headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
-          body: JSON.stringify({ action, ...(poolRelay?.url ? { relayUrl: poolRelay.url } : {}) }),
+          body: JSON.stringify({ action, ...(quotaRelay?.url ? { relayUrl: quotaRelay.url } : {}) }),
           cache: "no-store",
         });
         const data = await res.json().catch(() => ({}));
@@ -256,7 +257,7 @@ function drawEulerPoolPanel(relays) {
         } else {
           const failed = (data.results ?? []).find((r) => !r.ok);
           actionStatus.textContent = data.ok
-            ? `Updated Euler key pool (${action}). Refreshing…`
+            ? `Updated Euler quota (${action}). Refreshing…`
             : `Relay refused (${failed?.error || failed?.status || "error"}).`;
           if (data.ok) await refresh();
         }
@@ -271,29 +272,21 @@ function drawEulerPoolPanel(relays) {
   const actionsBar = el(
     "div",
     { className: "stats__euler-actions" },
-    eulerBtn("reset", "Use 1 Reset on Active Key"),
-    eulerBtn("rotate", "Rotate to Backup Key"),
-    eulerBtn("refill", "Refill All Keys"),
     eulerBtn("sync", "Sync Live Euler Quota", "btn btn--outline btn--sm"),
+    eulerBtn("refill", "Reset Local Counter"),
     actionStatus,
   );
 
   const envHint = el(
     "p",
     { className: "admin__note" },
-    "Server configuration (",
-    el("code", { textContent: "/etc/frills-relay.env" }),
-    "): set ",
-    el("code", { textContent: "EULER_API_KEYS=key1,key2,key3" }),
-    " (or ",
+    "Relay env: set single ",
     el("code", { textContent: "EULER_API_KEY" }),
-    ", ",
-    el("code", { textContent: "EULER_API_KEY_2" }),
-    ", ",
-    el("code", { textContent: "EULER_API_KEY_3" }),
-    "). Optional ",
-    el("code", { textContent: "EULER_RESET_URLS" }),
-    " webhooks fire automatically when each key hits 1,500 requests.",
+    " (optional ",
+    el("code", { textContent: "EULER_KEY_CAP=1500" }),
+    " and ",
+    el("code", { textContent: "EULER_DAILY_RESERVE=200" }),
+    " on a shared free relay to keep headroom for Frills Plus).",
   );
 
   return el("div", { className: "stats__panel stats__euler-panel" }, head, cards, actionsBar, envHint);

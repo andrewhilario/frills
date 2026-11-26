@@ -5,8 +5,8 @@ import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
 import { EventEmitter } from "node:events";
-import { createHelper, parseEulerConfig, syncConnectorSignKey } from "../helper/server.mjs";
-import { ALERT_AT, EULER_DEFAULT_CAP, EULER_DEFAULT_RESETS, Signing, capacity, deviceFacts, level, snapshot, statusPage } from "../helper/status.mjs";
+import { configureConnectorRoutes, createHelper, parseEulerConfig, syncConnectorSignKey } from "../helper/server.mjs";
+import { ALERT_AT, EULER_DEFAULT_CAP, Signing, capacity, deviceFacts, level, snapshot, statusPage } from "../helper/status.mjs";
 import { SlotAlerts, termuxNotifier } from "../helper/alerts.mjs";
 
 // ── the pure parts ──────────────────────────────────────────────────────────────────────────────────────────────────
@@ -53,7 +53,13 @@ const snap = (over = {}) => snapshot({ stats: { used: 45, max: 50, waiting: 2 },
 test("the numbers: free spots, the level, the line, uptime, and the device only when it is given", () => {
   const s = snap();
   assert.deepEqual([s.free, s.level, s.slots.waiting, s.uptimeS, s.alertAt], [5, "low", 2, 11520, 10]);
-  assert.deepEqual(s.signing, { busyRecently: 0, busy: false, connectsHour: 0, connectsDay: 0 });
+  assert.deepEqual(s.signing, {
+    busyRecently: 0,
+    busy: false,
+    connectsHour: 0,
+    connectsDay: 0,
+    metrics: { liveConnects: 0, reconnects: 0, offlineSaved: 0, roomIdCacheHits: 0, budgetBlocked: 0, rateLimited: 0 },
+  });
   assert.equal(s.capacity.estimate, 120);
   assert.equal("device" in s, false, "the public numbers never carry the device's details");
   assert.equal(snap({ device: deviceFacts(0.12) }).device.cores >= 1, true);
@@ -204,7 +210,7 @@ test("the relay's address gives a readable page to a browser and the numbers as 
   assert.match(page.headers["content-security-policy"], /default-src 'none'/);
   assert.equal((await ask("/", { Accept: "text/html" })).status, 200, "the bare address works too");
   const json = JSON.parse((await ask("/health", { Accept: "application/json" })).body);
-  assert.deepEqual([json.name, json.version, json.free, json.level, json.slots], ["frills-relay", "0.6.0", 50, "ok", { used: 0, max: 50, waiting: 0 }]);
+  assert.deepEqual([json.name, json.version, json.free, json.level, json.slots], ["frills-relay", "0.7.0", 50, "ok", { used: 0, max: 50, waiting: 0 }]);
   assert.ok(json.features.includes("status"));
   assert.ok(json.capacity.estimate >= 1 && json.capacity.estimate <= 500);
   assert.equal(JSON.parse((await ask("/health")).body).free, 50, "no Accept header at all: JSON, as before");
@@ -228,7 +234,14 @@ test("the alarm number is the owner's to set, and the server counts the signing 
   assert.equal(JSON.parse((await ask("/health", { Accept: "application/json" })).body).alertAt, 25);
   helper.signing.note();
   const json = JSON.parse((await ask("/health", { Accept: "application/json" })).body);
-  assert.deepEqual(json.signing, { busyRecently: 1, busy: true, connectsHour: 0, connectsDay: 0, key: false });
+  assert.deepEqual(json.signing, {
+    busyRecently: 1,
+    busy: true,
+    connectsHour: 0,
+    connectsDay: 0,
+    key: false,
+    metrics: { liveConnects: 0, reconnects: 0, offlineSaved: 0, roomIdCacheHits: 0, budgetBlocked: 0, rateLimited: 0 },
+  });
 });
 
 test("the status numbers say how many connections went through the signing service, and whether the relay has its own key", async () => {
@@ -379,172 +392,144 @@ test("without a password set, a password sent changes nothing, and the page offe
   assert.equal("ownerLogin" in json, false);
 });
 
-// ── 3-Account Euler key pool (1,500 cap + 3 resets each) ───────────────────────────────────────────────────────────
+// ── Single-Account Euler Quota & Leak Shield (1,500/day + daily reserve + route guard) ─────────────────────────────
 
-test("3-account Euler key pool uses 3 resets per key at the 1,500 cap before rotating through backup 1 and backup 2", () => {
+test("single-account Euler Signing enforces 1,500/day cap, optional reserve budget guard, and leak-shield metrics", () => {
   assert.equal(EULER_DEFAULT_CAP, 1500);
-  assert.equal(EULER_DEFAULT_RESETS, 3);
-  const events = [];
-  const pool = new Signing(() => 1000, {
-    keys: ["euler_acc_1", "euler_acc_2", "euler_acc_3"],
-    onReset: (info) => events.push(["reset", info.slot, info.resetsLeft]),
-    onRotate: (info) => events.push(["rotate", info.from, info.to]),
+  let now = 1000;
+  const paused = [];
+  const s = new Signing(() => now, {
+    keys: ["euler_primary", "euler_extra_ignored"],
+    cap: 10,
+    reserve: 2,
+    onBudgetPause: (info) => paused.push(info),
   });
-  assert.equal(pool.currentKey(), "euler_acc_1");
-  let summary = pool.poolSummary();
-  assert.equal(summary.activeSlot, 1);
-  assert.equal(summary.totalRemainingRequests, 18000);
+  assert.equal(s.currentKey(), "euler_primary", "uses only the single primary account key");
+  assert.equal(s.canSign(), true);
+  assert.equal(s.availableBudget(), 8, "10 cap - 2 reserved = 8 available");
 
-  // Use Key 1 across all 3 resets (3 * 1500 = 4500 requests -> still Key 1 with 0 resets left)
-  for (let i = 0; i < 4500; i++) pool.use();
-  assert.equal(pool.currentKey(), "euler_acc_1");
-  summary = pool.poolSummary();
-  assert.equal(summary.accounts[0].resetsLeft, 0);
-  assert.equal(summary.accounts[0].totalUsed, 4500);
+  // Use 7 live connects + 1 reconnect -> hits reserve (2 left) and pauses proactively
+  for (let i = 0; i < 7; i++) s.use({ reconnect: false });
+  assert.equal(s.canSign(), true);
+  s.use({ reconnect: true });
+  assert.equal(s.canSign(), false, "pauses before eating into reserved daily budget");
+  assert.equal(paused.length, 1);
+  assert.equal(paused[0].reason, "day_budget");
 
-  // 1500 more requests on Key 1's 4th cycle exhausts Key 1 and rotates to Backup Key 2
-  for (let i = 0; i < 1500; i++) pool.use();
-  assert.equal(pool.currentKey(), "euler_acc_2");
-  summary = pool.poolSummary();
-  assert.equal(summary.activeSlot, 2);
-  assert.equal(summary.accounts[0].exhausted, true);
-  assert.equal(summary.accounts[1].resetsLeft, 3);
+  const summary = s.quotaSummary();
+  assert.equal(summary.state, "reserved");
+  assert.equal(summary.remaining, 2);
+  assert.equal(summary.available, 0);
+  assert.equal(summary.metrics.liveConnects, 7);
+  assert.equal(summary.metrics.reconnects, 1);
 
-  // 6000 more requests exhausts Key 2 and rotates to Backup Key 3
-  for (let i = 0; i < 6000; i++) pool.use();
-  assert.equal(pool.currentKey(), "euler_acc_3");
-  summary = pool.poolSummary();
-  assert.equal(summary.activeSlot, 3);
-  assert.equal(summary.accounts[1].exhausted, true);
-
-  // 6000 more requests exhausts Key 3 (all 18,000 used)
-  for (let i = 0; i < 6000; i++) pool.use();
-  assert.equal(pool.currentKey(), "");
-  summary = pool.poolSummary();
-  assert.equal(summary.activeSlot, null);
-  assert.equal(summary.totalRemainingRequests, 0);
-  assert.ok(events.some((e) => e[0] === "rotate" && e[1] === 1 && e[2] === 2));
-  assert.ok(events.some((e) => e[0] === "rotate" && e[1] === 2 && e[2] === 3));
-
-  // Refilling brings all 3 keys back to 18,000 total capacity starting on Key 1
-  assert.equal(pool.refillKey("all"), true);
-  assert.equal(pool.currentKey(), "euler_acc_1");
-  assert.equal(pool.poolSummary().totalRemainingRequests, 18000);
+  // Refilling clears the pause and restores budget
+  assert.equal(s.refillKey(), true);
+  assert.equal(s.canSign(), true);
+  assert.equal(s.availableBudget(), 8);
 });
 
-test("parseEulerConfig reads EULER_API_KEYS or EULER_API_KEY/_2/_3 and createHelper exposes pool + /owner/euler", async () => {
-  const fromList = parseEulerConfig({ EULER_API_KEYS: "k1, k2, k3", EULER_KEY_CAP: "1500", EULER_KEY_RESETS: "3" });
-  assert.deepEqual(fromList.keys, ["k1", "k2", "k3"]);
-  assert.deepEqual([fromList.cap, fromList.maxResets], [1500, 3]);
+test("parseEulerConfig enforces single-account mode, reads reserve/fallback options, and /owner/euler handles sync/refill only", async () => {
+  const single = parseEulerConfig({ EULER_API_KEY: "primary_key", EULER_API_KEY_2: "ignored_2", EULER_KEY_CAP: "1500", EULER_DAILY_RESERVE: "200" });
+  assert.equal(single.key, "primary_key");
+  assert.deepEqual(single.keys, ["primary_key"]);
+  assert.equal(single.ignoredExtraKeys, 1);
+  assert.deepEqual([single.cap, single.reserve, single.allowEulerRoomIdFallback], [1500, 200, false]);
 
-  const fromNamed = parseEulerConfig({ EULER_API_KEY: "a1", EULER_API_KEY_2: "a2", EULER_API_KEY_3: "a3" });
-  assert.deepEqual(fromNamed.keys, ["a1", "a2", "a3"]);
+  const legacy = parseEulerConfig({ EULER_API_KEYS: "first_key, second_key", EULER_ALLOW_ROOM_ID_FALLBACK: "1" });
+  assert.equal(legacy.key, "first_key");
+  assert.equal(legacy.ignoredExtraKeys, 1);
+  assert.equal(legacy.allowEulerRoomIdFallback, true);
 
-  await start({ ownerKey: KEY, trustProxy: true }, { apiKeys: ["k1", "k2", "k3"], eulerCap: 2, eulerResets: 1 });
-  let h = JSON.parse((await ask("/health", PUBLIC)).body);
-  assert.equal(h.signing.pool.activeSlot, 1);
-  assert.equal(h.signing.pool.configuredCount, 3);
-  assert.equal("key" in h.signing.pool.accounts[0], false, "raw secret keys are never exposed");
+  await start({ ownerKey: KEY, trustProxy: true }, { apiKey: "k1", eulerCap: 5, eulerReserve: 1 });
+  const h = JSON.parse((await ask("/health", PUBLIC)).body);
+  assert.equal(h.signing.quota.mode, "single");
+  assert.equal(h.signing.quota.cap, 5);
+  assert.equal(h.signing.quota.available, 4);
+  assert.equal("key" in h.signing.quota, false, "raw secret key is never exposed");
+  assert.equal(h.signing.pool.configuredCount, 1);
 
-  // Manual rotate via /owner/euler requires owner key behind proxy
-  const denied = await new Promise((resolve, reject) => {
-    const req = http.request({ host: "127.0.0.1", port, path: "/owner/euler", method: "POST", headers: { "CF-Connecting-IP": "203.0.113.9", "Content-Type": "application/json" } }, (res) => {
-      let body = "";
-      res.on("data", (c) => { body += c; });
-      res.on("end", () => resolve({ status: res.statusCode, body: JSON.parse(body) }));
+  // Unauthorized POST to /owner/euler is rejected
+  const postEuler = (headers, body) => new Promise((resolve, reject) => {
+    const req = http.request({ host: "127.0.0.1", port, path: "/owner/euler", method: "POST", headers: { "Content-Type": "application/json", ...headers } }, (res) => {
+      let raw = "";
+      res.on("data", (c) => { raw += c; });
+      res.on("end", () => resolve({ status: res.statusCode, body: JSON.parse(raw) }));
     });
     req.on("error", reject);
-    req.end(JSON.stringify({ action: "rotate" }));
+    req.end(JSON.stringify(body));
   });
+
+  const denied = await postEuler({ "CF-Connecting-IP": "203.0.113.9" }, { action: "refill" });
   assert.equal(denied.status, 401);
 
-  const rotated = await new Promise((resolve, reject) => {
-    const req = http.request({ host: "127.0.0.1", port, path: "/owner/euler", method: "POST", headers: asOwner(KEY, { "Content-Type": "application/json" }) }, (res) => {
-      let body = "";
-      res.on("data", (c) => { body += c; });
-      res.on("end", () => resolve({ status: res.statusCode, body: JSON.parse(body) }));
-    });
-    req.on("error", reject);
-    req.end(JSON.stringify({ action: "rotate" }));
-  });
-  assert.equal(rotated.status, 200);
-  assert.equal(rotated.body.pool.activeSlot, 2);
+  // Removed multi-account rotate action is rejected
+  const bad = await postEuler(asOwner(KEY), { action: "rotate" });
+  assert.equal(bad.status, 400);
+  assert.equal(bad.body.error, "bad_action");
+
+  // Refill succeeds with owner key
+  const refilled = await postEuler(asOwner(KEY), { action: "refill" });
+  assert.equal(refilled.status, 200);
+  assert.equal(refilled.body.quota.state, "active");
 });
 
-test("Signing.syncRemoteLimits queries Euler /accounts/me/rate_limits and auto-rotates/recovers slots", async () => {
-  const rotations = [];
-  const pool = new Signing(() => 2000, {
-    keys: ["key_one", "key_two", "key_three"],
-    onRotate: (ev) => rotations.push(ev),
-  });
+test("Signing.syncRemoteLimits queries single key /accounts/me/rate_limits, pauses at reserve, and auto-recovers after reset", async () => {
+  const s = new Signing(() => 2000, { key: "key_one", cap: 1500, reserve: 100 });
   const calls = [];
-  const fetchImpl = async (url, init) => {
-    calls.push({ url, key: init?.headers?.["x-api-key"] });
-    if (init?.headers?.["x-api-key"] === "key_one") {
+  const summary = await s.syncRemoteLimits({
+    fetchImpl: async (url, init) => {
+      calls.push({ url, key: init?.headers?.["x-api-key"] });
       return new Response(JSON.stringify({
         code: 200,
-        day: { max: 1500, remaining: 0, reset_at: "2026-11-24T00:00:00.000Z" },
-        hour: { max: 300, remaining: 0, reset_at: "2026-11-23T12:00:00.000Z" },
-        minute: { max: 30, remaining: 30, reset_at: null },
+        day: { max: 1500, remaining: 90, reset_at: "2026-11-27T00:00:00.000Z" },
+        hour: { max: 300, remaining: 50, reset_at: "2026-11-26T13:00:00.000Z" },
       }), { status: 200 });
-    }
-    return new Response(JSON.stringify({
-      code: 200,
-      day: { max: 1500, remaining: 1420, reset_at: "2026-11-24T00:00:00.000Z" },
-      hour: { max: 300, remaining: 290, reset_at: "2026-11-23T12:00:00.000Z" },
-      minute: { max: 30, remaining: 30, reset_at: null },
-    }), { status: 200 });
-  };
-  const summary = await pool.syncRemoteLimits({ fetchImpl });
-  assert.equal(calls.length, 3);
-  assert.ok(calls.every((c) => c.url.endsWith("/accounts/me/rate_limits")));
-  assert.equal(summary.accounts[0].remote.ok, true);
-  assert.equal(summary.accounts[0].remote.day.remaining, 0);
-  assert.equal(summary.accounts[0].exhausted, true, "0 remaining with no reset webhook immediately marks slot 1 exhausted");
-  assert.equal(summary.activeSlot, 2, "and rotates immediately to healthy Backup Key #2");
-  assert.equal(rotations.at(-1)?.to, 2);
-  assert.equal(summary.accounts[1].used, 80, "syncs day.max - day.remaining on standby slots");
-  assert.equal(summary.accounts[1].remote.day.remaining, 1420);
+    },
+  });
+  assert.equal(calls.length, 1);
+  assert.ok(calls[0].url.endsWith("/accounts/me/rate_limits"));
+  assert.equal(summary.state, "reserved", "90 remaining <= 100 reserve pauses free connects proactively");
+  assert.equal(s.canSign(), false);
+  assert.equal(summary.used, 1410);
 
-  // With a reset webhook configured, 0 remaining triggers consumeReset instead of immediate exhaustion
-  const hooked = new Signing(() => 2000, { keys: ["key_one", "key_two"], resetUrls: ["https://hook.example/reset"] });
-  const hookSummary = await hooked.syncRemoteLimits({ fetchImpl });
-  assert.equal(hookSummary.accounts[0].resetsLeft, 2, "reset webhook slot consumes a reset first");
-  assert.equal(hookSummary.activeSlot, 1);
-
-  // When slot 1 later recovers (day.remaining > 0 after daily reset), sync un-exhausts it automatically
-  const recovered = await pool.syncRemoteLimits({
+  // Recovers automatically once Euler resets daily quota
+  const recovered = await s.syncRemoteLimits({
     fetchImpl: async () => new Response(JSON.stringify({
       code: 200,
-      day: { max: 1500, remaining: 1500, reset_at: "2026-11-25T00:00:00.000Z" },
+      day: { max: 1500, remaining: 1500, reset_at: "2026-11-28T00:00:00.000Z" },
       hour: { max: 300, remaining: 300, reset_at: null },
     }), { status: 200 }),
   });
-  assert.equal(recovered.accounts[0].exhausted, false);
-  assert.equal(recovered.accounts[0].used, 0);
-
-  // Live 429 on an unhooked key immediately fails over to the backup key
-  let now = 10_000;
-  const livePool = new Signing(() => now, { keys: ["k1", "k2"] });
-  const hit = livePool.limitHit();
-  assert.equal(hit.action, "exhausted");
-  assert.equal(hit.rotatedTo, 2);
-  assert.equal(livePool.currentKey(), "k2");
+  assert.equal(recovered.state, "active");
+  assert.equal(recovered.used, 0);
+  assert.equal(s.canSign(), true);
 });
 
-test("syncConnectorSignKey clears tiktok-live-connector's cached Euler client when rotating keys", () => {
+test("configureConnectorRoutes disables Euler roomId/isLive fallbacks by default and syncConnectorSignKey clears cached client", () => {
+  const lib = {
+    RoomIdRouteConfig: { skipFetchRoomIdFromEulerRoute: false },
+    IsLiveRouteConfig: { skipFetchRoomIdFromEulerRoute: false },
+    SignConfig: { apiKey: undefined, cachedInstance: undefined },
+  };
+  configureConnectorRoutes(lib);
+  assert.equal(lib.RoomIdRouteConfig.skipFetchRoomIdFromEulerRoute, true);
+  assert.equal(lib.IsLiveRouteConfig.skipFetchRoomIdFromEulerRoute, true);
+  configureConnectorRoutes(lib, { allowEulerRoomIdFallback: true });
+  assert.equal(lib.RoomIdRouteConfig.skipFetchRoomIdFromEulerRoute, false);
+  assert.equal(lib.IsLiveRouteConfig.skipFetchRoomIdFromEulerRoute, false);
+
   const fakeClient = { id: "first" };
-  const lib = { SignConfig: { apiKey: undefined, cachedInstance: undefined } };
   assert.equal(syncConnectorSignKey(lib, "key_one"), true);
   assert.equal(lib.SignConfig.apiKey, "key_one");
   lib.SignConfig.cachedInstance = fakeClient;
   assert.equal(syncConnectorSignKey(lib, "key_one"), false, "same key keeps cached Euler client");
   assert.equal(lib.SignConfig.cachedInstance, fakeClient);
-  assert.equal(syncConnectorSignKey(lib, "key_two"), true, "rotating to backup key invalidates cached Euler client");
-  assert.equal(lib.SignConfig.apiKey, "key_two");
+  assert.equal(syncConnectorSignKey(lib, "key_new"), true, "updating key invalidates cached Euler client");
+  assert.equal(lib.SignConfig.apiKey, "key_new");
   assert.equal(lib.SignConfig.cachedInstance, undefined);
   lib.SignConfig.cachedInstance = { id: "second" };
-  assert.equal(syncConnectorSignKey(lib, ""), true, "clearing all keys resets SignConfig cleanly");
+  assert.equal(syncConnectorSignKey(lib, ""), true, "clearing key resets SignConfig cleanly");
   assert.equal(lib.SignConfig.apiKey, undefined);
   assert.equal(lib.SignConfig.cachedInstance, undefined);
 });
