@@ -467,6 +467,19 @@ test("VtsClient pairs via Allow popup, discovers hotkeys/expressions/items/meshe
   }
   assert.deepEqual(shapeCalls.slice(1), ["heart", "star", "paw", "cloud", "random"], "Plus live overlay passes custom sticker shapes through");
 
+  // Sticky note sizing: supports 5–100% (chibi-friendly down to 5%) and forwards size to both preview and VTS
+  assert.equal(sanitizeStep({ type: "vts.sticky", size: 8 }).size, 8);
+  assert.equal(sanitizeStep({ type: "vts.sticky", size: 2 }).size, 5);
+  assert.equal(sanitizeStep({ type: "vts.sticky", size: 150 }).size, 100);
+  const previewSizes = [];
+  const sizeExec = createVtsStepExecutor(null, {
+    previewFallback: true,
+    renderStickyNote: () => "iVBORw0KGgo=",
+    onStickyPreview: (p) => previewSizes.push(p.size),
+  });
+  await sizeExec.run({ type: "vts.sticky", title: "{name}", size: 10 }, { who: "Chibi" });
+  assert.deepEqual(previewSizes, [10], "preview callback receives configured sticky note size");
+
   client.close();
 });
 

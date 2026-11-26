@@ -1771,7 +1771,7 @@ export function createActionsView(host) {
     hideReplay() {
       replayBar.hidden = true;
     },
-    showSticky({ base64 = "", maxNotes = 0 } = {}) {
+    showSticky({ base64 = "", maxNotes = 0, size = 22 } = {}) {
       const clean = String(base64 || "").replace(/[^A-Za-z0-9+/=]/g, "");
       if (!clean) return;
       const [bx, by, brot] = STICKY_SPOTS[stickySlot % STICKY_SPOTS.length];
@@ -1779,6 +1779,8 @@ export function createActionsView(host) {
       const jx = (Math.random() - 0.5) * 6;
       const jy = (Math.random() - 0.5) * 5;
       const jrot = (Math.random() - 0.5) * 8;
+      const sizePct = Math.max(5, Math.min(100, Math.round(Number(size) || 22)));
+      const sw = `${Math.max(8, Math.min(82, Math.round(sizePct * 1.15)))}%`;
       const img = el("img", {
         className: "actions__sticky",
         src: `data:image/png;base64,${clean}`,
@@ -1787,6 +1789,7 @@ export function createActionsView(host) {
       img.style.setProperty("--sx", `${Math.max(12, Math.min(82, Math.round(bx + jx)))}%`);
       img.style.setProperty("--sy", `${Math.max(20, Math.min(78, Math.round(by + jy)))}%`);
       img.style.setProperty("--sr", `${Math.round(brot + jrot)}deg`);
+      img.style.setProperty("--sw", sw);
       stickyLayer.append(img);
       activeStickies.push(img);
 
@@ -1798,6 +1801,11 @@ export function createActionsView(host) {
         const rid = setTimeout(() => { timers.delete(rid); oldest.remove(); }, 340);
         timers.add(rid);
       }
+    },
+    setStickySize(size = 22) {
+      const sizePct = Math.max(5, Math.min(100, Math.round(Number(size) || 22)));
+      const sw = `${Math.max(8, Math.min(82, Math.round(sizePct * 1.15)))}%`;
+      for (const img of activeStickies) img.style.setProperty("--sw", sw);
     },
     clearStickies() {
       activeStickies.length = 0;

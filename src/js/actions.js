@@ -325,7 +325,7 @@ export function sanitizeStep(raw) {
       color,
       pinMode,
       artMesh: cleanStr(s.artMesh ?? "", 80),
-      size: clampInt(s.size, 12, 60, 22),
+      size: clampInt(s.size, 5, 100, 22),
       rotation: clampInt(s.rotation, -45, 45, -6),
       duration: clampInt(s.duration, 0, 300, 0),
     };
@@ -877,8 +877,9 @@ export function createVtsStepExecutor(vts, {
             try {
               base64 = renderStickyNote({ title, subtitle, color: step.color || "random", shape });
             } catch { /* headless fallback */ }
+            const sizePct = clampInt(step.size, 5, 100, 22);
             if (base64 && onStickyPreview) {
-              onStickyPreview({ base64, maxNotes: stickyCap, title, subtitle });
+              onStickyPreview({ base64, maxNotes: stickyCap, title, subtitle, size: sizePct });
             }
             onToast({ title: ctx.ruleName || "Sticky note (preview)", text: `${title}${subtitle ? ` · ${subtitle}` : ""}`, fx: "sparkles" });
             return { ok: true, simulated: true, detail: `Preview sticky note “${title}” (connect VTube Studio to pin to avatar)` };
@@ -898,10 +899,11 @@ export function createVtsStepExecutor(vts, {
         const shape = plusShapesAllowed ? requestedShape : "note";
         const shapeFallback = !plusShapesAllowed && isPlusStickyShape(requestedShape);
         const customDataBase64 = renderStickyNote({ title, subtitle, color: step.color || "random", shape });
+        const sizePct = clampInt(step.size, 5, 100, 22);
         if (customDataBase64 && onStickyPreview) {
-          onStickyPreview({ base64: customDataBase64, maxNotes: stickyCap, title, subtitle });
+          onStickyPreview({ base64: customDataBase64, maxNotes: stickyCap, title, subtitle, size: sizePct });
         }
-        const sizeNorm = clampInt(step.size, 12, 60, 22) / 100;
+        const sizeNorm = sizePct / 100;
         const rot = clampInt(step.rotation, -45, 45, -6);
         const stays = !(step.duration > 0);
         const jitterX = step.pinMode === "random" || step.pinMode === "face" ? (Math.random() - 0.5) * 0.28 : 0;

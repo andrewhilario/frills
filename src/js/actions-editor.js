@@ -927,6 +927,31 @@ startWidgetEditor({
           }
         });
         const meshRow = el("span", { className: "act-pass-row" }, meshInput, pickMeshBtn);
+        const sizePresets = [["XS", 10], ["S", 18], ["M", 26], ["L", 40], ["XL", 60]];
+        const curSize = Math.min(100, Math.max(5, Math.round(Number(step.size) || 22)));
+        const sizeValEl = el("span", { className: "act-size-val", textContent: `${curSize}%` });
+        const sizeSlider = el("input", { type: "range", min: 5, max: 100, step: 1, value: String(curSize) });
+        sizeSlider.setAttribute("aria-label", "Sticky note size percent");
+        const sizeChips = el("div", { className: "act-size-chips" });
+        const sizeBtns = sizePresets.map(([lbl, val]) => {
+          const btn = el("button", { type: "button", className: "act-size-chip", textContent: `${lbl} · ${val}%` });
+          btn.dataset.val = String(val);
+          btn.dataset.on = String(curSize === val);
+          btn.addEventListener("click", () => applyStickySize(val));
+          return btn;
+        });
+        sizeChips.append(...sizeBtns);
+        const applyStickySize = (raw) => {
+          const next = Math.min(100, Math.max(5, Math.round(Number(raw) || 22)));
+          step.size = next;
+          sizeSlider.value = String(next);
+          sizeValEl.textContent = `${next}%`;
+          for (const b of sizeBtns) b.dataset.on = String(Number(b.dataset.val) === next);
+          view.setStickySize(next);
+          commitRules();
+        };
+        sizeSlider.addEventListener("input", () => applyStickySize(sizeSlider.value));
+        const sizeBox = el("div", { className: "act-size-box" }, el("div", { className: "act-size-row" }, sizeSlider, sizeValEl), sizeChips);
         hostEl.append(
           fieldRow("Name on note ({name}, {gift}, {text})", makeInput({
             value: step.title,
@@ -942,15 +967,9 @@ startWidgetEditor({
           })),
           fieldRow("Sticker shape", makeSelect(VTS_STICKY_SHAPES, step.shape || "note", (v) => { step.shape = v; commitRules(); })),
           fieldRow("Note color", makeSelect(VTS_STICKY_COLORS, step.color, (v) => { step.color = v; commitRules(); })),
+          fieldRow("Note size (5–100%)", sizeBox),
           fieldRow("Placement", makeSelect(VTS_STICKY_PIN_MODES, step.pinMode, (v) => { step.pinMode = v; commitRules(); })),
           fieldRow("Face ArtMesh (blank = auto)", meshRow),
-          fieldRow("Note size % (12–60)", makeInput({
-            type: "number",
-            value: step.size,
-            min: 12,
-            max: 60,
-            onInput: (v) => { step.size = Math.min(60, Math.max(12, Math.round(Number(v) || 26))); commitRules(); },
-          })),
           fieldRow("Remove after (sec, 0 = stay)", makeInput({
             type: "number",
             value: step.duration,
