@@ -4,6 +4,9 @@
 import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
+import os from "node:os";
+import { mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
 import { EventEmitter } from "node:events";
 import { createHelper } from "../helper/server.mjs";
 
@@ -309,4 +312,135 @@ test("the status numbers say how many pages are open, the limit, and how often p
   assert.match((await raw("/health", { headers: { Accept: "text/html" } })).body, /pages turned away/, "the readable page has the numbers too");
   await one.close();
   await helper.close();
+});
+
+test("smart eviction: idle offline rooms yield smoothly to the queue so live streamers never wait behind idle OBS tabs", async () => {
+  const made = [];
+  class ScriptedConn extends EventEmitter {
+    constructor(user) { super(); this.user = user; this.gone = false; }
+    async checkLiveDirect() {
+      if (this.user === "idle.off") return { live: false, roomId: "", followers: 0, viewers: 0 };
+      return { live: true, roomId: "999999", followers: 100, viewers: 5 };
+    }
+    async connect() { await sleep(5); }
+    disconnect() { if (!this.gone) { this.gone = true; this.emit("disconnected"); } }
+  }
+  helper = createHelper({
+    relay: { origins: [SITE], slots: 1, maxPerIp: 20, trustProxy: false },
+    factory: async (user) => { const c = new ScriptedConn(user); made.push({ user, c }); return c; },
+    directGapMs: 0,
+    offlineWaitMs: 5000,
+    offlineEvictAfterMs: 25,
+    queueGraceMs: 80,
+    idleStopMs: 60,
+  });
+  everyHelper.push(helper);
+  port = await helper.listen(0);
+
+  const off = listen("idle.off");
+  await off.until(() => off.last()?.state === "offline");
+  await sleep(40); // past offlineEvictAfterMs
+
+  // New live streamer arrives while the 1 slot is held by the offline room -> offline room yields smoothly into Waiting
+  const live = listen("live.now");
+  await live.until(() => live.states().includes("connected"));
+  await off.until(() => off.last()?.state === "queued");
+  assert.equal(helper.hub.stats().used, 1);
+  assert.equal(helper.hub.stats().waiting, 1);
+  assert.ok(helper.hub.evictions >= 1);
+
+  // Closing the yielded SSE stream cleans up the Waiting entry cleanly (no leak!)
+  await off.close();
+  await sleep(120);
+  assert.equal(helper.hub.stats().waiting, 0, "demoted client cleanup releases Waiting entry");
+  await live.close();
+  await helper.close();
+});
+
+test("priority users never wait in line and are never evicted even when the relay is full", async () => {
+  await start({ relay: { slots: 1, priorityUsers: ["owner.vip"] } });
+  const regular = listen("acct.a");
+  await connected(regular);
+
+  // Relay is 1/1 full with a connected room; owner VIP still connects immediately without queuing
+  const vip = listen("owner.vip");
+  await connected(vip);
+  assert.equal(vip.states().includes("queued"), false, "priority account never queued");
+  const ownerHealth = await health();
+  const vipRow = ownerHealth.roster.accounts.find((a) => a.user === "owner.vip");
+  assert.equal(vipRow?.priority, true, "tagged priority in owner roster");
+
+  // Regular third account still queues and never evicts the VIP
+  const third = listen("acct.b");
+  await third.until(() => third.last()?.state === "queued");
+  assert.equal(helper.hub.rooms.has("owner.vip"), true);
+
+  await Promise.all([regular.close(), vip.close(), third.close()]);
+  await helper.close();
+});
+
+test("10-minute disk roomId restart cache persists live roomIds on close and skips direct probe after restart", async () => {
+  const dir = mkdtempSync(join(os.tmpdir(), "frills-cache-test-"));
+  const cacheFile = join(dir, "rooms.json");
+  try {
+    let directCalls = 0;
+    const connectedRoomIds = [];
+    const makeFactory = () => async () => {
+      const c = new EventEmitter();
+      c.roomId = "7788990011";
+      c.checkLiveDirect = async () => { directCalls += 1; return { live: true, roomId: "7788990011", followers: 250, viewers: 12 }; };
+      c.connect = async (rid) => { connectedRoomIds.push(rid || ""); await sleep(5); };
+      c.disconnect = () => { c.emit("disconnected"); };
+      return c;
+    };
+
+    // First relay run: looks up roomId directly, caches it, and flushes to disk on close()
+    const first = createHelper({ relay: { origins: [SITE], slots: 5, roomCachePath: cacheFile }, factory: makeFactory(), directGapMs: 0, idleStopMs: 500 });
+    everyHelper.push(first);
+    port = await first.listen(0);
+    const p1 = listen("streamer.one");
+    await connected(p1);
+    assert.equal(directCalls, 1);
+    await first.close();
+    await p1.close();
+
+    // Second relay run (simulating restart): reloads disk cache and reconnects straight with cached roomId (0 direct probes!)
+    const second = createHelper({ relay: { origins: [SITE], slots: 5, roomCachePath: cacheFile }, factory: makeFactory(), directGapMs: 0, idleStopMs: 500 });
+    everyHelper.push(second);
+    port = await second.listen(0);
+    const p2 = listen("streamer.one");
+    await connected(p2);
+    assert.equal(directCalls, 1, "restart skipped direct /api-live lookup using disk cache");
+    assert.equal(connectedRoomIds.at(-1), "7788990011", "passed persisted roomId directly into connect()");
+    assert.equal(second.signing.metrics.roomIdCacheHits, 1);
+    await p2.close();
+    await second.close();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("Euler per-minute burst pacer spaces signed connects beyond the burst size", async () => {
+  const times = [];
+  const h = createHelper({
+    relay: { origins: [SITE], slots: 10 },
+    factory: async () => {
+      const c = new EventEmitter();
+      c.connect = async () => { times.push(Date.now()); };
+      c.disconnect = () => {};
+      return c;
+    },
+    directGapMs: 0,
+    signBurst: 2,
+    signPerMinute: 600, // 100 ms spacing after 2-item burst
+    idleStopMs: 60,
+  });
+  everyHelper.push(h);
+  port = await h.listen(0);
+  const pages = ["p.1", "p.2", "p.3", "p.4"].map((u) => listen(u));
+  await Promise.all(pages.map(connected));
+  assert.equal(times.length, 4);
+  assert.ok(times[3] - times[0] >= 160, `4 connects with burst 2 at 100ms spacing should take >=160ms, got ${times[3] - times[0]}ms`);
+  await Promise.all(pages.map((p) => p.close()));
+  await h.close();
 });

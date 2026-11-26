@@ -112,7 +112,7 @@ test("it answers a ping, serves the built site with its security headers, and sa
   await start(scripted().factory);
   const ping = await raw("/tiktok/ping");
   assert.equal(ping.status, 200);
-  assert.deepEqual(JSON.parse(ping.body), { ok: true, name: "frills-helper", version: "0.7.4", features: ["chat", "alerts", "info", "roles", "status", "viewers"] });
+  assert.deepEqual(JSON.parse(ping.body), { ok: true, name: "frills-helper", version: "0.7.5", features: ["chat", "alerts", "info", "roles", "status", "viewers"] });
   const editor = await raw("/editor/");
   assert.equal(editor.status, 200);
   assert.match(editor.body, /Connect your chat/);
@@ -434,16 +434,19 @@ test("the relay writes how long each connection to TikTok took", async () => {
   await helper.close();
 });
 
-test("the shared relay enforces leak-shield defaults: slower offline backoff, 4h offline cap, fast offline idle cleanup, and 5m silence threshold", () => {
+test("the shared relay enforces leak-shield and scale defaults: slower offline backoff, 2h offline cap, smart eviction, and 5m silence threshold", () => {
   const relay = createHelper({ relay: { origins: ["https://site.test"], slots: 3, maxPerIp: 5, trustProxy: false }, factory: async () => ({}) });
-  const { offlineWaitMs, offlineGiveUpMs, offlineSlowSteps, idleStopMs, offlineIdleStopMs, silentMs, wakeGapMs } = relay.hub.opts;
+  const { offlineWaitMs, offlineGiveUpMs, offlineSlowSteps, idleStopMs, offlineIdleStopMs, silentMs, wakeGapMs, smartEvict, offlineEvictAfterMs, signBurst } = relay.hub.opts;
   assert.equal(offlineWaitMs, 45000, "every 45 seconds at first to save quota while still catching Go LIVE quickly");
-  assert.deepEqual(offlineSlowSteps, [[600000, 120000], [1800000, 300000], [7200000, 600000]], "2m after 10m, 5m after 30m, 10m after 2h");
-  assert.equal(offlineGiveUpMs, 14400000, "stops polling after 4 hours continuously offline until reopened");
+  assert.deepEqual(offlineSlowSteps, [[600000, 120000], [1800000, 300000], [3600000, 600000]], "2m after 10m, 5m after 30m, 10m after 1h");
+  assert.equal(offlineGiveUpMs, 7200000, "stops polling after 2 hours continuously offline until reopened");
   assert.equal(idleStopMs, 300000, "keeps live rooms warm 5 minutes on refresh");
   assert.equal(offlineIdleStopMs, 45000, "drops abandoned offline rooms after 45 seconds");
   assert.equal(silentMs, 300000, "waits 5 minutes of complete silence before reconnecting");
   assert.equal(wakeGapMs, 60000, "throttles manual wake-ups to once per minute");
+  assert.equal(smartEvict, true, "idle/offline rooms yield slots automatically when full");
+  assert.equal(offlineEvictAfterMs, 120000, "offline rooms eligible to yield after 2 minutes");
+  assert.equal(signBurst, 5, "burst of 5 before per-minute Euler pacing kicks in");
   assert.ok(offlineSlowSteps.every(([after, every], i) => every > (offlineSlowSteps[i - 1]?.[1] ?? offlineWaitMs) && after > (offlineSlowSteps[i - 1]?.[0] ?? 0)), "each step is later and slower than the one before");
 });
 

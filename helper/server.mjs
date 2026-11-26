@@ -13,7 +13,7 @@
 import http from "node:http";
 import os from "node:os";
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { createStatic } from "../scripts/lib/static.mjs";
@@ -21,14 +21,14 @@ import { cleanTikTokUser } from "../src/js/tiktok.js";
 import { Hub } from "./rooms.mjs";
 import { ALERT_KINDS } from "./map.mjs";
 import { DEMO_USER, DemoConnection } from "./demo.mjs";
-import { ALERT_AT, EULER_DEFAULT_CAP, Signing, capacity, deviceFacts, snapshot, statusPage } from "./status.mjs";
-import { SlotAlerts, termuxNotifier } from "./alerts.mjs";
+import { ALERT_AT, EULER_DEFAULT_CAP, Signing, capacity, deviceFacts, recommendedSlots, snapshot, statusPage } from "./status.mjs";
+import { SlotAlerts, discordNotifier, termuxNotifier } from "./alerts.mjs";
 import { OWNER, ownerGate } from "./owner.mjs";
 import { handleProStatus } from "../worker/region.mjs";
 import { handleDevPass, handleTts } from "../worker/tts.mjs";
 import { validTicketSecret, verifyRelayTicket } from "../worker/relay-ticket.mjs";
 
-const VERSION = "0.7.4";
+const VERSION = "0.7.5";
 /** What this program can do, so a page can tell an old one ("chat" only) from one that sends alerts. */
 const FEATURES = ["chat", "alerts", "info", "roles", "status", "viewers"];
 
@@ -145,6 +145,28 @@ export function parseEulerConfig(env = process.env) {
   return { key, keys: key ? [key] : [], ignoredExtraKeys, cap, reserve, allowEulerRoomIdFallback };
 }
 
+/** Parses comma-separated priority (owner/VIP) TikTok handles from `RELAY_PRIORITY_USERS`. */
+export function parsePriorityUsers(raw = "") {
+  const seen = new Set();
+  for (const part of String(raw ?? "").split(",")) {
+    const clean = cleanTikTokUser(part);
+    if (clean) seen.add(clean);
+  }
+  return [...seen];
+}
+
+/** Resolves `RELAY_SLOTS` (explicit positive integer or `"auto"` derived from Euler + single-IP capacity). */
+export function resolveRelaySlots({ raw, eulerCap = 0, allowEulerRoomIdFallback = false, directGapMs = 3500, fallback = 30 } = {}) {
+  const text = String(raw ?? "").trim().toLowerCase();
+  if (text === "auto") {
+    const rec = recommendedSlots({ eulerCap, allowEulerRoomIdFallback, directGapMs }).recommended;
+    return { auto: true, slots: rec ?? 56 };
+  }
+  const n = Number(text);
+  if (text !== "" && Number.isFinite(n) && n > 0) return { auto: false, slots: Math.max(1, Math.round(n)) };
+  return { auto: false, slots: fallback };
+}
+
 /**
  * Builds the helper (nothing listens until listen() is called). `factory(user, { apiKey })` makes the connection to TikTok; tests pass a
  * pretend one. Anything else in `tuning` (waits, limits) goes to the Hub.
@@ -158,25 +180,6 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", apiK
   const make = (user, options) => (user === DEMO_USER ? new DemoConnection({ pace: demoPace }) : factory(user, { allowEulerRoomIdFallback, ...options }));
   const singleKey = String(apiKey ?? "").trim().split(",")[0].trim()
     || (Array.isArray(apiKeys) ? apiKeys.map((k) => String(k ?? "").trim()).find(Boolean) ?? "" : "");
-  const shared = relay
-    ? {
-        queue: true,
-        connectAtOnce: 3,
-        directGapMs: 3500,
-        directBurst: 3,
-        tiktokWaitMs: 30000,
-        tiktokMaxMs: 180000,
-        idleStopMs: 300000,
-        offlineIdleStopMs: 45000,
-        offlineWaitMs: 45000,
-        offlineGiveUpMs: 14400000,
-        offlineSlowSteps: [[600000, 120000], [1800000, 300000], [7200000, 600000]],
-        wakeGapMs: 60000,
-        silentMs: 300000,
-        silentMaxMs: 1800000,
-        maxRooms: relay.slots ?? 30,
-      }
-    : {};
   const ticketSecret = relay ? String(relay.ticketSecret ?? "").trim() : "";
   let hub = null;
   const signing = new Signing(Date.now, {
@@ -188,11 +191,35 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", apiK
       log(`Euler signing budget guard paused new connects (${reason}) until ${until}`);
     },
   });
+  const shared = relay
+    ? {
+        queue: true,
+        smartEvict: true,
+        offlineEvictAfterMs: 120000,
+        connectAtOnce: 3,
+        directGapMs: 3500,
+        directBurst: 3,
+        signPerMinute: () => signing.safeSignPerMinute(),
+        signBurst: 5,
+        tiktokWaitMs: 30000,
+        tiktokMaxMs: 180000,
+        idleStopMs: 300000,
+        offlineIdleStopMs: 45000,
+        offlineWaitMs: 45000,
+        offlineGiveUpMs: 7200000,
+        offlineSlowSteps: [[600000, 120000], [1800000, 300000], [3600000, 600000]],
+        wakeGapMs: 60000,
+        silentMs: 300000,
+        silentMaxMs: 1800000,
+        maxRooms: relay.slots ?? 30,
+        priorityUsers: relay.priorityUsers ?? [],
+      }
+    : {};
   const startedAt = Date.now();
   hub = new Hub({
     factory: make,
     apiKey: () => signing.currentKey(),
-    canSign: () => signing.canSign(),
+    canSign: (info) => signing.canSign(info),
     log,
     onLimited: () => signing.limitHit(),
     onSigned: (info) => signing.use(info),
@@ -202,6 +229,26 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", apiK
     ...shared,
     ...tuning,
   });
+  // Optional 10-minute roomId restart cache (public numeric roomIds only; zero chat ever persisted).
+  const roomCachePath = relay?.roomCachePath ? String(relay.roomCachePath).trim() : "";
+  if (roomCachePath) {
+    try {
+      if (existsSync(roomCachePath)) {
+        const parsed = JSON.parse(readFileSync(roomCachePath, "utf8"));
+        const count = hub.importRoomCache(parsed);
+        if (count > 0) log(`loaded ${count} cached live roomId${count === 1 ? "" : "s"} for fast restart recovery`);
+      }
+    } catch { /* ignore unreadable or corrupt cache */ }
+  }
+  const flushRoomCache = () => {
+    if (!roomCachePath) return;
+    try {
+      const data = hub.exportRoomCache();
+      writeFileSync(roomCachePath, JSON.stringify(data), { mode: 0o600 });
+    } catch { /* disk cache is best-effort */ }
+  };
+  const cacheFlushTimer = roomCachePath ? setInterval(flushRoomCache, 60000) : null;
+  cacheFlushTimer?.unref?.();
   // what this program costs the device, measured now and then, for the capacity guess on the status page
   const baseRss = process.memoryUsage().rss;
   let cpuFraction = 0;
@@ -218,7 +265,16 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", apiK
   const gate = ownerGate(relay?.ownerKey); // the owner's password, to see the names from anywhere
   const numbers = (local, owned = false) => {
     const stats = hub.stats();
-    const estimate = capacity({ freeMem: os.freemem(), rss: process.memoryUsage().rss, baseRss, rooms: stats.used, cpuFraction });
+    const estimate = capacity({
+      freeMem: os.freemem(),
+      rss: process.memoryUsage().rss,
+      baseRss,
+      rooms: stats.used,
+      cpuFraction,
+      eulerCap: signing.hasKeys() ? signing.effectiveCap() : 0,
+      allowEulerRoomIdFallback,
+      directGapMs: relay ? (hub.opts.directGapMs || 0) : 0,
+    });
     const streams = relay ? { open: openCount(), limit: maxPerIp, turnedAway: away.total, replaced: away.replaced, lastTurnedAwayS: away.lastAt ? Math.round((Date.now() - away.lastAt) / 1000) : null } : null;
     return snapshot({ stats, startedAt, now: Date.now(), version: VERSION, features: FEATURES, signing, estimate, streams, keyed: signing.hasKeys(), alertAt: relay?.alertAt ?? ALERT_AT, device: local ? deviceFacts(cpuFraction) : null, roster: local ? hub.roster() : null, ownerLogin: gate.enabled && !owned, actions: owned ? { restart: Boolean(relay?.restart) } : null });
   };
@@ -467,14 +523,14 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", apiK
         if (!held.size && open.get(who) === held) open.delete(who);
       }
       room.remove(client);
-      if (relay) log(`@${user}: a page left (${kinds}), ${room.clients.size} open`);
+      if (relay) log(`@${user}: a page left (${kinds}), ${room.activeClientCount()} open`);
     };
     const record = { user, page, end() { release(); res.end(); } };
     if (held) {
       if (!open.has(who)) open.set(who, held);
       held.add(record);
     }
-    if (relay) log(`@${user}: a page connected (${kinds}), ${room.clients.size} open`);
+    if (relay) log(`@${user}: a page connected (${kinds}), ${room.activeClientCount()} open`);
     beat = setInterval(() => res.write("event: beat\ndata: {}\n\n"), tuning.beatMs ?? 15000); // so a page can tell a quiet chat from a dead connection (an event, because a page cannot see a comment)
     res.on("close", release);
   }
@@ -483,6 +539,7 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", apiK
     server,
     hub,
     signing,
+    flushRoomCache,
     /** Starts listening, on this computer only unless a relay is told to bind elsewhere. Resolves with the port. */
     listen(port = 8765, bind = "127.0.0.1") {
       return new Promise((resolve, reject) => {
@@ -496,6 +553,8 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", apiK
       });
     },
     close() {
+      clearInterval(cacheFlushTimer);
+      flushRoomCache();
       hub.closeAll();
       try { proEnv.DB?.raw?.close?.(); } catch { /* ignore */ }
       server.closeAllConnections?.();
@@ -526,7 +585,14 @@ const say = (line) => console.log(`[${stamp()}] ${line}`);
 async function mainRelay() {
   const numberOr = (value, fallback) => (Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : fallback);
   const origins = (process.env.RELAY_ORIGINS ?? "https://frills.valwidgets.live").split(",").map((o) => o.trim()).filter(Boolean);
-  const slots = numberOr(process.env.RELAY_SLOTS, 30);
+  const euler = parseEulerConfig(process.env);
+  const slotConfig = resolveRelaySlots({
+    raw: process.env.RELAY_SLOTS,
+    eulerCap: euler.key ? euler.cap : 0,
+    allowEulerRoomIdFallback: euler.allowEulerRoomIdFallback,
+    directGapMs: 3500,
+    fallback: 30,
+  });
   const alertAt = Number.isFinite(Number(process.env.RELAY_ALERT_SPOTS)) && process.env.RELAY_ALERT_SPOTS !== undefined && process.env.RELAY_ALERT_SPOTS !== "" ? Math.max(0, Number(process.env.RELAY_ALERT_SPOTS)) : 10;
   const ownerKey = process.env.RELAY_OWNER_KEY;
   const ticketSecret = (process.env.RELAY_TICKET_SECRET ?? "").trim();
@@ -534,19 +600,30 @@ async function mainRelay() {
     console.error("RELAY_TICKET_SECRET must be at least 16 characters.");
     process.exit(1);
   }
+  const priorityUsers = parsePriorityUsers(process.env.RELAY_PRIORITY_USERS);
+  const roomCachePath = process.env.RELAY_ROOM_CACHE === "0" ? "" : (process.env.RELAY_ROOM_CACHE || join(os.tmpdir(), "frills-relay-rooms.json"));
   // Something starts the relay again when it stops: the keeper that `npm run relay` runs (it sets RELAY_SUPERVISED), or systemd (it sets INVOCATION_ID).
   const supervised = Boolean(process.env.RELAY_SUPERVISED || process.env.INVOCATION_ID);
-  const relay = { origins, slots, alertAt, ownerKey, ticketSecret, maxPerIp: numberOr(process.env.RELAY_PER_IP, 60), maxAccountsPerIp: numberOr(process.env.RELAY_ACCOUNTS_PER_IP, 12), trustProxy: process.env.RELAY_TRUST_PROXY !== "0" };
+  const relay = { origins, slots: slotConfig.slots, alertAt, ownerKey, ticketSecret, priorityUsers, roomCachePath, maxPerIp: numberOr(process.env.RELAY_PER_IP, 60), maxAccountsPerIp: numberOr(process.env.RELAY_ACCOUNTS_PER_IP, 12), trustProxy: process.env.RELAY_TRUST_PROXY !== "0" };
   const port = numberOr(process.argv.find((a) => a.startsWith("--port="))?.slice(7) ?? process.env.PORT, 8765);
   const bind = process.env.RELAY_BIND ?? "127.0.0.1"; // behind a tunnel nothing else may reach it
-  const euler = parseEulerConfig(process.env);
   const helper = createHelper({ relay, apiKey: euler.key, eulerCap: euler.cap, eulerReserve: euler.reserve, allowEulerRoomIdFallback: euler.allowEulerRoomIdFallback, log: say });
+  const syncAutoSlots = () => {
+    if (!slotConfig.auto) return;
+    const rec = recommendedSlots({
+      eulerCap: helper.signing.hasKeys() ? helper.signing.effectiveCap() : 0,
+      allowEulerRoomIdFallback: euler.allowEulerRoomIdFallback,
+      directGapMs: helper.hub.opts.directGapMs || 3500,
+    }).recommended;
+    if (rec && helper.hub.setMaxRooms(rec)) say(`auto-adjusted RELAY_SLOTS to ${rec} based on Euler quota (${helper.signing.effectiveCap()}/day)`);
+  };
   if (helper.signing.hasKeys()) {
-    // Sync live Euler quota before opening the server so budget guards reflect real remaining requests immediately.
+    // Sync live Euler quota before opening the server so budget guards & auto spots reflect real remaining requests immediately.
     await Promise.race([
       helper.signing.syncRemoteLimits(),
       new Promise((resolve) => setTimeout(resolve, 4000).unref?.()),
     ]).catch(() => {});
+    syncAutoSlots();
   }
   try {
     await helper.listen(port, bind);
@@ -555,13 +632,21 @@ async function mainRelay() {
     process.exit(1);
   }
   import("tiktok-live-connector").catch(() => {}); // warm it up now: the first account to connect should not wait for the library to load
+  const recSlots = recommendedSlots({ eulerCap: helper.signing.hasKeys() ? helper.signing.effectiveCap() : 0, allowEulerRoomIdFallback: euler.allowEulerRoomIdFallback, directGapMs: 3500 }).recommended;
+  const liveSlots = helper.hub.stats().max;
+  const slotsNote = slotConfig.auto
+    ? `${liveSlots} (auto from Euler ${helper.signing.effectiveCap()}/day & single-IP limit)`
+    : `${liveSlots}${recSlots && liveSlots > recSlots * 1.25 ? ` (recommended: ~${recSlots} for ${helper.signing.effectiveCap()}/day Euler — set RELAY_SLOTS=auto to match automatically)` : ""}`;
   const eulerDesc = euler.key
-    ? `single compliant key configured (${euler.cap}/day cap${euler.reserve ? ` · ${euler.reserve} reserved` : ""} · Euler roomId fallback ${euler.allowEulerRoomIdFallback ? "ON" : "OFF (leak shield)"}${euler.ignoredExtraKeys ? ` · NOTE: ${euler.ignoredExtraKeys} extra key(s) in env ignored` : ""})`
+    ? `single compliant key configured (${helper.signing.effectiveCap()}/day cap · ${helper.signing.safeSignPerMinute()}/min burst cap${euler.reserve ? ` · ${euler.reserve} reserved` : ""} · Euler roomId fallback ${euler.allowEulerRoomIdFallback ? "ON" : "OFF (leak shield)"}${euler.ignoredExtraKeys ? ` · NOTE: ${euler.ignoredExtraKeys} extra key(s) in env ignored` : ""})`
     : "NOT set: the limits are shared with everyone, and TikTok will often be busy at night";
-  console.log(`\nFrills relay ${VERSION} is running on ${bind}:${port}.\n  Spots: ${slots}. Allowed website addresses: ${origins.join(", ")}.\n  Status page: http://${bind}:${port}/health (open it in a browser)\n  Warns you when ${alertAt} spots or fewer are left${process.env.RELAY_ALERTS === "0" ? " (alerts are off)" : ""}.\n  Owner password (to see who is connected from your PC): ${ownerState(ownerKey)}.\n  Plus ticket lock (RELAY_TICKET_SECRET): ${ticketSecret ? "on (dedicated Frills Plus relay)" : "off (shared free relay)"}.\n  Signing service (EULER_API_KEY): ${eulerDesc}.\n  Pages one internet address may keep open: ${relay.maxPerIp} (RELAY_PER_IP), for at most ${relay.maxAccountsPerIp} different accounts (RELAY_ACCOUNTS_PER_IP).\n`);
+  const discordHook = discordNotifier({ webhookUrl: process.env.RELAY_ALERT_WEBHOOK, log: say });
+  console.log(`\nFrills relay ${VERSION} is running on ${bind}:${port}.\n  Spots: ${slotsNote}. Allowed website addresses: ${origins.join(", ")}.\n  Status page: http://${bind}:${port}/health (open it in a browser)\n  Warns you when ${alertAt} spots or fewer are left${process.env.RELAY_ALERTS === "0" ? " (alerts are off)" : ""}${discordHook ? " + Discord webhook" : ""}.\n  Priority accounts (RELAY_PRIORITY_USERS): ${priorityUsers.length ? priorityUsers.map((u) => "@" + u).join(", ") : "none (set RELAY_PRIORITY_USERS=yourhandle so you never wait in line)"}.\n  Smart slot eviction & restart roomId cache: on (${roomCachePath ? "disk cache enabled" : "disk cache off"}).\n  Owner password (to see who is connected from your PC): ${ownerState(ownerKey)}.\n  Plus ticket lock (RELAY_TICKET_SECRET): ${ticketSecret ? "on (dedicated Frills Plus relay)" : "off (shared free relay)"}.\n  Signing service (EULER_API_KEY): ${eulerDesc}.\n  Pages one internet address may keep open: ${relay.maxPerIp} (RELAY_PER_IP), for at most ${relay.maxAccountsPerIp} different accounts (RELAY_ACCOUNTS_PER_IP).\n`);
   console.log(`  Restart from the status page: ${ownerKey && ownerKey.length >= OWNER.minKey ? (supervised ? "on" : "off (start the relay with npm run relay, or under systemd, so that something starts it again)") : "off (it needs the owner password)"}`);
   if (process.env.RELAY_ALERTS !== "0") {
-    const alerts = new SlotAlerts({ stats: () => helper.hub.stats(), signing: helper.signing, alertAt, notify: termuxNotifier({ log: say }), log: say });
+    const phoneNotify = termuxNotifier({ log: say });
+    const notify = (title, content) => { phoneNotify(title, content); discordHook?.(title, content); };
+    const alerts = new SlotAlerts({ stats: () => helper.hub.stats(), signing: helper.signing, alertAt, notify, log: say });
     alerts.start();
   }
   setInterval(() => {
@@ -579,7 +664,7 @@ async function mainRelay() {
   if (supervised) relay.restart = stop; // asked for from the owner's status page: it stops and is started again. Without a keeper it would just stay stopped.
   if (helper.signing.hasKeys()) {
     setInterval(() => {
-      if (helper.signing.hasKeys()) helper.signing.syncRemoteLimits().catch(() => {});
+      if (helper.signing.hasKeys()) helper.signing.syncRemoteLimits().then(syncAutoSlots).catch(() => {});
     }, 5 * 60000).unref();
   }
   process.on("SIGINT", stop);

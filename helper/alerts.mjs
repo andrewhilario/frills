@@ -22,10 +22,31 @@ export function termuxNotifier({ run = execFile, log = () => {} } = {}) {
   };
 }
 
+/** Optional Discord webhook notifier for off-device relay alerts (never throws, never blocks). */
+export function discordNotifier({ webhookUrl = "", fetchImpl = globalThis.fetch?.bind(globalThis), log = () => {} } = {}) {
+  const url = String(webhookUrl ?? "").trim();
+  if (!url || typeof fetchImpl !== "function") return null;
+  let warned = false;
+  return (title, content) => {
+    fetchImpl(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: `**${title}** — ${content}` }),
+    }).then((res) => {
+      if (!res?.ok && !warned) {
+        warned = true;
+        log(`alerts: Discord webhook returned HTTP ${res?.status ?? 0}`);
+      }
+    }).catch(() => {
+      if (!warned) { warned = true; log("alerts: couldn't reach Discord webhook"); }
+    });
+  };
+}
+
 /**
  * Looks at the numbers now and then and speaks up when something changes for the worse, once per change: the spots left reach the alarm
- * number, the line starts to form, the free signing service starts saying "busy". It speaks again only after things got better (a few
- * spots more than the alarm number, an empty line, a quiet signing service), so a number hovering around the line does not nag.
+ * number, the line starts to form, the free signing service starts saying "busy", or Euler daily usage passes 80%. It speaks again only
+ * after things got better, so a number hovering around the line does not nag.
  */
 export class SlotAlerts {
   constructor({ stats, signing, alertAt = 10, notify = () => {}, log = () => {}, now = () => Date.now() } = {}) {
@@ -35,7 +56,7 @@ export class SlotAlerts {
     this.notify = notify;
     this.log = log;
     this.now = now;
-    this.state = { low: false, waiting: false, busy: false };
+    this.state = { low: false, waiting: false, busy: false, quotaHigh: false };
   }
 
   say(title, content) {
@@ -60,6 +81,17 @@ export class SlotAlerts {
     const busy = this.signing.recent(2 * 60 * 1000) > 0;
     if (busy && !this.state.busy) { this.state.busy = true; say("TikTok's free connection is busy", "The free signing service is saying \"busy\". New connections may fail for a minute or two."); }
     else if (!busy && this.signing.recent(10 * 60 * 1000) === 0) this.state.busy = false;
+
+    const q = typeof this.signing.quotaSummary === "function" ? this.signing.quotaSummary() : null;
+    if (q && q.cap > 0) {
+      const pct = Math.round(((q.cap - q.available) / q.cap) * 100);
+      if (pct >= 80 && !this.state.quotaHigh) {
+        this.state.quotaHigh = true;
+        say("Euler daily quota running low", `${q.available.toLocaleString()} of ${q.cap.toLocaleString()} daily signing requests left (${pct}% used).`);
+      } else if (pct <= 70) {
+        this.state.quotaHigh = false;
+      }
+    }
     return raised;
   }
 

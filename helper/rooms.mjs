@@ -115,6 +115,14 @@ export class Room {
     this.lastError = ""; // concise owner-facing explanation of the most recent connection error
     this.connectMs = null; // how long the most recent connect took (ms)
     this.nextTryAt = 0; // when the next offline/retry check is scheduled (ms, 0 when connected/stopped)
+    this.offlineSince = 0; // when this wait for a LIVE began (0 when not waiting offline)
+    this.demoted = null; // Waiting entry if this room yielded its slot while offline (so release() still cleans up)
+    const preloaded = typeof hub.consumePreloadedRoom === "function" ? hub.consumePreloadedRoom(user) : null;
+    if (preloaded?.roomId) {
+      this.cachedRoomId = preloaded.roomId;
+      this.cachedRoomAt = preloaded.at;
+      if (preloaded.followers > 0) this.base = preloaded.followers;
+    }
   }
 
   add(client) {
@@ -184,9 +192,26 @@ export class Room {
   }
 
   remove(client) {
+    if (this.demoted) {
+      this.demoted.remove(client);
+      return;
+    }
     this.clients.delete(client);
     if (!this.clients.size) this.emptySince = Date.now();
     if (!this.clients.size && !this.stopped) this.idleTimer = setTimeout(() => this.hub.drop(this), this.idleWindowMs());
+  }
+
+  /** Current client count across any demotion/promotion chain (used for logging on stream close). */
+  activeClientCount() {
+    let cur = this;
+    const seen = new Set();
+    while (cur && !seen.has(cur)) {
+      seen.add(cur);
+      if (cur.demoted) cur = cur.demoted;
+      else if (cur.room) cur = cur.room;
+      else break;
+    }
+    return cur?.clients?.size ?? 0;
   }
 
   broadcast(event, data) {
@@ -402,12 +427,23 @@ export class Room {
     }
 
     // 2. Daily Euler budget guard: avoid firing doomed 429 requests when the single account's quota is paused/reserved.
-    if (!conn.pretend && typeof this.hub.opts.canSign === "function" && !this.hub.opts.canSign()) {
+    const isPriority = this.hub.isPriority(this.user);
+    if (!conn.pretend && typeof this.hub.opts.canSign === "function" && !this.hub.opts.canSign({ priority: isPriority, user: this.user })) {
       give();
       this.letGo(conn);
       this.hub.opts.onBudgetBlocked?.();
       this.hub.busy();
       return { kind: "limited", detail: "Daily TikTok signing budget reached. Waiting for quota reset…", reason: "Daily Euler budget guard paused" };
+    }
+
+    // 3. Per-minute Euler burst pacer: stays safely under Euler's 60 req/min cap during mass reconnects.
+    if (!conn.pretend) {
+      await this.hub.signTurn();
+      if (this.stopped) {
+        give();
+        this.letGo(conn);
+        return { kind: "stopped" };
+      }
     }
 
     this.conn = conn;
@@ -518,14 +554,14 @@ export class Room {
     }, 60000);
     const { offlineWaitMs, offlineGiveUpMs, offlineSlowSteps, backoffMs } = this.hub.opts;
     let attempt = 0;
-    let offlineSince = 0; // when this wait for a LIVE began; each look at TikTok costs a request, so it does not go on for ever
+    this.offlineSince = 0; // when this wait for a LIVE began; tracked on the Room so smart eviction can yield stale offline rooms
     let quiet = false; // while waiting for a LIVE to start, keep saying so instead of flickering to "connecting" at every look
     while (!this.stopped) {
       if (!quiet) this.setStatus(attempt === 0 ? "connecting" : "reconnecting");
       const how = await this.once();
       if (this.stopped || how.kind === "stopped") break;
       if (how.wasConnected) attempt = 0;
-      if (how.kind !== "offline") offlineSince = 0;
+      if (how.kind !== "offline") this.offlineSince = 0;
       quiet = how.kind === "offline" || how.kind === "limited";
       if (how.kind === "fatal") {
         this.lastError = how.reason || how.detail || "Fatal error";
@@ -533,8 +569,8 @@ export class Room {
         break;
       } else if (how.kind === "offline") {
         this.lastError = "";
-        offlineSince ||= Date.now();
-        const waited = Date.now() - offlineSince;
+        this.offlineSince ||= Date.now();
+        const waited = Date.now() - this.offlineSince;
         if (offlineGiveUpMs > 0 && waited >= offlineGiveUpMs) {
           // Stop looking. A page that connects again (or the person pressing Connect) starts the wait afresh.
           this.setStatus("offline", "Still not live after a long wait, so Frills stopped looking. Press Disconnect, then Connect again when you go LIVE.");
@@ -617,6 +653,10 @@ class Waiting {
     }
   }
 
+  activeClientCount() {
+    return this.room ? this.room.activeClientCount() : this.clients.size;
+  }
+
   tell(position, total) {
     this.status = { state: "queued", detail: "", fatal: false, position, total };
     for (const client of [...this.clients]) {
@@ -631,7 +671,7 @@ class Waiting {
 
 export class Hub {
   constructor(opts = {}) {
-    this.opts = { factory: null, apiKey: "", maxRooms: 3, queue: false, queueGraceMs: 20000, idleStopMs: 30000, offlineIdleStopMs: null, offlineWaitMs: 20000, limitedWaitMs: 60000, limitedMaxMs: 600000, connectAtOnce: 5, offlineGiveUpMs: 0, offlineSlowSteps: [], wakeGapMs: 30000, backoffMs: [3000, 6000, 12000, 30000, 60000], silentMs: 300000, silentMaxMs: 1800000, roomIdCacheMs: 600000, directGapMs: 0, directBurst: 3, tiktokWaitMs: 30000, tiktokMaxMs: 180000, ...opts };
+    this.opts = { factory: null, apiKey: "", maxRooms: 3, queue: false, queueGraceMs: 20000, idleStopMs: 30000, offlineIdleStopMs: null, offlineWaitMs: 20000, limitedWaitMs: 60000, limitedMaxMs: 600000, connectAtOnce: 5, offlineGiveUpMs: 0, offlineSlowSteps: [], wakeGapMs: 30000, backoffMs: [3000, 6000, 12000, 30000, 60000], silentMs: 300000, silentMaxMs: 1800000, roomIdCacheMs: 600000, directGapMs: 0, directBurst: 3, tiktokWaitMs: 30000, tiktokMaxMs: 180000, smartEvict: false, offlineEvictAfterMs: 120000, signPerMinute: 0, signBurst: 5, priorityUsers: [], ...opts };
     this.log = opts.log ?? (() => {});
     this.rooms = new Map();
     this.waiting = new Map(); // accounts in line for a spot, oldest first
@@ -646,6 +686,102 @@ export class Hub {
     this.directChain = Promise.resolve();
     this.directBlockedUntil = 0;
     this.directStrikes = 0;
+    // Shared Euler per-minute burst pacer (prevents mass reconnects tripping Euler's 60 req/min wall)
+    this.signTokens = Math.max(1, this.opts.signBurst ?? 5);
+    this.signLastRefill = Date.now();
+    this.signChain = Promise.resolve();
+    // Priority (VIP/owner) accounts: never queued behind free traffic, never evicted
+    this.priorityUsers = new Set([...(this.opts.priorityUsers ?? [])].map((u) => String(u ?? "").trim().replace(/^@+/, "").toLowerCase()).filter(Boolean));
+    // Preloaded 10-min roomId restart cache (populated on boot from disk snapshot so restarts reconnect instantly)
+    this.preloadedRooms = new Map();
+    this.evictions = 0;
+  }
+
+  isPriority(user) {
+    return this.priorityUsers.has(String(user ?? "").trim().replace(/^@+/, "").toLowerCase());
+  }
+
+  /** Dynamically updates maxRooms (e.g. RELAY_SLOTS=auto after syncing live Euler quota) without interrupting live rooms. */
+  setMaxRooms(nextMax) {
+    const n = Math.max(1, Math.round(Number(nextMax) || 0));
+    if (!Number.isFinite(n) || n === this.opts.maxRooms) return false;
+    const grew = n > this.opts.maxRooms;
+    this.opts.maxRooms = n;
+    if (grew) this.promote();
+    return true;
+  }
+
+  /** Exports fresh active roomIds (TTL roomIdCacheMs) for fast restart recovery. Zero chat or private data. */
+  exportRoomCache(now = Date.now()) {
+    const ttl = this.opts.roomIdCacheMs ?? 600000;
+    const out = {};
+    for (const [user, entry] of this.preloadedRooms) {
+      if (entry?.roomId && now - entry.at <= ttl) out[user] = { roomId: entry.roomId, at: entry.at, followers: entry.followers || 0 };
+    }
+    for (const room of this.rooms.values()) {
+      if (room.cachedRoomId && now - room.cachedRoomAt <= ttl) {
+        out[room.user] = { roomId: room.cachedRoomId, at: room.cachedRoomAt, followers: room.base || 0 };
+      }
+    }
+    return out;
+  }
+
+  /** Imports fresh roomIds saved before a restart so reconnecting rooms skip /api-live/user/room/. */
+  importRoomCache(entries, now = Date.now()) {
+    if (!entries || typeof entries !== "object") return 0;
+    const ttl = this.opts.roomIdCacheMs ?? 600000;
+    let loaded = 0;
+    for (const [user, raw] of Object.entries(entries)) {
+      const clean = String(user ?? "").trim().toLowerCase();
+      const roomId = String(raw?.roomId ?? "").trim();
+      const at = Number(raw?.at) || 0;
+      const followers = Math.max(0, Math.round(Number(raw?.followers) || 0));
+      if (!clean || !/^\d{5,30}$/.test(roomId) || at <= 0 || now - at > ttl || at > now + 60000) continue;
+      this.preloadedRooms.set(clean, { roomId, at, followers });
+      loaded += 1;
+    }
+    return loaded;
+  }
+
+  consumePreloadedRoom(user, now = Date.now()) {
+    const entry = this.preloadedRooms.get(user);
+    if (!entry) return null;
+    this.preloadedRooms.delete(user);
+    const ttl = this.opts.roomIdCacheMs ?? 600000;
+    return now - entry.at <= ttl ? entry : null;
+  }
+
+  /** Paces Euler-signed connects to stay safely under Euler's per-minute cap (e.g. 45/min on Euler Free's 60/min limit). */
+  signTurn() {
+    const rawRate = typeof this.opts.signPerMinute === "function" ? this.opts.signPerMinute() : this.opts.signPerMinute;
+    const perMin = Math.max(0, Number(rawRate) || 0);
+    if (perMin <= 0) return Promise.resolve();
+    const gap = Math.max(10, Math.round(60000 / perMin));
+    const burst = Math.max(1, Math.min(perMin, Number(this.opts.signBurst) || 5));
+    const prev = this.signChain;
+    let release;
+    this.signChain = new Promise((r) => { release = r; });
+    return (async () => {
+      await prev;
+      try {
+        for (;;) {
+          const now = Date.now();
+          const gained = Math.floor((now - this.signLastRefill) / gap);
+          if (gained > 0) {
+            this.signTokens = Math.min(burst, this.signTokens + gained);
+            this.signLastRefill += gained * gap;
+          }
+          if (this.signTokens >= 1) {
+            this.signTokens -= 1;
+            return;
+          }
+          const wait = Math.max(20, this.signLastRefill + gap - now);
+          await new Promise((r) => { const t = setTimeout(r, wait); t.unref?.(); });
+        }
+      } finally {
+        release();
+      }
+    })();
   }
 
   directCooldownLeft(now = Date.now()) {
@@ -797,11 +933,67 @@ export class Hub {
       endedS: secondsSince(room.liveEndedAt), // how long ago the LIVE ended (null: not since we started watching)
       lastS: secondsSince(room.lastSeenAt), // how long ago a chat line, gift, follow or share last came through (null: none yet)
       leavesInS: room.clients.size ? null : Math.max(0, Math.round((room.emptySince + room.idleWindowMs() - now) / 1000)), // no page open: when it is let go
+      ...(this.isPriority(room.user) ? { priority: true } : {}),
     }));
     // In use first (LIVE with a page open), then a page waiting for a LIVE, then rooms with no page that are only waiting to be let go.
     const rank = (a) => (a.pages === 0 ? 2 : a.live ? 0 : 1);
     accounts.sort((a, b) => rank(a) - rank(b) || b.forS - a.forS);
     return { accounts, waiting: [...this.waiting.values()].map((entry) => entry.user) };
+  }
+
+  /**
+   * Frees one slot when the relay is full by reclaiming:
+   *  1. An abandoned room with 0 open pages (waiting out idleStopMs), oldest empty first.
+   *  2. A dead fatal-error room (e.g. misspelled username that stopped retrying), oldest first.
+   *  3. A long-offline room (`state === "offline"` >= `offlineEvictAfterMs`), smoothly moved to the Waiting line so its SSE stays open.
+   * Never evicts LIVE/connected rooms or priority (owner/VIP) accounts.
+   */
+  evictOne(incomingUser, now = Date.now()) {
+    const eligible = [...this.rooms.values()].filter((r) => r.user !== incomingUser && !this.isPriority(r.user));
+    if (!eligible.length) return false;
+
+    const empty = eligible.filter((r) => r.clients.size === 0).sort((a, b) => a.emptySince - b.emptySince);
+    if (empty.length) {
+      const victim = empty[0];
+      victim.stop();
+      if (this.rooms.get(victim.user) === victim) this.rooms.delete(victim.user);
+      this.evictions += 1;
+      this.log(`@${victim.user}: reclaimed idle spot (0 pages) for @${incomingUser}`);
+      return true;
+    }
+
+    const fatal = eligible.filter((r) => r.status.fatal).sort((a, b) => a.since - b.since);
+    if (fatal.length) {
+      const victim = fatal[0];
+      victim.stop();
+      if (this.rooms.get(victim.user) === victim) this.rooms.delete(victim.user);
+      this.evictions += 1;
+      this.log(`@${victim.user}: reclaimed fatal-error spot for @${incomingUser}`);
+      return true;
+    }
+
+    const minOfflineMs = Math.max(0, Number(this.opts.offlineEvictAfterMs) || 0);
+    const offline = eligible
+      .filter((r) => r.status.state === "offline" && !r.live && r.offlineSince > 0 && now - r.offlineSince >= minOfflineMs)
+      .sort((a, b) => a.offlineSince - b.offlineSince);
+    if (offline.length && this.opts.queue) {
+      const victim = offline[0];
+      victim.stop();
+      if (this.rooms.get(victim.user) === victim) this.rooms.delete(victim.user);
+      let place = this.waiting.get(victim.user);
+      if (!place) {
+        place = new Waiting(victim.user, this);
+        this.waiting.set(victim.user, place);
+      }
+      victim.demoted = place;
+      for (const client of [...victim.clients]) place.add(client);
+      victim.clients.clear();
+      this.evictions += 1;
+      this.tellLine();
+      this.log(`@${victim.user}: yielded spot while offline (moved to queue) for @${incomingUser}`);
+      return true;
+    }
+    return false;
   }
 
   /**
@@ -811,7 +1003,11 @@ export class Hub {
   subscribe(user, client) {
     let room = this.rooms.get(user);
     if (!room) {
-      if (this.rooms.size >= this.opts.maxRooms) {
+      const priority = this.isPriority(user);
+      if (this.rooms.size >= this.opts.maxRooms && (this.opts.smartEvict || priority)) {
+        this.evictOne(user);
+      }
+      if (this.rooms.size >= this.opts.maxRooms && !priority) {
         if (!this.opts.queue) {
           client.send("status", { state: "error", detail: `Frills is already watching ${this.opts.maxRooms} TikTok accounts. Close one first.`, fatal: true });
           return null;
@@ -828,6 +1024,14 @@ export class Hub {
       }
       room = new Room(user, this);
       this.rooms.set(user, room);
+      if (priority && this.waiting.has(user)) {
+        const prev = this.waiting.get(user);
+        this.waiting.delete(user);
+        clearTimeout(prev.leaveTimer);
+        prev.room = room;
+        for (const c of [...prev.clients]) room.add(c);
+        this.tellLine();
+      }
     }
     room.add(client);
     return room;

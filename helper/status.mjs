@@ -15,18 +15,55 @@ export function level({ used, max }, alertAt = ALERT_AT) {
 }
 
 /**
- * A rough guess of how many accounts this device could keep, from what it measures about itself. Memory: what is free, half of it, divided
- * by what an account costs (measured once a couple are open, else a typical 6 MB). Processor: how much of one core the program uses per
- * account (measured once a couple are open). The smaller of the two. It is a guess: the real limit is usually the internet at home and
- * TikTok's free signing service, not the device.
+ * Recommended max spots for a single relay node given its Euler daily cap and direct TikTok lookup pacing.
+ * - Euler budget: keeps 25% headroom for restarts/spikes at ~20 signed connects/active slot/day.
+ * - Single-IP lookup budget: keeps restart recovery under ~3.5 minutes when direct `/api-live` checks are paced
+ *   (bypassed when `allowEulerRoomIdFallback` is enabled on Euler Business/Enterprise plans).
  */
-export function capacity({ freeMem, rss, baseRss, rooms, cpuFraction }) {
+export function recommendedSlots({ eulerCap = 0, allowEulerRoomIdFallback = false, directGapMs = 0 } = {}) {
+  const cap = Number(eulerCap) || 0;
+  const gap = Number(directGapMs) || 0;
+  const euler = cap > 0 ? Math.max(1, Math.floor((cap * 0.75) / 20)) : null;
+  const ipLookup = gap > 0 && !allowEulerRoomIdFallback ? Math.max(10, Math.floor(210000 / gap)) : null;
+  const capMin = Math.min(euler ?? Infinity, ipLookup ?? Infinity);
+  return {
+    euler,
+    ipLookup,
+    recommended: Number.isFinite(capMin) ? Math.max(1, Math.min(capMin, 500)) : null,
+  };
+}
+
+/**
+ * A rough guess of how many accounts this device and relay setup could keep, from what it measures about itself
+ * plus (when given) the Euler daily signing cap and single-IP direct lookup pacing. The smallest constraint wins.
+ */
+export function capacity({ freeMem, rss, baseRss, rooms, cpuFraction, eulerCap = 0, allowEulerRoomIdFallback = false, directGapMs = 0 }) {
   const measured = rooms >= 2;
   const perRoom = measured && rss > baseRss ? Math.max(1.5e6, (rss - baseRss) / rooms) : 6e6;
   const memory = Math.floor((freeMem * 0.5) / perRoom);
   const cpu = measured && cpuFraction > 0 ? Math.floor(0.5 / (cpuFraction / rooms)) : null;
-  const estimate = Math.max(1, Math.min(memory, cpu ?? Infinity, 500));
-  return { estimate, memory, cpu, measured, perRoomMB: Math.round((perRoom / 1e6) * 10) / 10 };
+  const hardware = Math.max(1, Math.min(memory, cpu ?? Infinity, 500));
+  const { euler, ipLookup } = recommendedSlots({ eulerCap, allowEulerRoomIdFallback, directGapMs });
+  const estimate = Math.max(1, Math.min(hardware, euler ?? Infinity, ipLookup ?? Infinity, 500));
+  const candidates = [
+    ["euler", euler],
+    ["ip", ipLookup],
+    ["memory", memory],
+    ["cpu", cpu],
+  ].filter(([, v]) => typeof v === "number" && Number.isFinite(v));
+  candidates.sort((a, b) => a[1] - b[1]);
+  const limiter = candidates[0]?.[0] ?? "memory";
+  return {
+    estimate,
+    hardware,
+    memory,
+    cpu,
+    euler,
+    ipLookup,
+    limiter,
+    measured,
+    perRoomMB: Math.round((perRoom / 1e6) * 10) / 10,
+  };
 }
 
 /**
@@ -98,8 +135,8 @@ export class Signing {
     return Math.max(0, this.remainingDaily() - this.reserve);
   }
 
-  /** True when this relay is allowed to open a new Euler-signed WebSocket connection right now. */
-  canSign() {
+  /** True when this relay is allowed to open a new Euler-signed WebSocket connection right now. Priority users may use the reserved buffer. */
+  canSign({ priority = false } = {}) {
     if (!this.key) return true;
     // Auto-clear time-bounded pause once its reset window has elapsed
     if (this.pauseUntil > 0 && this.now() >= this.pauseUntil) {
@@ -107,7 +144,21 @@ export class Signing {
       this.exhausted = false;
       this.used = 0;
     }
+    if (priority) {
+      if (this.remote?.ok && this.remote.hour && this.remote.hour.remaining <= 0) {
+        const hourReset = Date.parse(this.remote.hour.reset_at ?? "");
+        if (!Number.isFinite(hourReset) || hourReset > this.now()) return false;
+      }
+      return this.remainingDaily() > 0;
+    }
     return this.availableBudget() > 0;
+  }
+
+  /** Safe per-minute signing rate (75% of Euler's synced minute cap, defaulting to 45/min on Euler Free). */
+  safeSignPerMinute() {
+    if (!this.key) return 0;
+    const remoteMin = this.remote?.ok && this.remote.minute?.max > 0 ? this.remote.minute.max : 60;
+    return Math.max(10, Math.floor(remoteMin * 0.75));
   }
 
   /** Next reset timestamp (ms) reported by Euler, or 0 if unknown. */
@@ -459,6 +510,7 @@ td a:hover{color:var(--color-accent-2)}
 .pill[data-s="wait"]{background:var(--color-paper-2);border-color:var(--color-rule-2);color:var(--color-ink)}
 .pill[data-s="err"]{background:var(--color-accent-3-tint);border-color:var(--color-error);color:var(--color-error)}
 .pill[data-s="gone"]{background:transparent;border-style:dashed;border-color:var(--color-rule-2);color:var(--color-ink-2)}
+.vip{display:inline-flex;align-items:center;margin-left:6px;padding:1px 6px;border-radius:var(--radius-pill);border:1.5px solid var(--color-ink);background:var(--color-accent-tint);font:800 0.65rem/1.3 var(--font-mono);vertical-align:middle}
 .st-sub{margin-top:4px;font-size:0.76rem;line-height:1.35;color:var(--color-ink-2);max-width:290px;word-break:break-word}
 .st-sub[data-err="true"]{color:var(--color-error);font-weight:700}
 
@@ -520,7 +572,7 @@ td a:hover{color:var(--color-accent-2)}
   <div class="card"><span class="card__label">Signing Service</span><b class="val" id="signing">-</b><span class="hint" id="signingnote">Euler single-account handshake</span></div>
   <div class="card"><span class="card__label">Pages Open</span><b class="val" id="streams">-</b><span class="hint">pages open right now</span></div>
   <div class="card"><span class="card__label">Rate Guard</span><b class="val" id="away">-</b><span class="hint" id="awaynote">pages turned away</span></div>
-  <div class="card card--sky"><span class="card__label">Hardware Headroom</span><b class="val" id="cap">-</b><span class="hint" id="capnote"></span></div>
+  <div class="card card--sky"><span class="card__label">Best Spots · Headroom</span><b class="val" id="cap">-</b><span class="hint" id="capnote"></span></div>
 </section>
 
 <section class="card card--mint" id="euler" hidden>
@@ -615,7 +667,9 @@ function drawWho(r){
   });
   for(const a of rows){
     const tr=document.createElement("tr"),td=document.createElement("td"),link=document.createElement("a");
-    link.textContent="@"+a.user;link.href="https://www.tiktok.com/@"+encodeURIComponent(a.user)+"/live";link.target="_blank";link.rel="noopener noreferrer";td.append(link);tr.append(td);
+    link.textContent="@"+a.user;link.href="https://www.tiktok.com/@"+encodeURIComponent(a.user)+"/live";link.target="_blank";link.rel="noopener noreferrer";td.append(link);
+    if(a.priority){const v=document.createElement("span");v.className="vip";v.textContent="VIP";td.append(v);}
+    tr.append(td);
     const took = typeof a.connectMs === "number" ? "Connected in " + (a.connectMs / 1000).toFixed(1) + " s" : "";
     const retry = typeof a.retryInS === "number" ? "Next check in " + forText(a.retryInS) : "";
     const st=a.pages===0?["No page open"+(a.live?" (still LIVE)":"")+", leaves in "+forText(a.leavesInS||0),"gone",""]
@@ -680,7 +734,15 @@ function draw(s){
     $("eulerctl").hidden=!(s.actions||s.device);
   }else{$("euler").hidden=true}
   if(s.streams){const t=s.streams;$("streams").textContent=t.open;$("away").textContent=t.turnedAway;$("awaynote").textContent="pages turned away since start"+(t.lastTurnedAwayS===null?"":" (last "+forText(t.lastTurnedAwayS)+" ago)")+" · limit "+t.limit+"/IP"+(t.replaced?" · "+t.replaced+" replaced":"")}
-  const c=s.capacity;$("cap").textContent="About "+c.estimate+" accounts";$("capnote").textContent=(c.measured?"Measured from current load.":"Initial estimate; sharpens as rooms open.")+(c.estimate>s.slots.max*1.5?" Room to raise above "+s.slots.max+" spots.":"");
+  const c=s.capacity;$("cap").textContent="Best ~"+c.estimate+" spots";
+  const capParts=[];
+  if(c.limiter==="euler")capParts.push("Euler quota cap");
+  else if(c.limiter==="ip")capParts.push("1-IP TikTok lookup pace");
+  else capParts.push(c.measured?"Measured hardware load":"Initial hardware estimate");
+  if(c.hardware&&c.hardware>c.estimate)capParts.push("device fits ~"+c.hardware);
+  if(s.slots.max>c.estimate*1.25)capParts.push("you set "+s.slots.max+" — lower to ~"+c.estimate+" (or RELAY_SLOTS=auto)");
+  else if(c.estimate>s.slots.max*1.5)capParts.push("room to raise above "+s.slots.max);
+  $("capnote").textContent=capParts.join(" · ");
   const b=$("banner");b.dataset.on=String(low);b.textContent=s.slots.waiting>0?"People are waiting in line. Only "+free+" spots left.":free===0?"The relay is full.":"Only "+free+" spots left.";
   $("own").hidden=!s.ownerLogin;$("ownout").hidden=!(s.roster&&OWNER);
   $("ctl").hidden=!(s.actions||s.device);

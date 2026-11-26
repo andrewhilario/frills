@@ -5,9 +5,9 @@ import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
 import { EventEmitter } from "node:events";
-import { configureConnectorRoutes, createHelper, parseEulerConfig, probeTikTokLiveDirect, syncConnectorSignKey } from "../helper/server.mjs";
-import { ALERT_AT, EULER_DEFAULT_CAP, Signing, capacity, deviceFacts, level, snapshot, statusPage } from "../helper/status.mjs";
-import { SlotAlerts, termuxNotifier } from "../helper/alerts.mjs";
+import { configureConnectorRoutes, createHelper, parseEulerConfig, parsePriorityUsers, probeTikTokLiveDirect, resolveRelaySlots, syncConnectorSignKey } from "../helper/server.mjs";
+import { ALERT_AT, EULER_DEFAULT_CAP, Signing, capacity, deviceFacts, level, recommendedSlots, snapshot, statusPage } from "../helper/status.mjs";
+import { SlotAlerts, discordNotifier, termuxNotifier } from "../helper/alerts.mjs";
 
 // ── the pure parts ──────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -210,7 +210,7 @@ test("the relay's address gives a readable page to a browser and the numbers as 
   assert.match(page.headers["content-security-policy"], /default-src 'none'/);
   assert.equal((await ask("/", { Accept: "text/html" })).status, 200, "the bare address works too");
   const json = JSON.parse((await ask("/health", { Accept: "application/json" })).body);
-  assert.deepEqual([json.name, json.version, json.free, json.level, json.slots], ["frills-relay", "0.7.4", 50, "ok", { used: 0, max: 50, waiting: 0 }]);
+  assert.deepEqual([json.name, json.version, json.free, json.level, json.slots], ["frills-relay", "0.7.5", 50, "ok", { used: 0, max: 50, waiting: 0 }]);
   assert.ok(json.features.includes("status"));
   assert.ok(json.capacity.estimate >= 1 && json.capacity.estimate <= 500);
   assert.equal(JSON.parse((await ask("/health")).body).free, 50, "no Accept header at all: JSON, as before");
@@ -547,4 +547,60 @@ test("configureConnectorRoutes skips dead HTML scrape and paid Euler roomId fall
   assert.equal(syncConnectorSignKey(lib, ""), true, "clearing key resets SignConfig cleanly");
   assert.equal(lib.SignConfig.apiKey, undefined);
   assert.equal(lib.SignConfig.cachedInstance, undefined);
+});
+
+test("recommendedSlots, capacity Euler/IP sizing, resolveRelaySlots, parsePriorityUsers, and Discord/80% quota alerts", () => {
+  // Euler Free (1,500/day) + 1 IP (3.5s gap) -> Euler cap (56) wins over IP (60)
+  const freeRec = recommendedSlots({ eulerCap: 1500, directGapMs: 3500, allowEulerRoomIdFallback: false });
+  assert.deepEqual(freeRec, { euler: 56, ipLookup: 60, recommended: 56 });
+
+  // Euler Business (10,000/day) with roomId fallback -> IP cap lifted, scales to 375
+  const bizRec = recommendedSlots({ eulerCap: 10000, directGapMs: 3500, allowEulerRoomIdFallback: true });
+  assert.deepEqual(bizRec, { euler: 375, ipLookup: null, recommended: 375 });
+
+  // capacity() incorporates Euler & IP constraints and identifies the active limiter
+  const cap = capacity({ freeMem: 4e9, rss: 80e6, baseRss: 60e6, rooms: 10, cpuFraction: 0.02, eulerCap: 1500, directGapMs: 3500 });
+  assert.equal(cap.estimate, 56);
+  assert.equal(cap.limiter, "euler");
+  assert.ok(cap.hardware > 100);
+
+  // resolveRelaySlots handles "auto", explicit numbers, and fallback
+  assert.deepEqual(resolveRelaySlots({ raw: "auto", eulerCap: 1500, directGapMs: 3500 }), { auto: true, slots: 56 });
+  assert.deepEqual(resolveRelaySlots({ raw: "70", eulerCap: 1500 }), { auto: false, slots: 70 });
+  assert.deepEqual(resolveRelaySlots({ raw: "", fallback: 30 }), { auto: false, slots: 30 });
+
+  // parsePriorityUsers cleans handles and deduplicates
+  assert.deepEqual(parsePriorityUsers("@Owner.Live, friend_1, owner.live, bad name"), ["owner.live", "friend_1"]);
+
+  // Priority users can still sign using the reserved daily buffer after regular traffic pauses
+  const s = new Signing(() => 1000, { key: "k1", cap: 10, reserve: 2 });
+  for (let i = 0; i < 8; i++) s.use();
+  assert.equal(s.canSign(), false, "regular traffic pauses at reserve");
+  assert.equal(s.canSign({ priority: true }), true, "priority owner stream can use reserved buffer");
+  assert.equal(s.safeSignPerMinute(), 45, "75% of Euler Free 60/min limit");
+
+  // SlotAlerts fires once at >= 80% daily Euler quota and resets once <= 70%
+  const alertsSent = [];
+  const alerts = new SlotAlerts({
+    stats: () => ({ used: 1, max: 56, waiting: 0 }),
+    signing: s,
+    alertAt: 10,
+    notify: (title, content) => alertsSent.push([title, content]),
+  });
+  const firstAlert = alerts.check();
+  assert.ok(firstAlert.some((m) => /daily signing requests left/.test(m)), "warns when >= 80% daily quota used");
+  assert.deepEqual(alerts.check(), [], "fires once without nagging");
+  s.refillKey();
+  assert.deepEqual(alerts.check(), [], "resets cleanly after refill");
+
+  // discordNotifier posts formatted message without throwing
+  const posted = [];
+  const hook = discordNotifier({
+    webhookUrl: "https://discord.example/api/webhooks/123/abc",
+    fetchImpl: async (url, init) => { posted.push({ url, body: JSON.parse(init.body) }); return new Response(null, { status: 204 }); },
+  });
+  hook("Relay full", "0 spots left");
+  assert.equal(posted.length, 1);
+  assert.equal(posted[0].body.content, "**Relay full** — 0 spots left");
+  assert.equal(discordNotifier({ webhookUrl: "" }), null);
 });
