@@ -3,23 +3,23 @@
   <div class="shell nav__inner">
     <a class="nav__brand" href="/" aria-label="Frills, home">{{>logo}}<span>Frills</span></a>
     <nav class="nav__center" aria-label="Main">
-      <a class="nav__link" href="/#looks">Looks</a>
-      <a class="nav__link" href="/overlays/"{{{navOverlays}}}>Overlays</a>
+      <a class="nav__link" href="/#looks">Chat looks</a>
       <a class="nav__link" href="/guides/test/"{{{navTest}}}>Test it</a>
       <a class="nav__link" href="/guides/tiktok/"{{{navTikTok}}}>TikTok</a>
       <a class="nav__link" href="/guides/obs/"{{{navGuide}}}>Setup guide</a>
       <a class="nav__link" href="/#faq">FAQ</a>{{{plusNavPlusLink}}}
     </nav>
     <div class="nav__right">
-      <a class="btn btn--sm" href="/editor/">Open editor</a>
+      <a class="btn btn--sm" href="/overlays/"{{{navOverlays}}}>Overlays</a>
+      <a class="btn btn--soft btn--sm" href="/editor/">Chat editor</a>
       <button class="nav__toggle" type="button" aria-expanded="false" aria-controls="nav-sheet">Menu</button>
     </div>
   </div>
   <div class="nav__sheet" id="nav-sheet" hidden>
-    <a class="nav__link" href="/editor/">Open the editor</a>
-    <a class="nav__link" href="/#looks">Looks</a>
-    <a class="nav__link" href="/guides/test/">Test it</a>
     <a class="nav__link" href="/overlays/">Overlays</a>
+    <a class="nav__link" href="/editor/">Chat editor</a>
+    <a class="nav__link" href="/#looks">Chat looks</a>
+    <a class="nav__link" href="/guides/test/">Test it</a>
     <a class="nav__link" href="/changelog/">Changelog</a>
     <a class="nav__link" href="/status/">Server status</a>
     <a class="nav__link" href="/#how">How it works</a>

@@ -120,6 +120,8 @@ test("the security headers are in place", () => {
   }
   assert.match(headers, /X-Content-Type-Options: nosniff/);
   assert.match(headers, /Referrer-Policy: strict-origin-when-cross-origin/);
+  assert.match(headers, /Strict-Transport-Security: max-age=31536000\n/, "HTTPS is remembered for a year");
+  assert.doesNotMatch(headers, /Strict-Transport-Security:[^\n]*(includeSubDomains|preload)/i, "HSTS covers this host only, not the other sites on valwidgets.live");
   assert.match(headers, /\/assets\/\*\n  Cache-Control: public, max-age=31536000, immutable/);
   assert.match(headers, /\/fonts\/\*\n  Cache-Control: public, max-age=31536000, immutable/);
 });
@@ -388,8 +390,8 @@ test("the questions in the FAQs are headings, so search engines and AI assistant
 
 test("the home page says in its first words what Frills is, and its structured data names the publisher and the features", () => {
   const home = pages.find((p) => p.url === "/").html;
-  assert.match(textOf(home.split("<main")[1]).slice(0, 700), /Free TikTok LIVE and Twitch chat overlays/, "the h1 says what it is");
-  assert.match(home, /<p class="lede">Frills is a free web tool that shows your TikTok LIVE or Twitch chat as cute speech bubbles on your stream\./, "an answer in one sentence");
+  assert.match(textOf(home.split("<main")[1]).slice(0, 700), /Free TikTok LIVE and Twitch overlays/, "the h1 says what it is");
+  assert.match(home, /<p class="lede">Frills is a free web tool for your stream: chat bubbles, gift jars, a prize wheel, goal bars, alerts and more\./, "an answer in one sentence");
   const nodes = ldOf(home);
   const app = nodes.find((n) => n["@type"] === "SoftwareApplication");
   assert.ok(app.featureList.length >= 6 && app.publisher.name === "Frills" && app.screenshot.endsWith("/og.png"));

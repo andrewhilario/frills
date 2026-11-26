@@ -29,8 +29,8 @@ export const site = {
   spotifyClientId: pick("SPOTIFY_CLIENT_ID", "spotifyClientId"),
   // The Client ID of the Twitch app used by the private /twitch/ page that listens for new followers. Public by design (the login uses no secret). Empty means no Twitch follows.
   twitchClientId: pick("TWITCH_CLIENT_ID", "twitchClientId"),
-  tagline: "Free chat overlays with all the frills.",
-  description: "Free, customizable chat overlays for live streams. Pick a cute look, tweak every detail, and paste one link into your streaming app. Works with TikTok LIVE and Twitch.",
+  tagline: "Free stream overlays with all the frills.",
+  description: "Free, customizable overlays for live streams: chat, gifts, goals, alerts and more. Pick a cute look, tweak every detail, and paste one link into your streaming app. Works with TikTok LIVE and Twitch.",
   tally: { url: "https://valwidgets.live", blurb: "free Valorant rank overlays" },
   year: new Date().getFullYear(),
   // Same policy as Tally: ask AI training crawlers to stay out, and let search and assistant crawlers in.

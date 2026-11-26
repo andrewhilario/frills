@@ -1,8 +1,9 @@
 # Frills
 
-> Frills is a free web tool that shows your TikTok LIVE or Twitch chat as cute speech bubbles on your stream. Pick a look, copy one link and paste it into OBS, Streamlabs or another streaming app. No account, nothing to install.
+> Frills is a free web tool for your TikTok LIVE or Twitch stream: chat bubbles, gift jars, a prize wheel, goal bars, alerts and more. Pick an overlay and a look, copy one link and paste it into OBS, Streamlabs or another streaming app. No account, nothing to install.
 
 ## Start here
+- [All the overlays](https://frills.valwidgets.live/overlays/): chat, alerts, spin the wheel, gift jar, goals, actions and more
 - [Quick start](https://frills.valwidgets.live/start/): answer six questions and get your links
 - [Chat overlay editor](https://frills.valwidgets.live/editor/): pick a look and change every color, font and corner
 - [Frills on TikTok LIVE](https://frills.valwidgets.live/guides/tiktok/): how TikTok chat reaches your overlay
