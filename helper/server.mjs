@@ -28,18 +28,58 @@ import { handleProStatus } from "../worker/region.mjs";
 import { handleDevPass, handleTts } from "../worker/tts.mjs";
 import { validTicketSecret, verifyRelayTicket } from "../worker/relay-ticket.mjs";
 
-const VERSION = "0.7.2";
+const VERSION = "0.7.3";
 /** What this program can do, so a page can tell an old one ("chat" only) from one that sends alerts. */
 const FEATURES = ["chat", "alerts", "info", "roles", "status", "viewers"];
 
+const DIRECT_API_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+  Accept: "application/json, text/plain, */*",
+  "Accept-Language": "en-US,en;q=0.9",
+  Referer: "https://www.tiktok.com/",
+};
+
 /**
- * Configures `tiktok-live-connector` routes for minimal wasted traffic and reliable connects:
- * - Always skips the broken HTML `SIGI_STATE` scrape (which returns a 1.4 KB JS challenge and wastes requests).
- * - Always keeps `IsLiveRouteConfig` Euler-free so live pre-checks never burn Euler quota.
- * - Keeps `RoomIdRouteConfig` Euler fallback available by default when TikTok's direct `api-live` returns 403
- *   on burst/restart traffic (can be forced strictly off via `EULER_ALLOW_ROOM_ID_FALLBACK=0`).
+ * Clean single-shot direct TikTok `/api-live/user/room/` check (0 Euler calls).
+ * Uses clean standard headers instead of `tiktok-live-connector`'s randomized outdated UA/region params,
+ * returning `{ live, roomId, followers, viewers }` or throwing an error with `.status` on HTTP 403/429.
  */
-export function configureConnectorRoutes(library, { allowEulerRoomIdFallback = true } = {}) {
+export async function probeTikTokLiveDirect(uniqueId, { fetchImpl = globalThis.fetch?.bind(globalThis), timeoutMs = 10000 } = {}) {
+  if (typeof fetchImpl !== "function") return null;
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetchImpl(
+      `https://www.tiktok.com/api-live/user/room/?aid=1988&sourceType=54&uniqueId=${encodeURIComponent(uniqueId)}`,
+      { method: "GET", headers: DIRECT_API_HEADERS, signal: ctrl.signal },
+    );
+    if (res.status === 403 || res.status === 429) {
+      throw Object.assign(new Error(`TikTok /api-live/user/room/ returned HTTP ${res.status}`), { status: res.status });
+    }
+    if (!res.ok) throw Object.assign(new Error(`TikTok /api-live/user/room/ returned HTTP ${res.status}`), { status: res.status });
+    const body = await res.json().catch(() => null);
+    if (!body || typeof body !== "object") return null;
+    const status = body?.data?.liveRoom?.status;
+    const roomId = body?.data?.user?.roomId ? String(body.data.user.roomId) : "";
+    const followers = Math.round(Number(body?.data?.stats?.followerCount ?? body?.data?.user?.stats?.followerCount ?? 0)) || 0;
+    const viewers = Math.round(Number(body?.data?.liveRoom?.liveRoomStats?.userCount ?? 0)) || 0;
+    if (status === 2 && roomId) return { live: true, roomId, followers, viewers };
+    // HTTP 200 with status === 4, or HTTP 200 with no active roomId/liveRoom (account offline or has no live room)
+    if (status === 4 || (!roomId && !body.statusCode)) return { live: false, roomId: "", followers, viewers: 0 };
+    return { live: null, roomId, followers, viewers };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Configures `tiktok-live-connector` routes for minimal wasted traffic and single-account compliance:
+ * - Always skips the dead HTML `SIGI_STATE` scrape (returns 1.4 KB JS challenge).
+ * - Always keeps `IsLiveRouteConfig` Euler-free.
+ * - Disables Euler's paid-only `/webcast/room_id` fallback by default (returns HTTP 403 on Free Euler plans);
+ *   can be opted in via `EULER_ALLOW_ROOM_ID_FALLBACK=1` on Euler Business/Enterprise plans.
+ */
+export function configureConnectorRoutes(library, { allowEulerRoomIdFallback = false } = {}) {
   const skipRoomEuler = !allowEulerRoomIdFallback;
   if (library?.RoomIdRouteConfig) {
     library.RoomIdRouteConfig.skipFetchRoomInfoFromHtmlRoute = true;
@@ -66,7 +106,7 @@ export function syncConnectorSignKey(library, apiKey = "") {
 }
 
 /** Makes a connection to TikTok for one account. The library is loaded only now, so everything else works (and is tested) without it. */
-export async function realFactory(user, { apiKey, allowEulerRoomIdFallback = true } = {}) {
+export async function realFactory(user, { apiKey, allowEulerRoomIdFallback = false } = {}) {
   let library;
   try {
     library = await import("tiktok-live-connector");
@@ -79,18 +119,7 @@ export async function realFactory(user, { apiKey, allowEulerRoomIdFallback = tru
   syncConnectorSignKey(library, apiKey);
   // processInitialData: false skips the little history TikTok sends on joining, so an overlay shows new chat only.
   const conn = new library.TikTokLiveConnection(user, { processInitialData: false, ...(apiKey ? { signApiKey: apiKey } : {}) });
-  // Attach single-shot direct TikTok check (`api-live/user/room/`): returns `{ live, roomId, followers, viewers }` in 1 request with 0 Euler calls.
-  if (typeof library.fetchRoomInfoFromApiLiveRoute === "function") {
-    conn.checkLiveDirect = async () => {
-      const data = await library.fetchRoomInfoFromApiLiveRoute({ webClient: conn.webClient, uniqueId: conn.uniqueId });
-      const status = data?.data?.liveRoom?.status;
-      const roomId = data?.data?.user?.roomId ? String(data.data.user.roomId) : "";
-      const followers = Math.round(Number(data?.data?.stats?.followerCount ?? data?.data?.user?.stats?.followerCount ?? 0)) || 0;
-      const viewers = Math.round(Number(data?.data?.liveRoom?.liveRoomStats?.userCount ?? 0)) || 0;
-      if (status === undefined) return { live: null, roomId, followers, viewers };
-      return { live: status !== 4, roomId, followers, viewers };
-    };
-  }
+  conn.checkLiveDirect = () => probeTikTokLiveDirect(conn.uniqueId);
   return conn;
 }
 
@@ -107,7 +136,7 @@ export function parseEulerConfig(env = process.env) {
     : Math.max(0, legacyList.length - 1);
   const cap = Math.max(1, Number(env.EULER_KEY_CAP) || EULER_DEFAULT_CAP);
   const reserve = Math.max(0, Math.min(cap - 1, Math.round(Number(env.EULER_DAILY_RESERVE) || 0)));
-  const allowEulerRoomIdFallback = env.EULER_ALLOW_ROOM_ID_FALLBACK !== "0" && env.EULER_ALLOW_ROOM_ID_FALLBACK !== "false";
+  const allowEulerRoomIdFallback = env.EULER_ALLOW_ROOM_ID_FALLBACK === "1" || env.EULER_ALLOW_ROOM_ID_FALLBACK === "true";
   return { key, keys: key ? [key] : [], ignoredExtraKeys, cap, reserve, allowEulerRoomIdFallback };
 }
 
@@ -119,7 +148,7 @@ export function parseEulerConfig(env = process.env) {
  * answers pages on those other addresses (the website), has `slots` spots and a line for them, limits how many streams (and how many
  * different accounts) one visitor address can hold open, and serves no site of its own unless a folder is given.
  */
-export function createHelper({ distDir, factory = realFactory, apiKey = "", apiKeys = null, eulerCap = EULER_DEFAULT_CAP, eulerReserve = 0, allowEulerRoomIdFallback = true, log = () => {}, demoPace, relay = null, ...tuning } = {}) {
+export function createHelper({ distDir, factory = realFactory, apiKey = "", apiKeys = null, eulerCap = EULER_DEFAULT_CAP, eulerReserve = 0, allowEulerRoomIdFallback = false, log = () => {}, demoPace, relay = null, ...tuning } = {}) {
   // The one built-in account, frills_demo, never reaches TikTok: it makes up chat so the whole chain can be tested without a LIVE.
   const make = (user, options) => (user === DEMO_USER ? new DemoConnection({ pace: demoPace }) : factory(user, { allowEulerRoomIdFallback, ...options }));
   const singleKey = String(apiKey ?? "").trim().split(",")[0].trim()
@@ -128,6 +157,10 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", apiK
     ? {
         queue: true,
         connectAtOnce: 3,
+        directGapMs: 3500,
+        directBurst: 3,
+        tiktokWaitMs: 30000,
+        tiktokMaxMs: 180000,
         idleStopMs: 300000,
         offlineIdleStopMs: 45000,
         offlineWaitMs: 45000,

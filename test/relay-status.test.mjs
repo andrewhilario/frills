@@ -5,7 +5,7 @@ import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
 import { EventEmitter } from "node:events";
-import { configureConnectorRoutes, createHelper, parseEulerConfig, syncConnectorSignKey } from "../helper/server.mjs";
+import { configureConnectorRoutes, createHelper, parseEulerConfig, probeTikTokLiveDirect, syncConnectorSignKey } from "../helper/server.mjs";
 import { ALERT_AT, EULER_DEFAULT_CAP, Signing, capacity, deviceFacts, level, snapshot, statusPage } from "../helper/status.mjs";
 import { SlotAlerts, termuxNotifier } from "../helper/alerts.mjs";
 
@@ -210,7 +210,7 @@ test("the relay's address gives a readable page to a browser and the numbers as 
   assert.match(page.headers["content-security-policy"], /default-src 'none'/);
   assert.equal((await ask("/", { Accept: "text/html" })).status, 200, "the bare address works too");
   const json = JSON.parse((await ask("/health", { Accept: "application/json" })).body);
-  assert.deepEqual([json.name, json.version, json.free, json.level, json.slots], ["frills-relay", "0.7.2", 50, "ok", { used: 0, max: 50, waiting: 0 }]);
+  assert.deepEqual([json.name, json.version, json.free, json.level, json.slots], ["frills-relay", "0.7.3", 50, "ok", { used: 0, max: 50, waiting: 0 }]);
   assert.ok(json.features.includes("status"));
   assert.ok(json.capacity.estimate >= 1 && json.capacity.estimate <= 500);
   assert.equal(JSON.parse((await ask("/health")).body).free, 50, "no Accept header at all: JSON, as before");
@@ -434,12 +434,12 @@ test("parseEulerConfig enforces single-account mode, reads reserve/fallback opti
   assert.equal(single.key, "primary_key");
   assert.deepEqual(single.keys, ["primary_key"]);
   assert.equal(single.ignoredExtraKeys, 1);
-  assert.deepEqual([single.cap, single.reserve, single.allowEulerRoomIdFallback], [1500, 200, true]);
+  assert.deepEqual([single.cap, single.reserve, single.allowEulerRoomIdFallback], [1500, 200, false]);
 
-  const legacy = parseEulerConfig({ EULER_API_KEYS: "first_key, second_key", EULER_ALLOW_ROOM_ID_FALLBACK: "0" });
+  const legacy = parseEulerConfig({ EULER_API_KEYS: "first_key, second_key", EULER_ALLOW_ROOM_ID_FALLBACK: "1" });
   assert.equal(legacy.key, "first_key");
   assert.equal(legacy.ignoredExtraKeys, 1);
-  assert.equal(legacy.allowEulerRoomIdFallback, false);
+  assert.equal(legacy.allowEulerRoomIdFallback, true);
 
   await start({ ownerKey: KEY, trustProxy: true }, { apiKey: "k1", eulerCap: 5, eulerReserve: 1 });
   const h = JSON.parse((await ask("/health", PUBLIC)).body);
@@ -506,7 +506,7 @@ test("Signing.syncRemoteLimits queries single key /accounts/me/rate_limits, paus
   assert.equal(s.canSign(), true);
 });
 
-test("configureConnectorRoutes skips dead HTML scrape, keeps IsLive Euler-free, allows RoomId fallback by default, and syncConnectorSignKey clears cached client", () => {
+test("configureConnectorRoutes skips dead HTML scrape and paid Euler roomId fallback by default, and probeTikTokLiveDirect parses live/offline/403", async () => {
   const lib = {
     RoomIdRouteConfig: { skipFetchRoomInfoFromHtmlRoute: false, skipFetchRoomIdFromEulerRoute: false },
     IsLiveRouteConfig: { skipFetchRoomInfoFromHtmlRoute: false, skipFetchRoomIdFromEulerRoute: false },
@@ -516,10 +516,22 @@ test("configureConnectorRoutes skips dead HTML scrape, keeps IsLive Euler-free, 
   assert.equal(lib.RoomIdRouteConfig.skipFetchRoomInfoFromHtmlRoute, true);
   assert.equal(lib.IsLiveRouteConfig.skipFetchRoomInfoFromHtmlRoute, true);
   assert.equal(lib.IsLiveRouteConfig.skipFetchRoomIdFromEulerRoute, true);
-  assert.equal(lib.RoomIdRouteConfig.skipFetchRoomIdFromEulerRoute, false, "RoomId Euler fallback stays available on direct TikTok 403");
-  configureConnectorRoutes(lib, { allowEulerRoomIdFallback: false });
-  assert.equal(lib.RoomIdRouteConfig.skipFetchRoomIdFromEulerRoute, true);
+  assert.equal(lib.RoomIdRouteConfig.skipFetchRoomIdFromEulerRoute, true, "paid-only Euler roomId fallback off by default");
+  configureConnectorRoutes(lib, { allowEulerRoomIdFallback: true });
+  assert.equal(lib.RoomIdRouteConfig.skipFetchRoomIdFromEulerRoute, false);
   assert.equal(lib.IsLiveRouteConfig.skipFetchRoomIdFromEulerRoute, true);
+
+  const liveRes = await probeTikTokLiveDirect("mochi", {
+    fetchImpl: async () => new Response(JSON.stringify({ data: { user: { roomId: "12345" }, liveRoom: { status: 2, liveRoomStats: { userCount: 44 } }, stats: { followerCount: 900 } } }), { status: 200 }),
+  });
+  assert.deepEqual(liveRes, { live: true, roomId: "12345", followers: 900, viewers: 44 });
+
+  const offRes = await probeTikTokLiveDirect("mochi", {
+    fetchImpl: async () => new Response(JSON.stringify({ data: { user: { roomId: "" }, liveRoom: { status: 4 } } }), { status: 200 }),
+  });
+  assert.equal(offRes.live, false);
+
+  await assert.rejects(() => probeTikTokLiveDirect("mochi", { fetchImpl: async () => new Response("", { status: 403 }) }), (e) => e.status === 403);
 
   const fakeClient = { id: "first" };
   assert.equal(syncConnectorSignKey(lib, "key_one"), true);

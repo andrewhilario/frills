@@ -112,7 +112,7 @@ test("it answers a ping, serves the built site with its security headers, and sa
   await start(scripted().factory);
   const ping = await raw("/tiktok/ping");
   assert.equal(ping.status, 200);
-  assert.deepEqual(JSON.parse(ping.body), { ok: true, name: "frills-helper", version: "0.7.2", features: ["chat", "alerts", "info", "roles", "status", "viewers"] });
+  assert.deepEqual(JSON.parse(ping.body), { ok: true, name: "frills-helper", version: "0.7.3", features: ["chat", "alerts", "info", "roles", "status", "viewers"] });
   const editor = await raw("/editor/");
   assert.equal(editor.status, 200);
   assert.match(editor.body, /Connect your chat/);
@@ -537,6 +537,41 @@ test("leak shield: fetchIsLive() === false skips conn.connect() completely, cach
   assert.match(entry.lastError, /Room lookup failed: TikTok API 403 \(blocked\)/);
   assert.ok(!entry.lastError.includes("euler_secret"), "never leaks API keys into status error text");
   await p4.close();
+  await helper.close();
+
+  // 7. Direct TikTok pacer + shared 403 cooldown prevents restart burst storms and skips conn.connect() on 403
+  let directCalls = 0;
+  let connectOn403 = 0;
+  let blockedOnce = false;
+  const timestamps = [];
+  await start(async (user) => {
+    const c = new EventEmitter();
+    c.roomId = `rid_${user}`;
+    c.checkLiveDirect = async () => {
+      directCalls += 1;
+      timestamps.push(Date.now());
+      if (!blockedOnce && directCalls === 2) {
+        blockedOnce = true;
+        throw Object.assign(new Error("HTTP 403"), { status: 403 });
+      }
+      return { live: true, roomId: c.roomId, followers: 500, viewers: 12 };
+    };
+    c.connect = async (rid) => {
+      connectOn403 += 1;
+      assert.equal(rid, c.roomId, "reuses roomId from direct probe");
+    };
+    c.disconnect = () => {};
+    return c;
+  }, { maxRooms: 5, directBurst: 1, directGapMs: 60, tiktokWaitMs: 120, tiktokMaxMs: 240 });
+  const a1 = listen("pace.one");
+  const a2 = listen("pace.two");
+  await a1.until(() => a1.states().includes("connected"), 2000);
+  await a2.until(() => a2.states().includes("limited"), 2000);
+  assert.equal(helper.hub.roster().accounts.find((a) => a.user === "pace.one").live, true, "falls back to directProbe live status");
+  assert.equal(helper.hub.roster().accounts.find((a) => a.user === "pace.one").followers, 500);
+  await a2.until(() => a2.states().includes("connected"), 3000);
+  assert.equal(connectOn403, 2, "403 never fell through into conn.connect(); resumed automatically after shared cooldown");
+  await Promise.all([a1.close(), a2.close()]);
   await helper.close();
 });
 

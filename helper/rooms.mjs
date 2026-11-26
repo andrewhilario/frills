@@ -336,14 +336,24 @@ export class Room {
     }
 
     // 1. Direct TikTok live pre-check (0 Euler calls!):
-    //    - If `checkLiveDirect()` exists (real TikTok connection), ONE direct api-live call returns `{ live, roomId, followers, viewers }`.
-    //      Offline -> skip Euler completely! Live -> reuse `roomId` straight in `conn.connect(roomId)` so we don't hit TikTok twice!
-    //    - Otherwise fall back to `conn.fetchIsLive()` when provided by a custom factory / test double.
+    //    - Paced through `hub.directTurn()` (small burst + steady spacing + shared 403 cooldown) so restarts with
+    //      15+ rooms never trip TikTok's per-IP 403 WAF on /api-live/user/room/.
+    //    - If `checkLiveDirect()` returns `{ live: false }`, skip `conn.connect()` & Euler completely (`offlineSaved`).
+    //    - If `checkLiveDirect()` returns `{ live: true, roomId }`, pass `roomId` straight into `conn.connect(roomId)`.
+    //    - If `checkLiveDirect()` gets HTTP 403, trip the shared TikTok cooldown and wait cleanly instead of
+    //      falling into `conn.connect()` and compounding the 403 storm.
     let directProbe = null;
     if (!conn.pretend && !freshRoomId) {
       if (typeof conn.checkLiveDirect === "function") {
+        await this.hub.directTurn();
+        if (this.stopped) {
+          give();
+          this.letGo(conn);
+          return { kind: "stopped" };
+        }
         try {
           const probe = await conn.checkLiveDirect();
+          this.hub.directOk();
           if (probe?.live === false) {
             give();
             this.letGo(conn);
@@ -354,8 +364,20 @@ export class Room {
             directProbe = probe;
             if (probe.roomId) freshRoomId = String(probe.roomId);
           }
-        } catch {
-          /* direct api-live 403/glitch — fall through to conn.connect() */
+        } catch (err) {
+          const status = err?.status ?? err?.response?.statusCode ?? 0;
+          if (status === 403 || status === 429) {
+            const waitMs = this.hub.directBlocked(status);
+            give();
+            this.letGo(conn);
+            return {
+              kind: "tiktok_busy",
+              waitMs,
+              detail: `TikTok paused room checks (HTTP ${status}). Resuming automatically…`,
+              reason: `TikTok API ${status} cooldown (${Math.round(waitMs / 1000)} s)`,
+            };
+          }
+          /* transient network/parse glitch — fall through to conn.connect() */
         }
       } else if (typeof conn.fetchIsLive === "function") {
         try {
@@ -517,6 +539,11 @@ export class Room {
         for (const [after, wait] of offlineSlowSteps) if (waited >= after) every = wait;
         this.setStatus("offline", every > offlineWaitMs ? `Not live yet. Looking again every ${lengthOf(every)}. Opening this link again looks right away.` : how.detail ?? "");
         await this.sleep(every);
+      } else if (how.kind === "tiktok_busy") {
+        this.lastError = how.reason || how.detail || "TikTok API cooldown";
+        this.setStatus("limited", how.detail ?? "");
+        const left = this.hub.directCooldownLeft() || how.waitMs || 30000;
+        await this.sleep(Math.min(left, 60000));
       } else if (how.kind === "limited") {
         this.lastError = how.reason || how.detail || "Rate limited";
         this.setStatus("limited", how.detail ?? "");
@@ -597,7 +624,7 @@ class Waiting {
 
 export class Hub {
   constructor(opts = {}) {
-    this.opts = { factory: null, apiKey: "", maxRooms: 3, queue: false, queueGraceMs: 20000, idleStopMs: 30000, offlineIdleStopMs: null, offlineWaitMs: 20000, limitedWaitMs: 60000, limitedMaxMs: 600000, connectAtOnce: 5, offlineGiveUpMs: 0, offlineSlowSteps: [], wakeGapMs: 30000, backoffMs: [3000, 6000, 12000, 30000, 60000], silentMs: 300000, silentMaxMs: 1800000, roomIdCacheMs: 600000, ...opts };
+    this.opts = { factory: null, apiKey: "", maxRooms: 3, queue: false, queueGraceMs: 20000, idleStopMs: 30000, offlineIdleStopMs: null, offlineWaitMs: 20000, limitedWaitMs: 60000, limitedMaxMs: 600000, connectAtOnce: 5, offlineGiveUpMs: 0, offlineSlowSteps: [], wakeGapMs: 30000, backoffMs: [3000, 6000, 12000, 30000, 60000], silentMs: 300000, silentMaxMs: 1800000, roomIdCacheMs: 600000, directGapMs: 0, directBurst: 3, tiktokWaitMs: 30000, tiktokMaxMs: 180000, ...opts };
     this.log = opts.log ?? (() => {});
     this.rooms = new Map();
     this.waiting = new Map(); // accounts in line for a spot, oldest first
@@ -606,6 +633,72 @@ export class Hub {
     this.strikes = 0; // how many "busy" in a row, which sets how long the next pause is
     this.active = 0; // attempts to connect that are under way
     this.line = []; // attempts waiting for a turn
+    // Shared direct TikTok api-live pacer + 403 cooldown (prevents 15+ rooms bursting /api-live/user/room/ at once)
+    this.directTokens = Math.max(1, this.opts.directBurst ?? 3);
+    this.directLastRefill = Date.now();
+    this.directChain = Promise.resolve();
+    this.directBlockedUntil = 0;
+    this.directStrikes = 0;
+  }
+
+  directCooldownLeft(now = Date.now()) {
+    return Math.max(0, this.directBlockedUntil - now);
+  }
+
+  /** Called when a direct TikTok api-live call returns 200 OK: clears any 403 strike backoff. */
+  directOk() {
+    this.directStrikes = 0;
+    this.directBlockedUntil = 0;
+  }
+
+  /** Called when TikTok returns HTTP 403/429 on /api-live/user/room/: pauses all rooms briefly so the IP bucket recovers. */
+  directBlocked(status = 403, now = Date.now()) {
+    if (now < this.directBlockedUntil) return this.directCooldownLeft(now);
+    const base = Math.max(100, this.opts.tiktokWaitMs ?? 30000);
+    const max = Math.max(base, this.opts.tiktokMaxMs ?? 180000);
+    const wait = Math.min(max, base * 2 ** Math.min(this.directStrikes, 4));
+    this.directStrikes += 1;
+    this.directBlockedUntil = now + wait;
+    this.directTokens = 0;
+    this.directLastRefill = this.directBlockedUntil;
+    this.log(`TikTok /api-live/ returned HTTP ${status}: pausing room lookups for ${Math.round(wait / 1000)} s (strike ${this.directStrikes})`);
+    return wait;
+  }
+
+  /** Paces direct TikTok api-live checks (small burst, then 1 every `directGapMs`, plus waiting out any active 403 cooldown). */
+  directTurn() {
+    const gap = Math.max(0, Number(this.opts.directGapMs) || 0);
+    const burst = Math.max(1, Number(this.opts.directBurst) || 3);
+    const prev = this.directChain;
+    let release;
+    this.directChain = new Promise((r) => { release = r; });
+    return (async () => {
+      await prev;
+      try {
+        for (;;) {
+          const blocked = this.directCooldownLeft();
+          if (blocked > 0) {
+            await new Promise((r) => { const t = setTimeout(r, blocked + 20); t.unref?.(); });
+            continue;
+          }
+          if (gap <= 0) return;
+          const now = Date.now();
+          const gained = Math.floor((now - this.directLastRefill) / gap);
+          if (gained > 0) {
+            this.directTokens = Math.min(burst, this.directTokens + gained);
+            this.directLastRefill += gained * gap;
+          }
+          if (this.directTokens >= 1) {
+            this.directTokens -= 1;
+            return;
+          }
+          const wait = Math.max(20, this.directLastRefill + gap - now);
+          await new Promise((r) => { const t = setTimeout(r, wait); t.unref?.(); });
+        }
+      } finally {
+        release();
+      }
+    })();
   }
 
   /** What is left of the pause after the signing service said "busy" (0 when there is none). */
