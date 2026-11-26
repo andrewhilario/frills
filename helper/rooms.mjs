@@ -4,18 +4,68 @@
 
 import { mapChat, mapDelete, mapEmoteChat, mapFollow, mapGift, mapGiftAlert, mapLike, mapShare } from "./map.mjs";
 
-/** What went wrong when connecting, in the three ways that need different handling. */
+/** Turns any TikTok / Euler / network error into a concise, safe, owner-readable reason string (never leaks keys). */
+export function describeError(err) {
+  const names = [err?.constructor?.name, err?.name].filter(Boolean);
+  const name = names[0] || "Error";
+  const clean = (raw) => String(raw ?? "")
+    .replace(/https?:\/\/\S+/g, (u) => {
+      try { const p = new URL(u); return `${p.origin}${p.pathname}`; } catch { return "[url]"; }
+    })
+    .replace(/\b(euler_[A-Za-z0-9_-]{8,}|api[_-]?key=[^&\s]+)/gi, "[redacted]")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  // Unpack tiktok-live-connector's InvalidResponseCompositeError (stores sub-errors in err.config.requestErrs)
+  const subErrs = Array.isArray(err?.config?.requestErrs) ? err.config.requestErrs : Array.isArray(err?.errors) ? err.errors : [];
+  if (subErrs.length) {
+    const parts = subErrs.slice(0, 3).map((sub) => {
+      const m = clean(sub?.message ?? sub);
+      if (/403\b|Forbidden/i.test(m)) return "TikTok API 403 (blocked)";
+      if (/429\b|rate.?limit/i.test(m)) return "Rate limited (429)";
+      if (/401\b|Unauthorized|permission/i.test(m)) return "Euler auth/permission (401/403)";
+      if (/SIGI_STATE|captcha/i.test(m)) return "TikTok HTML blocked";
+      if (/Failed to extract Room ID from Euler/i.test(m)) return "Euler: no active room";
+      return m.slice(0, 60);
+    });
+    return `Room lookup failed: ${parts.join(" · ")}`.slice(0, 160);
+  }
+
+  const msg = clean(err?.message ?? err);
+  const status = err?.response?.statusCode ?? err?.response?.status ?? (/\bstatus(?: code)?\s+(\d{3})\b/i.exec(msg)?.[1] ? Number(/\bstatus(?: code)?\s+(\d{3})\b/i.exec(msg)[1]) : 0);
+  if (/SignAPIError/i.test(name)) {
+    if (status === 401 || status === 403) return `Euler rejected API key (HTTP ${status}) — check EULER_API_KEY`;
+    if (status >= 500) return `Euler sign server error (HTTP ${status})`;
+    if (/Empty Cookies/i.test(msg) || /No cookies/i.test(msg)) return "Euler returned no TikTok session cookies";
+    return `Euler sign error${status ? ` (HTTP ${status})` : ""}: ${msg.slice(0, 90)}`.slice(0, 160);
+  }
+  if (/ConnectTimeoutError/i.test(name)) return "Timed out connecting to TikTok WebSocket";
+  if (/SignatureMissingTokensError/i.test(name)) return "Euler returned incomplete signature tokens";
+  if (/ENOTFOUND|EAI_AGAIN|ECONNREFUSED|ECONNRESET|ETIMEDOUT/i.test(msg)) return `Network error: ${msg.slice(0, 110)}`;
+  if (status === 401 || status === 403) return `Upstream rejected request (HTTP ${status})`;
+  return (msg ? `${name !== "Error" ? `${name}: ` : ""}${msg}` : name).slice(0, 160);
+}
+
+/** What went wrong when connecting, in the ways that need different handling. */
 export function classify(err) {
   // The class name is what the library sets; our own errors set `name` on a plain Error. Either may be the one that says what it is.
   const names = [err?.constructor?.name, err?.name].map(String);
   const is = (name) => names.includes(name);
   const message = String(err?.message ?? err ?? "");
-  if (is("SetupError")) return { kind: "fatal", detail: message };
+  const subErrs = Array.isArray(err?.config?.requestErrs) ? err.config.requestErrs : [];
+  const subText = subErrs.map((e) => String(e?.message ?? e ?? "")).join(" ");
+  if (is("SetupError")) return { kind: "fatal", detail: message, reason: message };
   if (is("UserOfflineError")) return { kind: "offline" };
-  if (is("InvalidUniqueIdError")) return { kind: "fatal", detail: "TikTok doesn't know that name. Check the spelling." };
-  if (names.some((n) => /RateLimit/i.test(n)) || /\b429\b|rate.?limit/i.test(message) || err?.response?.statusCode === 429) return { kind: "limited" };
-  if (is("PremiumFeatureError")) return { kind: "fatal", detail: "TikTok's free connection doesn't allow that." };
-  return { kind: "failed", detail: "Couldn't reach TikTok. Trying again…" };
+  if (is("InvalidUniqueIdError")) return { kind: "fatal", detail: "TikTok doesn't know that name. Check the spelling.", reason: "Unknown TikTok username" };
+  if (names.some((n) => /RateLimit/i.test(n)) || /\b429\b|rate.?limit/i.test(message) || /\b429\b|rate.?limit/i.test(subText) || err?.response?.statusCode === 429) {
+    return { kind: "limited", reason: describeError(err) };
+  }
+  if (is("PremiumFeatureError")) return { kind: "fatal", detail: "TikTok's free connection doesn't allow that.", reason: describeError(err) };
+  // If Euler explicitly answered 200 with no active room (and no auth/rate-limit error), treat as offline instead of hard error
+  if (is("InvalidResponseCompositeError") && /Failed to extract Room ID from Euler/i.test(subText) && !/\b(401|402|403|429)\b/.test(subText)) {
+    return { kind: "offline" };
+  }
+  return { kind: "failed", detail: "Couldn't reach TikTok. Trying again…", reason: describeError(err) };
 }
 
 /** A wait in plain words for a page to show: "minute", "10 minutes", "30 seconds". */
@@ -60,6 +110,7 @@ export class Room {
     this.cachedRoomId = ""; // cached live roomId so short hiccups skip fetchRoomId()
     this.cachedRoomAt = 0;
     this.hadLive = false;
+    this.lastError = ""; // concise owner-facing explanation of the most recent connection error
   }
 
   add(client) {
@@ -270,25 +321,44 @@ export class Room {
       return { kind: "stopped" };
     }
     const cacheTtlMs = this.hub.opts.roomIdCacheMs ?? 600000;
-    const freshRoomId = this.cachedRoomId && (Date.now() - this.cachedRoomAt) <= cacheTtlMs ? this.cachedRoomId : "";
+    let freshRoomId = this.cachedRoomId && (Date.now() - this.cachedRoomAt) <= cacheTtlMs ? this.cachedRoomId : "";
     if (!freshRoomId) {
       this.cachedRoomId = "";
       this.cachedRoomAt = 0;
     }
 
-    // 1. Direct TikTok live pre-check (0 Euler calls when skipFetchRoomIdFromEulerRoute is on):
-    //    if TikTok says the account is offline, skip conn.connect() completely so Euler is never touched.
-    if (!conn.pretend && !freshRoomId && typeof conn.fetchIsLive === "function") {
-      try {
-        const isLive = await conn.fetchIsLive();
-        if (isLive === false) {
-          give();
-          this.letGo(conn);
-          this.hub.opts.onOfflineSaved?.();
-          return { kind: "offline" };
+    // 1. Direct TikTok live pre-check (0 Euler calls!):
+    //    - If `checkLiveDirect()` exists (real TikTok connection), ONE direct api-live call returns both `{ live, roomId }`.
+    //      Offline -> skip Euler completely! Live -> reuse `roomId` straight in `conn.connect(roomId)` so we don't hit TikTok twice!
+    //    - Otherwise fall back to `conn.fetchIsLive()` when provided by a custom factory / test double.
+    if (!conn.pretend && !freshRoomId) {
+      if (typeof conn.checkLiveDirect === "function") {
+        try {
+          const probe = await conn.checkLiveDirect();
+          if (probe?.live === false) {
+            give();
+            this.letGo(conn);
+            this.hub.opts.onOfflineSaved?.();
+            return { kind: "offline" };
+          }
+          if (probe?.live === true && probe?.roomId) {
+            freshRoomId = String(probe.roomId);
+          }
+        } catch {
+          /* direct api-live 403/glitch — fall through to conn.connect() */
         }
-      } catch {
-        /* direct check inconclusive — fall through to conn.connect() which still enforces route config */
+      } else if (typeof conn.fetchIsLive === "function") {
+        try {
+          const isLive = await conn.fetchIsLive();
+          if (isLive === false) {
+            give();
+            this.letGo(conn);
+            this.hub.opts.onOfflineSaved?.();
+            return { kind: "offline" };
+          }
+        } catch {
+          /* direct check inconclusive — fall through to conn.connect() */
+        }
       }
     }
 
@@ -298,7 +368,7 @@ export class Room {
       this.letGo(conn);
       this.hub.opts.onBudgetBlocked?.();
       this.hub.busy();
-      return { kind: "limited", detail: "Daily TikTok signing budget reached. Waiting for quota reset…" };
+      return { kind: "limited", detail: "Daily TikTok signing budget reached. Waiting for quota reset…", reason: "Daily Euler budget guard paused" };
     }
 
     this.conn = conn;
@@ -307,7 +377,7 @@ export class Room {
     this.wire(conn, finish);
     try {
       if (freshRoomId) {
-        this.hub.opts.onCacheHit?.();
+        if (this.cachedRoomId && freshRoomId === this.cachedRoomId) this.hub.opts.onCacheHit?.();
         await conn.connect(freshRoomId);
       } else {
         await conn.connect();
@@ -320,6 +390,9 @@ export class Room {
         this.cachedRoomAt = 0;
       }
       const how = classify(err);
+      if (how.kind === "failed" || how.kind === "fatal") {
+        this.hub.log(`@${this.user}: connect failed — ${how.reason || how.detail}`);
+      }
       if (how.kind === "limited") this.hub.busy();
       return how;
     }
@@ -328,6 +401,7 @@ export class Room {
       this.letGo(conn);
       return { kind: "stopped" };
     }
+    this.lastError = "";
     const resolvedRoomId = String(conn.roomId ?? conn.state?.roomId ?? "").trim();
     if (resolvedRoomId) {
       this.cachedRoomId = resolvedRoomId;
@@ -410,9 +484,11 @@ export class Room {
       if (how.kind !== "offline") offlineSince = 0;
       quiet = how.kind === "offline" || how.kind === "limited";
       if (how.kind === "fatal") {
+        this.lastError = how.reason || how.detail || "Fatal error";
         this.setStatus("error", how.detail, true);
         break;
       } else if (how.kind === "offline") {
+        this.lastError = "";
         offlineSince ||= Date.now();
         const waited = Date.now() - offlineSince;
         if (offlineGiveUpMs > 0 && waited >= offlineGiveUpMs) {
@@ -427,12 +503,17 @@ export class Room {
         this.setStatus("offline", every > offlineWaitMs ? `Not live yet. Looking again every ${lengthOf(every)}. Opening this link again looks right away.` : how.detail ?? "");
         await this.sleep(every);
       } else if (how.kind === "limited") {
+        this.lastError = how.reason || how.detail || "Rate limited";
         this.setStatus("limited", how.detail ?? "");
         if (!how.detail) this.hub.opts.onLimited?.();
         await this.sleep(Math.min(this.hub.cooldownLeft(), 1000)); // the shared pause is waited out in Hub.turn at the next attempt
       } else {
-        if (how.kind === "failed") this.setStatus("error", how.detail);
-        else this.setStatus("reconnecting");
+        if (how.kind === "failed") {
+          this.lastError = how.reason || how.detail || "Connection failed";
+          this.setStatus("error", how.detail);
+        } else {
+          this.setStatus("reconnecting");
+        }
         await this.sleep(backoffMs[Math.min(attempt, backoffMs.length - 1)]);
         attempt += 1;
       }
@@ -589,6 +670,8 @@ export class Hub {
     const accounts = [...this.rooms.values()].map((room) => ({
       user: room.user,
       state: room.status.state,
+      detail: room.status.detail || "",
+      lastError: room.lastError || "",
       live: room.live,
       pages: room.clients.size,
       followers: room.info().followers,

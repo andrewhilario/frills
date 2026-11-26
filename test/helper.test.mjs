@@ -112,7 +112,7 @@ test("it answers a ping, serves the built site with its security headers, and sa
   await start(scripted().factory);
   const ping = await raw("/tiktok/ping");
   assert.equal(ping.status, 200);
-  assert.deepEqual(JSON.parse(ping.body), { ok: true, name: "frills-helper", version: "0.7.0", features: ["chat", "alerts", "info", "roles", "status", "viewers"] });
+  assert.deepEqual(JSON.parse(ping.body), { ok: true, name: "frills-helper", version: "0.7.1", features: ["chat", "alerts", "info", "roles", "status", "viewers"] });
   const editor = await raw("/editor/");
   assert.equal(editor.status, 200);
   assert.match(editor.body, /Connect your chat/);
@@ -514,6 +514,29 @@ test("leak shield: fetchIsLive() === false skips conn.connect() completely, cach
   assert.equal(blockedConnects, 0, "budget guard stops conn.connect() before touching Euler");
   assert.ok(helper.signing.metrics.budgetBlocked >= 1);
   await p3.close();
+  await helper.close();
+
+  // 6. Descriptive error capture: InvalidResponseCompositeError and SignAPIError populate room.lastError and roster()
+  class InvalidResponseCompositeError extends Error {
+    constructor(msg, errs) { super(msg); this.config = { requestErrs: errs }; }
+  }
+  await start(async () => {
+    const c = new EventEmitter();
+    c.connect = async () => {
+      throw new InvalidResponseCompositeError("Failed to retrieve Room ID from all sources.", [
+        new Error("Request failed with status code 403 (Forbidden): GET https://www.tiktok.com/api-live/user/room/?api_key=euler_secret1234567890"),
+      ]);
+    };
+    c.disconnect = () => {};
+    return c;
+  }, { backoffMs: [5000] });
+  const p4 = listen("err.user");
+  await p4.until(() => p4.states().includes("error"), 2000);
+  const entry = helper.hub.roster().accounts.find((a) => a.user === "err.user");
+  assert.equal(entry.state, "error");
+  assert.match(entry.lastError, /Room lookup failed: TikTok API 403 \(blocked\)/);
+  assert.ok(!entry.lastError.includes("euler_secret"), "never leaks API keys into status error text");
+  await p4.close();
   await helper.close();
 });
 

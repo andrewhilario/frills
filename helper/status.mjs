@@ -336,7 +336,7 @@ input[type=number]{width:5rem;padding:6px;border:2px solid var(--ink);border-rad
 .note{color:var(--ink2);font-size:.9rem}.dev{display:none}.dev[data-on="true"]{display:block}
 .own{margin-top:16px}.ownrow{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.ownrow input{flex:1 1 12rem;min-width:0;padding:8px;border:2px solid var(--ink);border-radius:8px;font:inherit}#ownout{margin-top:8px}.who{margin-top:16px}.who h2{font-size:1.1rem;margin:0 0 4px}.wrap{overflow-x:auto;margin-top:8px}table{border-collapse:collapse;width:100%;font-size:.92rem}
 th{text-align:left;color:var(--ink2);font-weight:600;padding:6px 8px;border-bottom:2px solid var(--line);white-space:nowrap}td{padding:8px;border-bottom:1px solid var(--line);vertical-align:top}
-td a{font-weight:700;color:var(--ink)}.pill{display:inline-block;padding:2px 10px;border-radius:99px;border:2px solid var(--ink);font-weight:700;font-size:.8rem;white-space:nowrap}.pill[data-s="live"]{background:#ffd23f}.pill[data-s="wait"]{background:var(--paper2)}.pill[data-s="gone"]{background:transparent;border-style:dashed}
+td a{font-weight:700;color:var(--ink)}.pill{display:inline-block;padding:2px 10px;border-radius:99px;border:2px solid var(--ink);font-weight:700;font-size:.8rem;white-space:nowrap}.pill[data-s="live"]{background:#ffd23f}.pill[data-s="wait"]{background:var(--paper2)}.pill[data-s="err"]{background:#ffe0e6;border-color:var(--full);color:#8a1226}.pill[data-s="gone"]{background:transparent;border-style:dashed}.st-sub{margin-top:4px;font-size:.78rem;line-height:1.35;color:var(--ink2);max-width:260px;word-break:break-word}.st-sub[data-err="true"]{color:#8a1226;font-weight:600}
 </style></head>
 <body><main data-level="${esc(s.level)}" id="app">
 <div class="banner" id="banner" role="alert"></div>
@@ -381,16 +381,23 @@ function drawWho(r){
   for(const a of r.accounts){
     const tr=document.createElement("tr"),td=document.createElement("td"),link=document.createElement("a");
     link.textContent="@"+a.user;link.href="https://www.tiktok.com/@"+encodeURIComponent(a.user)+"/live";link.target="_blank";link.rel="noopener noreferrer";td.append(link);tr.append(td);
-    // A page open is what makes it "in use". With none, the account is only kept for a few minutes (the last page may be back), and says so.
-    const st=a.pages===0?["No page open"+(a.live?" (still LIVE)":"")+", leaves in "+forText(a.leavesInS||0),"gone"]:a.state==="connected"?(a.live?["LIVE now","live"]:["Connected, not LIVE yet","wait"]):a.state==="offline"?[a.endedS!=null?"LIVE ended "+forText(a.endedS)+" ago, waiting":"Waiting for their LIVE","wait"]:a.state==="limited"?["Waiting (TikTok is busy)","wait"]:[a.state,"wait"];
-    const sc=document.createElement("td"),pill=document.createElement("span");pill.className="pill";pill.dataset.s=st[1];pill.textContent=st[0];sc.append(pill);tr.append(sc);
+    // A page open is what makes it "in use". With none, the account is only kept briefly (the last page may be back), and says so.
+    const st=a.pages===0?["No page open"+(a.live?" (still LIVE)":"")+", leaves in "+forText(a.leavesInS||0),"gone",""]
+      :a.state==="connected"?(a.live?["LIVE now","live",""]:["Connected, not LIVE yet","wait",""])
+      :a.state==="offline"?[a.endedS!=null?"LIVE ended "+forText(a.endedS)+" ago, waiting":"Waiting for their LIVE","wait",a.detail&&/stopped looking|Looking again/.test(a.detail)?a.detail:""]
+      :a.state==="limited"?["Rate limited / paused","err",a.lastError||a.detail||"Waiting for signing quota or cooldown"]
+      :a.state==="error"?["Error","err",a.lastError||a.detail||"Could not connect to TikTok"]
+      :[a.state,"wait",a.detail||""];
+    const sc=document.createElement("td"),pill=document.createElement("span");pill.className="pill";pill.dataset.s=st[1];pill.textContent=st[0];sc.append(pill);
+    if(st[2]){const sub=document.createElement("div");sub.className="st-sub";if(st[1]==="err")sub.dataset.err="true";sub.textContent=st[2];sc.append(sub);}
+    tr.append(sc);
     cell(tr,String(a.pages));cell(tr,a.followers?a.followers.toLocaleString():"-");cell(tr,forText(a.forS));
     cell(tr,a.counts.chat+" chat, "+a.counts.gift+" gifts, "+a.counts.follow+" follows, "+a.counts.share+" shares"+(a.lastS==null?" · nothing yet":" · last "+forText(a.lastS)+" ago"));
     body.append(tr);
   }
-  const gone=r.accounts.filter((a)=>a.pages===0).length,live=r.accounts.filter((a)=>a.pages>0&&a.state==="connected"&&a.live).length,wait=r.accounts.length-gone-live;
+  const gone=r.accounts.filter((a)=>a.pages===0).length,live=r.accounts.filter((a)=>a.pages>0&&a.state==="connected"&&a.live).length,errored=r.accounts.filter((a)=>a.pages>0&&(a.state==="error"||a.state==="limited")).length,wait=r.accounts.length-gone-live-errored;
   $("whotable").hidden=r.accounts.length===0;
-  $("whonote").textContent=r.accounts.length?r.accounts.length+" on the list: "+live+" LIVE now with a page open, "+wait+" with a page open waiting for a LIVE, "+gone+" with no page open (about to leave). Press a name to open their LIVE on TikTok.":"Nobody is connected right now.";
+  $("whonote").textContent=r.accounts.length?r.accounts.length+" on the list: "+live+" LIVE now, "+wait+" waiting for a LIVE"+(errored?", "+errored+" with error/limit":"")+", "+gone+" with no page open. Press a name to open their LIVE on TikTok.":"Nobody is connected right now.";
   $("waitnote").textContent=r.waiting.length?"In line: "+r.waiting.map((u)=>"@"+u).join(", "):"";
 }
 function draw(s){
