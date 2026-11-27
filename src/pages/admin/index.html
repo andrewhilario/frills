@@ -43,6 +43,7 @@
     <div class="chips admin__tabs" role="group" aria-label="What to look at">
       <button class="chip" type="button" id="tab-feedback" aria-pressed="true">Feedback</button>
       <button class="chip" type="button" id="tab-files" aria-pressed="false">Files</button>
+      <button class="chip" type="button" id="tab-plus" aria-pressed="false">Frills Plus VIP</button>
     </div>
 
     <section id="panel-feedback" aria-label="Feedback">
@@ -71,6 +72,28 @@
       <p class="admin__status" id="m-status" role="status"></p>
       <div class="admin__files" id="m-list"></div>
       <button class="btn btn--soft" type="button" id="m-more" hidden>Show more</button>
+    </section>
+
+    <section id="panel-plus" aria-label="Frills Plus VIP passes" hidden>
+      <form id="p-form" class="admin__grant">
+        <div class="admin__grant-head">
+          <h2 class="admin__h">Grant complimentary Frills Plus (VIP)</h2>
+          <p class="admin__note">Gives an email address lifetime Frills Plus with zero billing, working from any country. Once granted, they sign in at <code>/account/</code> with that email to unlock every Plus feature, including all 16 Matcha pages.</p>
+        </div>
+        <div class="admin__grant-fields">
+          <label class="admin__field">
+            <span>Email address</span>
+            <input type="email" id="p-email" placeholder="friend@example.com" autocomplete="off" spellcheck="false" required>
+          </label>
+          <label class="admin__field">
+            <span>AI voice chars / month</span>
+            <input type="number" id="p-limit" value="150000" min="1000" max="10000000" step="10000" inputmode="numeric">
+          </label>
+          <button class="btn" type="submit" id="p-grant">Grant free Frills Plus</button>
+        </div>
+      </form>
+      <p class="admin__status" id="p-status" role="status"></p>
+      <div class="admin__list" id="p-list"></div>
     </section>
   </div>
 </main>

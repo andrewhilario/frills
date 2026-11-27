@@ -14,6 +14,7 @@ import { mountEditorMode } from "./editor-mode.js";
 import { mountSizeGuide } from "./size-guide.js";
 import { closePlusModal, openPlusModal } from "./plus-modal.js";
 import { loadPlatformPref } from "./platform-pref.js";
+import { loadMatchaProfile, matchaDefaultsFor } from "./matcha-bridge.js";
 import {
   DEFAULT_GIFT_MENU,
   DEFAULT_INFO_ITEMS,
@@ -39,8 +40,9 @@ import { createOutlineView } from "./outline-view.js";
 import { downloadBlob, exportOutlinePng } from "./outline-export.js";
 
 const $ = (id) => document.getElementById(id);
-const STORE_KEY = "frills:outline:editor:v2";
-const BC_NAME = "frills:outline:live";
+const MATCHA = $("main")?.dataset.mode === "matcha";
+const STORE_KEY = MATCHA ? "frills:outline:matcha:v2" : "frills:outline:editor:v2";
+const BC_NAME = MATCHA ? "frills:outline:matcha:live" : "frills:outline:live";
 const LOOK_FILTER_HIDE = new Set(["deco", "size", "letterSpacing", "align", "border"]);
 
 const params = new URLSearchParams(location.search);
@@ -49,9 +51,10 @@ const loadSaved = () => {
 };
 const saved = loadSaved();
 const pref = loadPlatformPref();
+const matchaBase = MATCHA ? matchaDefaultsFor("outline", loadMatchaProfile()) : null;
 const urlOutline = OUTLINE.fromParams(params);
-const defaultMode = !saved?.settings && !urlOutline.mode && pref.platform === "twitch" ? { mode: "screen16x9" } : {};
-let settings = OUTLINE.sanitize({ ...defaultMode, ...saved?.settings, ...urlOutline });
+const defaultMode = !MATCHA && !saved?.settings && !urlOutline.mode && pref.platform === "twitch" ? { mode: "screen16x9" } : {};
+let settings = OUTLINE.sanitize({ ...(matchaBase ?? {}), ...defaultMode, ...saved?.settings, ...urlOutline });
 let plusActive = false;
 let plusEligible = false;
 let plusChecked = false;
@@ -994,7 +997,7 @@ function syncAllControls() {
 }
 
 $("reset")?.addEventListener("click", () => {
-  settings = { ...OUTLINE.defaults };
+  settings = OUTLINE.sanitize({ ...OUTLINE.defaults, ...(matchaBase ?? {}) });
   showSafeZones = false;
   editBoxes = false;
   selectedBox = "";

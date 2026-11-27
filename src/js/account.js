@@ -150,6 +150,7 @@ if ($("acct-form")) {
   const plusWords = (me) => {
     const plus = me.plus;
     if (plus?.active) {
+      if (plus.comp) return "Complimentary Frills Plus is on for this account (VIP pass — no billing).";
       if (plus.status === "canceled") return `Frills Plus is on until ${day(plus.renewsAt)}. It will not renew.`;
       return `Frills Plus is on for this account.${plus.renewsAt ? ` It renews around ${day(plus.renewsAt)}.` : ""}`;
     }
@@ -162,7 +163,10 @@ if ($("acct-form")) {
   const badgeOf = (me) => {
     const plus = me.plus;
     if (!plus) return null;
-    if (plus.active) return plus.status === "canceled" ? { text: `Ends ${shortDay(plus.renewsAt)}`, tone: "soon" } : { text: "On", tone: "on" };
+    if (plus.active) {
+      if (plus.comp) return { text: "VIP", tone: "on" };
+      return plus.status === "canceled" ? { text: `Ends ${shortDay(plus.renewsAt)}`, tone: "soon" } : { text: "On", tone: "on" };
+    }
     return { text: "Off", tone: "off" };
   };
   const canBuyAccount = (me) => canBuy(me);
@@ -255,7 +259,7 @@ if ($("acct-form")) {
     $("acct-buy-hint").hidden = !canBuyAccount(me);
     const promoEl = $("acct-promo");
     if (promoEl) promoEl.hidden = !canBuyAccount(me) || !promoEl.textContent.trim();
-    const manage = Boolean(me.portal) && Boolean(me.plus);
+    const manage = Boolean(me.portal) && Boolean(me.plus) && !me.plus.comp;
     $("acct-manage").hidden = !manage;
     $("acct-manage-hint").hidden = !manage;
 

@@ -82,6 +82,55 @@ const pages = walk(join(src, "pages")).filter((f) => f.endsWith(".html")).map((f
   return { file, meta: JSON.parse(m[1]), body: text.slice(m[0].length), mtime: statSync(file).mtime };
 }).filter((p) => !p.meta.devOnly || withOgCard).filter((p) => !p.meta.feature || (Object.hasOwn(site, p.meta.feature) && site[p.meta.feature] === true)); // a page that names a feature is built only while that feature is on
 
+// Dedicated private Matcha editors (/matcha/<slug>/) for all 14 remaining Frills overlays (16 total with /matcha/ and /matcha/alerts/).
+// Derived directly from the live public editor templates so controls, tests, and fixes never drift out of sync.
+const MATCHA_SLUGS = ["studio", "alerts", "jar", "wheel", "outline", "songs", "tts", "goal", "timer", "gifts", "gifters", "labels", "actions", "likers", "gallery", "counter"];
+const MATCHA_OVERLAY_PAGES = [
+  { slug: "jar", name: "Matcha gift & bits jar", lede: "Your private Frog Pond & crystal gift jar editor, starting from your Matcha palette for TikTok LIVE, Twitch, or Both." },
+  { slug: "wheel", name: "Matcha spin the wheel", lede: "Your private Kawaii prize & dare wheel editor, pre-colored in your Matcha palette for TikTok gifts and Twitch bits & subs." },
+  { slug: "outline", name: "Matcha stream outline", lede: "Your private 9:16 TikTok LIVE & 16:9 OBS stream outline designer, starting with your Matcha palette and Frog Pond corner art." },
+  { slug: "songs", name: "Matcha song requests", lede: "Your private !sr song request queue and Spotify player editor, pre-styled in your Matcha palette for TikTok, Twitch, or Both." },
+  { slug: "tts", name: "Matcha talking pet TTS", lede: "Your private Talking Pet TTS editor with your Matcha palette and active mascot reading gifts, bits, subs, and !say chat." },
+  { slug: "goal", name: "Matcha goal bar", lede: "Your private follower, sub, gift, and bits goal bar editor, starting in your Matcha palette with milestone cheers." },
+  { slug: "timer", name: "Matcha subathon timer", lede: "Your private subathon countdown timer editor, pre-styled in your Matcha palette for TikTok gifts and Twitch subs & bits." },
+  { slug: "gifts", name: "Matcha recent gifts", lede: "Your private live recent gifts & support feed editor, pre-styled in your Matcha palette for TikTok, Twitch, or Both." },
+  { slug: "gifters", name: "Matcha top gifters", lede: "Your private supporter leaderboard editor, ranking TikTok diamonds and Twitch gifted subs & bits in your Matcha palette." },
+  { slug: "labels", name: "Matcha rotating highlights", lede: "Your private rotating stream highlights editor (Last Gift, Last Follower, Last Sub, Last Bits, Top Gifter) in your Matcha palette." },
+  { slug: "actions", name: "Matcha OBS & VTS actions", lede: "Your private OBS Studio, Streamlabs & VTube Studio actions editor with sticky notes, scenes, and instant replay cam." },
+  { slug: "likers", name: "Matcha top likers", lede: "Your private TikTok LIVE top likers leaderboard editor, pre-colored in your Matcha palette with crown celebrations." },
+  { slug: "gallery", name: "Matcha gift gallery", lede: "Your private TikTok LIVE rotating gift gallery editor, pre-styled in your Matcha palette." },
+  { slug: "counter", name: "Matcha viewer & like counter", lede: "Your private TikTok LIVE viewer and heart counter editor, pre-styled in your Matcha palette." },
+];
+for (const entry of MATCHA_OVERLAY_PAGES) {
+  const sourcePage = pages.find((p) => p.meta.path === `/${entry.slug}/`);
+  if (!sourcePage) throw new Error(`Missing source editor page /${entry.slug}/ for /matcha/${entry.slug}/`);
+  const introHtml = `<header class="panel__intro">\n      <div class="matcha-subhead">\n        <span class="matcha-subhead__pill">Private Matcha Studio</span>\n        <a class="matcha-subhead__back" href="/matcha/#matcha-suite">← All 16 Matcha overlays</a>\n      </div>\n      <h1 class="panel__title">${esc(entry.name)}</h1>\n      <p class="panel__lede">${esc(entry.lede)}</p>\n    </header>`;
+  const body = sourcePage.body
+    .replace(/<main\b([^>]*)>/, `<main$1 data-mode="matcha" data-matcha-slug="${entry.slug}">`)
+    .replace(/\{\{\{\s*intro\s*\}\}\}/, introHtml)
+    .replace(/\{\{\{\s*about\s*\}\}\}/, "");
+  pages.push({
+    file: sourcePage.file,
+    mtime: sourcePage.mtime,
+    meta: {
+      ...sourcePage.meta,
+      title: `${entry.name} | Frills`,
+      description: entry.lede,
+      path: `/matcha/${entry.slug}/`,
+      bodyClass: `${sourcePage.meta.bodyClass ?? ""} page-matcha-editor`.trim(),
+      chrome: "matcha",
+      matchaNav: entry.slug,
+      footer: false,
+      noindex: true,
+      listed: false,
+      intro: undefined,
+      about: undefined,
+      jsonld: [],
+    },
+    body,
+  });
+}
+
 const looksCount = Object.keys(PRESETS).length;
 const WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
 const builtOn = new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
@@ -181,7 +230,7 @@ const shared = {
 };
 
 const ORG = { "@type": "Organization", name: site.name, url: `${site.url}/`, logo: `${site.url}/apple-touch-icon.png` };
-const FEATURES = ["Chat overlay for TikTok LIVE and Twitch, with cute looks and little pets", "Alerts for follows, gifts and shares", "Last gifts list", "Goal bar for followers, gifts or likes", "Top likers and top gifters rankings", "Rotating stream highlights for last gifts, followers, subs and bits", "Song requests with a queue, and a Spotify player", "Seasonal looks and pictures", "Practice mode with made-up chat", "Free, no account"];
+const FEATURES = ["Chat overlay for TikTok LIVE, Twitch and Both in one link, with cute looks and little pets", "Pop-up alerts for TikTok follows, gifts and shares and Twitch subs, gifted subs, bits, raids and follows", "Recent gifts and support feed for TikTok and Twitch", "14 crystal Gift and Bits Jars in Small, Medium and Large", "Goal bars for followers, subs, gifts, bits or likes", "Spin the wheel prize and dare overlay", "Subathon countdown timer for TikTok gifts and Twitch subs and bits", "Talking Pet TTS (!say, gifts and bits)", "Song requests (!sr) with queue and optional Spotify player for TikTok and Twitch", "Top gifters, top likers, rotating highlights, gift gallery and live counter", "Stream outline and border designer for 9:16 TikTok LIVE and 16:9 Twitch/OBS", "OBS, Streamlabs and VTube Studio Actions with 10 free automatic plus unlimited manual sticky notes", "Simple and Advanced setup mode with Overlay Size Guide", "Free, no account"];
 
 function jsonLd(meta, canonical, faqItems, overlayItems = []) {
   const nodes = [];
@@ -228,12 +277,13 @@ function renderPage(page, stats) {
     navTest: meta.navTest ? ' aria-current="page"' : "",
     navFeedback: meta.navFeedback ? ' aria-current="page"' : "",
     navOverlays: meta.navOverlays ? ' aria-current="page"' : "",
+    ...Object.fromEntries(MATCHA_SLUGS.map((s) => [`matchaNav${s[0].toUpperCase()}${s.slice(1)}`, meta.matchaNav === s ? ' aria-current="page"' : ""])),
     overlaysFaqItems: overlayItems.map((i) => `        <details><summary><h3 class="faq__q">${esc(i.q)}</h3></summary><div class="faq__answer"><p>${i.a}</p></div></details>`).join("\n"),
     faqItems: faqItems.map((i) => `        <details><summary><h3 class="faq__q">${esc(i.q)}</h3></summary><div class="faq__answer"><p>${i.a}</p></div></details>`).join("\n"),
   };
   const where = relative(root, page.file);
   const content = render(page.body, vars, partials, where);
-  const chrome = meta.chrome === "nav" ? render(partials.nav, vars, partials, "nav") : meta.chrome === "appbar" ? render(partials.appbar, vars, partials, "appbar") : "";
+  const chrome = meta.chrome === "nav" ? render(partials.nav, vars, partials, "nav") : meta.chrome === "appbar" ? render(partials.appbar, vars, partials, "appbar") : meta.chrome === "matcha" ? render(partials["matcha-bar"], vars, partials, "matcha-bar") : "";
   const footer = meta.footer ? render(partials.footer, vars, partials, "footer") : "";
   return render(layouts[meta.layout ?? "base"], { ...vars, content, chrome, footer }, partials, `${where} (layout)`);
 }
@@ -281,7 +331,7 @@ const actionsCsp = csp.replace("connect-src 'self'", "connect-src 'self' ws://12
 const actionsOverlayCsp = actionsCsp.replace("frame-ancestors 'none'", "frame-ancestors 'self'");
 writeFileSync(
   join(dist, "_headers"),
-  `/*\n  Content-Security-Policy: ${csp}\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n  Strict-Transport-Security: max-age=31536000\n  Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()\n\n/assets/*\n  Cache-Control: public, max-age=31536000, immutable\n\n/fonts/*\n  Cache-Control: public, max-age=31536000, immutable\n\n/actions/*\n  ! Content-Security-Policy\n  Content-Security-Policy: ${actionsCsp}\n\n/overlay/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n  ! Content-Security-Policy\n  Content-Security-Policy: ${csp.replace("frame-ancestors 'none'", "frame-ancestors 'self'")}\n\n/overlay/actions/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n  ! Content-Security-Policy\n  Content-Security-Policy: ${actionsOverlayCsp}\n\n/o/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n\n/matcha/*\n  X-Robots-Tag: noindex, nofollow\n\n/check/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n\n/admin/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n`,
+  `/*\n  Content-Security-Policy: ${csp}\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: strict-origin-when-cross-origin\n  Strict-Transport-Security: max-age=31536000\n  Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()\n\n/assets/*\n  Cache-Control: public, max-age=31536000, immutable\n\n/fonts/*\n  Cache-Control: public, max-age=31536000, immutable\n\n/actions/*\n  ! Content-Security-Policy\n  Content-Security-Policy: ${actionsCsp}\n\n/overlay/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n  ! Content-Security-Policy\n  Content-Security-Policy: ${csp.replace("frame-ancestors 'none'", "frame-ancestors 'self'")}\n\n/overlay/actions/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n  ! Content-Security-Policy\n  Content-Security-Policy: ${actionsOverlayCsp}\n\n/o/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n\n/matcha/*\n  X-Robots-Tag: noindex, nofollow\n\n/matcha/actions/*\n  X-Robots-Tag: noindex, nofollow\n  ! Content-Security-Policy\n  Content-Security-Policy: ${actionsCsp}\n\n/check/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n\n/admin/*\n  X-Robots-Tag: noindex, nofollow\n  Cache-Control: no-store\n`,
 );
 
 // ── Report ────────────────────────────────────────────────────────────────────────────────────────────────────────────

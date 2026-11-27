@@ -311,6 +311,102 @@ test("the Matcha alerts editor is its own private page: it starts with the Match
   await page.evaluate("localStorage.clear()");
 });
 
+test("matcha: the full-size Matcha Stream Suite renders all 14 other overlays, syncs palette + Both channels live, previews on demand, and opens the full preview modal", { skip }, async () => {
+  await fresh();
+  const initial = await page.evaluate(`({
+    cards: document.querySelectorAll("#matcha-grid .matcha-card").length,
+    frames: document.querySelectorAll("#matcha-grid iframe").length,
+    outlineLink: document.querySelector('.matcha-card[data-id="outline"] .matcha-card__input')?.value ?? "",
+    palettePill: document.getElementById("suite-palette-pill")?.textContent.trim(),
+  })`);
+  assert.equal(initial.cards, 14, "all 14 other Frills overlays appear in the Matcha Suite (16 total with Chat + Alerts)");
+  assert.equal(initial.frames, 0, "cards stay lightweight until previewed on demand");
+  assert.match(initial.outlineLink, /\/overlay\/outline\/\?.*look=matcha/, "Stream Outline link is ready immediately");
+  assert.equal(initial.palettePill, "Palette: Latte");
+
+  // Switching palette to Sakura recolors every suite card's link and Customize href
+  await click("#palettes .chip", "Sakura");
+  assert.equal(await page.evaluate(`document.getElementById("suite-palette-pill").textContent.trim()`), "Palette: Sakura");
+
+  // Entering Both platforms populates unified ?tiktok=...&twitch=... links on Alerts and dual-platform suite cards
+  await click("#source .chip", "Both");
+  await set("source-channel", "matchafan");
+  await set("source-channel-2", "matchafan_tv");
+  const synced = await page.evaluate(`({
+    alerts: document.getElementById("alerts-link").value,
+    jar: document.querySelector('.matcha-card[data-id="jar"] .matcha-card__input').value,
+    songs: document.querySelector('.matcha-card[data-id="songs"] .matcha-card__input').value,
+    likers: document.querySelector('.matcha-card[data-id="likers"] .matcha-card__input').value,
+    copyAllOff: document.getElementById("suite-copy-all").disabled,
+  })`);
+  const alertsUrlObj = new URL(synced.alerts);
+  assert.equal(alertsUrlObj.searchParams.get("tiktok"), "matchafan");
+  assert.equal(alertsUrlObj.searchParams.get("twitch"), "matchafan_tv");
+  assert.equal(alertsUrlObj.searchParams.get("accent"), MATCHA_PALETTES.sakura.matcha);
+  const jarUrlObj = new URL(synced.jar);
+  assert.equal(jarUrlObj.searchParams.get("tiktok"), "matchafan");
+  assert.equal(jarUrlObj.searchParams.get("twitch"), "matchafan_tv");
+  assert.equal(jarUrlObj.searchParams.get("design"), "frog");
+  assert.equal(jarUrlObj.searchParams.get("accent"), MATCHA_PALETTES.sakura.matcha);
+  const songsUrlObj = new URL(synced.songs);
+  assert.equal(songsUrlObj.searchParams.get("tiktok"), "matchafan");
+  assert.equal(songsUrlObj.searchParams.get("twitch"), "matchafan_tv");
+  const likersUrlObj = new URL(synced.likers);
+  assert.equal(likersUrlObj.searchParams.get("channel"), "matchafan");
+  assert.equal(likersUrlObj.searchParams.get("platform"), "tiktok");
+  assert.equal(synced.copyAllOff, false);
+
+  // Filter chips narrow the visible cards cleanly
+  await click("#suite-filters .chip", "TikTok LIVE");
+  assert.equal(await page.evaluate(`document.querySelectorAll("#matcha-grid .matcha-card:not([hidden])").length`), 3);
+  await click("#suite-filters .chip", "All 14 overlays");
+  assert.equal(await page.evaluate(`document.querySelectorAll("#matcha-grid .matcha-card:not([hidden])").length`), 14);
+
+  // On-demand inline preview + Full preview lightbox work cleanly under CSP
+  await page.evaluate(`document.querySelector('.matcha-card[data-id="jar"] .matcha-card__placeholder button').click()`);
+  assert.equal(await page.evaluate(`document.querySelectorAll('.matcha-card[data-id="jar"] iframe').length`), 1);
+  await page.evaluate(`[...document.querySelectorAll('.matcha-card[data-id="jar"] .matcha-card__actions button')].find((b) => b.textContent.trim() === "Full preview").click()`);
+  assert.equal(await page.evaluate(`document.getElementById("matcha-lightbox").open`), true);
+  assert.equal(await page.evaluate(`document.getElementById("mlb-title").textContent.trim()`), "Gift & bits jar");
+  await click("#mlb-close");
+  assert.equal(await page.evaluate(`document.getElementById("matcha-lightbox").open`), false);
+  assert.equal(new URL(await page.evaluate(`document.querySelector('.matcha-card[data-id="jar"] a').href`)).pathname, "/matcha/jar/");
+  assert.equal(new URL(await page.evaluate(`document.querySelector('.matcha-card[data-id="outline"] a').href`)).pathname, "/matcha/outline/");
+
+  // Opening dedicated /matcha/jar/ inherits the Sakura Matcha palette + Frog jar + Both channels without touching public /jar/
+  await page.goto(base + "/matcha/jar/", { settle: 900 });
+  const jarState = await page.evaluate(`({
+    mode: document.getElementById("main")?.dataset.mode,
+    link: document.getElementById("link")?.value ?? "",
+    matchaStored: localStorage.getItem("frills:jar:editor:v1:matcha"),
+    publicStored: localStorage.getItem("frills:jar:editor:v1"),
+  })`);
+  assert.equal(jarState.mode, "matcha");
+  const jarLink = new URL(jarState.link);
+  assert.equal(jarLink.searchParams.get("design"), "frog");
+  assert.equal(jarLink.searchParams.get("accent"), MATCHA_PALETTES.sakura.matcha);
+  assert.equal(jarLink.searchParams.get("tiktok"), "matchafan");
+  assert.equal(jarLink.searchParams.get("twitch"), "matchafan_tv");
+  assert.equal(jarState.publicStored, null, "public /jar/ settings remain untouched");
+
+  // Opening dedicated /matcha/outline/ inherits the saved Matcha palette & Frog Pond art pack without touching public /outline/
+  await page.goto(base + "/matcha/outline/", { settle: 900 });
+  const olState = await page.evaluate(`({
+    mode: document.getElementById("main")?.dataset.mode,
+    link: document.getElementById("link")?.value ?? "",
+    artPack: document.getElementById("c-artPack")?.value ?? "",
+    publicStored: localStorage.getItem("frills:outline:editor:v2"),
+  })`);
+  assert.equal(olState.mode, "matcha");
+  const olLink = new URL(olState.link);
+  assert.equal(olState.artPack, "frog2", "the Frog Pond corner art is picked (it is the default, so the link does not repeat it)");
+  assert.equal(olLink.searchParams.get("accent"), MATCHA_PALETTES.sakura.matcha);
+  assert.equal(olState.publicStored, null, "public /outline/ settings remain untouched");
+
+  assert.deepEqual(page.problems, [], page.problems.join(" | "));
+  await page.evaluate("localStorage.clear()");
+});
+
 test("the Matcha alerts editor is private: not in the sitemap, not linked from the menu or the footer, and asks search engines to stay away", async () => {
   const sitemap = fs.readFileSync(join(dist, "sitemap.xml"), "utf8");
   assert.equal(sitemap.includes("/matcha/"), false);

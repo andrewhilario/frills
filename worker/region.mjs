@@ -2,7 +2,7 @@
 // Enforced server-side inside the Worker using Cloudflare's `request.cf.country`. Regular static pages remain globally free.
 
 import { resolveCredential } from "./plus-credential.mjs";
-import { plusActive } from "./accounts.mjs";
+import { isCompPlus, plusActive } from "./accounts.mjs";
 
 export const DEFAULT_PRO_COUNTRIES = new Set([
   // North America & Oceania
@@ -161,7 +161,9 @@ export async function handleProStatus(request, env, { now = Date.now() } = {}) {
     if (who.kind === "invalid" || !plusActive(who.plus, now)) out.pass = { valid: false, error: "invalid_pass" };
     else {
       const p = who.plus;
-      out.pass = { valid: true, status: p.status, used: p.tts_used, limit: p.tts_limit, remaining: Math.max(0, p.tts_limit - p.tts_used), periodStart: p.period_start };
+      const comp = isCompPlus(p);
+      if (comp && !out.eligible) { out.eligible = true; out.reason = "comp_vip"; }
+      out.pass = { valid: true, status: p.status, ...(comp ? { comp: true } : {}), used: p.tts_used, limit: p.tts_limit, remaining: Math.max(0, p.tts_limit - p.tts_used), periodStart: p.period_start };
     }
   }
   return json(200, out);

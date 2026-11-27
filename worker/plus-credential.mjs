@@ -19,10 +19,10 @@ export async function resolveCredential(request, env, { now = Date.now(), overla
   if (!db) return { kind: "none" };
   const code = String(overlayCode || request.headers.get("x-overlay") || "").trim();
   if (code) {
-    const found = await accountForOverlayCode(db, code);
+    const found = await accountForOverlayCode(db, code, "tts", now);
     return found ? { kind: "overlay", accountId: found.accountId, plus: found.plus } : { kind: "invalid" };
   }
   const who = await sessionAccount(db, cookieOf(request, COOKIE), { now });
   if (!who) return { kind: "none" };
-  return { kind: "session", accountId: who.accountId, plus: await getPlus(db, who.accountId) };
+  return { kind: "session", accountId: who.accountId, plus: await getPlus(db, who.accountId, now) };
 }

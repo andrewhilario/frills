@@ -14,6 +14,7 @@ import { mountCloudSave } from "./cloud-save.js";
 import { mountEditorMode } from "./editor-mode.js";
 import { mountSizeGuide } from "./size-guide.js";
 import { loadPlatformPref, savePlatformPref } from "./platform-pref.js";
+import { loadMatchaProfile, matchaDefaultsFor } from "./matcha-bridge.js";
 
 const $ = (id) => document.getElementById(id);
 const CANVASES = { vertical: [1080, 1920], landscape: [1920, 1080], square: [1080, 1080] };
@@ -25,15 +26,21 @@ const CANVASES = { vertical: [1080, 1920], landscape: [1920, 1080], square: [108
  */
 export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs = "alerts", platforms = ["tiktok"], defaultPlatform = "tiktok", extraUrlParams, urlTransform, create, idleHint }) {
   const params = new URLSearchParams(location.search);
-  const load = () => { try { return JSON.parse(localStorage.getItem(storeKey) ?? "null"); } catch { return null; } };
+  const MATCHA = $("main")?.dataset.mode === "matcha";
+  const matchaSlug = $("main")?.dataset.matchaSlug || String(overlayPath ?? "").replace(/^\/overlay\/|\/+$/g, "");
+  const effectiveStoreKey = MATCHA ? `${storeKey}:matcha` : storeKey;
+  const matchaProfile = MATCHA ? loadMatchaProfile() : null;
+  const matchaBase = MATCHA ? matchaDefaultsFor(matchaSlug, matchaProfile) : null;
+  const load = () => { try { return JSON.parse(localStorage.getItem(effectiveStoreKey) ?? "null"); } catch { return null; } };
   const saved = load();
   const pref = loadPlatformPref();
-  let settings = widget.sanitize({ ...saved?.settings, ...widget.fromParams(params) });
+  let settings = widget.sanitize({ ...(matchaBase ?? {}), ...saved?.settings, ...widget.fromParams(params) });
   const askedPlatform = params.get("tiktok") && params.get("twitch") && platforms.includes("both")
     ? "both"
     : params.get("platform");
   const initialPlatform = platforms.includes(askedPlatform) ? askedPlatform
     : platforms.includes(saved?.platform) ? saved.platform
+    : MATCHA && platforms.includes(matchaProfile?.platform) ? matchaProfile.platform
     : platforms.includes(pref.platform) ? pref.platform
     : platforms.includes(defaultPlatform) ? defaultPlatform : platforms[0];
   let currentPlatform = initialPlatform;
@@ -112,7 +119,7 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
   const hasAdvancedOpts = rowsByControl.some(({ control, row }) => control.section !== "look" && row.classList.contains("ed-adv"));
   if (hasAdvancedOpts && $("opt-controls")) editorMode.addAdvancePrompt($("opt-controls"), "All options (Advanced) →");
   $("reset").addEventListener("click", () => {
-    settings = { ...widget.defaults };
+    settings = widget.sanitize({ ...widget.defaults, ...(matchaBase ?? {}) });
     syncControls();
     api.onReset?.(settings);
     paint();
@@ -126,10 +133,11 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
   // ── the account ─────────────────────────────────────────────────────────────────────────────────────────────────
   const channelFromLink = params.get("tiktok") || params.get("channel") || "";
   const twitchFromLink = params.get("twitch") || "";
+  const matchaPrimary = MATCHA ? (initialPlatform === "twitch" ? (matchaProfile?.twitch || matchaProfile?.channel) : matchaProfile?.channel) : "";
   const prefPrimary = initialPlatform === "twitch" ? pref.twitch : pref.tiktok;
   const savedMatchesInitial = !saved?.platform || saved.platform === initialPlatform || (initialPlatform === "both" && saved.platform === "tiktok");
-  const initialChannel = channelFromLink || (savedMatchesInitial ? saved?.channel : "") || prefPrimary || "";
-  const initialTwitch = twitchFromLink || saved?.twitch || pref.twitch || "";
+  const initialChannel = channelFromLink || (savedMatchesInitial ? saved?.channel : "") || matchaPrimary || prefPrimary || "";
+  const initialTwitch = twitchFromLink || saved?.twitch || (MATCHA ? matchaProfile?.twitch : "") || pref.twitch || "";
   source = mountSource($("source"), {
     // chat is not drawn here, but an overlay that reads commands from it (song requests) is given each message; connecting or
     // disconnecting never empties it (clear does nothing)
@@ -160,7 +168,7 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
   const linkInput = $("link");
   const copyBtn = $("copy-link");
   copyButton(copyBtn, () => linkInput.value);
-  const cloud = cloudKind ? mountCloudSave({ kind: cloudKind, storeKey, anchor: linkInput.closest(".linkfield"), getUrl: () => linkInput.value, defaultName: `My ${cloudKind} overlay`, onStatus: (st) => api.onPlusStatus?.(st) }) : { sync() {} };
+  const cloud = cloudKind ? mountCloudSave({ kind: cloudKind, storeKey: effectiveStoreKey, anchor: linkInput.closest(".linkfield"), getUrl: () => linkInput.value, defaultName: MATCHA ? `Matcha ${cloudKind}` : `My ${cloudKind} overlay`, onStatus: (st) => api.onPlusStatus?.(st) }) : { sync() {} };
   function refreshLink() {
     const platform = source.platform;
     const isBoth = platform === "both";
@@ -257,7 +265,7 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
   });
 
   function save() {
-    try { localStorage.setItem(storeKey, JSON.stringify({ settings, channel: source.channel, twitch: source.twitchChannel, platform: source.platform, canvas })); } catch { /* storage can be blocked; the editor still works */ }
+    try { localStorage.setItem(effectiveStoreKey, JSON.stringify({ settings, channel: source.channel, twitch: source.twitchChannel, platform: source.platform, canvas })); } catch { /* storage can be blocked; the editor still works */ }
   }
 
   fit();

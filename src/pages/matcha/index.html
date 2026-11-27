@@ -1,101 +1,167 @@
 <!--
 {
-  "title": "Matcha chat styles | Frills",
-  "description": "Six matcha-green chat styles on made-up messages or real TikTok and Twitch chat. Pick one and copy its link.",
+  "title": "Matcha stream studio | Frills",
+  "description": "Your private full-size Matcha stream studio: 6 matcha-green chat styles, frog pond alerts, and all 16 Frills overlays synced to your palette.",
   "path": "/matcha/",
   "css": "matcha",
   "js": "matcha",
   "bodyClass": "page-editor page-matcha",
-  "chrome": "appbar",
+  "chrome": "matcha",
+  "matchaNav": "studio",
   "footer": false,
   "noindex": true,
   "listed": false
 }
 -->
-<main class="workspace" id="main" data-mode="matcha">
-  <section class="preview" id="preview" data-back="dark" data-view="chat" aria-label="Live preview of your matcha chat">
-    <div class="preview__bar">
-      <div class="preview__tabs" role="group" aria-label="What to preview">
-        <button class="chip" type="button" id="view-chat" aria-pressed="true">Chat</button>
-        <button class="chip" type="button" id="view-alerts" aria-pressed="false">Frog pond alerts</button>
+<main class="matcha-page" id="main" data-mode="matcha">
+  <div class="workspace">
+    <section class="preview" id="preview" data-back="dark" data-view="chat" aria-label="Live preview of your matcha chat">
+      <div class="preview__bar">
+        <div class="preview__tabs" role="group" aria-label="What to preview">
+          <button class="chip" type="button" id="view-chat" aria-pressed="true">Chat</button>
+          <button class="chip" type="button" id="view-alerts" aria-pressed="false">Frog pond alerts</button>
+        </div>
+        <div id="preview-width"></div>
+        <label class="visually-hidden" for="backdrop">What sits behind the preview</label>
+        <select id="backdrop">
+          <option value="dark">Dark game</option>
+          <option value="bright">Bright game</option>
+          <option value="busy">Busy scene</option>
+          <option value="checker">See-through</option>
+        </select>
       </div>
-      <div id="preview-width"></div>
-      <label class="visually-hidden" for="backdrop">What sits behind the preview</label>
-      <select id="backdrop">
-        <option value="dark">Dark game</option>
-        <option value="bright">Bright game</option>
-        <option value="busy">Busy scene</option>
-        <option value="checker">See-through</option>
-      </select>
+      <div class="chatstage" id="stage" aria-hidden="true"><div class="chatbox" id="chat"></div></div>
+      <div class="matcha-alerts__stage" id="alerts-stage" aria-hidden="true"></div>
+    </section>
+
+    <div class="panel">
+      <noscript><p class="note">Frills needs JavaScript to draw your chat. Turn it on for this page and reload.</p></noscript>
+      <header class="panel__intro">
+        <span class="matcha-kicker">Private Matcha · All 16 Overlays</span>
+        <h1 class="panel__title">Matcha stream studio</h1>
+        <p class="panel__lede">Six matcha-green chat styles, frog pond alerts, and every Frills overlay synced to your matcha palette on {{matchaLede}}. Pick a palette once, type your channel name, and copy any link below.</p>
+        <p class="matcha-jump"><a class="btn btn--soft btn--sm" href="#matcha-suite">Browse all 14 Matcha overlays ↓</a></p>
+      </header>
+
+      <section class="step-card" aria-labelledby="s1">
+        <div class="step-card__head">
+          <span class="step-card__num" aria-hidden="true">1</span>
+          <h2 class="step-card__title" id="s1">Pick a style</h2>
+        </div>
+        <div class="stack">
+          <div class="ctl ctl--wide"><span class="ctl__label">Style</span><div class="chips" id="styles" role="group" aria-label="Chat style"></div><small class="ctl__hint" id="style-note"></small></div>
+          <div class="ctl ctl--wide"><span class="ctl__label">Palette</span><div class="chips" id="palettes" role="group" aria-label="Palette"></div></div>
+          <div class="ctl ctl--wide"><span class="ctl__label">Mod icon</span><div class="chips" id="icons" role="group" aria-label="Moderator icon"></div></div>
+          <div class="ctl ctl--wide"><span class="ctl__label">Pictures</span><div class="chips" id="decos" role="group" aria-label="Pictures on the bubbles"></div><small class="ctl__hint">Little pictures that sit on the bubbles, alerts, outline, and talking pet: a frog pond, a cat café, and more.</small></div>
+        </div>
+        <details class="more matcha-more">
+          <summary>More options</summary>
+          <div class="stack" id="more-controls"></div>
+          <p class="matcha-more__foot"><button class="btn btn--soft btn--sm" type="button" id="more-reset">Reset these options</button></p>
+        </details>
+      </section>
+
+      <section class="step-card" aria-labelledby="s2">
+        <div class="step-card__head">
+          <span class="step-card__num" aria-hidden="true">2</span>
+          <h2 class="step-card__title" id="s2">Connect your chat</h2>
+        </div>
+        {{>source-checklist}}
+        <div id="source"></div>
+      </section>
+
+      <section class="step-card" aria-labelledby="s3">
+        <div class="step-card__head">
+          <span class="step-card__num" aria-hidden="true">3</span>
+          <h2 class="step-card__title" id="s3">Add it to your stream</h2>
+        </div>
+        <div class="linkfield">
+          <label class="ctl__label" for="link">Your link</label>
+          <input type="text" id="link" readonly placeholder="Appears once you type a name" spellcheck="false" autocomplete="off">
+          <div class="linkfield__actions">
+            <button class="btn" type="button" id="copy-link" disabled>Copy link</button>
+          </div>
+          <p class="linkfield__hint" id="link-hint" role="status"></p>
+        </div>
+      </section>
+
+      <section class="step-card" aria-labelledby="alerts-title">
+        <div class="step-card__head">
+          <span class="step-card__num" aria-hidden="true">4</span>
+          <h2 class="step-card__title" id="alerts-title">Frog pond alerts</h2>
+        </div>
+        <p class="matcha-alerts__text">Follows, gifts, shares, subs, bits, and raids pop up on a card with a frog peeking over the top and a lily pad with a lotus on the corner, synced to your active matcha palette. Press “Frog pond alerts” above the preview to see them live.</p>
+        <div class="linkfield">
+          <label class="ctl__label" for="alerts-link">Your alerts link</label>
+          <input type="text" id="alerts-link" readonly placeholder="Appears once you type a name" spellcheck="false" autocomplete="off">
+          <div class="linkfield__actions">
+            <button class="btn" type="button" id="copy-alerts-link" disabled>Copy alerts link</button>
+          </div>
+          <p class="linkfield__hint" id="alerts-hint" role="status"></p>
+        </div>
+        <p class="matcha-alerts__edit"><a class="btn btn--soft btn--sm" id="alerts-edit" href="/matcha/alerts/">Matcha alerts editor</a> A private editor for these alerts: change the card style, the colors, the words, the sounds and where the alert sits.</p>
+      </section>
     </div>
-    <div class="chatstage" id="stage" aria-hidden="true"><div class="chatbox" id="chat"></div></div>
-    <div class="matcha-alerts__stage" id="alerts-stage" aria-hidden="true"></div>
+  </div>
+
+  <section class="matcha-suite" id="matcha-suite" aria-labelledby="suite-title">
+    <div class="matcha-suite__inner">
+      <header class="matcha-suite__head">
+        <div class="matcha-suite__copy">
+          <span class="matcha-kicker">Auto-synced to Step 1 &amp; Step 2</span>
+          <h2 class="matcha-suite__title" id="suite-title">Complete Matcha Stream Suite</h2>
+          <p class="matcha-suite__lede">Every other Frills overlay—pre-styled in your chosen matcha palette and frog pond aesthetic. Preview any widget live or full-screen, copy its ready Browser source link, or open its full editor with your colors already loaded.</p>
+        </div>
+        <div class="matcha-suite__status" aria-live="polite">
+          <span class="matcha-pill" id="suite-palette-pill">Palette: Latte</span>
+          <span class="matcha-pill" id="suite-channel-pill">Channel: Practice mode</span>
+        </div>
+      </header>
+
+      <div class="matcha-suite__bar">
+        <div class="chips matcha-suite__filters" id="suite-filters" role="group" aria-label="Filter Matcha overlays">
+          <button class="chip" type="button" data-suite-filter="all" aria-pressed="true">All 14 overlays</button>
+          <button class="chip" type="button" data-suite-filter="both" aria-pressed="false">TikTok + Twitch</button>
+          <button class="chip" type="button" data-suite-filter="tiktok" aria-pressed="false">TikTok LIVE</button>
+          <button class="chip" type="button" data-suite-filter="visual" aria-pressed="false">Visual &amp; OBS</button>
+        </div>
+        <div class="matcha-suite__actions">
+          <button class="btn btn--soft btn--sm" type="button" id="suite-load-all">Load all previews</button>
+          <button class="btn btn--sm" type="button" id="suite-copy-all" disabled>Copy all links</button>
+        </div>
+      </div>
+      <p class="matcha-suite__msg" id="suite-msg" role="status" aria-live="polite" hidden></p>
+
+      <div class="matcha-grid" id="matcha-grid"></div>
+    </div>
   </section>
 
-  <div class="panel">
-    <noscript><p class="note">Frills needs JavaScript to draw your chat. Turn it on for this page and reload.</p></noscript>
-    <header class="panel__intro">
-      <h1 class="panel__title">Matcha chat styles</h1>
-      <p class="panel__lede">Six matcha-green looks for your chat, on made-up messages or on {{matchaLede}}. Pick one, change anything you like and copy its link.</p>
-    </header>
-
-    <section class="step-card" aria-labelledby="s1">
-      <div class="step-card__head">
-        <span class="step-card__num" aria-hidden="true">1</span>
-        <h2 class="step-card__title" id="s1">Pick a style</h2>
-      </div>
-      <div class="stack">
-        <div class="ctl ctl--wide"><span class="ctl__label">Style</span><div class="chips" id="styles" role="group" aria-label="Chat style"></div><small class="ctl__hint" id="style-note"></small></div>
-        <div class="ctl ctl--wide"><span class="ctl__label">Palette</span><div class="chips" id="palettes" role="group" aria-label="Palette"></div></div>
-        <div class="ctl ctl--wide"><span class="ctl__label">Mod icon</span><div class="chips" id="icons" role="group" aria-label="Moderator icon"></div></div>
-        <div class="ctl ctl--wide"><span class="ctl__label">Pictures</span><div class="chips" id="decos" role="group" aria-label="Pictures on the bubbles"></div><small class="ctl__hint">Little pictures that sit on the bubbles: a frog pond, a cat cafe and more.</small></div>
-      </div>
-      <details class="more matcha-more">
-        <summary>More options</summary>
-        <div class="stack" id="more-controls"></div>
-        <p class="matcha-more__foot"><button class="btn btn--soft btn--sm" type="button" id="more-reset">Reset these options</button></p>
-      </details>
-    </section>
-
-    <section class="step-card" aria-labelledby="s2">
-      <div class="step-card__head">
-        <span class="step-card__num" aria-hidden="true">2</span>
-        <h2 class="step-card__title" id="s2">Connect your chat</h2>
-      </div>
-      {{>source-checklist}}
-      <div id="source"></div>
-    </section>
-
-    <section class="step-card" aria-labelledby="s3">
-      <div class="step-card__head">
-        <span class="step-card__num" aria-hidden="true">3</span>
-        <h2 class="step-card__title" id="s3">Add it to your stream</h2>
-      </div>
-      <div class="linkfield">
-        <label class="ctl__label" for="link">Your link</label>
-        <input type="text" id="link" readonly placeholder="Appears once you type a name" spellcheck="false" autocomplete="off">
-        <div class="linkfield__actions">
-          <button class="btn" type="button" id="copy-link" disabled>Copy link</button>
+  <dialog class="matcha-lightbox" id="matcha-lightbox" aria-labelledby="mlb-title">
+    <div class="matcha-lightbox__inner">
+      <header class="matcha-lightbox__head">
+        <div class="matcha-lightbox__meta">
+          <h2 class="matcha-lightbox__title" id="mlb-title">Overlay preview</h2>
+          <span class="matcha-card__size" id="mlb-size">1080 × 1920</span>
         </div>
-        <p class="linkfield__hint" id="link-hint" role="status"></p>
-      </div>
-    </section>
-
-    <section class="step-card" aria-labelledby="alerts-title">
-      <div class="step-card__head">
-        <span class="step-card__num" aria-hidden="true">4</span>
-        <h2 class="step-card__title" id="alerts-title">Frog pond alerts</h2>
-      </div>
-      <p class="matcha-alerts__text">Follows, gifts and shares pop up on a card with a frog peeking over the top and a lily pad with a lotus on the corner, in the same matcha colors. Press “Frog pond alerts” above the preview to see them on made-up examples. Use the same TikTok name as in step 2.</p>
-      <div class="linkfield">
-        <label class="ctl__label" for="alerts-link">Your alerts link</label>
-        <input type="text" id="alerts-link" readonly placeholder="Appears once you type a name" spellcheck="false" autocomplete="off">
-        <div class="linkfield__actions">
-          <button class="btn" type="button" id="copy-alerts-link" disabled>Copy alerts link</button>
+        <div class="matcha-lightbox__controls">
+          <label class="visually-hidden" for="mlb-backdrop">Preview backdrop</label>
+          <select id="mlb-backdrop">
+            <option value="dark">Dark game</option>
+            <option value="bright">Bright game</option>
+            <option value="busy">Busy scene</option>
+            <option value="checker">See-through</option>
+          </select>
+          <button class="btn btn--soft btn--sm" type="button" id="mlb-close" aria-label="Close full preview">Close</button>
         </div>
-        <p class="linkfield__hint" id="alerts-hint" role="status"></p>
-      </div>
-      <p class="matcha-alerts__edit"><a class="btn btn--soft btn--sm" id="alerts-edit" href="/matcha/alerts/">Matcha alerts editor</a> A private editor for these alerts: change the card style, the colors, the words, the sounds and where the alert sits.</p>
-    </section>
-  </div>
+      </header>
+      <div class="matcha-lightbox__stage" id="mlb-stage" data-back="dark"></div>
+      <footer class="matcha-lightbox__foot">
+        <input type="text" id="mlb-link" readonly placeholder="Type your channel in Step 2 to get this link" spellcheck="false" autocomplete="off">
+        <div class="matcha-lightbox__btns">
+          <button class="btn btn--sm" type="button" id="mlb-copy" disabled>Copy link</button>
+          <a class="btn btn--soft btn--sm" id="mlb-edit" href="/matcha/jar/">Open Matcha editor</a>
+        </div>
+      </footer>
+    </div>
+  </dialog>
 </main>

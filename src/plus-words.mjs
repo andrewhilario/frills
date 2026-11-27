@@ -18,6 +18,7 @@ export function plusWords({ on = false, promoBanner = "" } = {}) {
       sheetPlusLink: "",
       navPlusLink: "",
       appbarPlusLink: "",
+      matchaAccountLink: "",
       homePlusBand: "",
       overlaysCard: "",
       ideasIntro: "Frills is free today. If we ever add a paid plan, it would be for extras that cost money to run, and we would say so up front. These are ideas, not promises: nothing here is for sale or promised for a date. Tap the ones you would use. Each tap is counted anonymously (no account, nothing that identifies you), so we build what people want.",
@@ -48,6 +49,7 @@ export function plusWords({ on = false, promoBanner = "" } = {}) {
     sheetPlusLink: `\n    <a class="nav__link" href="/plus/">Frills Plus</a>\n    <a class="nav__link" href="/account/">Account</a>`,
     navPlusLink: `\n      <a class="nav__link nav__link--plus" href="/plus/" data-plus-only hidden>Frills Plus</a>`,
     appbarPlusLink: `\n      <a class="nav__link nav__link--plus" href="/plus/" data-plus-only hidden>Frills Plus</a>`,
+    matchaAccountLink: `\n      <a class="nav__link nav__link--plus" href="/account/">Plus account</a>`,
     homePlusBand: `
   <section class="band band--pear" id="plus" data-plus-only hidden aria-labelledby="plus-band-title">
     <div class="shell">

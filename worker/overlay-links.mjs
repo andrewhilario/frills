@@ -35,16 +35,16 @@ export async function hasOverlayLink(db, accountId, kind = "tts") {
  * What a link code stands for: { accountId, plus } (plus is what the account bought, possibly nothing or ended: the caller asks `plusActive`), or null for a code that is not
  * live (never made, ended by a new one, or the account was deleted).
  */
-export async function accountForOverlayCode(db, code, kind = "tts") {
+export async function accountForOverlayCode(db, code, kind = "tts", now = Date.now()) {
   const text = String(code ?? "").trim();
   if (!CODE.test(text)) return null;
   const row = await db.prepare("SELECT account_id FROM overlay_links WHERE code_hash = ? AND kind = ?").bind(await sha256(text), kind).first();
   if (!row) return null;
-  return { accountId: row.account_id, plus: await getPlus(db, row.account_id) };
+  return { accountId: row.account_id, plus: await getPlus(db, row.account_id, now) };
 }
 
 /** The same, but only for an account that has Plus right now: { accountId, plus } or null. */
 export async function plusForOverlayCode(db, code, { now = Date.now(), kind = "tts" } = {}) {
-  const found = await accountForOverlayCode(db, code, kind);
+  const found = await accountForOverlayCode(db, code, kind, now);
   return found && plusActive(found.plus, now) ? found : null;
 }

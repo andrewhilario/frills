@@ -2,7 +2,7 @@
 // Accepts either a signed-in browser session cookie or a revocable Plus overlay link code (`x-overlay` header or JSON body `{ code }`).
 // Unlike /api/tts, using the dedicated relay does NOT consume AI voice characters — it is included unlimited with an active Frills Plus subscription.
 
-import { plusActive } from "./accounts.mjs";
+import { isCompPlus, plusActive } from "./accounts.mjs";
 import { resolveCredential } from "./plus-credential.mjs";
 import { checkProRegion, json } from "./region.mjs";
 import { signRelayTicket, validTicketSecret } from "./relay-ticket.mjs";
@@ -55,8 +55,10 @@ export async function handlePlusRelayTicket(request, env, { now = Date.now() } =
   if (who.kind === "none") return json(401, { ok: false, error: "no_pass" });
   if (who.kind === "invalid" || !plusActive(who.plus, now)) return json(401, { ok: false, error: "invalid_pass" });
 
-  const region = checkProRegion(request, env);
-  if (!region.eligible) return json(403, { ok: false, error: "region_unavailable", country: region.country });
+  if (!isCompPlus(who.plus)) {
+    const region = checkProRegion(request, env);
+    if (!region.eligible) return json(403, { ok: false, error: "region_unavailable", country: region.country });
+  }
 
   const signed = await signRelayTicket(secret, { now });
   if (!signed) return json(503, { ok: false, error: "plus_relay_off" });

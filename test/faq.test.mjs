@@ -72,8 +72,8 @@ test("the overlays FAQ answers what people ask about alerts, Twitch, uploads, so
 test("the overlays FAQ keeps its promises: Twitch support as it is, uploads described honestly, and the privacy page linked", () => {
   const items = overlaysFaq({});
   const answer = (q) => items.find((i) => i.q === q).a;
-  assert.match(answer("Do the overlays work with Twitch?"), /chat overlay.*alerts.*top gifters.*rotating highlights/);
-  assert.match(answer("Do the overlays work with Twitch?"), /Last gifts, goals and top likers are for TikTok LIVE only/);
+  assert.match(answer("Do the overlays work with Twitch?"), /chat.*alerts.*top gifters.*rotating highlights/);
+  assert.match(answer("Do the overlays work with Twitch?"), /Only .*top likers.*gift gallery.*like counter.* are TikTok LIVE only/);
   assert.match(answer("Which overlays are there?"), /top gifters/);
   assert.match(answer("Which overlays are there?"), /rotating highlights/);
   assert.match(answer("Can I use my own images, GIFs and sounds in alerts?"), /1 MB.*300 KB/);

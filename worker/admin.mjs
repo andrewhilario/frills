@@ -9,6 +9,7 @@ import { KINDS } from "./feedback.mjs";
 import { MEDIA } from "./media.mjs";
 import { handleOffice } from "./office.mjs";
 import { parseRelayUrls, report } from "./stats-report.mjs";
+import { grantCompPlus, listPlusAccounts, resetPlusUsage, revokeCompPlus } from "./accounts.mjs";
 
 export const ADMIN = { minKey: 12, maxWrong: 10, windowMs: 10 * 60 * 1000, pageSize: 40, maxPage: 100 };
 export const STATUSES = ["new", "done"];
@@ -58,18 +59,28 @@ async function hasStatus(env) {
 const clampLimit = (value) => Math.min(ADMIN.maxPage, Math.max(1, Math.round(Number(value)) || ADMIN.pageSize));
 const likePattern = (text) => `%${text.replace(/[\\%_]/g, (c) => "\\" + c)}%`;
 
-async function summary(env) {
+async function summary(env, now = Date.now()) {
   const status = await hasStatus(env);
   const total = await env.DB.prepare("SELECT COUNT(*) AS n FROM feedback").first();
   const fresh = status ? await env.DB.prepare("SELECT COUNT(*) AS n FROM feedback WHERE status = 'new'").first() : total;
   const kinds = (await env.DB.prepare("SELECT kind, COUNT(*) AS n FROM feedback GROUP BY kind").all()).results;
   const files = await env.DB.prepare("SELECT COUNT(*) AS n, COALESCE(SUM(size), 0) AS bytes FROM media").first();
   const byKind = (await env.DB.prepare("SELECT kind, COUNT(*) AS n FROM media GROUP BY kind").all()).results;
+  let plusSummary = { total: 0, active: 0, comp: 0 };
+  try {
+    const list = await listPlusAccounts(env.DB, { now });
+    plusSummary = {
+      total: list.length,
+      active: list.filter((p) => p.active).length,
+      comp: list.filter((p) => p.comp && p.active).length,
+    };
+  } catch { /* older DBs before accounts/plus tables */ }
   return json(200, {
     ok: true,
     canMark: status,
     feedback: { total: total?.n ?? 0, new: fresh?.n ?? 0, kinds: Object.fromEntries(kinds.map((k) => [k.kind, k.n])) },
     media: { count: files?.n ?? 0, bytes: files?.bytes ?? 0, limit: MEDIA.totalBytes, kinds: Object.fromEntries(byKind.map((k) => [k.kind, k.n])) },
+    plus: plusSummary,
   });
 }
 
@@ -155,6 +166,41 @@ async function controlEuler(request, env, { fetchImpl = globalThis.fetch?.bind(g
   return json(200, { ok: results.some((r) => r.ok), action, results });
 }
 
+async function handleAdminPlus(method, rest, more, request, env, now) {
+  if (!rest && more.length === 0) {
+    if (method === "GET") {
+      const items = await listPlusAccounts(env.DB, { now });
+      return json(200, { ok: true, items });
+    }
+    if (method === "POST") {
+      let body;
+      try { body = await request.json(); } catch { return json(400, { ok: false, error: "bad_json" }); }
+      const result = await grantCompPlus(env.DB, body?.email, { limit: body?.limit, now });
+      if (!result.ok) {
+        const status = result.error === "already_paid" ? 409 : result.error === "full" ? 503 : 400;
+        return json(status, result);
+      }
+      return json(200, result);
+    }
+    return json(405, { ok: false, error: "method" }, { allow: "GET, POST" });
+  }
+  const accountId = String(rest ?? "").trim();
+  if (!/^[0-9a-f]{16}$/.test(accountId)) return json(404, { ok: false, error: "not_found" });
+  if (more.length === 0 && method === "DELETE") {
+    const result = await revokeCompPlus(env.DB, accountId, { now });
+    if (!result.ok) return json(result.error === "not_comp" ? 409 : 404, result);
+    return json(200, result);
+  }
+  if (more.length === 1 && more[0] === "reset" && method === "POST") {
+    let body = {};
+    try { const raw = await request.text(); if (raw.trim()) body = JSON.parse(raw); } catch { return json(400, { ok: false, error: "bad_json" }); }
+    const result = await resetPlusUsage(env.DB, accountId, { limit: body?.limit, now });
+    if (!result.ok) return json(404, result);
+    return json(200, result);
+  }
+  return json(405, { ok: false, error: "method" }, { allow: "POST, DELETE" });
+}
+
 /** Routes everything under /api/admin/. Returns a Response, or null when the address is not under it. */
 export async function handleAdmin(request, env, { now = Date.now(), fetchImpl = globalThis.fetch?.bind(globalThis) } = {}) {
   const url = new URL(request.url);
@@ -165,9 +211,10 @@ export async function handleAdmin(request, env, { now = Date.now(), fetchImpl = 
   if (method !== "GET" && !sameOrigin(request)) return json(403, { ok: false, error: "wrong_origin" });
   const [, , , area, rest, ...more] = url.pathname.split("/");
   try {
-    if (more.length === 0 && area === "summary" && !rest) return method === "GET" ? await summary(env) : json(405, { ok: false, error: "method" }, { allow: "GET" });
+    if (more.length === 0 && area === "summary" && !rest) return method === "GET" ? await summary(env, now) : json(405, { ok: false, error: "method" }, { allow: "GET" });
     if (more.length === 0 && area === "stats" && !rest) return method === "GET" ? json(200, await report(env, { now, fetchImpl })) : json(405, { ok: false, error: "method" }, { allow: "GET" });
     if (area === "office") return await handleOffice(request, env, [rest, ...more].filter(Boolean), { now, fetchImpl });
+    if (area === "plus") return await handleAdminPlus(method, rest, more, request, env, now);
     if (more.length === 0 && area === "euler" && !rest) return method === "POST" ? await controlEuler(request, env, { fetchImpl }) : json(405, { ok: false, error: "method" }, { allow: "POST" });
     if (more.length === 0 && area === "feedback") {
       if (!rest) return method === "GET" ? await listFeedback(url, env) : json(405, { ok: false, error: "method" }, { allow: "GET" });

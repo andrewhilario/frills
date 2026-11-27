@@ -13,7 +13,7 @@
 // to press "Sign in", so an email scanner that opens every link in a message cannot spend the one-use token before the person gets to it.
 // Every change needs the request to come from this site itself (the Origin header), and the cookie is HttpOnly, SameSite=Lax, and Secure on the real site.
 
-import { LIMITS, createLoginLink, deleteAccount, endAllSessions, endSession, getPlus, normalizeEmail, plusActive, sessionAccount, sweep, useLoginLink } from "./accounts.mjs";
+import { LIMITS, createLoginLink, deleteAccount, endAllSessions, endSession, getPlus, hasCompPlusByEmail, isCompLoginToken, isCompPlus, normalizeEmail, plusActive, sessionAccount, sweep, useLoginLink } from "./accounts.mjs";
 import { getMailer, signInMessage } from "./mailer.mjs";
 import { checkoutLink, checkoutReady } from "./checkout.mjs";
 import { portalLink, portalReady } from "./portal.mjs";
@@ -73,15 +73,16 @@ export async function handleAccount(request, env, { now = Date.now(), mailer = n
     if (action === "me") {
       const who = await sessionAccount(db, cookieOf(request, COOKIE), { now });
       if (!who) return json(200, { ok: true, signedIn: false });
-      const plus = await getPlus(db, who.accountId);
+      const plus = await getPlus(db, who.accountId, now);
+      const comp = isCompPlus(plus);
       return json(200, {
         ok: true,
         signedIn: true,
         email: who.email,
         checkout: (polarCheckoutReady(env) || checkoutReady(env.LEMON_CHECKOUT_URL, Boolean(env.DEV))) && regionAllowed(request, env) && !sandboxCheckoutBlocked(request, env),
-        portal: polarPortalReady(env) || portalReady(env),
+        portal: !comp && (polarPortalReady(env) || portalReady(env)),
         overlayLink: await hasOverlayLink(db, who.accountId),
-        plus: plus ? { status: plus.status, active: plusActive(plus, now), renewsAt: plus.renews_at, used: plus.tts_used, limit: plus.tts_limit } : null,
+        plus: plus ? { status: plus.status, active: plusActive(plus, now), ...(comp ? { comp: true } : {}), renewsAt: plus.renews_at, used: plus.tts_used, limit: plus.tts_limit } : null,
       });
     }
 
@@ -155,8 +156,8 @@ export async function handleAccount(request, env, { now = Date.now(), mailer = n
       const { body: asked, tooBig: big } = await readBody(request);
       if (big) return json(413, { ok: false, error: "too_big" });
       if (!asked || normalizeEmail(asked.email) !== who.email) return json(400, { ok: false, error: "confirm_mismatch" });
-      const plus = await getPlus(db, who.accountId);
-      if (plus?.status === "active" && plusActive(plus, now)) return json(409, { ok: false, error: "cancel_first" });
+      const plus = await getPlus(db, who.accountId, now);
+      if (plus?.status === "active" && !isCompPlus(plus) && plusActive(plus, now)) return json(409, { ok: false, error: "cancel_first" });
       await deleteAccount(db, who.accountId);
       return json(200, { ok: true }, { "set-cookie": setCookie(env, "", 0) });
     }
@@ -166,8 +167,10 @@ export async function handleAccount(request, env, { now = Date.now(), mailer = n
     if (!body) return json(400, { ok: false, error: "bad_data" });
 
     if (action === "login") {
-      if (!regionAllowed(request, env)) return json(403, { ok: false, error: "region_unavailable" });
       const email = normalizeEmail(body.email);
+      if (!regionAllowed(request, env) && !(email && (await hasCompPlusByEmail(db, email, now)))) {
+        return json(403, { ok: false, error: "region_unavailable" });
+      }
       if (!email) return json(400, { ok: false, error: "bad_email" });
       const sender = getMailer(env, mailer, { fetchFn });
       if (!sender) return json(503, { ok: false, error: "email_off" });
@@ -182,8 +185,11 @@ export async function handleAccount(request, env, { now = Date.now(), mailer = n
     }
 
     // verify
-    if (!regionAllowed(request, env)) return json(403, { ok: false, error: "region_unavailable" });
-    const used = await useLoginLink(db, typeof body.token === "string" ? body.token : "", { now });
+    const verifyToken = typeof body.token === "string" ? body.token : "";
+    if (!regionAllowed(request, env) && !(await isCompLoginToken(db, verifyToken, now))) {
+      return json(403, { ok: false, error: "region_unavailable" });
+    }
+    const used = await useLoginLink(db, verifyToken, { now });
     if (!used.ok) return json(used.error === "full" ? 503 : 400, { ok: false, error: used.error });
     return json(200, { ok: true, email: used.email, created: used.created }, { "set-cookie": setCookie(env, used.sessionToken, Math.floor(LIMITS.sessionMs / 1000)) });
   } catch {

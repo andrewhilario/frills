@@ -29,6 +29,9 @@ async function api(method, path, body) {
   if (res.status === 503 && data.error === "admin_off") throw new Wrong("The admin side is switched off. Set the ADMIN_KEY secret in Cloudflare (12 or more characters) and try again.");
   if (res.status === 503) throw new Wrong("The database is not ready. Check the D1 tables in schema.sql exist.");
   if (data.error === "no_status_column") throw new Wrong("The database has no status column yet. See the note at the top.");
+  if (data.error === "bad_email") throw new Wrong("That does not look like a valid email address.");
+  if (data.error === "already_paid") throw new Wrong("That account already has an active paid Frills Plus subscription.");
+  if (data.error === "not_comp") throw new Wrong("Only complimentary VIP passes can be revoked here (cancel paid plans in Polar).");
   throw new Wrong("Something went wrong (" + res.status + ").");
 }
 
@@ -108,6 +111,7 @@ async function refreshSummary() {
     card(String(s.feedback.new), canMark ? "not marked done" : "(marking is off)"),
     card(String(s.media.count), `files (${plural(s.media.kinds.image ?? 0, "image", "images")}, ${plural(s.media.kinds.sound ?? 0, "sound", "sounds")})`),
     card(size(s.media.bytes), `stored of ${size(s.media.limit)}`, used),
+    card(String(s.plus?.active ?? 0), `Frills Plus active (${s.plus?.comp ?? 0} VIP)`),
   );
 }
 function card(number, label, percent) {
@@ -122,13 +126,16 @@ function card(number, label, percent) {
 
 // ── Tabs ───────────────────────────────────────────────────────────────────────────────────────────────────────────
 function tab(which) {
-  for (const name of ["feedback", "files"]) {
-    $("panel-" + name).hidden = name !== which;
-    $("tab-" + name).setAttribute("aria-pressed", String(name === which));
+  for (const name of ["feedback", "files", "plus"]) {
+    const panel = $("panel-" + name);
+    const btn = $("tab-" + name);
+    if (panel) panel.hidden = name !== which;
+    if (btn) btn.setAttribute("aria-pressed", String(name === which));
   }
 }
 $("tab-feedback").addEventListener("click", () => tab("feedback"));
 $("tab-files").addEventListener("click", () => tab("files"));
+$("tab-plus")?.addEventListener("click", () => tab("plus"));
 
 /** A row of chips where one is pressed. Returns { get, set }. */
 function pick(host, items, onPick) {
@@ -255,10 +262,89 @@ async function loadMedia(fresh) {
 }
 $("m-more").addEventListener("click", () => loadMedia(false));
 
+// ── Frills Plus VIP ────────────────────────────────────────────────────────────────────────────────────────────────
+function plusCard(p) {
+  const node = el("article", { className: "item" + (p.active ? "" : " is-done") });
+  const kindTag = el("span", { className: p.comp ? "tag tag--vip" : "tag", textContent: p.comp ? "VIP (Free)" : "Paid" });
+  const stateTag = el("span", { className: p.active ? "tag tag--vip" : "tag tag--off", textContent: p.active ? "Active" : p.status });
+  const pct = Math.min(100, Math.round((100 * p.used) / Math.max(1, p.limit)));
+  const bar = el("i", { className: "stat__bar" });
+  bar.style.setProperty("--used", pct + "%");
+  node.append(
+    el("div", { className: "item__head" },
+      kindTag,
+      stateTag,
+      el("strong", { textContent: p.email }),
+      el("span", { className: "item__meta item__id", textContent: p.accountId }),
+    ),
+    el("p", { className: "item__meta", textContent: `AI voice: ${p.used.toLocaleString()} / ${p.limit.toLocaleString()} chars (${pct}%)` }),
+    bar,
+  );
+  const actions = el("div", { className: "item__actions" });
+  const resetBtn = el("button", { type: "button", className: "btn btn--soft btn--sm", textContent: "Reset AI credits" });
+  resetBtn.addEventListener("click", async () => {
+    resetBtn.disabled = true;
+    await run($("p-status"), async () => {
+      await api("POST", `plus/${p.accountId}/reset`, {});
+      say($("p-status"), `Reset AI voice credits for ${p.email}.`);
+      await loadPlus();
+    });
+    resetBtn.disabled = false;
+  });
+  actions.append(resetBtn);
+  if (p.comp && p.active) {
+    actions.append(confirmButton("Revoke VIP", () => run($("p-status"), async () => {
+      await api("DELETE", `plus/${p.accountId}`);
+      say($("p-status"), `Revoked complimentary Frills Plus for ${p.email}.`);
+      await Promise.all([loadPlus(), refreshSummary()]);
+      return true;
+    }).then((ok) => { if (!ok) throw new Error("not revoked"); })));
+  } else if (p.comp && !p.active) {
+    const restoreBtn = el("button", { type: "button", className: "btn btn--sm", textContent: "Re-enable VIP" });
+    restoreBtn.addEventListener("click", async () => {
+      restoreBtn.disabled = true;
+      await run($("p-status"), async () => {
+        await api("POST", "plus", { email: p.email, limit: p.limit });
+        say($("p-status"), `Re-enabled VIP Frills Plus for ${p.email}.`);
+        await Promise.all([loadPlus(), refreshSummary()]);
+      });
+      restoreBtn.disabled = false;
+    });
+    actions.append(restoreBtn);
+  }
+  node.append(actions);
+  return node;
+}
+
+async function loadPlus() {
+  if (!$("p-list")) return;
+  say($("p-status"), "Loading…");
+  const data = await run($("p-status"), () => api("GET", "plus"));
+  if (!data) return;
+  $("p-list").replaceChildren(...(data.items ?? []).map(plusCard));
+  say($("p-status"), $("p-list").children.length ? "" : "No Frills Plus or VIP accounts yet. Grant one above.");
+}
+
+$("p-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const address = $("p-email").value.trim();
+  const limit = Number($("p-limit").value) || 150000;
+  if (!address) return;
+  $("p-grant").disabled = true;
+  say($("p-status"), "Granting…");
+  await run($("p-status"), async () => {
+    const res = await api("POST", "plus", { email: address, limit });
+    $("p-email").value = "";
+    say($("p-status"), `Complimentary Frills Plus granted to ${res.email}. They can now sign in at /account/ with this email.`);
+    await Promise.all([loadPlus(), refreshSummary()]);
+  });
+  $("p-grant").disabled = false;
+});
+
 async function refreshAll() {
   try {
     await refreshSummary();
-    await Promise.all([loadFeedback(true), loadMedia(true)]);
+    await Promise.all([loadFeedback(true), loadMedia(true), loadPlus()]);
   } catch (error) {
     if (!(error instanceof Wrong)) throw error;
   }

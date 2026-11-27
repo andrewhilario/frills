@@ -27,7 +27,7 @@ const assetOf = (html, kind) => (new RegExp(`${kind === "css" ? 'href="(/assets/
 
 test("the pages we expect are all there", () => {
   const urls = pages.map((p) => p.url).sort();
-  const base = ["/","/404.html","/actions/","/admin/","/admin/office/","/admin/stats/","/alerts/","/changelog/","/check/","/counter/","/editor/","/feedback/","/gallery/","/gifters/","/gifts/","/goal/","/guides/alerts/","/guides/both/","/guides/live-studio/","/guides/not-showing/","/guides/obs/","/guides/setup/","/guides/sizes/","/guides/songs/","/guides/test/","/guides/tiktok/","/jar/","/labels/","/likers/","/looks/","/looks/bunny-cloud/","/looks/frog-pond/","/looks/hamster-burrow/","/looks/neko-cafe/","/matcha/","/matcha/alerts/","/outline/","/overlay/","/overlay/actions/","/overlay/alerts/","/overlay/counter/","/overlay/gallery/","/overlay/gifters/","/overlay/gifts/","/overlay/goal/","/overlay/jar/","/overlay/labels/","/overlay/likers/","/overlay/outline/","/overlay/songs/","/overlay/timer/","/overlay/tts/","/overlay/wheel/","/overlays/","/overlays/faq/","/privacy/","/songs/","/spotify/","/spotify/callback/","/start/","/status/","/timer/","/tts/","/twitch/","/twitch/callback/","/wheel/"];
+  const base = ["/","/404.html","/actions/","/admin/","/admin/office/","/admin/stats/","/alerts/","/changelog/","/check/","/counter/","/editor/","/feedback/","/gallery/","/gifters/","/gifts/","/goal/","/guides/alerts/","/guides/both/","/guides/live-studio/","/guides/not-showing/","/guides/obs/","/guides/setup/","/guides/sizes/","/guides/songs/","/guides/test/","/guides/tiktok/","/jar/","/labels/","/likers/","/looks/","/looks/bunny-cloud/","/looks/frog-pond/","/looks/hamster-burrow/","/looks/neko-cafe/","/matcha/","/matcha/actions/","/matcha/alerts/","/matcha/counter/","/matcha/gallery/","/matcha/gifters/","/matcha/gifts/","/matcha/goal/","/matcha/jar/","/matcha/labels/","/matcha/likers/","/matcha/outline/","/matcha/songs/","/matcha/timer/","/matcha/tts/","/matcha/wheel/","/outline/","/overlay/","/overlay/actions/","/overlay/alerts/","/overlay/counter/","/overlay/gallery/","/overlay/gifters/","/overlay/gifts/","/overlay/goal/","/overlay/jar/","/overlay/labels/","/overlay/likers/","/overlay/outline/","/overlay/songs/","/overlay/timer/","/overlay/tts/","/overlay/wheel/","/overlays/","/overlays/faq/","/privacy/","/songs/","/spotify/","/spotify/callback/","/start/","/status/","/timer/","/tts/","/twitch/","/twitch/callback/","/wheel/"];
   const expected = site.plusAccounts ? [...base, "/account/", "/account/verify/", "/o/", "/plus/"].sort() : base;
   assert.deepEqual(urls, expected);
 });
@@ -58,11 +58,12 @@ test("every indexable page has its own title and description, a canonical addres
 
 test("pages that should stay out of search say so, in the page and in the headers", () => {
   const headers = read("_headers");
-  for (const url of ["/overlay/", "/matcha/", "/matcha/alerts/", "/404.html"]) {
+  for (const url of ["/overlay/", "/matcha/", "/matcha/alerts/", "/matcha/jar/", "/matcha/outline/", "/matcha/wheel/", "/matcha/actions/", "/matcha/tts/", "/404.html"]) {
     assert.match(pages.find((p) => p.url === url).html, /<meta name="robots" content="noindex, nofollow">/, url);
   }
   assert.match(headers, /\/overlay\/\*\n  X-Robots-Tag: noindex, nofollow/);
   assert.match(headers, /\/matcha\/\*\n  X-Robots-Tag: noindex, nofollow/);
+  assert.match(headers, /\/matcha\/actions\/\*\n  X-Robots-Tag: noindex, nofollow/);
 });
 
 test("the sitemap lists exactly the indexable pages", () => {
