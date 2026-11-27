@@ -40,8 +40,8 @@ export const GIFTERS = defineWidget({
     { section: "list", ...toggle("showCounts", "Show the score") },
     { section: "list", ...toggle("avatar", "Show the person's picture") },
     { section: "list", ...toggle("medals", "Gold, silver and bronze for the top 3") },
-    { section: "list", onlyPlatform: "twitch", ...chipsOf("twitchMode", "Twitch ranks", [["subgift", "Sub gifters"], ["bits", "Bit senders"], ["combined", "Both together"]]) },
-    { section: "list", onlyPlatform: "tiktok", ...number("minDiamonds", "Diamonds needed to be listed", 1, 1000000) },
+    { section: "list", onlyPlatform: "twitch both", ...chipsOf("twitchMode", "Twitch ranks", [["subgift", "Sub gifters"], ["bits", "Bit senders"], ["combined", "Both together"]]) },
+    { section: "list", onlyPlatform: "tiktok both", ...number("minDiamonds", "Diamonds needed to be listed", 1, 1000000) },
     { section: "list", ...toggle("keep", "Remember the totals if the page reloads", "Kept only in this browser or streaming app. Off starts again each time the page loads.") },
     { section: "list", ...chipsOf("period", "Leaderboard window", [["all", "All-time (until reset)"], ["week", "This week (resets Mon)"], ["month", "This month (resets 1st)"]]) },
     { section: "list", ...toggle("celebrate", "Celebrate a gift milestone", "When someone reaches a milestone, their picture, name and score zoom in with a crown, for a few seconds.") },
@@ -62,6 +62,15 @@ const plural = (n, one, many) => `${nfmt(n)} ${n === 1 ? one : many}`;
 
 /** Numeric score used for sorting and minimum filtering under the active platform and Twitch mode. */
 export function gifterScore(person, platform = "tiktok", twitchMode = "subgift") {
+  if (platform === "both") {
+    const d = person.diamonds || 0;
+    const tw = twitchMode === "bits"
+      ? (person.bits || 0)
+      : twitchMode === "subgift"
+        ? (person.subgifts || 0) * SUB_WEIGHT
+        : (person.subgifts || 0) * SUB_WEIGHT + (person.bits || 0);
+    return d + tw;
+  }
   if (platform !== "twitch") return person.diamonds || 0;
   if (twitchMode === "bits") return person.bits || 0;
   if (twitchMode === "combined") return (person.subgifts || 0) * SUB_WEIGHT + (person.bits || 0);
@@ -70,6 +79,13 @@ export function gifterScore(person, platform = "tiktok", twitchMode = "subgift")
 
 /** Human-readable score label shown on each leaderboard row. */
 export function formatGifterScore(person, platform = "tiktok", twitchMode = "subgift") {
+  if (platform === "both") {
+    const parts = [];
+    if (person.diamonds > 0) parts.push(plural(person.diamonds, "diamond", "diamonds"));
+    if (twitchMode !== "bits" && person.subgifts > 0) parts.push(plural(person.subgifts, "sub", "subs"));
+    if (twitchMode !== "subgift" && person.bits > 0) parts.push(plural(person.bits, "bit", "bits"));
+    return parts.length ? parts.join(" · ") : plural(0, "point", "points");
+  }
   if (platform !== "twitch") return plural(person.diamonds || 0, "diamond", "diamonds");
   if (twitchMode === "bits") return plural(person.bits || 0, "bit", "bits");
   if (twitchMode === "subgift") return plural(person.subgifts || 0, "sub", "subs");
@@ -82,6 +98,7 @@ export function formatGifterScore(person, platform = "tiktok", twitchMode = "sub
 
 /** Returns { metric, unit } for milestone counting and the trophy popup text. */
 export function milestoneInfo(person, platform = "tiktok", twitchMode = "subgift") {
+  if (platform === "both") return { metric: gifterScore(person, platform, twitchMode), unit: "points" };
   if (platform !== "twitch") return { metric: person.diamonds || 0, unit: (person.diamonds || 0) === 1 ? "diamond" : "diamonds" };
   if (twitchMode === "bits") return { metric: person.bits || 0, unit: (person.bits || 0) === 1 ? "bit" : "bits" };
   if (twitchMode === "subgift") return { metric: person.subgifts || 0, unit: (person.subgifts || 0) === 1 ? "gifted sub" : "gifted subs" };
@@ -89,13 +106,13 @@ export function milestoneInfo(person, platform = "tiktok", twitchMode = "subgift
 }
 
 /**
- * Ranks gifters for TikTok LIVE (gift diamonds) or Twitch (sub gifters, bit senders, or both).
+ * Ranks gifters for TikTok LIVE (gift diamonds), Twitch (sub gifters, bit senders, or both), or Both platforms combined.
  * Calls `onChange(top)` after every state change and `onMilestone(info)` when a tracked threshold is crossed.
  */
 export class GifterBoard {
   constructor(settings, { platform = "tiktok", onChange, onMilestone, entries = [] } = {}) {
     this.settings = settings;
-    this.platform = platform === "twitch" ? "twitch" : "tiktok";
+    this.platform = platform === "twitch" || platform === "both" ? platform : "tiktok";
     this.onChange = onChange ?? (() => {});
     this.onMilestone = onMilestone ?? (() => {});
     this.people = new Map();
@@ -119,7 +136,7 @@ export class GifterBoard {
   }
 
   setPlatform(platform) {
-    const next = platform === "twitch" ? "twitch" : "tiktok";
+    const next = platform === "twitch" || platform === "both" ? platform : "tiktok";
     if (next === this.platform) return;
     this.platform = next;
     this.onChange(this.top);
@@ -132,7 +149,7 @@ export class GifterBoard {
   /** Ranked entries, best first; earliest achiever wins ties. */
   get top() {
     const twitchMode = this.settings.twitchMode || "subgift";
-    const minScore = this.platform === "twitch" ? 1 : Math.max(1, Number(this.settings.minDiamonds) || 1);
+    const minScore = this.platform === "tiktok" ? Math.max(1, Number(this.settings.minDiamonds) || 1) : 1;
     return [...this.people.values()]
       .map((p) => ({ person: p, score: gifterScore(p, this.platform, twitchMode) }))
       .filter(({ score }) => score >= minScore)

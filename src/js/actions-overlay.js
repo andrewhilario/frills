@@ -63,8 +63,8 @@ if (!demo && needsObs) {
   obs.connect().catch(() => {});
 }
 
-// Free links connect to VTube Studio for live named sticky notes (up to 5 on screen at once);
-// Frills Plus unlocks unlimited sticky notes plus all other VTS actions (hotkeys, props, expressions, moves, tints).
+// Free links connect to VTube Studio for live automatic named sticky notes (up to 10 on screen at once);
+// Frills Plus unlocks unlimited automatic sticky notes plus all other VTS actions (hotkeys, props, expressions, moves, tints).
 const needsVts = isPlus ? hasVtsSteps(rules) : hasFreeVtsSteps(rules);
 let vts = null;
 if (!demo && needsVts) {

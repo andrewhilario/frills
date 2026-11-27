@@ -8,6 +8,7 @@ import { copyButton } from "./ui.js";
 import { el } from "./feed.js";
 import { ALIGNS, SHAPES, VIBES, buildLinks, linksText, overlaysFor } from "./quickstart.js";
 import { appendPlusCode } from "./plus-relay.js";
+import { savePlatformPref } from "./platform-pref.js";
 
 initNav();
 
@@ -59,11 +60,11 @@ const QUESTIONS = [
     hint: "This decides which overlays you can have and how they connect. Pick one, then press Next.",
     body: () => picks(
       [
-        { id: "tiktok", name: "TikTok LIVE", text: "Chat, alerts, spin wheel, gift gallery, jars, goals and likers." },
-        { id: "twitch", name: "Twitch", text: "Chat, alerts, top gifters, rotating highlights and spin the wheel." },
-        { id: "both", name: "Both at once", text: "One chat together, alerts, gifters, highlights and spin wheel for each, plus TikTok gifts, gallery, goals and likers. In beta." },
+        { id: "tiktok", name: "TikTok LIVE", text: "Chat, alerts, gift jar, spin wheel, goals, song requests, talking pet TTS and more." },
+        { id: "twitch", name: "Twitch", text: "Chat, alerts, gift & bits jar, spin wheel, goals, subathon timer, song requests, talking pet TTS, top gifters and highlights." },
+        { id: "both", name: "Both at once", text: "One combined link for chat, alerts, jars, wheel, goals, song requests, timer, TTS, gifters & highlights — plus TikTok gallery, likers & counter." },
       ],
-      answers.platform, (id) => { answers.platform = id; }, (i) => titled(i.name, i.text), { label: "Where you stream" },
+      answers.platform, (id) => { answers.platform = id; savePlatformPref({ platform: id }); }, (i) => titled(i.name, i.text), { label: "Where you stream" },
     ),
     needsNext: true,
   },
@@ -91,7 +92,10 @@ const QUESTIONS = [
       queueMicrotask(() => host.querySelector("input[data-platform]")?.focus());
       return el("div", { className: "start__field" }, ...boxes, el("div", { className: "start__row" }, skip));
     },
-    commit: () => { for (const input of host.querySelectorAll("input[data-platform]")) answers.names[input.dataset.platform] = input.value; },
+    commit: () => {
+      for (const input of host.querySelectorAll("input[data-platform]")) answers.names[input.dataset.platform] = input.value;
+      savePlatformPref({ platform: answers.platform, tiktok: answers.names.tiktok, twitch: answers.names.twitch });
+    },
     valid: () => {
       const bad = accounts().filter(badOf);
       for (const input of host.querySelectorAll("input[data-platform]")) input.toggleAttribute("aria-invalid", bad.includes(input.dataset.platform));
@@ -112,7 +116,7 @@ const QUESTIONS = [
         const box = el("input", { type: "checkbox", checked: answers.overlays.includes(o.id) });
         box.addEventListener("change", () => { answers.overlays = box.checked ? [...new Set([...answers.overlays, o.id])] : answers.overlays.filter((id) => id !== o.id); });
         const both = answers.platform === "both";
-        const blurb = !both ? o.blurb : o.id === "chat" ? "Your TikTok and Twitch chat together, in one set of speech bubbles." : o.twitch ? `${o.blurb} One for TikTok and one for Twitch.` : `${o.blurb} TikTok only.`;
+        const blurb = !both ? o.blurb : o.id === "chat" ? "Your TikTok and Twitch chat together, in one set of speech bubbles." : o.both ? `${o.blurb} One combined link for TikTok and Twitch.` : o.twitch ? `${o.blurb} One for TikTok and one for Twitch.` : `${o.blurb} TikTok only.`;
         list.append(el("label", { className: "pick pick--check" }, box, el("span", { className: "pick__body" }, ...titled(o.name, blurb))));
       }
       return list;

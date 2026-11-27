@@ -78,16 +78,18 @@ test("a link means what it says: the settings read back from it are the vibe's l
   }
 });
 
-test("Twitch gets only the overlays that work there, and its alerts/labels links say the follow login is separate", () => {
-  assert.deepEqual(overlaysFor("twitch").map((o) => o.id), ["chat", "alerts", "gifters", "labels", "wheel"]);
+test("Twitch gets all 11 dual-platform overlays, and its alerts/labels links say the follow login is separate", () => {
+  const TWITCH_IDS = ["chat", "alerts", "gifters", "labels", "wheel", "gifts", "jar", "goal", "songs", "timer", "tts"];
+  assert.deepEqual(overlaysFor("twitch").map((o) => o.id), TWITCH_IDS);
   assert.equal(overlaysFor("tiktok").length, 14);
   const links = buildLinks(ORIGIN, answers({ platform: "twitch", channel: "pondpal" }));
-  assert.deepEqual(links.map((l) => l.id), ["chat", "alerts", "gifters", "labels", "wheel"], "chat, alerts, gifters, rotating highlights and spin the wheel work on Twitch");
+  assert.deepEqual(links.map((l) => l.id), TWITCH_IDS, "all 11 dual-platform overlays work on Twitch");
   assert.ok(links.every((l) => params(l.url).get("platform") === "twitch"));
   assert.match(links[1].note, /follow alerts need one extra login/i);
   assert.match(links[3].note, /last follower needs one extra login/i);
   assert.match(links[4].note, /wheel slices/i);
   assert.equal(params(links[4].preview).get("platform"), "twitch", "Twitch wheel preview uses Twitch platform");
+  assert.equal(params(links.find((l) => l.id === "songs").preview).get("platform"), "twitch", "Twitch songs preview uses Twitch platform");
   assert.equal(buildLinks(ORIGIN, answers()).find((l) => l.id === "goal").note.includes("real follower count"), true);
   assert.match(buildLinks(ORIGIN, answers()).find((l) => l.id === "gallery").note, /featured TikTok gifts/i);
 });
@@ -131,49 +133,45 @@ test("odd answers are tolerated: an unknown shape or alignment falls back, and t
   assert.ok(ALIGNS.map(([id]) => id).join() === "left,center,right");
 });
 
-test("Both: one chat reads the two accounts, alerts/gifters/labels/wheel are one for each platform, and the rest stay TikTok's", () => {
+test("Both: dual-platform overlays each produce one unified TikTok + Twitch link, and TikTok-only ones stay TikTok's", () => {
   const both = (over = {}) => answers({ platform: "both", channel: "pond.pal", twitch: "pondpal", ...over });
   assert.equal(overlaysFor("both").length, 14, "every overlay is on offer");
   const links = buildLinks(ORIGIN, both());
-  assert.deepEqual(links.map((l) => l.id), ["chat", "alerts-tiktok", "alerts-twitch", "gifters-tiktok", "gifters-twitch", "labels-tiktok", "labels-twitch", "wheel-tiktok", "wheel-twitch", "gifts", "jar", "gallery", "goal", "likers", "songs", "timer", "tts", "counter"]);
-  assert.deepEqual(links.map((l) => l.name), ["Chat", "Alerts (TikTok)", "Alerts (Twitch)", "Top gifters (TikTok)", "Top gifters (Twitch)", "Rotating highlights (TikTok)", "Rotating highlights (Twitch)", "Spin the wheel (TikTok)", "Spin the wheel (Twitch)", "Last gifts", "Gift jar", "Gift gallery rotator", "Goals", "Top likers", "Song requests", "Subathon timer", "Talking pet TTS", "Viewer and like counter"], "dual cards are told apart by name");
-  const [chat, tiktokAlerts, twitchAlerts, tiktokGifters, twitchGifters, tiktokLabels, twitchLabels, tiktokWheel, twitchWheel, ...rest] = links;
-  const c = params(chat.url);
-  assert.deepEqual([c.get("tiktok"), c.get("twitch"), c.has("channel"), c.has("platform")], ["pond.pal", "pondpal", false, false], "the chat link names both accounts");
-  assert.deepEqual(sourcesOf(c), [{ platform: "tiktok", channel: "pond.pal" }, { platform: "twitch", channel: "pondpal" }], "and reads back as both");
-  assert.deepEqual([params(tiktokAlerts.url).get("channel"), params(tiktokAlerts.url).get("platform")], ["pond.pal", "tiktok"]);
-  assert.deepEqual([params(twitchAlerts.url).get("channel"), params(twitchAlerts.url).get("platform")], ["pondpal", "twitch"]);
-  assert.deepEqual([params(twitchGifters.url).get("channel"), params(twitchGifters.url).get("platform")], ["pondpal", "twitch"]);
-  assert.deepEqual([params(twitchLabels.url).get("channel"), params(twitchLabels.url).get("platform")], ["pondpal", "twitch"]);
-  assert.deepEqual([params(twitchWheel.url).get("channel"), params(twitchWheel.url).get("platform")], ["pondpal", "twitch"]);
-  assert.match(twitchAlerts.note, /follow alerts need one extra login/i);
-  assert.match(twitchLabels.note, /last follower needs one extra login/i);
-  for (const l of [tiktokGifters, tiktokLabels, tiktokWheel, ...rest]) assert.deepEqual([params(l.url).get("channel"), params(l.url).get("platform")], ["pond.pal", "tiktok"], `${l.id} is TikTok's`);
+  assert.deepEqual(links.map((l) => l.id), ALL, "one unified card per overlay — no duplicate TikTok/Twitch pairs");
+  const chat = links.find((l) => l.id === "chat");
+  const alerts = links.find((l) => l.id === "alerts");
+  const songs = links.find((l) => l.id === "songs");
+  const gallery = links.find((l) => l.id === "gallery");
+  for (const unified of [chat, alerts, songs]) {
+    const p = params(unified.url);
+    assert.deepEqual([p.get("tiktok"), p.get("twitch"), p.has("channel"), p.has("platform")], ["pond.pal", "pondpal", false, false], `${unified.id} carries both accounts`);
+  }
+  assert.deepEqual(sourcesOf(params(chat.url)), [{ platform: "tiktok", channel: "pond.pal" }, { platform: "twitch", channel: "pondpal" }], "chat reads back as both");
+  assert.deepEqual([params(gallery.url).get("channel"), params(gallery.url).get("platform")], ["pond.pal", "tiktok"], "TikTok-only overlays keep TikTok channel");
+  assert.match(alerts.note, /follow alerts need one extra login/i);
+  assert.match(links.find((l) => l.id === "labels").note, /last follower needs one extra login/i);
   assert.match(chat.note, /small icon/);
-  assert.deepEqual(links.map((l) => l.needs), [["tiktok", "twitch"], ["tiktok"], ["twitch"], ["tiktok"], ["twitch"], ["tiktok"], ["twitch"], ["tiktok"], ["twitch"], ["tiktok"], ["tiktok"], ["tiktok"], ["tiktok"], ["tiktok"], ["tiktok"], ["tiktok"], ["tiktok"], ["tiktok"]]);
   for (const l of links) assert.equal(new URL(l.editUrl).search, new URL(l.url).search, `${l.id}: the editor gets the very same options`);
   assert.equal(new URL(links[0].editUrl).pathname, "/editor/");
   assert.equal(new URL(buildLinks(ORIGIN, both({ vibe: "green" }))[0].editUrl).pathname, "/matcha/", "a Matcha chat goes to the Matcha page, which opens in Both too");
   assert.equal(buildLinks(ORIGIN, both({ overlays: ["chat"] })).length, 1);
-  assert.deepEqual(buildLinks(ORIGIN, both({ overlays: ["alerts"] })).map((l) => l.id), ["alerts-tiktok", "alerts-twitch"]);
+  assert.deepEqual(buildLinks(ORIGIN, both({ overlays: ["alerts"] })).map((l) => l.id), ["alerts"]);
 });
 
 test("Both: a link only exists once the accounts it needs are named, and the picture of the chat shows both without using them", () => {
   const both = (over = {}) => answers({ platform: "both", channel: "pond.pal", twitch: "pondpal", ...over });
   const onlyTikTok = buildLinks(ORIGIN, both({ twitch: "" }));
-  assert.deepEqual(onlyTikTok.map((l) => [l.id, l.url !== ""]), [["chat", false], ["alerts-tiktok", true], ["alerts-twitch", false], ["gifters-tiktok", true], ["gifters-twitch", false], ["labels-tiktok", true], ["labels-twitch", false], ["wheel-tiktok", true], ["wheel-twitch", false], ["gifts", true], ["jar", true], ["gallery", true], ["goal", true], ["likers", true], ["songs", true], ["timer", true], ["tts", true], ["counter", true]], "each link waits only for the names it needs");
+  // 3 TikTok-only overlays (gallery, likers, counter) are ready with just TikTok; the 11 unified Both overlays wait for Twitch too
+  assert.deepEqual(onlyTikTok.filter((l) => l.url !== "").map((l) => l.id), ["gallery", "likers", "counter"], "only TikTok-only overlays are ready without Twitch");
   const onlyTwitch = buildLinks(ORIGIN, both({ channel: "" }));
-  assert.deepEqual(onlyTwitch.map((l) => [l.id, l.url !== ""]), [["chat", false], ["alerts-tiktok", false], ["alerts-twitch", true], ["gifters-tiktok", false], ["gifters-twitch", true], ["labels-tiktok", false], ["labels-twitch", true], ["wheel-tiktok", false], ["wheel-twitch", true], ["gifts", false], ["jar", false], ["gallery", false], ["goal", false], ["likers", false], ["songs", false], ["timer", false], ["tts", false], ["counter", false]]);
+  assert.ok(onlyTwitch.every((l) => l.url === ""), "unified Both overlays wait for TikTok name too");
   assert.ok(buildLinks(ORIGIN, both({ channel: "", twitch: "" })).every((l) => l.url === ""));
-  assert.equal(linksText(onlyTikTok).split("\n").length, 13, "'copy all' lists only the links that exist");
-  assert.match(linksText(onlyTikTok), /^Alerts \(TikTok\): /m);
+  assert.equal(linksText(onlyTikTok).split("\n").length, 3, "'copy all' lists only the links that exist");
   // the picture of the chat is practice for two chats, so it shows the icons; no real name goes into any picture
   const chatPicture = buildLinks(ORIGIN, both())[0].preview;
   assert.deepEqual(sourcesOf(params(chatPicture)).map((s) => s.platform), ["tiktok", "twitch"]);
   assert.equal(params(chatPicture).get("demo"), "1");
   for (const l of buildLinks(ORIGIN, both())) assert.ok(!l.preview.includes("pond"), `${l.id}: a picture never carries a real name`);
-  assert.equal(params(buildLinks(ORIGIN, both())[2].preview).get("platform"), "twitch", "the Twitch alerts picture practises Twitch alerts");
-  assert.equal(params(buildLinks(ORIGIN, both())[1].preview).get("platform"), "tiktok");
   // one platform is exactly as before
   assert.deepEqual(buildLinks(ORIGIN, answers()).map((l) => l.id), ALL);
   assert.ok(buildLinks(ORIGIN, answers()).every((l) => l.needs.length === 1 && l.needs[0] === "tiktok"));

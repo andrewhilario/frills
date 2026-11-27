@@ -26,9 +26,14 @@ startWidgetEditor({
   widget: SONGS,
   storeKey: "frills:songs:v1",
   overlayPath: "/overlay/songs/",
+  platforms: ["tiktok", "twitch", "both"],
   events: [],
   needs: "roles",
-  idleHint: "Type your TikTok name, or frills_demo to get made-up song requests. The test buttons above work without connecting.",
+  idleHint: (p) => (p === "twitch"
+    ? "Type your Twitch channel and press Connect to read !sr requests from Twitch chat — or use the test buttons above."
+    : p === "both"
+      ? "Type your TikTok @name and Twitch channel to collect !sr song requests from both chats in one queue."
+      : "Type your TikTok name, or frills_demo to get made-up song requests. The test buttons above work without connecting."),
   create(host, settings, ctx) {
     const view = createSongsView(host);
     const real = makeLookup(); // what chat asks for goes to the real catalog; the test buttons use the practice one

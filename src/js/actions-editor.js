@@ -542,7 +542,7 @@ startWidgetEditor({
       const step = sanitizeStep({ ...baseStep, title: "{name}", subtitle: gift ? "{gift}" : "" });
       if (vtsManualAdd) vtsManualAdd.disabled = true;
       try {
-        const res = await vtsExecutor.run(step, { who, name: who, gift, label: gift || "Manual", ruleName: "Manual sticky note" });
+        const res = await vtsExecutor.run(step, { who, name: who, gift, label: gift || "Manual", ruleName: "Manual sticky note", manual: true });
         soundReady.then(() => sounds.play("pop", { volume: 75, tier: 2 }));
         pushLog({ ruleName: "Manual sticky note", who, status: res?.ok === false ? "error" : "ok", detail: res?.detail || "Pinned" });
         if (res?.ok !== false && vtsManualName) {
@@ -627,31 +627,31 @@ startWidgetEditor({
           if (hasPlusVts) {
             if (showPlus) {
               vtsPlusNote.append(
-                "Named pastel sticky notes run live for free (up to 5 on your face at once). Live stream execution for custom sticker shapes, VTS hotkeys, props, expressions, zooms, and tints—plus unlimited sticky notes—unlocks with ",
+                `Named pastel sticky notes run live for free (up to ${FREE_STICKY_NOTES_LIMIT} automatic notes at once, plus unlimited manual notes from this page). Live stream execution for custom sticker shapes, VTS hotkeys, props, expressions, zooms, and tints—plus unlimited automatic sticky notes—unlocks with `,
                 el("a", { href: "/plus/", textContent: "Frills Plus" }),
                 ".",
               );
             } else {
-              vtsPlusNote.textContent = "Named pastel sticky notes run live for free (up to 5 on your face at once). Live stream execution for custom sticker shapes and other VTube Studio actions requires Frills Plus.";
+              vtsPlusNote.textContent = `Named pastel sticky notes run live for free (up to ${FREE_STICKY_NOTES_LIMIT} automatic notes at once, plus unlimited manual notes from this page). Live stream execution for custom sticker shapes and other VTube Studio actions requires Frills Plus.`;
             }
           } else if (hasPlusShape) {
             if (showPlus) {
               vtsPlusNote.append(
-                "Heart, star, paw, and cloud sticker shapes preview free here, and free live links fall back cleanly to classic pastel notes (up to 5 at once). ",
+                `Heart, star, paw, and cloud sticker shapes preview free here, and free live links fall back cleanly to classic pastel notes (up to ${FREE_STICKY_NOTES_LIMIT} automatic at once). `,
                 el("a", { href: "/plus/", textContent: "Upgrade to Frills Plus" }),
-                " to pin custom sticker shapes + unlimited sticky notes live.",
+                " to pin custom sticker shapes + unlimited automatic sticky notes live.",
               );
             } else {
               vtsPlusNote.textContent = "Custom sticker shapes preview free here; free live links fall back cleanly to classic pastel sticky notes. Frills Plus unlocks all sticker shapes and unlimited notes live.";
             }
           } else if (showPlus) {
             vtsPlusNote.append(
-              `Free links keep up to ${FREE_STICKY_NOTES_LIMIT} pastel sticky notes on your face at once (oldest peels off on the 6th). `,
+              `Free links keep up to ${FREE_STICKY_NOTES_LIMIT} automatic pastel sticky notes on your face at once (oldest peels off on #${FREE_STICKY_NOTES_LIMIT + 1}; add extra manual notes anytime in Step 2). `,
               el("a", { href: "/plus/", textContent: "Upgrade to Frills Plus" }),
-              " for custom sticker shapes, unlimited sticky notes piling up + all VTube Studio actions.",
+              " for custom sticker shapes, unlimited automatic sticky notes + all VTube Studio actions.",
             );
           } else {
-            vtsPlusNote.textContent = `Free links keep up to ${FREE_STICKY_NOTES_LIMIT} pastel sticky notes on your face at once (oldest peels off when a 6th arrives). Frills Plus unlocks custom shapes and unlimited sticky notes.`;
+            vtsPlusNote.textContent = `Free links keep up to ${FREE_STICKY_NOTES_LIMIT} automatic pastel sticky notes on your face at once (oldest peels off on #${FREE_STICKY_NOTES_LIMIT + 1}; add extra manual notes anytime in Step 2). Frills Plus unlocks custom shapes and unlimited automatic sticky notes.`;
           }
         }
       }
@@ -672,7 +672,7 @@ startWidgetEditor({
       if (!plusActive && (templateRule?.steps ?? []).some(isPlusVtsStep)) {
         openActionsPlusModal(
           "Subscribe for full VTube Studio actions",
-          "Pastel viewer sticky notes stay free (up to 5 on your face at once). Subscribe to Frills Plus to add VTS hotkeys, props, expressions, avatar zooms/flips, and color tints.",
+          `Pastel viewer sticky notes stay free (up to ${FREE_STICKY_NOTES_LIMIT} automatic notes at once, plus unlimited manual notes). Subscribe to Frills Plus to add VTS hotkeys, props, expressions, avatar zooms/flips, and color tints.`,
           "vts_locked",
         );
         return;
@@ -1044,7 +1044,7 @@ startWidgetEditor({
             shapeSelect.value = step.shape || "note";
             openActionsPlusModal(
               "Subscribe for custom sticker shapes",
-              "Classic pastel sticky notes stay free (up to 5 on your face at once). Subscribe to Frills Plus to unlock Heart, Star, Chibi Paw, Dreamy Cloud, and Random shapes.",
+              `Classic pastel sticky notes stay free (up to ${FREE_STICKY_NOTES_LIMIT} automatic notes at once, plus unlimited manual notes). Subscribe to Frills Plus to unlock Heart, Star, Chibi Paw, Dreamy Cloud, and Random shapes.`,
               "vts_locked",
             );
             return;
@@ -1456,6 +1456,11 @@ startWidgetEditor({
           ["Yuzu Tea", "Heart Me"],
           ["Boba Fox", "Corgi"],
           ["Luna Mint", "Doughnut"],
+          ["Kero Chan", "100 Bits"],
+          ["Matcha Cat", "Sub"],
+          ["Taro Cloud", "Perfume"],
+          ["Sunny Frog", "Sunglasses"],
+          ["Chibi Ghost", "Crown"],
         ];
         let stickyDemoIdx = 0;
         return {

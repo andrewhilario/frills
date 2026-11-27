@@ -292,19 +292,23 @@ const type = (selector, value) => page.evaluate(`(() => { const i = document.que
 const click = (selector) => page.evaluate(`document.querySelector(${JSON.stringify(selector)}).click()`);
 const text = (selector) => page.evaluate(`document.querySelector(${JSON.stringify(selector)})?.textContent.trim() ?? null`);
 
-test("actions editor & overlay load under CSP with no console errors, and Test sticky note previews 5-note FIFO stack without VTS", { skip }, async () => {
+test("actions editor & overlay load under CSP with no console errors, and Test sticky note previews 10-note automatic FIFO stack + uncapped manual note without VTS", { skip }, async () => {
   const { base } = await withHelper();
   for (const path of ["/actions/", "/overlay/actions/?demo=1"]) {
     await page.goto(base + path, { settle: 700 });
     assert.deepEqual(page.problems, [], `${path}: ${page.problems.join(" | ")}`);
   }
   await page.goto(base + "/actions/", { settle: 700 });
-  for (let i = 0; i < 6; i++) await click('[data-test="sticky"]');
-  await until(async () => (await page.evaluate(`document.querySelectorAll(".actions__sticky:not(.actions__sticky--out)").length`)) === 5);
+  for (let i = 0; i < 11; i++) await click('[data-test="sticky"]');
+  await until(async () => (await page.evaluate(`document.querySelectorAll(".actions__sticky:not(.actions__sticky--out)").length`)) === 10);
   await sleep(380);
   const stickies = await page.evaluate(`[...document.querySelectorAll(".actions__sticky:not(.actions__sticky--out)")].map((img) => img.src.slice(0, 32))`);
-  assert.equal(stickies.length, 5, "free sticky note preview caps at 5 notes and peels off the oldest on #6");
+  assert.equal(stickies.length, 10, "free automatic sticky note preview caps at 10 notes and peels off the oldest on #11");
   assert.ok(stickies.every((src) => src.startsWith("data:image/png;base64,iVBORw0KG")), "every preview sticky note renders a real base64 PNG");
+  // Manual sticky note from website adds on top of the 10 automatic notes without evicting them
+  await type("#vts-manual-name", "Manual Fan");
+  await click("#vts-manual-add");
+  await until(async () => (await page.evaluate(`document.querySelectorAll(".actions__sticky:not(.actions__sticky--out)").length`)) === 11);
   await click('[data-test="clear"]');
   assert.equal(await page.evaluate(`document.querySelectorAll(".actions__sticky").length`), 0, "Clear wipes preview sticky notes");
   assert.deepEqual(page.problems, [], page.problems.join(" | "));
@@ -387,7 +391,7 @@ test("actions editor connects to real mock OBS WebSocket v5, creates Replay Cam,
   assert.deepEqual(page.problems, [], page.problems.join(" | "));
 });
 
-test("actions editor connects to mock VTube Studio API, runs free 5-sticky-note cap live, isolates #vtsToken, and gates other VTS actions to Frills Plus", { skip }, async () => {
+test("actions editor connects to mock VTube Studio API, runs free 10-sticky-note automatic cap live, isolates #vtsToken, and gates other VTS actions to Frills Plus", { skip }, async () => {
   const { base, made } = await withHelper();
   await page.goto(base + "/actions/", { settle: 700 });
   await page.evaluate(`localStorage.clear()`);
@@ -491,7 +495,7 @@ test("actions editor connects to mock VTube Studio API, runs free 5-sticky-note 
   assert.equal(parsed.searchParams.has("vtsToken"), false);
   assert.equal(new URLSearchParams(parsed.hash.slice(1)).get("vtsToken"), mockVts.issuedToken);
 
-  // Free overlay link (no Plus code): runs 6 live sticky notes (peeling oldest on #6), but BLOCKS Plus-only Face zoom (MoveModelRequest)!
+  // Free overlay link (no Plus code): runs 11 live automatic sticky notes (peeling oldest on #11), but BLOCKS Plus-only Face zoom (MoveModelRequest)!
   const authBeforeFree = mockVts.calls.filter(([t]) => t === "AuthenticationRequest").length;
   const pinsBeforeFree = mockVts.calls.filter(([t]) => t === "ItemPinRequest").length;
   const unloadsBeforeFree = mockVts.calls.filter(([t]) => t === "ItemUnloadRequest").length;
@@ -499,7 +503,7 @@ test("actions editor connects to mock VTube Studio API, runs free 5-sticky-note 
   await page.goto(parsed.href.replace(parsed.origin, base), { settle: 800 });
   await until(() => made.length >= 1 && mockVts.calls.filter(([t]) => t === "AuthenticationRequest").length > authBeforeFree);
   await sleep(150);
-  for (let i = 1; i <= 6; i++) {
+  for (let i = 1; i <= 11; i++) {
     made[made.length - 1].emit("gift", {
       common: { msgId: `vts-free-gift-${i}` },
       user: { id: `uf${i}`, displayId: `viewer_${i}`, nickname: `Viewer ${i}` },
@@ -508,14 +512,14 @@ test("actions editor connects to mock VTube Studio API, runs free 5-sticky-note 
     });
   }
   await until(
-    async () => mockVts.calls.filter(([t]) => t === "ItemPinRequest").length >= pinsBeforeFree + 6,
-    8000,
+    async () => mockVts.calls.filter(([t]) => t === "ItemPinRequest").length >= pinsBeforeFree + 11,
+    10000,
     () => `pins=${mockVts.calls.filter(([t]) => t === "ItemPinRequest").length - pinsBeforeFree} loads=${mockVts.calls.filter(([t]) => t === "ItemLoadRequest").length} tail=${mockVts.calls.slice(-8).map(([t]) => t).join(",")}`,
   );
   await until(async () => mockVts.calls.filter(([t]) => t === "ItemUnloadRequest").length >= unloadsBeforeFree + 1);
   assert.equal(mockVts.calls.filter(([t]) => t === "MoveModelRequest").length, movesBeforeFree, "free live overlay blocks Plus-only VTS Face zoom");
 
-  // Plus overlay link (with 32-hex Plus code): runs BOTH unlimited sticky notes (no eviction on 6th) AND Plus-only VTS Face zoom!
+  // Plus overlay link (with 32-hex Plus code): runs BOTH unlimited sticky notes (no eviction on #11) AND Plus-only VTS Face zoom!
   const plusHelper = await withHelper();
   const authBeforePlus = mockVts.calls.filter(([t]) => t === "AuthenticationRequest").length;
   const unloadsBeforePlus = mockVts.calls.filter(([t]) => t === "ItemUnloadRequest").length;

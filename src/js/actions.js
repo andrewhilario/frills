@@ -11,9 +11,9 @@ import { cleanObsPort } from "./obs-ws.js";
 import { cleanSlobsPort } from "./slobs-ws.js";
 import { cleanVtsPort, renderStickyNoteBase64 } from "./vts-ws.js";
 
-/** Free visitors get up to 10 actions & up to 5 live VTS sticky notes at once with no account; Frills Plus unlocks unlimited. */
+/** Free visitors get up to 10 actions & up to 10 automatic live VTS sticky notes at once with no account; manual sticky notes from the editor are uncapped, and Frills Plus unlocks unlimited automatic notes. */
 export const FREE_ACTIONS_LIMIT = 10;
-export const FREE_STICKY_NOTES_LIMIT = 5;
+export const FREE_STICKY_NOTES_LIMIT = 10;
 export const PLUS_ACTIONS_LIMIT = 100;
 export const MAX_STEPS_PER_RULE = 5;
 export const MAX_ACTION_QUEUE = 12;
@@ -46,7 +46,7 @@ export const ACTION_TYPES = [
   ["obs.media", "OBS · Play media source"],
   ["obs.text", "OBS · Update text source"],
   ["obs.hotkey", "OBS · Trigger hotkey"],
-  ["vts.sticky", "VTube Studio · Sticky note with gifter’s name (5 free · ∞ Plus)"],
+  ["vts.sticky", "VTube Studio · Sticky note with gifter’s name (10 auto free · ∞ Plus)"],
   ["vts.hotkey", "VTube Studio · Hotkey / Item Scene (Plus)"],
   ["vts.item", "VTube Studio · Drop item / prop (Plus)"],
   ["vts.expression", "VTube Studio · Toggle expression (Plus)"],
@@ -870,6 +870,7 @@ export function createVtsStepExecutor(vts, {
       if (!vts?.connected) {
         if (previewFallback) {
           if (step.type === "vts.sticky") {
+            const isManual = Boolean(ctx?.manual);
             const title = formatTemplate(step.title || "{name}", ctx) || ctx.who || "Viewer";
             const subtitle = step.subtitle ? formatTemplate(step.subtitle, ctx) : "";
             const shape = plusShapesAllowed ? (step.shape || "note") : "note";
@@ -879,7 +880,7 @@ export function createVtsStepExecutor(vts, {
             } catch { /* headless fallback */ }
             const sizePct = clampInt(step.size, 5, 100, 22);
             if (base64 && onStickyPreview) {
-              onStickyPreview({ base64, maxNotes: stickyCap, title, subtitle, size: sizePct });
+              onStickyPreview({ base64, maxNotes: isManual ? 0 : stickyCap, manual: isManual, title, subtitle, size: sizePct });
             }
             onToast({ title: ctx.ruleName || "Sticky note (preview)", text: `${title}${subtitle ? ` · ${subtitle}` : ""}`, fx: "sparkles" });
             return { ok: true, simulated: true, detail: `Preview sticky note “${title}” (connect VTube Studio to pin to avatar)` };
@@ -893,6 +894,7 @@ export function createVtsStepExecutor(vts, {
 
       if (step.type === "vts.sticky") {
         await vts.ensureCustomItemPermission();
+        const isManual = Boolean(ctx?.manual);
         const title = formatTemplate(step.title || "{name}", ctx) || ctx.who || "Viewer";
         const subtitle = step.subtitle ? formatTemplate(step.subtitle, ctx) : "";
         const requestedShape = step.shape || "note";
@@ -901,7 +903,7 @@ export function createVtsStepExecutor(vts, {
         const customDataBase64 = renderStickyNote({ title, subtitle, color: step.color || "random", shape });
         const sizePct = clampInt(step.size, 5, 100, 22);
         if (customDataBase64 && onStickyPreview) {
-          onStickyPreview({ base64: customDataBase64, maxNotes: stickyCap, title, subtitle, size: sizePct });
+          onStickyPreview({ base64: customDataBase64, maxNotes: isManual ? 0 : stickyCap, manual: isManual, title, subtitle, size: sizePct });
         }
         const sizeNorm = sizePct / 100;
         const rot = clampInt(step.rotation, -45, 45, -6);
@@ -930,7 +932,7 @@ export function createVtsStepExecutor(vts, {
         });
         const instanceID = String(res?.instanceID ?? "");
         let evicted = false;
-        if (instanceID) {
+        if (instanceID && !isManual) {
           activeStickyIds.push(instanceID);
           if (stickyCap > 0) {
             while (activeStickyIds.length > stickyCap) {
@@ -1247,7 +1249,7 @@ export class ActionEngine {
           if (res?.detail) notes.push(res.detail);
         } else if (step.type.startsWith("vts.")) {
           if (isPlusVtsStep(step) && !this.allowVts) {
-            failed = "This VTube Studio action requires Frills Plus (sticky notes are free up to 5 at once)";
+            failed = `This VTube Studio action requires Frills Plus (sticky notes are free up to ${FREE_STICKY_NOTES_LIMIT} automatic at once)`;
             break;
           }
           const res = await this.runVts(step, ctx);

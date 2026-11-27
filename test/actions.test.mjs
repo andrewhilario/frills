@@ -382,8 +382,9 @@ test("VtsClient pairs via Allow popup, discovers hotkeys/expressions/items/meshe
   assert.ok(sent.some((m) => m.messageType === "MoveModelRequest" && m.data.valuesAreRelativeToModel === false && m.data.size === -20), "model restored to original position");
   assert.ok(sent.some((m) => m.messageType === "ColorTintRequest" && m.data.colorTint.colorR === 255 && m.data.colorTint.colorG === 255 && m.data.colorTint.colorB === 255), "tint reset to white");
 
-  // Free 5-sticky-note cap: 5 stay on face, 6th evicts oldest; Plus (0 = unlimited) keeps all 7!
-  assert.equal(FREE_STICKY_NOTES_LIMIT, 5);
+  // Free 10-sticky-note automatic cap: 10 stay on face, manual notes from the website bypass the cap without evicting,
+  // 11th automatic note evicts oldest; Plus (0 = unlimited) keeps all 12!
+  assert.equal(FREE_STICKY_NOTES_LIMIT, 10);
   let seq = 0;
   const capSent = [];
   const capClient = {
@@ -397,19 +398,24 @@ test("VtsClient pairs via Allow popup, discovers hotkeys/expressions/items/meshe
     },
   };
   const freeExec = createVtsStepExecutor(capClient, { maxStickyNotes: FREE_STICKY_NOTES_LIMIT, renderStickyNote: () => "iVBORw0KGgo=" });
-  for (let i = 1; i <= 5; i++) {
+  for (let i = 1; i <= 10; i++) {
     await freeExec.run({ type: "vts.sticky", title: "{name}", subtitle: "", color: "yellow", pinMode: "face", artMesh: "", size: 22, rotation: -6, duration: 0 }, { who: `Fan ${i}` });
   }
-  assert.equal(capSent.filter(([t]) => t === "ItemUnloadRequest").length, 0, "first 5 free sticky notes stay without eviction");
-  const sixth = await freeExec.run({ type: "vts.sticky", title: "{name}", subtitle: "", color: "yellow", pinMode: "face", artMesh: "", size: 22, rotation: -6, duration: 0 }, { who: "Fan 6" });
-  assert.match(sixth.detail, /5\/5 free cap/);
-  assert.deepEqual(capSent.filter(([t]) => t === "ItemUnloadRequest").map(([, d]) => d.instanceIDs[0]), ["sticky-1"], "6th free sticky note peels off oldest (#1)");
+  assert.equal(capSent.filter(([t]) => t === "ItemUnloadRequest").length, 0, "first 10 automatic free sticky notes stay without eviction");
+  // Manual sticky note pinned from the website bypasses the 10-note automatic cap and does not evict existing notes
+  const manualExtra = await freeExec.run({ type: "vts.sticky", title: "{name}", subtitle: "", color: "pink", pinMode: "face", artMesh: "", size: 22, rotation: -6, duration: 0 }, { who: "Manual VIP", manual: true });
+  assert.equal(manualExtra.ok, true);
+  assert.doesNotMatch(manualExtra.detail, /free cap/);
+  assert.equal(capSent.filter(([t]) => t === "ItemUnloadRequest").length, 0, "manual sticky note does not evict automatic notes");
+  const eleventh = await freeExec.run({ type: "vts.sticky", title: "{name}", subtitle: "", color: "yellow", pinMode: "face", artMesh: "", size: 22, rotation: -6, duration: 0 }, { who: "Fan 11" });
+  assert.match(eleventh.detail, /10\/10 free cap/);
+  assert.deepEqual(capSent.filter(([t]) => t === "ItemUnloadRequest").map(([, d]) => d.instanceIDs[0]), ["sticky-1"], "11th automatic free sticky note peels off oldest (#1)");
 
-  // Unlimited (Plus): 7 sticky notes all stay with zero evictions
+  // Unlimited (Plus): 12 automatic sticky notes all stay with zero evictions
   freeExec.clearStickyTracking();
   freeExec.setMaxStickyNotes(0);
   const unloadsBeforePlus = capSent.filter(([t]) => t === "ItemUnloadRequest").length;
-  for (let i = 1; i <= 7; i++) {
+  for (let i = 1; i <= 12; i++) {
     await freeExec.run({ type: "vts.sticky", title: "{name}", subtitle: "", color: "random", pinMode: "face", artMesh: "", size: 22, rotation: -6, duration: 0 }, { who: `Plus ${i}` });
   }
   assert.equal(capSent.filter(([t]) => t === "ItemUnloadRequest").length, unloadsBeforePlus, "Plus allows unlimited sticky notes without eviction");

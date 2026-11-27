@@ -6,12 +6,13 @@
 
 import { LABELS, LabelBoard, loadLabels, saveLabels } from "./labels.js";
 import { createLabelsView } from "./widgets-view.js";
-import { channelFromParams, connectEvents, platformFromParams } from "./widget-overlay.js";
+import { bothFromParams, channelFromParams, connectEvents, platformFromParams } from "./widget-overlay.js";
 import { demoLabelEvents, fakeLabelSource } from "./fake-alerts.js";
 import { fontsReady, generalFaces } from "./look.js";
 import { FollowReader, validCode } from "./follow-bridge.js";
 
 const params = new URLSearchParams(location.search);
+const both = bothFromParams(params);
 const platform = platformFromParams(params);
 const settings = LABELS.sanitize(LABELS.fromParams(params));
 const demoPace = Number(params.get("pace")) ? Math.min(10000, Math.max(300, Number(params.get("pace")))) : 0;
@@ -20,7 +21,7 @@ const note = document.getElementById("note");
 const say = (text) => { note.hidden = !text; note.textContent = text; };
 const channel = channelFromParams(params, platform);
 const demo = params.get("demo") === "1";
-const followsCode = platform === "twitch" ? validCode(params.get("follows")) : "";
+const followsCode = (platform === "twitch" || platform === "both") ? validCode(params.get("follows")) : "";
 
 const view = createLabelsView(document.getElementById("labels"));
 view.apply(settings);
@@ -58,7 +59,8 @@ if (demo) {
     connectEvents({
       channel,
       platform,
-      events: platform === "twitch" ? ["sub", "subgift", "bits"] : ["gift", "follow", "like"],
+      both,
+      events: platform === "twitch" ? ["sub", "subgift", "bits"] : platform === "both" ? ["gift", "follow", "like", "sub", "subgift", "bits"] : ["gift", "follow", "like"],
       onAlert: (event) => fonts.then(() => board.add(event)),
       say,
     });

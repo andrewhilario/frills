@@ -109,7 +109,7 @@ const QUICK_BRIEFS = {
     ["+ Write New Tips", "Write 3 new public Plus tips for the library in worker/plus-agent.mjs", "Facts from /plus/ only, ending with the exact PUBLIC_TAIL line, no hype words. The tests lint every one."],
   ],
   growth: [
-    ["+ TikTok VTS Clip", "Draft 30s TikTok clip: VTuber Sticky Notes & Paw Stamps", "Focus on free 5 pastel notes -> Plus chibi paw/heart/cloud shapes in /actions/."],
+    ["+ TikTok VTS Clip", "Draft 30s TikTok clip: VTuber Sticky Notes & Paw Stamps", "Focus on free 10 automatic pastel notes (+ unlimited manual) -> Plus chibi paw/heart/cloud shapes in /actions/."],
     ["+ X Launch Thread", "Draft 4-post X thread: Frills Plus 1-Link Master Scene", "Highlight 1-click theme switching + crash-proof subathon memory for $5.99/mo."],
     ["+ Creator Outreach", "Draft 5 DM templates for Founding 20 VTuber & TikTok creators", "Friendly, zero-spam offer of free Frills Plus in exchange for honest stream feedback."],
   ],

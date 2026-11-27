@@ -3,9 +3,11 @@
 import { initNav } from "./nav.js";
 import { initTip } from "./tip.js";
 import { countPlus } from "./stats.js";
+import { initPlatformFilters } from "./platform-pref.js";
 
 initNav();
 initTip(); // (only on the few pages it is meant for)
+initPlatformFilters();
 
 // The setup clips play (silent, looping) only while they are on screen. With reduced motion set they stay on their first picture, and the
 // player's own controls start them. (Without script they are plain videos with controls.)

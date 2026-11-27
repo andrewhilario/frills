@@ -12,11 +12,13 @@ startWidgetEditor({
   widget: GIFTERS,
   storeKey: "frills:gifters:v1",
   overlayPath: "/overlay/gifters/",
-  platforms: ["tiktok", "twitch"],
-  events: (p) => (p === "twitch" ? ["subgift", "bits"] : ["gift"]),
+  platforms: ["tiktok", "twitch", "both"],
+  events: (p) => (p === "twitch" ? ["subgift", "bits"] : p === "both" ? ["gift", "subgift", "bits"] : ["gift"]),
   idleHint: (p) => (p === "twitch"
     ? "Type your Twitch channel, or press the test buttons above without connecting."
-    : "Type your TikTok name, or frills_demo to get made-up gifts. The test buttons above work without connecting."),
+    : p === "both"
+      ? "Type your TikTok @name and Twitch channel to rank supporters from both streams on one leaderboard."
+      : "Type your TikTok name, or frills_demo to get made-up gifts. The test buttons above work without connecting."),
   create(host, settings, ctx) {
     const view = createGiftersView(host);
     let current = settings;

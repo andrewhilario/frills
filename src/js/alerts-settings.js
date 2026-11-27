@@ -302,13 +302,17 @@ export function toParams(settings, params = new URLSearchParams()) {
   return params;
 }
 
-/** The address a streamer pastes into their streaming app. `base` is the alerts overlay page's address; `platform` is "tiktok" or "twitch"; `follows` is the post box code for Twitch follows. */
-export function alertsUrl(base, { channel = "", settings = DEFAULTS, platform = "tiktok", follows = "" } = {}) {
+/** The address a streamer pastes into their streaming app. `base` is the alerts overlay page's address; `platform` is "tiktok", "twitch", or "both"; `both` carries `{ tiktok, twitch }`; `follows` is the post box code for Twitch follows. */
+export function alertsUrl(base, { channel = "", settings = DEFAULTS, platform = "tiktok", both = null, follows = "" } = {}) {
   const params = new URLSearchParams();
-  if (channel) {
+  if (both?.tiktok && both?.twitch) {
+    params.set("tiktok", both.tiktok);
+    params.set("twitch", both.twitch);
+    if (/^[A-Za-z0-9_-]{16}$/.test(follows)) params.set("follows", follows);
+  } else if (channel) {
     params.set("channel", channel);
     params.set("platform", platform === "twitch" ? "twitch" : "tiktok");
-    // The code of the post box that the streamer's Twitch follows page fills (only a Twitch link has one).
+    // The code of the post box that the streamer's Twitch follows page fills (only a Twitch or Both link has one).
     if (platform === "twitch" && /^[A-Za-z0-9_-]{16}$/.test(follows)) params.set("follows", follows);
   }
   return base + "?" + toParams(settings, params);

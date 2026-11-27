@@ -67,25 +67,25 @@ export const LABELS = defineWidget({
     { section: "labels", ...toggle("avatar", "Show picture or gift image") },
     { section: "labels", ...toggle("showEmpty", "Show a waiting card before events arrive") },
     { section: "labels", ...toggle("keep", "Remember highlights if the page reloads", "Kept only in this browser or streaming app. Off starts fresh each load.") },
-    { section: "labels", onlyPlatform: "tiktok", ...toggle("showGift", "Include last gift") },
-    { section: "labels", onlyPlatform: "tiktok", ...text("labelGift", "Last gift label", 28) },
+    { section: "labels", onlyPlatform: "tiktok both", ...toggle("showGift", "Include last gift") },
+    { section: "labels", onlyPlatform: "tiktok both", ...text("labelGift", "Last gift label", 28) },
     { section: "labels", ...toggle("showFollow", "Include last follower") },
     { section: "labels", ...text("labelFollow", "Last follower label", 28) },
-    { section: "labels", onlyPlatform: "tiktok", ...toggle("showTopGifter", "Include top gifter") },
-    { section: "labels", onlyPlatform: "tiktok", ...text("labelTopGifter", "Top gifter label", 28) },
-    { section: "labels", onlyPlatform: "tiktok", ...toggle("showTopGiftAnim", "Show top gifter’s animated gift", "Displays an animated badge of the biggest gift the top gifter sent (like Hand Hearts, Super GG, or Galaxy).") },
-    { section: "labels", onlyPlatform: "tiktok", ...toggle("showTopStreak", "Include top streak", "Highest multi-send gift combo streak in this LIVE.") },
-    { section: "labels", onlyPlatform: "tiktok", ...text("labelTopStreak", "Top streak label", 28) },
-    { section: "labels", onlyPlatform: "tiktok", ...toggle("showTopLiker", "Include top liker", "Whoever has tapped the most likes since the overlay connected.") },
-    { section: "labels", onlyPlatform: "tiktok", ...text("labelTopLiker", "Top liker label", 28) },
-    { section: "labels", onlyPlatform: "twitch", ...toggle("showSub", "Include last sub") },
-    { section: "labels", onlyPlatform: "twitch", ...text("labelSub", "Last sub label", 28) },
-    { section: "labels", onlyPlatform: "twitch", ...toggle("showBits", "Include last bits") },
-    { section: "labels", onlyPlatform: "twitch", ...text("labelBits", "Last bits label", 28) },
-    { section: "labels", onlyPlatform: "twitch", ...toggle("showTopSubGifter", "Include top sub gifter") },
-    { section: "labels", onlyPlatform: "twitch", ...text("labelTopSub", "Top sub gifter label", 28) },
-    { section: "labels", onlyPlatform: "twitch", ...toggle("showTopBitSender", "Include top bit sender") },
-    { section: "labels", onlyPlatform: "twitch", ...text("labelTopBits", "Top bit sender label", 28) },
+    { section: "labels", onlyPlatform: "tiktok both", ...toggle("showTopGifter", "Include top gifter") },
+    { section: "labels", onlyPlatform: "tiktok both", ...text("labelTopGifter", "Top gifter label", 28) },
+    { section: "labels", onlyPlatform: "tiktok both", ...toggle("showTopGiftAnim", "Show top gifter’s animated gift", "Displays an animated badge of the biggest gift the top gifter sent (like Hand Hearts, Super GG, or Galaxy).") },
+    { section: "labels", onlyPlatform: "tiktok both", ...toggle("showTopStreak", "Include top streak", "Highest multi-send gift combo streak in this LIVE.") },
+    { section: "labels", onlyPlatform: "tiktok both", ...text("labelTopStreak", "Top streak label", 28) },
+    { section: "labels", onlyPlatform: "tiktok both", ...toggle("showTopLiker", "Include top liker", "Whoever has tapped the most likes since the overlay connected.") },
+    { section: "labels", onlyPlatform: "tiktok both", ...text("labelTopLiker", "Top liker label", 28) },
+    { section: "labels", onlyPlatform: "twitch both", ...toggle("showSub", "Include last sub") },
+    { section: "labels", onlyPlatform: "twitch both", ...text("labelSub", "Last sub label", 28) },
+    { section: "labels", onlyPlatform: "twitch both", ...toggle("showBits", "Include last bits") },
+    { section: "labels", onlyPlatform: "twitch both", ...text("labelBits", "Last bits label", 28) },
+    { section: "labels", onlyPlatform: "twitch both", ...toggle("showTopSubGifter", "Include top sub gifter") },
+    { section: "labels", onlyPlatform: "twitch both", ...text("labelTopSub", "Top sub gifter label", 28) },
+    { section: "labels", onlyPlatform: "twitch both", ...toggle("showTopBitSender", "Include top bit sender") },
+    { section: "labels", onlyPlatform: "twitch both", ...text("labelTopBits", "Top bit sender label", 28) },
   ],
 });
 
@@ -95,6 +95,19 @@ const TOP_ONE = { max: 1, minLikes: 1, celebrate: false, milestone: 1000, celebr
 
 /** Orders enabled highlight slots per streaming platform. */
 export function enabledSlotIds(platform, settings) {
+  if (platform === "both") {
+    return [
+      settings.showGift && "lastGift",
+      settings.showFollow && "lastFollower",
+      settings.showSub && "lastSub",
+      settings.showBits && "lastBits",
+      settings.showTopGifter && "topGifter",
+      settings.showTopSubGifter && "topSubGifter",
+      settings.showTopBitSender && "topBitSender",
+      settings.showTopStreak && "topStreak",
+      settings.showTopLiker && "topLiker",
+    ].filter(Boolean);
+  }
   if (platform === "twitch") {
     return [
       settings.showFollow && "lastFollower",
@@ -120,7 +133,7 @@ export function enabledSlotIds(platform, settings) {
 export class LabelBoard {
   constructor(settings, { platform = "tiktok", onChange, timers = globalThis, now = () => Date.now(), initial = null } = {}) {
     this.settings = settings;
-    this.platform = platform === "twitch" ? "twitch" : "tiktok";
+    this.platform = platform === "twitch" || platform === "both" ? platform : "tiktok";
     this.onChange = onChange ?? (() => {});
     this.timers = timers;
     this.now = now;
@@ -355,7 +368,7 @@ export class LabelBoard {
   }
 
   setPlatform(platform) {
-    const next = platform === "twitch" ? "twitch" : "tiktok";
+    const next = platform === "twitch" || platform === "both" ? platform : "tiktok";
     if (next === this.platform) return;
     this.platform = next;
     this.index = 0;
@@ -369,8 +382,10 @@ export class LabelBoard {
     if (!event || !event.kind) return false;
     let jumpTo = "";
     let newLeader = false;
+    const allowTikTok = this.platform === "tiktok" || this.platform === "both";
+    const allowTwitch = this.platform === "twitch" || this.platform === "both";
 
-    if (event.kind === "gift" && this.platform === "tiktok") {
+    if (event.kind === "gift" && allowTikTok) {
       const name = event.name || event.user;
       const gift = event.gift || "Gift";
       if (!name) return false;
@@ -449,7 +464,7 @@ export class LabelBoard {
         : (newStreakRecord && this.settings.showTopStreak)
           ? "topStreak"
           : (this.settings.showTopGifter ? "topGifter" : (this.settings.showTopStreak && this.topStreak ? "topStreak" : ""));
-    } else if (event.kind === "like" && this.platform === "tiktok") {
+    } else if (event.kind === "like" && allowTikTok) {
       const before = this.cards().length;
       const prevTop = this.likeBoard.top[0]?.user ?? "";
       if (!this.likeBoard.add(event)) return false;
@@ -472,19 +487,19 @@ export class LabelBoard {
       if (!name) return false;
       this.lastFollower = { name, avatar: event.avatar || "" };
       if (this.settings.showFollow) jumpTo = "lastFollower";
-    } else if (event.kind === "sub" && this.platform === "twitch") {
+    } else if (event.kind === "sub" && allowTwitch) {
       const name = event.name || event.user;
       if (!name) return false;
       this.lastSub = { name, months: Math.max(1, Math.round(Number(event.count) || 1)), resub: Boolean(event.resub) };
       if (this.settings.showSub) jumpTo = "lastSub";
-    } else if (event.kind === "subgift" && this.platform === "twitch") {
+    } else if (event.kind === "subgift" && allowTwitch) {
       if (!event.user) return false;
       const prevTop = this.subBoard.top[0]?.user ?? "";
       this.subBoard.add(event);
       const nextTop = this.subBoard.top[0]?.user ?? "";
       newLeader = Boolean(nextTop && nextTop !== prevTop);
       if (this.settings.showTopSubGifter) jumpTo = "topSubGifter";
-    } else if (event.kind === "bits" && this.platform === "twitch") {
+    } else if (event.kind === "bits" && allowTwitch) {
       const name = event.name || event.user;
       const count = Math.max(0, Math.round(Number(event.count) || 0));
       if (!name || !(count > 0)) return false;

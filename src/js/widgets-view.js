@@ -59,8 +59,18 @@ export function createGiftsView(host) {
 
   function row(item) {
     const words = el("span", { className: "gift__words" });
-    for (const piece of fillTemplate(settings.template, { name: item.name, gift: item.gift, count: item.count, diamonds: item.diamonds, total: item.total })) {
-      words.append(piece.mark ? el("strong", { className: "gift__mark", textContent: piece.text }) : document.createTextNode(piece.text));
+    if (item.kind === "bits") {
+      words.append(el("strong", { className: "gift__mark", textContent: item.name }), document.createTextNode(" cheered "), el("strong", { className: "gift__mark", textContent: item.gift }));
+    } else if (item.kind === "sub") {
+      words.append(el("strong", { className: "gift__mark", textContent: item.name }), document.createTextNode(item.resub ? ` resubbed (${item.count} mo)` : " subscribed"));
+    } else if (item.kind === "subgift") {
+      words.append(el("strong", { className: "gift__mark", textContent: item.name }), document.createTextNode(" sent "), el("strong", { className: "gift__mark", textContent: item.gift }));
+    } else if (item.kind === "raid") {
+      words.append(el("strong", { className: "gift__mark", textContent: item.name }), document.createTextNode(" raided with "), el("strong", { className: "gift__mark", textContent: `${item.count.toLocaleString("en-US")} viewers` }));
+    } else {
+      for (const piece of fillTemplate(settings.template, { name: item.name, gift: item.gift, count: item.count, diamonds: item.diamonds, total: item.total })) {
+        words.append(piece.mark ? el("strong", { className: "gift__mark", textContent: piece.text }) : document.createTextNode(piece.text));
+      }
     }
     const node = el("div", { className: "gift gift--in" });
     // The entrance is played once. Without this, anything that moves the row in the page (see render) would play it again.
@@ -1748,6 +1758,7 @@ export function createActionsView(host) {
   let settings = null;
   const timers = new Set();
   const activeStickies = [];
+  const autoStickies = [];
   let stickySlot = 0;
   const STICKY_SPOTS = [
     [52, 46, -8],
@@ -1756,6 +1767,10 @@ export function createActionsView(host) {
     [66, 66, 6],
     [48, 72, -4],
     [28, 40, 11],
+    [75, 52, -7],
+    [40, 30, 8],
+    [25, 70, -10],
+    [60, 28, 5],
   ];
 
   return {
@@ -1772,7 +1787,7 @@ export function createActionsView(host) {
     hideReplay() {
       replayBar.hidden = true;
     },
-    showSticky({ base64 = "", maxNotes = 0, size = 22 } = {}) {
+    showSticky({ base64 = "", maxNotes = 0, size = 22, manual = false } = {}) {
       const clean = String(base64 || "").replace(/[^A-Za-z0-9+/=]/g, "");
       if (!clean) return;
       const [bx, by, brot] = STICKY_SPOTS[stickySlot % STICKY_SPOTS.length];
@@ -1794,13 +1809,23 @@ export function createActionsView(host) {
       stickyLayer.append(img);
       activeStickies.push(img);
 
-      const cap = maxNotes > 0 ? maxNotes : 16;
-      while (activeStickies.length > cap) {
-        const oldest = activeStickies.shift();
-        if (!oldest) continue;
-        oldest.classList.add("actions__sticky--out");
-        const rid = setTimeout(() => { timers.delete(rid); oldest.remove(); }, 340);
+      const evictNode = (node) => {
+        if (!node) return;
+        const aIdx = activeStickies.indexOf(node);
+        if (aIdx >= 0) activeStickies.splice(aIdx, 1);
+        const auIdx = autoStickies.indexOf(node);
+        if (auIdx >= 0) autoStickies.splice(auIdx, 1);
+        node.classList.add("actions__sticky--out");
+        const rid = setTimeout(() => { timers.delete(rid); node.remove(); }, 340);
         timers.add(rid);
+      };
+
+      if (!manual) {
+        autoStickies.push(img);
+        const cap = maxNotes > 0 ? maxNotes : 24;
+        while (autoStickies.length > cap) evictNode(autoStickies.shift());
+      } else {
+        while (activeStickies.length > 30) evictNode(activeStickies.shift());
       }
     },
     setStickySize(size = 22) {
@@ -1810,6 +1835,7 @@ export function createActionsView(host) {
     },
     clearStickies() {
       activeStickies.length = 0;
+      autoStickies.length = 0;
       stickySlot = 0;
       stickyLayer.replaceChildren();
     },
@@ -1855,6 +1881,7 @@ export function createActionsView(host) {
       replayBar.hidden = true;
       stack.replaceChildren();
       activeStickies.length = 0;
+      autoStickies.length = 0;
       stickySlot = 0;
       stickyLayer.replaceChildren();
     },

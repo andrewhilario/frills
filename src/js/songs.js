@@ -48,7 +48,7 @@ export const SONGS = defineWidget({
     { section: "rules", ...text("command", "The word viewers type after !", 16, "Viewers type !sr song name. Letters and numbers only. !songrequest, !request and !song always work too.") },
     { section: "rules", ...number("limit", "Most requests waiting", 3, 50) },
     { section: "rules", ...number("perUser", "Most per person waiting", 1, 5) },
-    { section: "rules", ...toggle("modsSkip", "Moderators can use !next too", "You can always use !next from your own TikTok account. Needs the relay to be up to date.") },
+    { section: "rules", ...toggle("modsSkip", "Moderators can use !next too", "You can always use !next from your own streamer account.") },
     { section: "rules", ...toggle("onlyFound", "Skip songs the catalog cannot find", "Off keeps the request as it was typed, so you can decide.") },
     { section: "rules", ...toggle("autoNext", "Move on by itself when the song ends", "Uses the song's length from the catalog. Off waits for !next (or the button in the editor).") },
     { section: "list", ...range("max", "Songs shown", 2, 8, 1, "") },
@@ -136,7 +136,8 @@ export class SongQueue {
       this.heard.add(message.id);
       if (this.heard.size > 500) this.heard.delete(this.heard.values().next().value);
     }
-    const streamer = message.host === true || (channel && String(message.login ?? "").toLowerCase() === String(channel).toLowerCase());
+    const hosts = String(channel || "").toLowerCase().split("+").filter(Boolean);
+    const streamer = message.host === true || (hosts.length > 0 && hosts.includes(String(message.login ?? "").toLowerCase()));
     if (command.kind === "next") {
       if (!(streamer || (this.settings.modsSkip && message.mod === true))) return { kind: "ignored", why: "not allowed" };
       return this.next() ? { kind: "next" } : { kind: "ignored", why: "nothing playing" };

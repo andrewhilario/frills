@@ -12,6 +12,7 @@ import { appendPlusCode } from "./plus-relay.js";
 import { mountCloudSave } from "./cloud-save.js";
 import { mountEditorMode } from "./editor-mode.js";
 import { mountSizeGuide } from "./size-guide.js";
+import { loadPlatformPref, savePlatformPref } from "./platform-pref.js";
 import { sourcesOf } from "./both.js";
 import { luminance } from "./color.js";
 
@@ -121,12 +122,14 @@ const channelFromLink = named.length ? named[0].channel : params.get("channel") 
 const twitchFromLink = bothFromLink ? named[1].channel : "";
 // TikTok first. A name saved before there were two platforms was a Twitch channel.
 const platformFromLink = bothFromLink ? "both" : named.length === 1 ? named[0].platform : ["tiktok", "twitch"].includes(params.get("platform")) ? params.get("platform") : "";
+const pref = loadPlatformPref();
+const initialPlatform = platformFromLink || saved?.platform || (saved?.channel ? "twitch" : pref.platform || "tiktok");
 const source = mountSource($("source"), {
   feeds: [feed],
   pace: () => [1500, 3000],
-  channel: channelFromLink || saved?.channel || "",
-  twitch: twitchFromLink || saved?.twitch || "",
-  platform: platformFromLink || saved?.platform || (saved?.channel ? "twitch" : "tiktok"),
+  channel: channelFromLink || saved?.channel || (initialPlatform === "twitch" ? pref.twitch : pref.tiktok) || "",
+  twitch: twitchFromLink || saved?.twitch || pref.twitch || "",
+  platform: initialPlatform,
   platforms: ["tiktok", "twitch", "both"],
   autoconnect: Boolean(channelFromLink),
   waitlistUrl: document.body.dataset.waitlist || "",
@@ -165,7 +168,15 @@ function refreshLink() {
   linkHint.append(guide, ". ", test, ".");
 }
 linkInput.addEventListener("focus", () => linkInput.select());
-source.onChange(() => { refreshLink(); save(); });
+source.onChange(() => {
+  savePlatformPref({
+    platform: source.platform,
+    tiktok: source.platform === "tiktok" || source.platform === "both" ? source.channel : undefined,
+    twitch: source.platform === "twitch" ? source.channel : source.platform === "both" ? source.twitchChannel : undefined,
+  });
+  refreshLink();
+  save();
+});
 // When one chat reads TikTok and Twitch together, each message gets a small platform icon (unless the look turns it off).
 const syncMark = () => feed.configure({ markPlatform: source.platform === "both" && settings.source !== "none" });
 source.onChange(syncMark);

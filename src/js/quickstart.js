@@ -1,22 +1,22 @@
 // Quick start: a few answers become a set of ready links, one for each overlay, all in the same style. Pure code (no page), so it is tested
 // without a browser. The page that asks the questions is start.js.
 
-/** The overlays, the address a streaming app opens, the editor that fine-tunes it, and whether it works on Twitch. */
+/** The overlays, the address a streaming app opens, the editor that fine-tunes it, and platform support (`twitch`, `both`). */
 export const OVERLAYS = [
-  { id: "chat", name: "Chat", blurb: "Your chat as speech bubbles.", overlay: "/overlay/", editor: "/editor/", twitch: true },
-  { id: "alerts", name: "Alerts", blurb: "A pop-up for each follow, gift or share.", overlay: "/overlay/alerts/", editor: "/alerts/", twitch: true },
-  { id: "gifters", name: "Top gifters", blurb: "A live ranking of top diamond gifters, sub gifters or bit senders.", overlay: "/overlay/gifters/", editor: "/gifters/", twitch: true },
-  { id: "labels", name: "Rotating highlights", blurb: "Cycles through your last gift, follower, sub, bits and top supporters.", overlay: "/overlay/labels/", editor: "/labels/", twitch: true },
-  { id: "wheel", name: "Spin the wheel", blurb: "A prize or dare wheel viewers spin with TikTok gifts, Twitch bits or subs.", overlay: "/overlay/wheel/", editor: "/wheel/", twitch: true },
-  { id: "gifts", name: "Last gifts", blurb: "A list of your most recent gifts.", overlay: "/overlay/gifts/", editor: "/gifts/", twitch: false },
-  { id: "jar", name: "Gift jar", blurb: "Watch TikTok gifts tumble into a themed jar until it is full.", overlay: "/overlay/jar/", editor: "/jar/", twitch: false },
-  { id: "gallery", name: "Gift gallery rotator", blurb: "Rotates through featured TikTok gifts and lights them up when sent.", overlay: "/overlay/gallery/", editor: "/gallery/", twitch: false },
-  { id: "goal", name: "Goals", blurb: "A bar that fills as you gain followers, gifts or likes.", overlay: "/overlay/goal/", editor: "/goal/", twitch: false },
-  { id: "likers", name: "Top likers", blurb: "A live ranking of who taps the heart the most.", overlay: "/overlay/likers/", editor: "/likers/", twitch: false },
-  { id: "songs", name: "Song requests", blurb: "Viewers type !sr in chat to add songs to your queue.", overlay: "/overlay/songs/", editor: "/songs/", twitch: false },
-  { id: "timer", name: "Subathon timer", blurb: "A countdown clock that grows when viewers send gifts.", overlay: "/overlay/timer/", editor: "/timer/", twitch: false },
-  { id: "tts", name: "Talking pet TTS", blurb: "An animated pet reads gifts and !say messages aloud.", overlay: "/overlay/tts/", editor: "/tts/", twitch: false },
-  { id: "counter", name: "Viewer and like counter", blurb: "How many are watching and how many likes your LIVE has.", overlay: "/overlay/counter/", editor: "/counter/", twitch: false },
+  { id: "chat", name: "Chat", blurb: "Your chat as speech bubbles.", overlay: "/overlay/", editor: "/editor/", twitch: true, both: true },
+  { id: "alerts", name: "Alerts", blurb: "A pop-up for TikTok follows, gifts & shares and Twitch subs, bits, raids & follows.", overlay: "/overlay/alerts/", editor: "/alerts/", twitch: true, both: true },
+  { id: "gifters", name: "Top gifters", blurb: "A live ranking of top diamond gifters, sub gifters or bit senders.", overlay: "/overlay/gifters/", editor: "/gifters/", twitch: true, both: true },
+  { id: "labels", name: "Rotating highlights", blurb: "Cycles through your last gift, follower, sub, bits and top supporters.", overlay: "/overlay/labels/", editor: "/labels/", twitch: true, both: true },
+  { id: "wheel", name: "Spin the wheel", blurb: "A prize or dare wheel viewers spin with TikTok gifts, Twitch bits or subs.", overlay: "/overlay/wheel/", editor: "/wheel/", twitch: true, both: true },
+  { id: "gifts", name: "Last gifts", blurb: "A live feed of your recent TikTok gifts and Twitch subs, bits and raids.", overlay: "/overlay/gifts/", editor: "/gifts/", twitch: true, both: true },
+  { id: "jar", name: "Gift jar", blurb: "Watch TikTok gifts or Twitch bits & subs tumble into a themed jar until it is full.", overlay: "/overlay/jar/", editor: "/jar/", twitch: true, both: true },
+  { id: "gallery", name: "Gift gallery rotator", blurb: "Rotates through featured TikTok gifts and lights them up when sent.", overlay: "/overlay/gallery/", editor: "/gallery/", twitch: false, both: false },
+  { id: "goal", name: "Goals", blurb: "A bar that fills with followers, TikTok gifts/likes, or Twitch subs & bits.", overlay: "/overlay/goal/", editor: "/goal/", twitch: true, both: true },
+  { id: "likers", name: "Top likers", blurb: "A live ranking of who taps the heart the most.", overlay: "/overlay/likers/", editor: "/likers/", twitch: false, both: false },
+  { id: "songs", name: "Song requests", blurb: "Viewers type !sr in TikTok or Twitch chat to add songs to your queue.", overlay: "/overlay/songs/", editor: "/songs/", twitch: true, both: true },
+  { id: "timer", name: "Subathon timer", blurb: "A countdown clock that grows with TikTok gifts or Twitch subs & bits.", overlay: "/overlay/timer/", editor: "/timer/", twitch: true, both: true },
+  { id: "tts", name: "Talking pet TTS", blurb: "An animated pet reads TikTok gifts, Twitch bits/subs and !say messages aloud.", overlay: "/overlay/tts/", editor: "/tts/", twitch: true, both: true },
+  { id: "counter", name: "Viewer and like counter", blurb: "How many are watching and how many likes your LIVE has.", overlay: "/overlay/counter/", editor: "/counter/", twitch: false, both: false },
 ];
 
 /**
@@ -61,11 +61,11 @@ export function buildLinks(origin, answers) {
   const align = ALIGNS.some(([id]) => id === answers.align) ? answers.align : "left";
   const chosen = new Set(answers.overlays ?? []);
 
-  // one entry for each link: the overlay, the platform it reads, and (for the one chat of "both") whether it reads two
+  // one entry for each link: dual-platform overlays with `both: true` produce one unified ?tiktok=...&twitch=... link in Both mode
   const entries = [];
   for (const o of overlaysFor(platform).filter((o) => chosen.has(o.id))) {
     if (!both) entries.push({ o, id: o.id, name: o.name, platform });
-    else if (o.id === "chat") entries.push({ o, id: o.id, name: o.name, platform: "both" });
+    else if (o.both) entries.push({ o, id: o.id, name: o.name, platform: "both" });
     else if (o.twitch) entries.push({ o, id: `${o.id}-tiktok`, name: `${o.name} (TikTok)`, platform: "tiktok" }, { o, id: `${o.id}-twitch`, name: `${o.name} (Twitch)`, platform: "twitch" });
     else entries.push({ o, id: o.id, name: o.name, platform: "tiktok" });
   }
@@ -86,7 +86,11 @@ export function buildLinks(origin, answers) {
       : query(["channel", names[reads]], ["platform", names[reads] ? reads : ""]);
     // chat in a Matcha style is fine-tuned on the Matcha page, which has its own looks
     const editor = o.id === "chat" && look.has("style") ? "/matcha/" : o.editor;
-    const previewMore = (o.id === "alerts" || o.id === "gifters" || o.id === "labels" || o.id === "wheel") ? [["platform", reads]] : o.id === "chat" ? (reads === "both" ? [["tiktok", "demo"], ["twitch", "demo"]] : []) : [["pace", "1100"]];
+    const previewMore = reads === "both"
+      ? (o.id === "chat" ? [["tiktok", "demo"], ["twitch", "demo"]] : [["tiktok", "demo"], ["twitch", "demo"], ["pace", "1100"]])
+      : (o.id === "alerts" || o.id === "gifters" || o.id === "labels" || o.id === "wheel" || o.id === "gifts" || o.id === "jar" || o.id === "goal" || o.id === "timer" || o.id === "tts" || o.id === "songs")
+        ? [["platform", reads]]
+        : o.id === "chat" ? [] : [["pace", "1100"]];
     return {
       id,
       name,
@@ -103,12 +107,13 @@ export function buildLinks(origin, answers) {
 
 function noteFor(id, reads) {
   if (id === "chat" && reads === "both") return "One chat for both: TikTok and Twitch messages arrive together, each with a small icon so you can tell them apart. The editor can turn the icon off.";
-  if (id === "alerts" && reads === "twitch") return "Twitch subs, gifted subs, cheers and raids work with this link. Follow alerts need one extra login: open this overlay in the editor and press the Twitch login button.";
-  if (id === "labels" && reads === "twitch") return "Twitch subs, bits, top sub gifter and top bit sender work with this link. Last follower needs one extra login: open this overlay in the editor and press the Twitch login button.";
+  if (id === "alerts" && (reads === "twitch" || reads === "both")) return "Twitch subs, gifted subs, cheers and raids work with this link. Follow alerts need one extra login: open this overlay in the editor and press the Twitch login button.";
+  if (id === "labels" && (reads === "twitch" || reads === "both")) return "Twitch subs, bits, top sub gifter and top bit sender work with this link. Last follower needs one extra login: open this overlay in the editor and press the Twitch login button.";
+  if (id === "gifters" && reads === "both") return "Ranks TikTok gift diamonds, Twitch gifted subs and bit cheers together in one leaderboard.";
   if (id === "gifters" && reads === "twitch") return "Ranks gifted subs, bit cheers, or both together in the editor.";
   if (id === "wheel") return "Open the editor to customize your wheel slices and pick whether gifts, bits or a spin meter trigger it.";
   if (id === "gallery") return "Open the editor to choose your featured TikTok gifts and optional reward captions.";
-  if (id === "goal") return "The follower goal starts from your real follower count once you are LIVE.";
+  if (id === "goal") return reads === "twitch" ? "Open the editor to choose a Twitch sub, bits, or follower goal and set your milestone reward." : "The follower goal starts from your real follower count once you are LIVE.";
   if (id === "timer") return "Open this overlay in the editor to press Start, Pause or add time during your stream.";
   if (id === "songs") return "Viewers type !sr and a song name in chat. Open the editor if you also want to connect Spotify.";
   return "";

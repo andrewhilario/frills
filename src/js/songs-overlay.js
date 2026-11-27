@@ -4,7 +4,7 @@
 
 import { SONGS, SongQueue, loadSongs, makeLookup, saveSongs } from "./songs.js";
 import { createSongsView } from "./widgets-view.js";
-import { channelFromParams, connectEvents } from "./widget-overlay.js";
+import { bothFromParams, channelFromParams, connectEvents, platformFromParams } from "./widget-overlay.js";
 import { fakeLookup, fakeSongSource } from "./fake-alerts.js";
 import { spotifyLayer } from "./songs-spotify.js";
 import { SpotifyForward } from "./spotify-forward.js";
@@ -18,7 +18,9 @@ const demoPace = Number(params.get("pace")) ? Math.min(10000, Math.max(300, Numb
 
 const note = document.getElementById("note");
 const say = (text) => { note.hidden = !text; note.textContent = text; };
-const channel = channelFromParams(params);
+const platform = platformFromParams(params);
+const both = bothFromParams(params);
+const channel = channelFromParams(params, platform);
 const demo = params.get("demo") === "1";
 
 const view = createSongsView(document.getElementById("songs"));
@@ -72,6 +74,8 @@ if (demo) {
   const fonts = fontsReady(generalFaces(settings), 1000); // the connection starts at once; only drawing waits for the font
   connectEvents({
     channel,
+    platform,
+    both,
     events: [],
     onChat: (message) => {
       fonts.then(() => {

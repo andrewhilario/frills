@@ -9,9 +9,11 @@ import { fontsReady, generalFaces, paintGeneral } from "./look.js";
 import { chips, copyButton } from "./ui.js";
 import { cleanChannel } from "./twitch.js";
 import { luminance } from "./color.js";
+import { initPlatformFilters } from "./platform-pref.js";
 
 initNav();
 initTip();
+initPlatformFilters();
 
 const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 

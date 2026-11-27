@@ -16,6 +16,7 @@ import { appendPlusCode } from "./plus-relay.js";
 import { mountCloudSave } from "./cloud-save.js";
 import { mountEditorMode } from "./editor-mode.js";
 import { mountSizeGuide } from "./size-guide.js";
+import { loadPlatformPref, savePlatformPref } from "./platform-pref.js";
 
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
@@ -173,20 +174,31 @@ const showSeen = (kind) => {
   dd.dataset.bump = "";
 };
 
-const channelFromLink = params.get("channel") ?? "";
-// TikTok or Twitch: the address says, else what was used last, else TikTok. What each one can send is in PLATFORM_KINDS.
-let platform = ["tiktok", "twitch"].includes(params.get("platform")) ? params.get("platform") : ["tiktok", "twitch"].includes(saved?.platform) ? saved.platform : "tiktok";
+const pref = loadPlatformPref();
+const askedBoth = Boolean(params.get("tiktok") && params.get("twitch"));
+const channelFromLink = params.get("tiktok") || params.get("channel") || "";
+const twitchFromLink = params.get("twitch") || "";
+// TikTok, Twitch, or Both: the address says, else what was used last, else global preference, else TikTok.
+const VALID_PLATFORMS = ["tiktok", "twitch", "both"];
+let platform = askedBoth ? "both"
+  : VALID_PLATFORMS.includes(params.get("platform")) ? params.get("platform")
+  : VALID_PLATFORMS.includes(saved?.platform) ? saved.platform
+  : VALID_PLATFORMS.includes(pref.platform) ? pref.platform
+  : "tiktok";
+const prefPrimary = platform === "twitch" ? pref.twitch : pref.tiktok;
+const savedMatches = !saved?.platform || saved.platform === platform || (platform === "both" && saved.platform === "tiktok");
 const source = mountSource($("source"), {
   feeds: [],
   pace: () => [2000, 4000],
-  channel: channelFromLink || ((saved?.platform ?? "tiktok") === platform ? saved?.channel : "") || "",
+  channel: channelFromLink || (savedMatches ? saved?.channel : "") || prefPrimary || "",
+  twitch: twitchFromLink || saved?.twitch || pref.twitch || "",
   platform,
-  platforms: ["tiktok", "twitch"],
+  platforms: ["tiktok", "twitch", "both"],
   autoconnect: Boolean(channelFromLink),
   waitlistUrl: document.body.dataset.waitlist || "",
   tools: false,
-  idleHint: "Type your name. On TikTok, frills_demo gives you made-up follows, gifts and shares. The test buttons above work without connecting.",
-  events: () => (platform === "twitch" ? TWITCH_CHAT_KINDS : PLATFORM_KINDS.tiktok), // Twitch follows do not come through the chat connection
+  idleHint: "Type your name (or both names in Both mode). On TikTok, frills_demo gives you made-up follows, gifts and shares. The test buttons above work without connecting.",
+  events: () => (platform === "twitch" ? TWITCH_CHAT_KINDS : platform === "both" ? [...PLATFORM_KINDS.tiktok, ...TWITCH_CHAT_KINDS] : PLATFORM_KINDS.tiktok), // Twitch follows arrive via the follow box
   onAlert: (event) => {
     seen[event.kind] += 1;
     showSeen(event.kind);
@@ -212,19 +224,29 @@ copyButton(copyBtn, () => linkInput.value);
 const cloud = mountCloudSave({ kind: "alerts", storeKey: STORE, anchor: linkInput.closest(".linkfield"), getUrl: () => linkInput.value, defaultName: "Stream alerts" });
 
 function refreshLink() {
-  const channel = source.cleanChannel();
+  const isBoth = platform === "both";
+  const both = isBoth ? source.cleanChannels() : null;
+  const channel = isBoth ? (both.tiktok && both.twitch ? both.tiktok : "") : source.cleanChannel();
   if (!channel) {
     linkInput.value = "";
     copyBtn.disabled = true;
-    linkHint.textContent = "Your link appears here once you have typed your name in step 4.";
+    linkHint.textContent = isBoth
+      ? "Your link appears here once you have typed both your TikTok and Twitch names in step 4."
+      : "Your link appears here once you have typed your name in step 4.";
     cloud.sync();
     return;
   }
-  const rawUrl = alertsUrl(`${location.origin}/overlay/alerts/`, { channel, settings, platform, follows: followBox.codeFor(platform) });
-  linkInput.value = platform === "tiktok" ? appendPlusCode(rawUrl) : rawUrl;
+  const rawUrl = alertsUrl(`${location.origin}/overlay/alerts/`, { channel, settings, platform, both, follows: followBox.codeFor(platform) });
+  linkInput.value = platform === "tiktok" || isBoth ? appendPlusCode(rawUrl) : rawUrl;
   copyBtn.disabled = false;
   cloud.sync();
-  linkHint.replaceChildren("Paste it into a Browser source in your streaming app, next to your chat. For a vertical LIVE use 1080 wide by 1920 high. ");
+  linkHint.replaceChildren(
+    isBoth
+      ? "Paste one Browser source link into OBS or Streamlabs — shows TikTok LIVE and Twitch alerts together. "
+      : platform === "twitch"
+        ? "Paste it into a Browser source in OBS or Streamlabs. For a PC stream use 1920 wide by 1080 high. "
+        : "Paste it into a Browser source in your streaming app, next to your chat. For a vertical LIVE use 1080 wide by 1920 high. ",
+  );
   const guide = document.createElement("a");
   guide.href = "/guides/alerts/";
   guide.textContent = "How to set up and test alerts";
@@ -252,13 +274,18 @@ function showPlatform() {
 
 source.onChange(() => {
   if (source.platform !== platform) { platform = source.platform; showPlatform(); }
+  savePlatformPref({
+    platform: source.platform,
+    tiktok: source.platform === "tiktok" || source.platform === "both" ? source.channel : undefined,
+    twitch: source.platform === "twitch" ? source.channel : source.platform === "both" ? source.twitchChannel : undefined,
+  });
   refreshLink();
   save();
 });
 showPlatform();
 
 function save() {
-  try { localStorage.setItem(STORE, JSON.stringify({ settings, channel: source.channel, platform, canvas })); } catch { /* storage can be blocked; the editor still works */ }
+  try { localStorage.setItem(STORE, JSON.stringify({ settings, channel: source.channel, twitch: source.twitchChannel, platform, canvas })); } catch { /* storage can be blocked; the editor still works */ }
 }
 
 // ── The preview itself ───────────────────────────────────────────────────────────────────────────────────────────
@@ -266,7 +293,7 @@ $("backdrop").addEventListener("change", (event) => { $("preview").dataset.back 
 // The preview is a true copy of the page your streaming app will show (a vertical LIVE is 1080 x 1920), shrunk to fit the panel, so
 // sizes, distances and wrapping are exactly what you will get.
 const CANVASES = { vertical: [1080, 1920], landscape: [1920, 1080], square: [1080, 1080] };
-let canvas = CANVASES[saved?.canvas] ? saved.canvas : "vertical";
+let canvas = CANVASES[saved?.canvas] ? saved.canvas : platform === "twitch" ? "landscape" : "vertical";
 let sizeGuide = null;
 function fit() {
   const [w, h] = CANVASES[canvas];

@@ -197,6 +197,15 @@ export function fakeCounterSource({ onViewers, onLike }, getPace = () => [600, 1
 
 /** Starting entries for the Top Gifters demo overlay, close to a celebration milestone when reasonable. */
 export function demoGifters(platform = "tiktok", twitchMode = "subgift", every = 1000) {
+  if (platform === "both") {
+    return [
+      { user: "Pond Pal", name: "Pond Pal", avatar: "", diamonds: 920, subgifts: 0, bits: 0 },
+      { user: "Mochi Bun", name: "Mochi Bun", avatar: "", diamonds: 0, subgifts: 2, bits: 0 },
+      { user: "frogfan", name: "frogfan 🐸", avatar: "", diamonds: 450, subgifts: 0, bits: 300 },
+      { user: "Mattcha", name: "Mattcha", avatar: "", diamonds: 0, subgifts: 0, bits: 650 },
+      { user: "Little Lily", name: "Little Lily", avatar: "", diamonds: 240, subgifts: 0, bits: 0 },
+    ];
+  }
   if (platform === "twitch") {
     const subsNear = twitchMode === "subgift" && every <= 100 ? Math.max(1, every - 1) : 12;
     const bitsNear = twitchMode === "bits" ? Math.max(50, every - 50) : 1400;
@@ -219,7 +228,10 @@ export function fakeGifterSource(push, platform = "tiktok", getPace = () => [900
   let timer = 0;
   const loop = () => {
     if (stopped) return;
-    if (platform === "twitch") {
+    if (platform === "both") {
+      const kind = Math.random() < 0.45 ? "gift" : Math.random() < 0.5 ? "bits" : "subgift";
+      push(fakeAlert(kind, { size: 1 + Math.floor(Math.random() * 2) }));
+    } else if (platform === "twitch") {
       const kind = twitchMode === "bits" ? "bits" : twitchMode === "subgift" ? "subgift" : Math.random() < 0.55 ? "bits" : "subgift";
       push(fakeAlert(kind, { size: 1 + Math.floor(Math.random() * 2) }));
     } else {
@@ -234,6 +246,16 @@ export function fakeGifterSource(push, platform = "tiktok", getPace = () => [900
 
 /** Practice events seeded on load for /overlay/labels/?demo=1 so all enabled cards can rotate immediately. */
 export function demoLabelEvents(platform = "tiktok") {
+  if (platform === "both") {
+    return [
+      { kind: "gift", id: `practice-seed-${++counter}`, user: "Mochi Bun", name: "Mochi Bun", avatar: "", gift: "Hand Hearts", picture: "", diamonds: 100, count: 1, total: 100 },
+      fakeAlert("sub", { name: "Little Lily", resub: true }),
+      fakeAlert("bits", { name: "Mattcha", size: 2 }),
+      fakeAlert("subgift", { name: "Mochi Bun", size: 2 }),
+      fakeAlert("follow", { name: "Pond Pal" }),
+      fakeLike({ name: "frogfan 🐸", count: 340 }),
+    ];
+  }
   if (platform === "twitch") {
     return [
       fakeAlert("subgift", { name: "Mochi Bun", size: 2 }),
@@ -250,9 +272,13 @@ export function demoLabelEvents(platform = "tiktok") {
   ];
 }
 
-/** Sends occasional practice events matching Rotating Highlights on TikTok or Twitch. */
+/** Sends occasional practice events matching Rotating Highlights on TikTok, Twitch, or Both. */
 export function fakeLabelSource(push, platform = "tiktok", getPace = () => [2200, 4200]) {
-  const kinds = platform === "twitch" ? ["follow", "sub", "bits", "subgift"] : ["gift", "follow", "like"];
+  const kinds = platform === "twitch"
+    ? ["follow", "sub", "bits", "subgift"]
+    : platform === "both"
+      ? ["gift", "follow", "sub", "bits", "subgift", "like"]
+      : ["gift", "follow", "like"];
   let stopped = false;
   let timer = 0;
   const loop = () => {

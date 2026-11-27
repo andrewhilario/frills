@@ -47,56 +47,105 @@
     <div class="shell">
       <div class="band__head">
         <h2 class="title" id="suite-title">Every free overlay for your TikTok LIVE and Twitch stream</h2>
-        <p class="lede">Chat is just one of them. Every overlay works the same way: pick a look, press the test buttons, type your @name and paste one Browser source link into your streaming app. Free, with no Frills account. Most are in beta: they work, and they may still change.</p>
+        <p class="lede">Built equally for TikTok LIVE, Twitch, and multistreaming to both at once. Pick an overlay and a look, test it live, enter your channel name, and paste one Browser source link into OBS, Streamlabs, or TikTok LIVE Studio. Free, with no account.</p>
       </div>
-      <ul class="tools tools--rows" role="list">
-        <li class="tool" data-status="live">
-          <h3 class="subtitle"><a href="/editor/">Chat overlay for TikTok LIVE and Twitch</a></h3>
-          <p>Your chat as cute speech bubbles, with {{stats.looksWordLower}} to start from and your own colors, fonts and corners. This is the one you see above.</p>
+      <div class="suite-filter" data-platform-filter="suite-tools" role="group" aria-label="Filter overlays by platform">
+        <button class="chip" type="button" data-filter="all" aria-pressed="true">All overlays</button>
+        <button class="chip" type="button" data-filter="both" aria-pressed="false">TikTok + Twitch</button>
+        <button class="chip" type="button" data-filter="twitch" aria-pressed="false">Twitch</button>
+        <button class="chip" type="button" data-filter="tiktok" aria-pressed="false">TikTok LIVE</button>
+      </div>
+      <ul class="tools tools--rows" id="suite-tools" role="list">
+        <li class="tool" data-status="live" data-plats="tiktok twitch both">
+          <div class="tool__head">
+            <h3 class="subtitle"><a href="/editor/">Chat overlay for TikTok LIVE and Twitch</a></h3>
+            <span class="tool__plat">TikTok + Twitch · Both</span>
+          </div>
+          <p>Your chat as cute speech bubbles, with {{stats.looksWordLower}} to start from and your own colors, fonts and corners. Combine TikTok and Twitch into one feed in Both mode.</p>
         </li>
-        <li class="tool" data-status="beta">
-          <h3 class="subtitle"><a href="/alerts/">Alerts for TikTok LIVE and Twitch</a></h3>
-          <p>Pop-up cards for TikTok follows, gifts and shares, and for Twitch subs, gifted subs, bits, raids and follows, with sounds, animations and your own uploaded GIFs.</p>
+        <li class="tool" data-status="beta" data-plats="tiktok twitch both">
+          <div class="tool__head">
+            <h3 class="subtitle"><a href="/alerts/">Alerts for TikTok LIVE and Twitch</a></h3>
+            <span class="tool__plat">TikTok + Twitch · Both</span>
+          </div>
+          <p>Pop-up cards for TikTok follows, gifts and shares, and for Twitch subs, gifted subs, bits, raids and follows — separately or combined in one alert queue, with sounds and custom GIFs.</p>
         </li>
-        <li class="tool" data-status="beta">
-          <h3 class="subtitle"><a href="/wheel/">Spin the wheel</a></h3>
-          <p>Let viewers spin a wheel of your own prizes or dares with TikTok LIVE gifts, Twitch bits and subs, with real pointer ticks, a spin queue and confetti.</p>
+        <li class="tool" data-status="beta" data-plats="tiktok twitch both">
+          <div class="tool__head">
+            <h3 class="subtitle"><a href="/wheel/">Spin the wheel</a></h3>
+            <span class="tool__plat">TikTok + Twitch · Both</span>
+          </div>
+          <p>Let viewers spin a wheel of your own prizes or dares with TikTok LIVE gifts, Twitch bits and subs (or both at once), with real pointer ticks, a spin queue and confetti.</p>
         </li>
-        <li class="tool" data-status="beta">
-          <h3 class="subtitle"><a href="/jar/">Gift jar</a></h3>
-          <p>Drop TikTok gifts into 14 themed crystal jars (in Small, Medium, or Large) until one is full. Big gifts pour in as a shower.</p>
+        <li class="tool" data-status="beta" data-plats="tiktok twitch both">
+          <div class="tool__head">
+            <h3 class="subtitle"><a href="/jar/">Gift &amp; bits jar</a></h3>
+            <span class="tool__plat">TikTok + Twitch · Both</span>
+          </div>
+          <p>Drop TikTok gifts and Twitch bits &amp; subs into 14 themed crystal jars (in Small, Medium, or Large) until one is full. Big gifts and cheers pour in as a shower.</p>
         </li>
-        <li class="tool" data-status="beta">
-          <h3 class="subtitle"><a href="/actions/">Actions for OBS and VTube Studio</a></h3>
-          <p>Turn chat commands like <strong>!clip</strong>, gifts, subs, bits or raids into OBS clips, instant replays, scene switches, sounds and banners, and pin viewers’ names on your VTube Studio avatar as sticky notes. 10 actions and 5 sticky notes are free. It needs OBS Studio or Streamlabs Desktop, not TikTok LIVE Studio.</p>
+        <li class="tool" data-status="beta" data-plats="tiktok twitch both">
+          <div class="tool__head">
+            <h3 class="subtitle"><a href="/outline/">Stream outline &amp; border designer</a></h3>
+            <span class="tool__plat">TikTok 9:16 + Twitch 16:9</span>
+          </div>
+          <p>Animated 16:9 Twitch/OBS borders, 9:16 TikTok LIVE layouts with safe-zone guides, webcam/VTuber frames, transparent widget slots, and transparent PNG export.</p>
         </li>
-        <li class="tool" data-status="beta">
-          <h3 class="subtitle"><a href="/goal/">Follower, gift and like goal bars</a></h3>
-          <p>A progress bar that starts from your real TikTok follower count, cheers at 25%, 50% and 75%, celebrates when you hit the goal, and raises the target automatically.</p>
+        <li class="tool" data-status="beta" data-plats="tiktok twitch both">
+          <div class="tool__head">
+            <h3 class="subtitle"><a href="/actions/">Actions for OBS and VTube Studio</a></h3>
+            <span class="tool__plat">TikTok + Twitch · Both</span>
+          </div>
+          <p>Turn chat commands like <strong>!clip</strong>, gifts, subs, bits or raids into OBS clips, instant replays, scene switches, sounds and banners, and pin viewers’ names on your VTube Studio avatar as sticky notes. 10 actions and 10 automatic sticky notes (plus unlimited manual notes) are free. Works in OBS Studio and Streamlabs Desktop.</p>
         </li>
-        <li class="tool" data-status="beta">
-          <h3 class="subtitle"><a href="/gifters/">Top gifters</a> &amp; <a href="/labels/">rotating highlights</a></h3>
-          <p>Rank your biggest diamond, sub and bit supporters live, or rotate your last gift, last follower, last sub, last bits and top gifters in one compact card.</p>
+        <li class="tool" data-status="beta" data-plats="tiktok twitch both">
+          <div class="tool__head">
+            <h3 class="subtitle"><a href="/goal/">Follower, sub, gift &amp; bits goal bars</a></h3>
+            <span class="tool__plat">TikTok + Twitch · Both</span>
+          </div>
+          <p>A progress bar for TikTok followers, gifts &amp; likes or Twitch subs, bits &amp; follows — cheers at 25%, 50% and 75%, celebrates at 100%, and raises the next target automatically.</p>
         </li>
-        <li class="tool" data-status="beta">
-          <h3 class="subtitle"><a href="/gallery/">Gift gallery</a></h3>
-          <p>An animated gallery of TikTok LIVE gifts that rotates through your favorites or collects the live ones, lighting up each card and crediting whoever sent it.</p>
+        <li class="tool" data-status="beta" data-plats="tiktok twitch both">
+          <div class="tool__head">
+            <h3 class="subtitle"><a href="/gifters/">Top gifters</a> &amp; <a href="/labels/">rotating highlights</a></h3>
+            <span class="tool__plat">TikTok + Twitch · Both</span>
+          </div>
+          <p>Rank your biggest diamond, sub and bit supporters live, or rotate your last gift, last follower, last sub, last bits and top supporters across one or both platforms.</p>
         </li>
-        <li class="tool" data-status="beta">
-          <h3 class="subtitle"><a href="/timer/">Subathon countdown timer</a></h3>
-          <p>A countdown clock that grows automatically whenever viewers send TikTok gifts, follows or shares. Start, pause or add time right from your browser.</p>
+        <li class="tool" data-status="beta" data-plats="tiktok twitch both">
+          <div class="tool__head">
+            <h3 class="subtitle"><a href="/timer/">Subathon countdown timer</a></h3>
+            <span class="tool__plat">TikTok + Twitch · Both</span>
+          </div>
+          <p>A countdown clock that grows automatically whenever viewers send TikTok gifts or Twitch subs, gifted subs and bits. Start, pause or add time right from your browser.</p>
         </li>
-        <li class="tool" data-status="beta">
-          <h3 class="subtitle"><a href="/tts/">Talking pet TTS (!say, gifts &amp; bits)</a></h3>
+        <li class="tool" data-status="beta" data-plats="tiktok twitch both">
+          <div class="tool__head">
+            <h3 class="subtitle"><a href="/tts/">Talking pet TTS (!say, gifts &amp; bits)</a></h3>
+            <span class="tool__plat">TikTok + Twitch · Both</span>
+          </div>
           <p>An animated frog, cat, bunny or hamster hops along as it reads out TikTok gifts, Twitch bits and subs, and viewer <strong>!say</strong> messages using free built-in browser voices.</p>
         </li>
-        <li class="tool" data-status="beta">
-          <h3 class="subtitle"><a href="/songs/">Song requests (!sr) and Spotify player</a></h3>
-          <p>Viewers type <strong>!sr</strong> and a song name in chat to build your on-screen queue with album covers, and optionally queue songs straight into your Spotify.</p>
+        <li class="tool" data-status="beta" data-plats="tiktok twitch both">
+          <div class="tool__head">
+            <h3 class="subtitle"><a href="/songs/">Song requests (!sr) and Spotify player</a></h3>
+            <span class="tool__plat">TikTok + Twitch · Both</span>
+          </div>
+          <p>Viewers type <strong>!sr</strong> and a song name in TikTok or Twitch chat (or both together) to build your on-screen queue with album covers, and optionally queue straight into Spotify.</p>
         </li>
-        <li class="tool" data-status="beta">
-          <h3 class="subtitle"><a href="/likers/">Top likers</a>, <a href="/gifts/">last gifts</a> and <a href="/counter/">live counter</a></h3>
-          <p>Rank your top 10 heart tappers, list your recent gifts, or show your live viewer and like counts.</p>
+        <li class="tool" data-status="beta" data-plats="tiktok twitch both">
+          <div class="tool__head">
+            <h3 class="subtitle"><a href="/gifts/">Recent gifts &amp; support</a></h3>
+            <span class="tool__plat">TikTok + Twitch · Both</span>
+          </div>
+          <p>A live scrolling feed of your latest TikTok gifts and Twitch subs, gifted subs, bit cheers and raids — individually or combined in one feed.</p>
+        </li>
+        <li class="tool" data-status="beta" data-plats="tiktok">
+          <div class="tool__head">
+            <h3 class="subtitle"><a href="/gallery/">Gift gallery</a>, <a href="/likers/">top likers</a> &amp; <a href="/counter/">live counter</a></h3>
+            <span class="tool__plat tool__plat--single">TikTok LIVE</span>
+          </div>
+          <p>TikTok-specific favorites: an animated gift gallery showcase, live top 10 heart-tappers leaderboard, and live viewer &amp; like counter.</p>
         </li>
       </ul>
       <p class="band__aside"><a href="/overlays/">See every overlay and what is coming</a>, or <a href="/start/">answer 6 quick questions and get your links</a>.</p>

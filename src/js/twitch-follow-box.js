@@ -6,6 +6,7 @@ import { FollowPublisher, FollowReader, followIdentity, followsOn, setFollowsOn 
 import { FollowWatcher, REDIRECT_PATH, beginLogin, clearLogin, loadLogin, validate } from "./twitch-follows.js";
 
 const $ = (id) => document.getElementById(id);
+const hasTwitch = (p) => p === "twitch" || p === "both";
 
 function startClock(tickerJs, fn, every) {
   try {
@@ -142,13 +143,13 @@ export function mountFollowBox({ getPlatform, onFollow, onChanged } = {}) {
       return;
     }
 
-    if (getPlatform?.() === "twitch") startWatcher(login);
+    if (hasTwitch(getPlatform?.())) startWatcher(login);
   }
 
   async function checkFollows() {
     clearTimeout(followsTimer);
     if (!followsNote) return;
-    if (getPlatform?.() !== "twitch" || !followsBox?.checked) { followsNote.textContent = ""; return; }
+    if (!hasTwitch(getPlatform?.()) || !followsBox?.checked) { followsNote.textContent = ""; return; }
     const login = loadLogin();
     if (login && watcher) {
       followsNote.textContent = "The Twitch follows page is running, so new followers will show up in your overlay.";
@@ -173,7 +174,7 @@ export function mountFollowBox({ getPlatform, onFollow, onChanged } = {}) {
   function syncFollowReader() {
     followReader?.stop();
     followReader = null;
-    if (getPlatform?.() !== "twitch" || !followsBox?.checked) return;
+    if (!hasTwitch(getPlatform?.()) || !followsBox?.checked) return;
     followReader = new FollowReader({
       code: identity.code,
       onFollow: (f) => deliver(f, false),
@@ -216,7 +217,7 @@ export function mountFollowBox({ getPlatform, onFollow, onChanged } = {}) {
   });
 
   function sync() {
-    if (getPlatform?.() === "twitch") syncTwitchAuth();
+    if (hasTwitch(getPlatform?.())) syncTwitchAuth();
     else stopWatcher();
     checkFollows();
     syncFollowReader();
@@ -224,7 +225,7 @@ export function mountFollowBox({ getPlatform, onFollow, onChanged } = {}) {
 
   return {
     sync,
-    codeFor: (platform) => (platform === "twitch" && followsOn() ? identity.code : ""),
+    codeFor: (platform) => (hasTwitch(platform) && followsOn() ? identity.code : ""),
     stop() {
       stopWatcher();
       clearTimeout(followsTimer);

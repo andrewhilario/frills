@@ -13,6 +13,7 @@ import { appendPlusCode } from "./plus-relay.js";
 import { mountCloudSave } from "./cloud-save.js";
 import { mountEditorMode } from "./editor-mode.js";
 import { mountSizeGuide } from "./size-guide.js";
+import { loadPlatformPref, savePlatformPref } from "./platform-pref.js";
 
 const $ = (id) => document.getElementById(id);
 const CANVASES = { vertical: [1080, 1920], landscape: [1920, 1080], square: [1080, 1080] };
@@ -26,12 +27,14 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
   const params = new URLSearchParams(location.search);
   const load = () => { try { return JSON.parse(localStorage.getItem(storeKey) ?? "null"); } catch { return null; } };
   const saved = load();
+  const pref = loadPlatformPref();
   let settings = widget.sanitize({ ...saved?.settings, ...widget.fromParams(params) });
   const askedPlatform = params.get("tiktok") && params.get("twitch") && platforms.includes("both")
     ? "both"
     : params.get("platform");
   const initialPlatform = platforms.includes(askedPlatform) ? askedPlatform
     : platforms.includes(saved?.platform) ? saved.platform
+    : platforms.includes(pref.platform) ? pref.platform
     : platforms.includes(defaultPlatform) ? defaultPlatform : platforms[0];
   let currentPlatform = initialPlatform;
   let source = null;
@@ -74,7 +77,7 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
       node.hidden = !node.dataset.platform.split(" ").includes(platform);
     }
     for (const { control, row } of rowsByControl) {
-      if (control.onlyPlatform) row.hidden = control.onlyPlatform !== platform;
+      if (control.onlyPlatform) row.hidden = !String(control.onlyPlatform).split(" ").includes(platform);
     }
   }
   // The season's looks come first while it lasts (Halloween, Christmas), then the usual ones.
@@ -123,13 +126,17 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
   // ── the account ─────────────────────────────────────────────────────────────────────────────────────────────────
   const channelFromLink = params.get("tiktok") || params.get("channel") || "";
   const twitchFromLink = params.get("twitch") || "";
+  const prefPrimary = initialPlatform === "twitch" ? pref.twitch : pref.tiktok;
+  const savedMatchesInitial = !saved?.platform || saved.platform === initialPlatform || (initialPlatform === "both" && saved.platform === "tiktok");
+  const initialChannel = channelFromLink || (savedMatchesInitial ? saved?.channel : "") || prefPrimary || "";
+  const initialTwitch = twitchFromLink || saved?.twitch || pref.twitch || "";
   source = mountSource($("source"), {
     // chat is not drawn here, but an overlay that reads commands from it (song requests) is given each message; connecting or
     // disconnecting never empties it (clear does nothing)
     feeds: [{ add: (m) => api.onChat?.(m), removeById() {}, removeUser() {}, clear() {} }],
     pace: () => [2000, 4000],
-    channel: channelFromLink || saved?.channel || "",
-    twitch: twitchFromLink || saved?.twitch || "",
+    channel: initialChannel,
+    twitch: initialTwitch,
     platform: initialPlatform,
     platforms,
     autoconnect: Boolean(channelFromLink),
@@ -183,22 +190,31 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
     linkInput.value = nextUrl;
     copyBtn.disabled = false;
     cloud.sync();
-    $("link-hint").textContent = "Paste it into a Browser source in your streaming app. For a vertical LIVE use 1080 wide by 1920 high.";
+    $("link-hint").textContent = isBoth
+      ? "Paste one Browser source link into OBS or Streamlabs — reads TikTok LIVE and Twitch together."
+      : platform === "twitch"
+        ? "Paste it into a Browser source in OBS or Streamlabs. For a PC stream use 1920 wide by 1080 high."
+        : "Paste it into a Browser source in your streaming app. For a vertical LIVE use 1080 wide by 1920 high.";
   }
   linkInput.addEventListener("focus", () => linkInput.select());
   syncPlatformUi(source.platform);
   source.onChange(() => {
     if (source.platform !== currentPlatform) {
       syncPlatformUi(source.platform);
-      if (source.platform !== "tiktok") $("relay-note").textContent = "";
+      if (source.platform !== "tiktok" && source.platform !== "both") $("relay-note").textContent = "";
       api.onPlatform?.(source.platform);
     }
+    savePlatformPref({
+      platform: source.platform,
+      tiktok: source.platform === "tiktok" || source.platform === "both" ? source.channel : undefined,
+      twitch: source.platform === "twitch" ? source.channel : source.platform === "both" ? source.twitchChannel : undefined,
+    });
     refreshLink();
     save();
   });
 
   // ── the preview: a true copy of the page your streaming app shows, shrunk to fit ───────────────────────────────────────
-  let canvas = CANVASES[saved?.canvas] ? saved.canvas : "vertical";
+  let canvas = CANVASES[saved?.canvas] ? saved.canvas : initialPlatform === "twitch" ? "landscape" : "vertical";
   let sizeGuide = null;
   function fit() {
     const [w, h] = CANVASES[canvas];

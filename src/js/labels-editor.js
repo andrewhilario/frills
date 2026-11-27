@@ -14,15 +14,17 @@ const editor = startWidgetEditor({
   widget: LABELS,
   storeKey: "frills:labels:v1",
   overlayPath: "/overlay/labels/",
-  platforms: ["tiktok", "twitch"],
-  events: (p) => (p === "twitch" ? ["sub", "subgift", "bits"] : ["gift", "follow", "like"]),
+  platforms: ["tiktok", "twitch", "both"],
+  events: (p) => (p === "twitch" ? ["sub", "subgift", "bits"] : p === "both" ? ["gift", "follow", "like", "sub", "subgift", "bits"] : ["gift", "follow", "like"]),
   extraUrlParams: ({ platform }) => {
     const follows = followBox?.codeFor(platform);
     return follows ? { follows } : {};
   },
   idleHint: (p) => (p === "twitch"
     ? "Type your Twitch channel, or test each slide above. Log in below to include Twitch follows."
-    : "Type your TikTok name, or frills_demo to see practice gifts and follows. The test buttons above work without connecting."),
+    : p === "both"
+      ? "Type your TikTok @name and Twitch channel to rotate highlights from both streams in one card."
+      : "Type your TikTok name, or frills_demo to see practice gifts and follows. The test buttons above work without connecting."),
   create(host, settings, ctx) {
     const view = createLabelsView(host);
     board = new LabelBoard(settings, {

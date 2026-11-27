@@ -13,6 +13,7 @@ import { mountCloudSave } from "./cloud-save.js";
 import { mountEditorMode } from "./editor-mode.js";
 import { mountSizeGuide } from "./size-guide.js";
 import { closePlusModal, openPlusModal } from "./plus-modal.js";
+import { loadPlatformPref } from "./platform-pref.js";
 import {
   DEFAULT_GIFT_MENU,
   DEFAULT_INFO_ITEMS,
@@ -47,7 +48,10 @@ const loadSaved = () => {
   try { return JSON.parse(localStorage.getItem(STORE_KEY) ?? "null"); } catch { return null; }
 };
 const saved = loadSaved();
-let settings = OUTLINE.sanitize({ ...saved?.settings, ...OUTLINE.fromParams(params) });
+const pref = loadPlatformPref();
+const urlOutline = OUTLINE.fromParams(params);
+const defaultMode = !saved?.settings && !urlOutline.mode && pref.platform === "twitch" ? { mode: "screen16x9" } : {};
+let settings = OUTLINE.sanitize({ ...defaultMode, ...saved?.settings, ...urlOutline });
 let plusActive = false;
 let plusEligible = false;
 let plusChecked = false;
@@ -617,6 +621,88 @@ const TIKTOK_PRESETS = {
 for (const btn of document.querySelectorAll("[data-tt-preset]")) {
   btn.addEventListener("click", () => {
     const preset = TIKTOK_PRESETS[btn.dataset.ttPreset];
+    if (!preset) return;
+    settings = OUTLINE.sanitize({ ...settings, ...preset, customBoxes: "" });
+    selectedBox = "";
+    syncAllControls();
+    paint();
+    saveLocal();
+  });
+}
+
+// ── 1-Click Twitch / OBS 16:9 Starter Presets ─────────────────────────────────────────────────────────────────
+const TWITCH_PRESETS = {
+  "tw-game-cam": {
+    mode: "screen16x9",
+    layout16: "game-cam",
+    sideMode: "widget",
+    widgetSlotLabel: "CHAT / ALERTS",
+    sidePad: 36,
+    swapSides: false,
+    frameStyle: "window",
+    matMode: "gradient",
+    showBanner: true,
+    bannerText: "LIVE ON TWITCH · !SR FOR MUSIC",
+    showPromo: true,
+    promoText: "Prime Sub = Ad-Free · !discord · !commands",
+    slot1Label: "16:9 GAMEPLAY",
+    slot2Label: "FACECAM",
+  },
+  "tw-just-chat": {
+    mode: "screen16x9",
+    layout16: "just-chatting",
+    sideMode: "widget",
+    widgetSlotLabel: "TWITCH CHAT",
+    sidePad: 40,
+    swapSides: false,
+    frameStyle: "clean",
+    matMode: "dots",
+    showBanner: true,
+    bannerText: "JUST CHATTING & COMMUNITY HANGOUT",
+    showPromo: false,
+    slot1Label: "FULL CAM",
+    slot2Label: "CHAT BOX",
+  },
+  "tw-vtuber": {
+    mode: "screen16x9",
+    layout16: "game-cam",
+    sideMode: "info",
+    cardTitle: "Stream Commands",
+    cardItems: DEFAULT_INFO_ITEMS,
+    highlightRow: -1,
+    sidePad: 38,
+    swapSides: false,
+    frameStyle: "sticker",
+    matMode: "stripes",
+    artPack: "neko",
+    decorPos: "corners",
+    showBanner: true,
+    bannerText: "COZY VTUBER STREAM ✨",
+    showPromo: true,
+    promoText: "!clip · !sr · Bits & Subs trigger live effects!",
+    slot1Label: "GAME / ART",
+    slot2Label: "VTUBER",
+  },
+  "tw-dual": {
+    mode: "screen16x9",
+    layout16: "dual-split",
+    sideMode: "none",
+    sidePad: 36,
+    swapSides: false,
+    frameStyle: "neon",
+    matMode: "grid",
+    showBanner: true,
+    bannerText: "⚡ CO-OP / COLLAB NIGHT",
+    showPromo: true,
+    promoText: "Follow both channels · !multi in chat!",
+    slot1Label: "HOST",
+    slot2Label: "CO-HOST",
+  },
+};
+
+for (const btn of document.querySelectorAll("[data-tw-preset]")) {
+  btn.addEventListener("click", () => {
+    const preset = TWITCH_PRESETS[btn.dataset.twPreset];
     if (!preset) return;
     settings = OUTLINE.sanitize({ ...settings, ...preset, customBoxes: "" });
     selectedBox = "";

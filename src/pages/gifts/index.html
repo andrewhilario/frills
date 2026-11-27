@@ -1,7 +1,7 @@
 <!--
 {
-  "title": "Last gifts overlay for TikTok LIVE | Frills",
-  "description": "Show your latest TikTok LIVE gifts as a list on your stream, with your own colors, words and size. Pick a look, test it, copy one link. Free.",
+  "title": "Recent gifts & support for TikTok & Twitch | Frills",
+  "description": "Show your latest TikTok LIVE gifts and Twitch subs, gifted subs, bits and raids as a live stream feed. Pick a look, test it, copy one link. Free.",
   "path": "/gifts/",
   "updated": "2026-11-01",
   "published": "2026-10-08",
@@ -29,9 +29,13 @@
     </div>
     <div class="chatstage" id="stage" aria-hidden="true"><div id="widget"></div></div>
     <div class="preview__tests" role="group" aria-label="Try it">
-      <button class="btn btn--soft btn--sm" type="button" data-test="gift">Add a gift</button>
-      <button class="btn btn--soft btn--sm" type="button" data-test="big">Add a big gift</button>
-      <button class="btn btn--soft btn--sm" type="button" data-test="many">Add six gifts</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="gift" data-platform="tiktok both">Add a gift</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="big" data-platform="tiktok both">Add a big gift</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="sub" data-platform="twitch both" hidden>Add sub</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="subgift" data-platform="twitch both" hidden>Add gifted subs</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="bits" data-platform="twitch both" hidden>Add bits</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="raid" data-platform="twitch both" hidden>Add raid</button>
+      <button class="btn btn--soft btn--sm" type="button" data-test="many">Add six</button>
       <button class="btn btn--soft btn--sm" type="button" data-test="clear">Clear</button>
     </div>
   </section>
@@ -62,7 +66,7 @@
     <section class="step-card" aria-labelledby="s3">
       <div class="step-card__head">
         <span class="step-card__num" aria-hidden="true">3</span>
-        <h2 class="step-card__title" id="s3">Connect your TikTok</h2>
+        <h2 class="step-card__title" id="s3">Connect your stream</h2>
       </div>
       <div id="source"></div>
       <p class="ctl__hint" id="relay-note" role="status"></p>

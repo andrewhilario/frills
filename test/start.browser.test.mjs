@@ -162,7 +162,7 @@ test("Twitch gets the overlays that work there, and alerts/highlights note the f
   assert.equal(await ask(), "What is your Twitch channel?");
   await typeName("PondPal");
   await press("Next");
-  assert.deepEqual(await page.evaluate(`[...document.querySelectorAll("#start .pick--check .pick__name")].map((n) => n.textContent)`), ["Chat", "Alerts", "Top gifters", "Rotating highlights", "Spin the wheel"]);
+  assert.deepEqual(await page.evaluate(`[...document.querySelectorAll("#start .pick--check .pick__name")].map((n) => n.textContent)`), ["Chat", "Alerts", "Top gifters", "Rotating highlights", "Spin the wheel", "Last gifts", "Gift jar", "Goals", "Song requests", "Subathon timer", "Talking pet TTS"]);
   await press("Next");
   await choose("Dark and gamer"); await choose("A PC stream"); await choose("Left");
   await page.waitFor(`document.querySelector("#start .card")`);
@@ -233,14 +233,14 @@ test("Both: it asks for the TikTok name and the Twitch channel, checks each, and
   const text = await page.evaluate(`JSON.stringify([...document.querySelectorAll("#start .pick--check .pick__body")].map((b) => b.textContent))`).then(JSON.parse);
   assert.equal(text.length, 14, "every overlay is on offer");
   assert.match(text[0], /TikTok and Twitch chat together/);
-  for (const t of text.slice(1, 5)) assert.match(t, /One for TikTok and one for Twitch/);
-  for (const t of text.slice(5)) assert.match(t, /TikTok only/);
+  for (const idx of [1, 2, 3, 4, 5, 6, 8, 10, 11, 12]) assert.match(text[idx], /One combined link for TikTok and Twitch/);
+  for (const idx of [7, 9, 13]) assert.match(text[idx], /TikTok only/);
   // going back keeps what was typed
   await press("Back");
   assert.deepEqual(await page.evaluate(`[...document.querySelectorAll("#start input[data-platform]")].map((i) => i.value)`), ["@Pond.Pal", "PondPal"]);
 });
 
-test("Both: the links page has one chat for both, dual overlays for each platform, and the rest for TikTok", { skip }, async () => {
+test("Both: the links page has unified Both links for all 11 dual-platform overlays, and TikTok-only for the rest", { skip }, async () => {
   await startBoth();
   await typeInto("start-name", "@Pond.Pal");
   await typeInto("start-name-2", "PondPal");
@@ -251,18 +251,17 @@ test("Both: the links page has one chat for both, dual overlays for each platfor
   await page.waitFor(`document.querySelector("#start .card")`);
   assert.equal(await ask(), "Your links are ready");
   const list = await cards();
-  assert.deepEqual(list.map((c) => c.name), ["Chat", "Alerts (TikTok)", "Alerts (Twitch)", "Top gifters (TikTok)", "Top gifters (Twitch)", "Rotating highlights (TikTok)", "Rotating highlights (Twitch)", "Spin the wheel (TikTok)", "Spin the wheel (Twitch)", "Last gifts", "Gift jar", "Gift gallery rotator", "Goals", "Top likers", "Song requests", "Subathon timer", "Talking pet TTS", "Viewer and like counter"]);
+  assert.deepEqual(list.map((c) => c.name), ["Chat", "Alerts", "Top gifters", "Rotating highlights", "Spin the wheel", "Last gifts", "Gift jar", "Gift gallery rotator", "Goals", "Top likers", "Song requests", "Subathon timer", "Talking pet TTS", "Viewer and like counter"]);
   assert.equal(list[0].link, `${base}/overlay/?tiktok=pond.pal&twitch=pondpal&look=bubblegum&deco=neko&align=center`, "one chat link names both accounts");
-  assert.equal(list[1].link, `${base}/overlay/alerts/?channel=pond.pal&platform=tiktok&look=bubblegum&align=center`);
-  assert.equal(list[2].link, `${base}/overlay/alerts/?channel=pondpal&platform=twitch&look=bubblegum&align=center`);
-  assert.equal(list[4].link, `${base}/overlay/gifters/?channel=pondpal&platform=twitch&look=bubblegum&align=center`);
-  assert.equal(list[6].link, `${base}/overlay/labels/?channel=pondpal&platform=twitch&look=bubblegum&align=center`);
-  assert.equal(list[8].link, `${base}/overlay/wheel/?channel=pondpal&platform=twitch&look=bubblegum&align=center`);
-  for (const c of [list[3], list[5], list[7], ...list.slice(9)]) assert.match(c.link, /channel=pond\.pal&platform=tiktok/, `${c.name} is TikTok's`);
+  assert.equal(list[1].link, `${base}/overlay/alerts/?tiktok=pond.pal&twitch=pondpal&look=bubblegum&align=center`, "one alerts link names both accounts");
+  assert.equal(list[10].link, `${base}/overlay/songs/?tiktok=pond.pal&twitch=pondpal&look=bubblegum&align=center`, "one song requests link names both accounts");
+  for (const name of ["Gift gallery rotator", "Top likers", "Viewer and like counter"]) {
+    assert.match(list.find((c) => c.name === name).link, /channel=pond\.pal&platform=tiktok/, `${name} is TikTok's`);
+  }
   assert.ok(list.every((c) => !c.copyOff && c.size === "1080 × 1920"));
   assert.match(list[0].note, /small icon/);
-  assert.match(list[2].note, /follow alerts need one extra login/i);
-  assert.match(list[6].note, /last follower needs one extra login/i);
+  assert.match(list[1].note, /follow alerts need one extra login/i);
+  assert.match(list[3].note, /last follower needs one extra login/i);
   assert.equal(list[0].edit, list[0].link.replace("/overlay/", "/editor/"), "the editor gets the very same two accounts");
   // two name boxes on this page, each already filled in
   assert.deepEqual(await page.evaluate(`[...document.querySelectorAll("#start .start__field--inline input")].map((i) => i.id + "=" + i.value)`), ["result-name=@Pond.Pal", "result-name-2=PondPal"]);
@@ -274,22 +273,24 @@ test("Both: each link waits only for the names it needs, and a wrong name is exp
   await typeInto("start-name", "pond.pal");
   await typeInto("start-name-2", "pondpal");
   await press("Next");
-  await press("Next"); // the chat and the alerts are the two that are ticked to begin with
+  // Chat & Alerts are ticked (both need tiktok+twitch); tick Top likers too so we test a TikTok-only card alongside unified Both cards
+  await page.evaluate(`[...document.querySelectorAll("#start .pick--check")].find((el) => el.textContent.includes("Top likers")).querySelector("input").click()`);
+  await press("Next");
   await choose("Cute and pink"); await choose("A phone LIVE"); await choose("Left");
   await page.waitFor(`document.querySelector("#start .card")`);
-  assert.deepEqual((await cards()).map((c) => c.name), ["Chat", "Alerts (TikTok)", "Alerts (Twitch)"]);
-  // take the Twitch channel away: the chat and the Twitch alerts have nothing to read, the TikTok alerts still do
+  assert.deepEqual((await cards()).map((c) => c.name), ["Chat", "Alerts", "Top likers"]);
+  // take the Twitch channel away: unified Chat & Alerts wait for both names, while Top likers (TikTok-only) stays ready
   await typeInto("result-name-2", "");
   let list = await cards();
-  assert.deepEqual(list.map((c) => c.link !== ""), [false, true, false]);
-  assert.deepEqual(list.map((c) => c.copyOff), [true, false, true]);
+  assert.deepEqual(list.map((c) => c.link !== ""), [false, false, true]);
+  assert.deepEqual(list.map((c) => c.copyOff), [true, true, false]);
   const holders = await page.evaluate(`JSON.stringify([...document.querySelectorAll("#start .card__input")].map((i) => i.placeholder))`).then(JSON.parse);
-  assert.deepEqual(holders, ["Type both names above to get this link", "Type your TikTok @name above to get this link", "Type your Twitch channel above to get this link"]);
+  assert.deepEqual(holders, ["Type both names above to get this link", "Type both names above to get this link", "Type your TikTok @name above to get this link"]);
   // and the other way round
   await typeInto("result-name-2", "pondpal");
   await typeInto("result-name", "");
   list = await cards();
-  assert.deepEqual(list.map((c) => c.link !== ""), [false, false, true]);
+  assert.deepEqual(list.map((c) => c.link !== ""), [false, false, false]);
   // a name the platform does not accept is told which rule it broke, and does not become a link
   await typeInto("result-name", "no good!");
   assert.match(await page.evaluate(`document.querySelector("#start .start__field--inline .start__error").textContent`), /TikTok @name: letters, numbers, _ and \. only/);
@@ -298,6 +299,7 @@ test("Both: each link waits only for the names it needs, and a wrong name is exp
   await typeInto("result-name", "Pond.Pal");
   list = await cards();
   assert.equal(list[0].link, `${base}/overlay/?tiktok=pond.pal&twitch=pondpal&look=bubblegum&deco=neko`);
+  assert.equal(list[1].link, `${base}/overlay/alerts/?tiktok=pond.pal&twitch=pondpal&look=bubblegum`);
   assert.equal(await page.evaluate(`document.querySelector("#start .start__field--inline .start__error").hidden`), true);
 });
 

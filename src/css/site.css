@@ -270,6 +270,20 @@
 .tool [data-plus][hidden] { display: none; }
 .tool [data-plus][aria-pressed="true"] { --btn-face: var(--color-mint-tint); cursor: default; }
 
+/* Platform filter bar & platform tags on / and /overlays/ */
+.suite-filter { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin: var(--space-md) 0 var(--space-sm); }
+.suite-filter .chip { min-height: 44px; padding: var(--space-xs) var(--space-md); border: 1.5px solid var(--color-ink); border-radius: var(--radius-pill); background: var(--color-paper); color: var(--color-ink); font-family: var(--font-body); font-size: var(--text-sm); font-weight: 700; line-height: 1.1; white-space: nowrap; cursor: pointer; transition: background-color var(--dur-micro) var(--ease-out), transform var(--dur-micro) var(--ease-out); }
+@media (hover: hover) { .suite-filter .chip:hover:not([aria-pressed="true"]) { background: var(--color-paper-2); } }
+.suite-filter .chip:active { transform: translateY(1px); }
+.suite-filter .chip:focus-visible { outline: 3px solid var(--color-focus); outline-offset: 2px; transition: none; }
+.suite-filter .chip[aria-pressed="true"] { background: var(--color-accent); color: var(--color-accent-ink); box-shadow: 0 2px 0 var(--color-ink); }
+.tool[hidden] { display: none; }
+.tool__head { display: grid; gap: var(--space-2xs); align-content: start; min-width: 0; }
+.tool__badges { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs); }
+.tool__plat { justify-self: start; display: inline-flex; align-items: center; padding: 2px var(--space-xs); border-radius: var(--radius-pill); border: 1px solid var(--color-rule-2); background: var(--color-paper-2); color: var(--color-ink-2); font-family: var(--font-label); font-size: var(--text-xs); font-weight: 700; letter-spacing: 0.04em; line-height: 1.25; white-space: nowrap; }
+.tool__plat--single { background: var(--color-accent-tint); border-color: var(--color-rule); }
+@media (prefers-reduced-motion: reduce) { .suite-filter .chip { transition-duration: 1ms; } }
+
 /* Shared Frills Plus card & badges (homepage, /overlays/, /plus/, /account/) */
 .acct-card__head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2xs) var(--space-sm); }
 .acct-card__title { margin: 0; font-size: var(--text-md); font-weight: 800; letter-spacing: -0.015em; }

@@ -6,11 +6,9 @@
 
 import { AlertQueue, makeAlert } from "./alerts.js";
 import { createAlertView } from "./alerts-view.js";
-import { KINDS, PLATFORM_KINDS, fromParams, mediaUrl, sanitize } from "./alerts-settings.js";
+import { KINDS, PLATFORM_KINDS, TWITCH_CHAT_KINDS, fromParams, mediaUrl, sanitize } from "./alerts-settings.js";
 import { createSounds } from "./sounds.js";
-import { cleanName, connectTo, statusText } from "./connect.js";
-import { relayForPage } from "./tiktok.js";
-import { plusCodeFromParams, plusRelayForPage } from "./plus-relay.js";
+import { bothFromParams, channelFromParams, connectEvents, platformFromParams } from "./widget-overlay.js";
 import { fakeAlert, fakeAlertSource } from "./fake-alerts.js";
 import { fontsReady, generalFaces } from "./look.js";
 import { FollowReader, validCode } from "./follow-bridge.js";
@@ -19,10 +17,12 @@ const params = new URLSearchParams(location.search);
 const settings = sanitize(fromParams(params));
 // ?pace=1500 makes the practice (demo) events come about that many milliseconds apart: handy for trying a look, or for filming it
 const demoPace = Number(params.get("pace")) ? Math.min(10000, Math.max(300, Number(params.get("pace")))) : 0; // (no pace, or not a number: the usual speed)
-const platform = params.get("platform") === "twitch" ? "twitch" : "tiktok";
-// ?only=follow,gift keeps the practice to those kinds; a Twitch overlay practises with the Twitch kinds
+const both = bothFromParams(params);
+const platform = platformFromParams(params);
+// ?only=follow,gift keeps the practice to those kinds; a Twitch overlay practises with Twitch kinds, Both practises with all kinds
 const demoOnly = (params.get("only") ?? "").split(",").filter((kind) => KINDS.includes(kind));
 if (platform === "twitch" && !demoOnly.length) demoOnly.push(...PLATFORM_KINDS.twitch);
+else if (platform === "both" && !demoOnly.length) demoOnly.push(...KINDS);
 
 const note = document.getElementById("note");
 const say = (text) => { note.hidden = !text; note.textContent = text; };
@@ -52,9 +52,9 @@ window.addEventListener("frills:cloud-cmd", (e) => {
   else if (cmd === "alerts:sub") push(fakeAlert("sub"));
 });
 
-const channel = cleanName(platform, params.get("channel"));
+const channel = channelFromParams(params, platform);
 // Twitch follows reach this page another way: the streamer's Twitch follows page puts each one in a small post box, and this reads the box.
-const followsCode = platform === "twitch" ? validCode(params.get("follows")) : "";
+const followsCode = (platform === "twitch" || platform === "both") ? validCode(params.get("follows")) : "";
 if (followsCode && params.get("demo") !== "1") new FollowReader({ code: followsCode, onFollow: (f) => push({ kind: "follow", id: f.id, user: f.user, name: f.name, avatar: "" }) }).start();
 if (params.get("demo") === "1") {
   fontsReady(generalFaces(settings), 1000).then(() => fakeAlertSource(push, demoPace ? () => [demoPace * 0.6, demoPace * 1.4] : undefined, demoOnly));
@@ -64,23 +64,13 @@ if (params.get("demo") === "1") {
   // The connection starts at once: waiting for the font (up to a second) before even asking for the stream made every overlay slower to connect. The first
   // alert is still drawn in the chosen font, because drawing is what waits for it.
   const fonts = fontsReady(generalFaces(settings), 1000);
-  const noFeed = { add() {}, removeById() {}, removeUser() {}, clear() {} }; // chat is not shown here; only alerts
-  let old = false; // the relay we found can only send chat: say so, and keep saying it
-  connectTo([noFeed], platform, channel, (status) => {
-    if (old) return;
-    say(status.state === "connected" || status.state === "stopped" ? "" : statusText(status));
-  }, {
-    relay: relayForPage(),
-    plusRelay: plusRelayForPage(),
-    plusCode: plusCodeFromParams(params),
-    keepTrying: true, // an overlay in OBS has no button to press: if the relay is not answering when it opens, it looks again by itself
-    events: PLATFORM_KINDS.tiktok,
+  const events = platform === "twitch" ? TWITCH_CHAT_KINDS : platform === "both" ? [...PLATFORM_KINDS.tiktok, ...TWITCH_CHAT_KINDS] : PLATFORM_KINDS.tiktok;
+  connectEvents({
+    channel,
+    platform,
+    both,
+    events,
     onAlert: (alert) => fonts.then(() => push(alert)),
-    onFound: (found) => {
-      if (found && !found.features.includes("alerts")) {
-        old = true;
-        say("The Frills relay needs an update before it can send alerts.");
-      }
-    },
+    say,
   });
 }

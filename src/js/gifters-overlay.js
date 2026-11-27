@@ -6,12 +6,13 @@
 
 import { GIFTERS, GifterBoard, loadGifters, saveGifters } from "./gifters.js";
 import { createGiftersView } from "./widgets-view.js";
-import { channelFromParams, connectEvents, platformFromParams } from "./widget-overlay.js";
+import { bothFromParams, channelFromParams, connectEvents, platformFromParams } from "./widget-overlay.js";
 import { demoGifters, fakeGifterSource } from "./fake-alerts.js";
 import { createSounds } from "./sounds.js";
 import { fontsReady, generalFaces } from "./look.js";
 
 const params = new URLSearchParams(location.search);
+const both = bothFromParams(params);
 const platform = platformFromParams(params);
 const settings = GIFTERS.sanitize(GIFTERS.fromParams(params));
 const demoPace = Number(params.get("pace")) ? Math.min(10000, Math.max(300, Number(params.get("pace")))) : 0;
@@ -60,7 +61,8 @@ if (demo) {
   connectEvents({
     channel,
     platform,
-    events: platform === "twitch" ? ["subgift", "bits"] : ["gift"],
+    both,
+    events: platform === "twitch" ? ["subgift", "bits"] : platform === "both" ? ["gift", "subgift", "bits"] : ["gift"],
     onAlert: (event) => fonts.then(() => board.add(event)),
     say,
   });
