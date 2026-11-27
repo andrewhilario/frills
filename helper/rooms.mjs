@@ -669,6 +669,22 @@ class Waiting {
   }
 }
 
+/** Label for one connected page: its explicit overlay tag when sent, else a safe fallback from its subscribed events. */
+function clientOverlay(client) {
+  if (client?.overlay) return client.overlay;
+  return client?.events?.size ? [...client.events].sort().join("+") : "chat";
+}
+
+/** Counts open pages by overlay tag, most active first (ties broken alphabetically). */
+function summarizeOverlays(clients) {
+  const counts = new Map();
+  for (const client of clients) {
+    const tag = clientOverlay(client);
+    counts.set(tag, (counts.get(tag) ?? 0) + 1);
+  }
+  return Object.fromEntries([...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])));
+}
+
 export class Hub {
   constructor(opts = {}) {
     this.opts = { factory: null, apiKey: "", maxRooms: 3, queue: false, queueGraceMs: 20000, idleStopMs: 30000, offlineIdleStopMs: null, offlineWaitMs: 20000, limitedWaitMs: 60000, limitedMaxMs: 600000, connectAtOnce: 5, offlineGiveUpMs: 0, offlineSlowSteps: [], wakeGapMs: 30000, backoffMs: [3000, 6000, 12000, 30000, 60000], silentMs: 300000, silentMaxMs: 1800000, roomIdCacheMs: 600000, directGapMs: 0, directBurst: 3, tiktokWaitMs: 30000, tiktokMaxMs: 180000, smartEvict: false, offlineEvictAfterMs: 120000, signPerMinute: 0, signBurst: 5, priorityUsers: [], ...opts };
@@ -911,6 +927,14 @@ export class Hub {
     return { used: this.rooms.size, max: this.opts.maxRooms, waiting: this.waiting.size };
   }
 
+  /** How many open pages are using each overlay right now across all active and waiting rooms (counts only, no account names). */
+  overlayCounts() {
+    const all = [];
+    for (const room of this.rooms.values()) for (const c of room.clients) all.push(c);
+    for (const place of this.waiting.values()) for (const c of place.clients) all.push(c);
+    return summarizeOverlays(all);
+  }
+
   /**
    * Who is connected right now, for the owner's own screen only (the status page opened on the device itself): each account with whether
    * it is LIVE, how many pages are listening, what has passed, and for how long it has been here; and the names in line. Held in memory
@@ -927,6 +951,7 @@ export class Hub {
       retryInS: room.nextTryAt > now ? Math.max(1, Math.round((room.nextTryAt - now) / 1000)) : null,
       live: room.live,
       pages: room.clients.size,
+      overlays: summarizeOverlays(room.clients),
       followers: room.info().followers,
       forS: Math.max(0, Math.round((now - room.since) / 1000)),
       counts: { ...room.counts },

@@ -14,6 +14,8 @@ import { luminance } from "./color.js";
 import { mountFollowBox } from "./twitch-follow-box.js";
 import { appendPlusCode } from "./plus-relay.js";
 import { mountCloudSave } from "./cloud-save.js";
+import { mountEditorMode } from "./editor-mode.js";
+import { mountSizeGuide } from "./size-guide.js";
 
 const params = new URLSearchParams(location.search);
 const $ = (id) => document.getElementById(id);
@@ -115,14 +117,21 @@ lookChips = chips(
   { dot: true },
 );
 
+const editorMode = mountEditorMode({ kind: "alerts" });
 const HOLDERS = { look: "look-controls", move: "move-controls", queue: "queue-controls", ...Object.fromEntries(KINDS.map((kind) => [kind, `${kind}-controls`])) };
+const alertRows = [];
 for (const control of CONTROL_LIST) {
   const { row, write } = control.type === "media"
     ? mountMediaPicker({ consentBox: $("media-ok"), kind: control.media, label: control.label, hint: control.hint, value: settings[control.key], onSet: (value) => change(control.key, value) })
     : buildControl(control, settings[control.key], (value) => change(control.key, value));
   writers[control.key] = write;
+  alertRows.push({ control, row });
   $(HOLDERS[control.section]).append(row);
 }
+editorMode.markControls(alertRows);
+$("s2")?.closest(".step-card")?.classList.add("ed-adv");
+$("s3")?.closest(".step-card")?.classList.add("ed-adv");
+if ($("look-controls")) editorMode.addAdvancePrompt($("look-controls"), "Colors, sounds & motion →");
 
 $("reset").addEventListener("click", () => {
   settings = { ...BASE };
@@ -258,6 +267,7 @@ $("backdrop").addEventListener("change", (event) => { $("preview").dataset.back 
 // sizes, distances and wrapping are exactly what you will get.
 const CANVASES = { vertical: [1080, 1920], landscape: [1920, 1080], square: [1080, 1080] };
 let canvas = CANVASES[saved?.canvas] ? saved.canvas : "vertical";
+let sizeGuide = null;
 function fit() {
   const [w, h] = CANVASES[canvas];
   const room = $("stage").getBoundingClientRect();
@@ -270,11 +280,33 @@ function fit() {
 const canvasControl = buildControl(
   { key: "canvas", type: "select", label: "Preview as", options: [{ id: "vertical", name: "Vertical LIVE, 1080 x 1920" }, { id: "landscape", name: "Landscape, 1920 x 1080" }, { id: "square", name: "Square, 1080 x 1080" }], hint: "Set your streaming app's source to the same size." },
   canvas,
-  (value) => { canvas = value; fit(); save(); },
+  (value) => { canvas = value; fit(); sizeGuide?.sync(); save(); },
 );
 $("preview-canvas").append(canvasControl.row);
 new ResizeObserver(fit).observe($("stage"));
 fit();
+
+sizeGuide = mountSizeGuide({
+  mode: "scene",
+  anchor: linkInput.closest(".linkfield"),
+  copyBtn,
+  getSize: () => {
+    const [w, h] = CANVASES[canvas] ?? CANVASES.vertical;
+    return {
+      width: w,
+      height: h,
+      canvas,
+      appHint: canvas === "landscape" || platform === "twitch" ? "obs" : "tiktok",
+    };
+  },
+  onPreset: (preset) => {
+    if (!CANVASES[preset.id]) return;
+    canvas = preset.id;
+    canvasControl.write(canvas);
+    fit();
+    save();
+  },
+});
 
 fontsReady(generalFaces(settings), 900).then(paint);
 paint();

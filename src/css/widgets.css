@@ -1141,7 +1141,7 @@
 /* ── Gift Jar (TikTok LIVE only) ────────────────────────────────────────────────────────────────────────────────────── */
 .jar {
   position: absolute; inset: 0; display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start;
-  gap: 0.4em; padding: 3%; overflow: hidden; pointer-events: none;
+  gap: 0.4em; padding: 3%; overflow: hidden; pointer-events: none; container-type: size;
   font-family: var(--a-font, sans-serif); font-size: var(--a-size, 24px); letter-spacing: var(--a-letter, 0px);
 }
 .jar[data-align="center"] { align-items: center; text-align: center; }
@@ -1157,8 +1157,28 @@
 .jar__meta { font-size: 0.85em; font-variant-numeric: tabular-nums; }
 .jar__title[hidden], .jar__meta[hidden], .jar__thanks[hidden] { display: none; }
 
-.jar__box { position: relative; width: 8.8em; max-width: 78%; max-height: 60%; aspect-ratio: 280 / 340; flex: none; }
-.jar__canvas { display: block; width: 100%; height: 100%; }
+.jar__box {
+  position: relative; width: 8.8em; max-width: 78%; max-height: 60%; aspect-ratio: 280 / 340; flex: none;
+  transition: width 220ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.jar[data-jar-size="small"] .jar__box { width: 6em; max-width: 56%; max-height: 44%; }
+.jar[data-jar-size="small"] .jar__title { font-size: 0.82em; }
+.jar[data-jar-size="small"] .jar__meta { font-size: 0.72em; }
+.jar[data-jar-size="small"] .jar__thanks { font-size: 0.66em; }
+.jar[data-jar-size="small"] .jar__fullbadge { font-size: 0.7em; }
+.jar[data-jar-size="small"] .jar__cheer { font-size: 0.56em; }
+.jar[data-jar-size="large"] .jar__box { width: 12.6em; max-width: 86%; max-height: 56%; }
+.jar[data-jar-size="large"] .jar__title { font-size: 1.15em; }
+.jar[data-jar-size="large"] .jar__meta { font-size: 0.96em; }
+.jar[data-jar-size="large"] .jar__thanks { font-size: 0.84em; }
+.jar[data-jar-size="large"] .jar__fullbadge { font-size: 1.05em; }
+.jar[data-jar-size="large"] .jar__cheer { font-size: 0.72em; }
+@supports (height: 1cqh) {
+  .jar__box { width: min(8.8em, 78cqw, calc(56cqh * 280 / 340)); height: auto; max-width: none; max-height: none; }
+  .jar[data-jar-size="small"] .jar__box { width: min(6em, 56cqw, calc(44cqh * 280 / 340)); max-width: none; max-height: none; }
+  .jar[data-jar-size="large"] .jar__box { width: min(12.6em, 86cqw, calc(56cqh * 280 / 340)); max-width: none; max-height: none; }
+}
+.jar__canvas { display: block; width: 100%; height: 100%; object-fit: contain; }
 
 .jar__fullbadge {
   position: absolute; left: 50%; top: 48%; transform: translate(-50%, -50%) rotate(-6deg); z-index: 3;
@@ -1190,6 +1210,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .jar__box { transition: none; }
   .jar__fullbadge, .jar[data-full="true"] .jar__box, .jar__cheer { animation: none; }
 }
 

@@ -54,7 +54,7 @@ test("chat editor: in Halloween the four Halloween looks come first, marked, the
   assert.deepEqual(all, ["Pumpkin patch", "Friendly ghost", "Witch's brew", "Blood moon", ...usual]);
   assert.equal(await page.evaluate(`document.querySelectorAll("#presets .chip--season[data-season=halloween]").length`), 4, "the festive ones are marked");
   assert.equal(await page.evaluate(`document.querySelectorAll("#presets .chip--season").length`), 4, "and only those");
-  assert.deepEqual((await chipNames(chipsOfLabel("Decorations on the bubbles"))).slice(-2), ["Bunny cloud", "Halloween"], "the Halloween pictures can be picked, and no Christmas ones");
+  assert.deepEqual((await chipNames(chipsOfLabel("Decorations on the bubbles"))).slice(-2), ["Cozy witch", "Halloween"], "the Halloween pictures can be picked, and no Christmas ones");
   assert.equal(await pressed("#presets"), "Blueberry", "nothing is switched on for anyone: the editor starts as it always did");
 });
 
@@ -80,10 +80,14 @@ test("chat editor: choosing a Halloween look paints it, turns on the pictures, a
 test("chat editor: in Christmas the Christmas looks come first; between seasons only the usual looks, and no seasonal pictures", { skip }, async () => {
   await open("/editor/?season=christmas");
   assert.deepEqual(await chipNames("#presets"), ["Candy cane", "Pine and gold", "Snowfall", "Cozy knit", ...usual]);
-  assert.deepEqual((await chipNames(chipsOfLabel("Decorations on the bubbles"))).slice(-2), ["Bunny cloud", "Christmas"]);
+  assert.deepEqual((await chipNames(chipsOfLabel("Decorations on the bubbles"))).slice(-2), ["Cozy witch", "Christmas"]);
   await open("/editor/?season=none");
   assert.deepEqual(await chipNames("#presets"), usual);
-  assert.deepEqual(await chipNames(chipsOfLabel("Decorations on the bubbles")), ["None", "Frog pond", "Frog pond V2", "Neko cafe", "Hamster burrow", "Bunny cloud"]);
+  assert.deepEqual(await chipNames(chipsOfLabel("Decorations on the bubbles")), [
+    "None", "Frog pond", "Frog pond V2", "Neko cafe", "Hamster burrow", "Bunny cloud",
+    "Shiba gamer", "Chill capybara", "Retro dino", "Space bot", "Skate cat", "RPG dragon",
+    "Sakura spring", "Valentine café", "Summer matsuri", "Cozy autumn", "Cozy winter", "Cozy witch",
+  ]);
   assert.equal(await page.evaluate(`document.querySelectorAll(".chip--season").length`), 0);
 });
 

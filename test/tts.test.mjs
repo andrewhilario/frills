@@ -132,9 +132,12 @@ test("TtsQueue runs utterances sequentially, enforces per-viewer cooldown, and c
 });
 
 test("TTS settings sanitize out-of-range inputs and round-trip through query params", () => {
-  const clean = TTS.sanitize({ engine: "bogus", pet: "dragon", rate: 999, volume: -5, maxChars: 12, command: "!talk", minDiamonds: 25 });
+  const clean = TTS.sanitize({ engine: "bogus", pet: "unicorn", rate: 999, volume: -5, maxChars: 12, command: "!talk", minDiamonds: 25 });
   assert.equal(clean.engine, "auto");
   assert.equal(clean.pet, "frog2");
+  assert.equal(TTS.sanitize({ pet: "dragon" }).pet, "dragon");
+  assert.equal(TTS.sanitize({ pet: "shiba" }).pet, "shiba");
+  assert.equal(TTS.sanitize({ pet: "capybara" }).pet, "capybara");
   assert.equal(clean.rate, 150);
   assert.equal(clean.volume, 10);
   assert.equal(clean.maxChars, 40);

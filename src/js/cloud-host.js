@@ -61,6 +61,7 @@ if (!id) {
         const key = `frills:timer:state:${code || channel || "demo"}`;
         return (k) => k === key;
       }
+      if (kind === "outline") return (k) => k === "frills:outline:step";
       if (!channel) return null;
       if (kind === "jar") return (k) => k === `frills:jar:${channel}`;
       if (kind === "gallery") return (k) => k === `frills:gallery:tiktok:${channel}`;
@@ -122,7 +123,7 @@ if (!id) {
       try {
         frame.contentWindow.dispatchEvent(new CustomEvent("frills:cloud-cmd", { detail: item }));
         const c = String(item?.cmd ?? "");
-        if (c === "gifters:reset" || c === "likers:reset" || c === "jar:clear" || c === "goal:reset") shouldFlush = true;
+        if (c === "gifters:reset" || c === "likers:reset" || c === "jar:clear" || c === "goal:reset" || c.startsWith("outline:")) shouldFlush = true;
       } catch { /* ignore */ }
     }
     if (shouldFlush) setTimeout(checkpointState, 600);

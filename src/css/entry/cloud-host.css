@@ -5,8 +5,10 @@ html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
 #cloud-root { position: fixed; inset: 0; width: 100%; height: 100%; }
 .cloud-frame { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; display: block; background: transparent; }
 .cloud-scene { position: fixed; inset: 0; width: 100%; height: 100%; overflow: hidden; background: transparent; pointer-events: none; }
-.cloud-layer { position: absolute; border: 0; display: block; background: transparent; pointer-events: none; width: 32%; height: 42%; }
+.cloud-layer { position: absolute; z-index: 2; border: 0; display: block; background: transparent; pointer-events: none; width: 32%; height: 42%; }
 .cloud-scene[data-aspect="9x16"] .cloud-layer { width: 47%; height: 30%; }
+.cloud-layer[data-slot="frame"],
+.cloud-scene[data-aspect="9x16"] .cloud-layer[data-slot="frame"] { inset: 0; width: 100%; height: 100%; z-index: 0; }
 
 .cloud-layer[data-slot="tl"] { top: 2%; left: 2%; }
 .cloud-layer[data-slot="tc"] { top: 2%; left: 50%; transform: translateX(-50%); width: 46%; height: 28%; }

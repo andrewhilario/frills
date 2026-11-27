@@ -4,21 +4,21 @@
 // where the meaning is the same: visit, link_copied, overlay_load), so the two sites can be read side by side on the stats page.
 
 /** Where a visit started, in coarse groups. */
-export const PAGES = ["home", "editor", "overlays", "alerts", "gifts", "jar", "goal", "likers", "gifters", "labels", "counter", "timer", "tts", "songs", "matcha", "start", "guides", "other"];
+export const PAGES = ["home", "editor", "overlays", "alerts", "gifts", "jar", "goal", "likers", "gifters", "labels", "counter", "timer", "tts", "songs", "outline", "matcha", "start", "guides", "other"];
 /** Where a visit came from, in coarse groups. The address itself is never kept. "bio" and "ad1" to "ad3" are for links we put in a profile or an ad (?ref=bio, ?ref=ad1). */
 export const REFS = ["direct", "tiktok", "reddit", "discord", "youtube", "search", "bio", "ad1", "ad2", "ad3", "other"];
 /** The editor a link was copied from. */
-export const OVERLAYS = ["chat", "alerts", "gifts", "jar", "goal", "likers", "gifters", "labels", "counter", "timer", "tts", "songs", "matcha"];
+export const OVERLAYS = ["chat", "alerts", "gifts", "jar", "goal", "likers", "gifters", "labels", "counter", "timer", "tts", "songs", "outline", "matcha"];
 /** The overlay pages that count when they open. */
-export const LOADS = ["chat", "alerts", "gifts", "jar", "goal", "likers", "gifters", "labels", "counter", "timer", "tts", "songs"];
+export const LOADS = ["chat", "alerts", "gifts", "jar", "goal", "likers", "gifters", "labels", "counter", "timer", "tts", "songs", "outline"];
 /** Whether an overlay ran on a real account, or on practice events. */
 export const MODES = ["live", "demo"];
 /** The streaming platforms a link or overlay can be for ("both" when a chat overlay reads TikTok and Twitch together). */
 export const PLATFORMS = ["tiktok", "twitch", "both"];
 /** The Frills Plus ideas a streamer can click to express interest in. */
 export const PLUS_FEATURES = ["remote_link", "custom_upload", "scene_link", "plus_pack"];
-/** The moments a Frills Plus prompt can show up in: the free-actions limit, the note about Plus-only sticker and VTube Studio actions, the tip under an editor, the checkout button. */
-export const PLUS_MOMENTS = ["action_limit", "vts_locked", "editor_tip", "checkout"];
+/** The moments a Frills Plus prompt can show up in. */
+export const PLUS_MOMENTS = ["action_limit", "vts_locked", "editor_tip", "copy_nudge", "outline_plus", "tts_voice", "checkout"];
 /** What happened to a prompt: it was seen, or it was clicked. */
 export const PLUS_STEPS = ["shown", "clicked"];
 
@@ -87,7 +87,7 @@ export function pageOf(pathname) {
   if (path === "/") return "home";
   if (path.startsWith("/editor")) return "editor";
   if (path.startsWith("/overlays")) return "overlays";
-  for (const name of ["alerts", "gifts", "jar", "goal", "likers", "gifters", "labels", "counter", "timer", "tts", "songs", "matcha", "start"]) if (path.startsWith("/" + name)) return name;
+  for (const name of ["alerts", "gifts", "jar", "goal", "likers", "gifters", "labels", "counter", "timer", "tts", "songs", "outline", "matcha", "start"]) if (path.startsWith("/" + name)) return name;
   if (path.startsWith("/guides") || path.startsWith("/looks")) return "guides";
   return "other";
 }
@@ -97,7 +97,7 @@ export function overlayOf(pathname) {
   const path = String(pathname || "/");
   if (path.startsWith("/matcha/alerts")) return "alerts";
   if (path.startsWith("/editor")) return "chat";
-  for (const name of ["alerts", "gifts", "jar", "goal", "likers", "gifters", "labels", "counter", "timer", "tts", "songs", "matcha"]) if (path.startsWith("/" + name)) return name;
+  for (const name of ["alerts", "gifts", "jar", "goal", "likers", "gifters", "labels", "counter", "timer", "tts", "songs", "outline", "matcha"]) if (path.startsWith("/" + name)) return name;
   return "";
 }
 

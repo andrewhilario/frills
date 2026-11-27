@@ -260,39 +260,125 @@ export function mountCloudSave({ kind, storeKey, anchor, getUrl, defaultName = "
   };
 
   const TIER1_TIPS = {
-    timer: "Want crash-proof cloud timer recovery across OBS restarts, live phone controls (+1m, pause, start), and 1-click theme sync? ",
-    tts: "Want 150,000 natural AI voice characters/mo, custom 3-frame PNGTuber uploads, and 1-Link OBS Master Scenes? ",
-    gifters: "Want crash-proof Weekly, Monthly & All-Time cloud leaderboards, phone reset controls, and 1-click OBS theme sync? ",
-    likers: "Want crash-proof Weekly, Monthly & All-Time cloud leaderboards, phone reset controls, and 1-click OBS theme sync? ",
-    jar: "Want crash-proof cloud progress backup across restarts, live phone remote controls, and 1-click OBS theme sync? ",
-    wheel: "Want a Spin Wheel Now remote trigger on your phone, 1-Link Master Scenes, and 1-click OBS theme sync? ",
-    actions: "Want unlimited OBS actions (beyond 10 free), live VTube Studio props & expressions, and Phone Stream Deck buttons for every action? ",
-    goal: "Want crash-proof cloud progress backup across restarts, live phone remote controls, and 1-click OBS theme sync? ",
+    timer: {
+      title: "Keep your timer safe through OBS crashes",
+      body: "Cloud backup across restarts, live phone controls (+1m, pause, resume), and 1-click theme sync.",
+    },
+    tts: {
+      title: "Unlock natural AI voices & your own mascot",
+      body: "150,000 neural AI voice characters/mo, custom 3-frame PNGTuber uploads, and 1-Link Master Scenes.",
+    },
+    gifters: {
+      title: "Never lose your Weekly & Monthly leaderboards",
+      body: "Crash-proof cloud backups, phone reset controls, and 1-click theme sync across every OBS source.",
+    },
+    likers: {
+      title: "Never lose your Weekly & Monthly leaderboards",
+      body: "Crash-proof cloud backups, phone reset controls, and 1-click theme sync across every OBS source.",
+    },
+    jar: {
+      title: "Never lose your Gift Jar progress on a crash",
+      body: "Automatic cloud recovery, live phone controls (+100 drop, fill, empty), and 1-click OBS theme sync.",
+    },
+    wheel: {
+      title: "Spin your wheel right from your phone",
+      body: "Remote Spin button on your phone deck, 1-Link Master Scenes, and 1-click OBS theme sync.",
+    },
+    actions: {
+      title: "Go past 10 free actions & unlock full VTube Studio",
+      body: "Unlimited OBS rules, unlimited custom-shape sticky notes, VTS props & expressions, and phone triggers.",
+    },
+    goal: {
+      title: "Keep your Goal Bar backed up across restarts",
+      body: "Crash-proof cloud memory, phone remote controls (+1, +10, reset), and 1-click OBS theme sync.",
+    },
+    outline: {
+      title: "Unlock collector frames, custom wallpapers & 4K PNG",
+      body: "Cyber HUD, Celestial Filigree, Scrapbook & Plush Ribbon frames, custom wallpapers behind cutouts, orbiting glows, 10-row Gift Rewards boards & 4K PNG.",
+    },
+  };
+
+  /** Fires `shown` only when `el` is actually scrolled into the viewport for >= 300ms (never inflated by un-scrolled page loads). */
+  const observePromptView = (el, moment) => {
+    if (typeof IntersectionObserver !== "function") {
+      countPrompt(moment, "shown");
+      return;
+    }
+    let timer = 0;
+    const io = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.some((e) => e.isIntersecting && e.intersectionRatio >= 0.35);
+        if (visible && !timer) {
+          timer = setTimeout(() => {
+            io.disconnect();
+            countPrompt(moment, "shown");
+          }, 300);
+        } else if (!visible && timer) {
+          clearTimeout(timer);
+          timer = 0;
+        }
+      },
+      { threshold: [0, 0.35, 0.6] },
+    );
+    io.observe(el);
+  };
+
+  /** High-intent 1-line nudge shown right after a Tier-1 free user clicks "Copy link". */
+  const attachPostCopyNudge = () => {
+    if (document.body?.dataset?.plusAccounts !== "on") return;
+    const copyBtn = anchor?.querySelector("#copy-link, [data-copy-link]");
+    if (!copyBtn) return;
+    let shown = false;
+    copyBtn.addEventListener("click", () => {
+      if (shown || copyBtn.disabled) return;
+      try { if (sessionStorage.getItem("frills:plus:copy-nudge:off") === "1") return; } catch {}
+      shown = true;
+      const nudge = document.createElement("div");
+      nudge.className = "cloud-nudge";
+      nudge.setAttribute("role", "status");
+      const body = document.createElement("span");
+      body.className = "cloud-nudge__body";
+      body.append("Hate re-pasting links into OBS when you tweak colors? Save one live link with ");
+      const link = document.createElement("a");
+      link.href = "/plus/";
+      link.textContent = "Frills Plus →";
+      link.addEventListener("click", () => countPrompt("copy_nudge", "clicked"));
+      body.append(link);
+      const dismiss = document.createElement("button");
+      dismiss.type = "button";
+      dismiss.className = "cloud-tip__close";
+      dismiss.setAttribute("aria-label", "Hide this note");
+      dismiss.textContent = "×";
+      dismiss.addEventListener("click", () => {
+        nudge.remove();
+        try { sessionStorage.setItem("frills:plus:copy-nudge:off", "1"); } catch {}
+      });
+      nudge.append(body, dismiss);
+      const actions = anchor.querySelector(".linkfield__actions");
+      if (actions) actions.insertAdjacentElement("afterend", nudge);
+      else anchor.append(nudge);
+      countPrompt("copy_nudge", "shown");
+    });
   };
 
   const mountTier1Tip = () => {
     if (document.body?.dataset?.plusAccounts !== "on") return;
+    attachPostCopyNudge();
     try { if (sessionStorage.getItem("frills:plus:tip:off") === "1") return; } catch {}
     const promo = String(document.body?.dataset?.plusPromo ?? "").trim();
+    const copy = TIER1_TIPS[kind] ?? {
+      title: "Edit live in OBS without re-pasting your link",
+      body: "Permanent /o/… cloud links, 1-click theme sync across every overlay, and a dedicated 24/7 TikTok server.",
+    };
     const tip = document.createElement("aside");
     tip.className = "cloud-tip";
     tip.setAttribute("aria-label", "Frills Plus live cloud links");
 
-    const text = document.createElement("p");
-    text.className = "cloud-tip__text";
-    text.append(TIER1_TIPS[kind] ?? "Want one link that updates in OBS without re-pasting, 1-click full-stream theme sync, and a dedicated 24/7 TikTok server? ");
-    if (promo) {
-      text.append("First 20 get 20% off forever with ");
-      const code = document.createElement("code");
-      code.textContent = promo;
-      text.append(code, ". ");
-    }
-    const link = document.createElement("a");
-    link.href = "/plus/";
-    link.textContent = "See Frills Plus";
-    text.append(link, ".");
-    link.addEventListener("click", () => countPrompt("editor_tip", "clicked"));
-
+    const top = document.createElement("div");
+    top.className = "cloud-tip__top";
+    const badge = document.createElement("span");
+    badge.className = "cloud-box__badge";
+    badge.textContent = "Frills Plus";
     const close = document.createElement("button");
     close.type = "button";
     close.className = "cloud-tip__close";
@@ -302,10 +388,31 @@ export function mountCloudSave({ kind, storeKey, anchor, getUrl, defaultName = "
       tip.remove();
       try { sessionStorage.setItem("frills:plus:tip:off", "1"); } catch {}
     });
+    top.append(badge, close);
 
-    tip.append(text, close);
+    const title = document.createElement("strong");
+    title.className = "cloud-tip__title";
+    title.textContent = copy.title;
+
+    const text = document.createElement("p");
+    text.className = "cloud-tip__text";
+    text.append(copy.body + " ");
+    if (promo) {
+      text.append("Founding 20: 20% off forever with ");
+      const code = document.createElement("code");
+      code.textContent = promo;
+      text.append(code, ".");
+    }
+
+    const cta = document.createElement("a");
+    cta.className = "btn btn--sm cloud-tip__cta";
+    cta.href = "/plus/";
+    cta.textContent = "See Frills Plus →";
+    cta.addEventListener("click", () => countPrompt("editor_tip", "clicked"));
+
+    tip.append(top, title, text, cta);
     anchor.insertAdjacentElement("afterend", tip);
-    countPrompt("editor_tip", "shown");
+    observePromptView(tip, "editor_tip");
   };
 
   // Probe account + Plus status silently (probe=1 returns 200 when signed out so DevTools stays error-free);

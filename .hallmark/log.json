@@ -1,5 +1,15 @@
 [
   {
+    "date": "2026-11-27",
+    "macrostructure": "Narrative Workflow (editor workbench + component audit)",
+    "theme": "Hum",
+    "enrichment": "Tier-B SVG stream outline frames & Frills corner art packs",
+    "nav": "N1b",
+    "footer": "Ft8",
+    "brief": "Hallmark visual audit & fixes for Stream Outline designer (/outline/), OBS-style Simple/Advanced mode (.ed-mode), and Frills Plus tips (.cloud-tip / .cloud-nudge)",
+    "note": "Fixed Simple-mode grid blowout, token-locked outline.css + editor.css to tokens.css, stripped macOS traffic-light dots from window frame style (Gate 47), upgraded touch targets to 44px & 8 states, fixed standalone card mascot/badge spacing, verified across 320/375/414/768/1280px screenshots"
+  },
+  {
     "date": "2026-10-07",
     "macrostructure": "Narrative Workflow",
     "theme": "Hum",

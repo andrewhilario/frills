@@ -93,8 +93,12 @@ const NAMES = {
   plus_pack: "Collector Art Packs",
   action_limit: "Reached the 10 free actions",
   vts_locked: "Sticker & VTube Studio note",
-  editor_tip: "Tip under an editor",
+  editor_tip: "Tip under an editor (scrolled in view)",
+  copy_nudge: "Post-copy live link nudge",
+  outline_plus: "Stream Outline Plus preview",
+  tts_voice: "Talking Pet AI voice lock",
   checkout: "Opened the checkout",
+  outline: "Stream Outline",
 };
 const nameOf = (label) => NAMES[label] ?? label;
 

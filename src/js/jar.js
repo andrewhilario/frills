@@ -10,10 +10,24 @@ export const MAX_JAR_ITEMS = 42;
 export const JAR_DESIGNS = [
   ["boba", "Boba cup: domed lid & straw"],
   ["cat", "Cat jar: kitty-eared glass jar"],
+  ["bunny", "Bunny jar: crystal ears & pearl heart"],
+  ["heart", "Crystal heart: rose-gold crown jar"],
+  ["star", "Star wishing jar: faceted moon crystal"],
+  ["bear", "Teddy bear jar: honey ears & glass paws"],
+  ["honey", "Honey pot: ribbed glass & wooden dipper"],
+  ["gacha", "Gachapon globe: pastel capsule dispenser"],
+  ["ghost", "Ghost jar: spooky-cute iridescent glass"],
+  ["aquarium", "Aquarium bowl: pearl shell & starfish"],
   ["potion", "Potion flask: crystal bottle & cork"],
   ["frog", "Frog pond: cute round terrarium"],
   ["arcade", "Arcade tank: glowing cyber neon glass"],
   ["piggy", "Piggy jar: cute coin-slot bank"],
+];
+
+export const JAR_SIZES = [
+  ["small", "Small"],
+  ["medium", "Medium"],
+  ["large", "Large"],
 ];
 
 export const JAR_MODES = [
@@ -30,6 +44,7 @@ export const JAR_FULL_MODES = [
 export const JAR = defineWidget({
   defaults: {
     design: "boba",
+    jarSize: "medium",
     goalBy: "diamonds",
     target: 1000,
     whenFull: "stay",
@@ -50,6 +65,7 @@ export const JAR = defineWidget({
   },
   controls: [
     { section: "jar", ...selectOf("design", "Jar design", JAR_DESIGNS) },
+    { section: "jar", ...chipsOf("jarSize", "Jar size", JAR_SIZES) },
     { section: "jar", ...chipsOf("goalBy", "What fills the jar", JAR_MODES) },
     { section: "jar", ...number("target", "Full at", 1, 10000000, { hint: "Diamonds or number of gifts needed to fill the jar to the brim." }) },
     { section: "jar", ...chipsOf("whenFull", "When the jar gets full", JAR_FULL_MODES) },

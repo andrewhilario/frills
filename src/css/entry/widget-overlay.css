@@ -4,6 +4,7 @@
 @import "../fonts.css";
 @import "../alerts.css";
 @import "../widgets.css";
+@import "../outline.css";
 
 html { color-scheme: normal; background: transparent; }
 html, body { margin: 0; height: 100%; overflow: hidden; background: transparent; }

@@ -1,0 +1,112 @@
+<!--
+{
+  "title": "Stream outline & border designer for OBS | Frills",
+  "description": "Design free animated 9:16 TikTok LIVE outlines with safe zones, 16:9 OBS borders, webcam frames, widget slots, and Gift Rewards boards. Link or PNG.",
+  "path": "/outline/",
+  "updated": "2026-11-27",
+  "published": "2026-11-27",
+  "css": "widget",
+  "js": "outline",
+  "bodyClass": "page-editor page-alerts page-outline",
+  "chrome": "appbar",
+  "footer": false,
+  "intro": "intro-outline",
+  "about": "about-outline",
+  "jsonld": ["webapp"]
+}
+-->
+<main class="workspace" id="main">
+  <section class="preview" id="preview" data-back="dark" aria-label="Live preview of your stream outline">
+    <div class="preview__bar">
+      <span class="preview__tag">Preview</span>
+      <label class="visually-hidden" for="backdrop">What sits behind the overlay</label>
+      <select id="backdrop">
+        <option value="dark">Dark game</option>
+        <option value="bright">Bright game</option>
+        <option value="busy">Busy scene</option>
+        <option value="checker">See-through</option>
+      </select>
+    </div>
+    <div class="chatstage" id="stage"><div id="widget"></div></div>
+    <div class="preview__tests" role="group" aria-label="Preview tools">
+      <button class="btn btn--soft btn--sm" type="button" id="ol-prev-step" hidden>◀ Spotlight</button>
+      <button class="btn btn--soft btn--sm" type="button" id="ol-next-step" hidden>Spotlight ▶</button>
+      <button class="btn btn--soft btn--sm ol-safe-btn" type="button" id="ol-safe-toggle" aria-pressed="false" hidden>TikTok safe zones</button>
+      <button class="btn btn--soft btn--sm" type="button" id="ol-hints-toggle" aria-pressed="true">Cutout labels</button>
+    </div>
+  </section>
+
+  <div class="panel">
+    <noscript><p class="note">Frills needs JavaScript to draw your stream outline. Turn it on for this page and reload.</p></noscript>
+    {{{intro}}}
+
+    <section class="step-card" aria-labelledby="s1">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">1</span>
+        <h2 class="step-card__title" id="s1">Mode, TikTok layout &amp; look</h2>
+        <button class="btn btn--soft btn--sm step-card__aside" type="button" id="reset">Reset</button>
+      </div>
+      <div class="ol-quick-presets" id="ol-tt-presets" role="group" aria-label="Quick TikTok vertical presets">
+        <span class="ol-quick-presets__label">TikTok quick starters:</span>
+        <button class="btn btn--soft btn--sm" type="button" data-tt-preset="mobile-game">Mobile / PC Game</button>
+        <button class="btn btn--soft btn--sm" type="button" data-tt-preset="cam-first">Facecam First</button>
+        <button class="btn btn--soft btn--sm" type="button" data-tt-preset="vtuber">VTuber Cozy</button>
+        <button class="btn btn--soft btn--sm" type="button" data-tt-preset="just-chat">Just Chatting</button>
+        <button class="btn btn--soft btn--sm" type="button" data-tt-preset="pk-duo">PK / Co-Host</button>
+      </div>
+      <div class="stack" id="mode-controls"></div>
+      <h3 class="stack__group">Starting look &amp; colors</h3>
+      <div class="chips" id="looks" role="group" aria-label="Starting looks"></div>
+      <div class="stack" id="look-controls"></div>
+    </section>
+
+    <section class="step-card" aria-labelledby="s2">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">2</span>
+        <h2 class="step-card__title" id="s2">Frame style, motion &amp; decor</h2>
+      </div>
+      <div class="stack" id="frame-controls"></div>
+      <p class="ctl__hint" id="media-ok-wrap" hidden><label class="consent"><input type="checkbox" id="media-ok"> I own the rights to the mascot or logo I upload and know anyone with my overlay link can view it.</label></p>
+      <p class="ol-plus-banner" id="ol-plus-banner" role="status" hidden></p>
+    </section>
+
+    <section class="step-card" aria-labelledby="s3">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">3</span>
+        <h2 class="step-card__title" id="s3">Branding, Callouts &amp; Side Card</h2>
+      </div>
+      <div class="stack" id="brand-controls"></div>
+      <div class="stack" id="card-controls"></div>
+      <div id="ol-card-builder" aria-label="Gift menu or commands rows">
+        <div class="ol-seg-list" id="ol-seg-list"></div>
+        <div class="ol-seg-actions">
+          <button class="btn btn--soft btn--sm" type="button" id="ol-seg-add">+ Add row</button>
+          <button class="btn btn--soft btn--sm" type="button" id="ol-sample-gifts">Sample Gift Menu</button>
+          <button class="btn btn--soft btn--sm" type="button" id="ol-sample-info">Sample Commands</button>
+        </div>
+        <p class="ctl__hint" id="ol-seg-hint">Tap a row number (or click a row in the preview) to spotlight a featured gift or command with ★.</p>
+      </div>
+    </section>
+
+    <section class="step-card" aria-labelledby="s4">
+      <div class="step-card__head">
+        <span class="step-card__num" aria-hidden="true">4</span>
+        <h2 class="step-card__title" id="s4">Add to OBS / TikTok or export PNG</h2>
+      </div>
+      <div class="linkfield">
+        <label class="ctl__label" for="link">Browser source link (animated &amp; scalable)</label>
+        <input type="text" id="link" readonly spellcheck="false" autocomplete="off">
+        <div class="linkfield__actions">
+          <button class="btn" type="button" id="copy-link">Copy link</button>
+        </div>
+        <div class="ol-export-row">
+          <button class="btn btn--soft btn--sm" type="button" id="ol-export-1x">1080p PNG (Free)</button>
+          <button class="btn btn--soft btn--sm" type="button" id="ol-export-2x">4K PNG (Plus)</button>
+        </div>
+        <p class="linkfield__hint" id="link-hint" role="status"></p>
+      </div>
+    </section>
+
+    {{{about}}}
+  </div>
+</main>

@@ -5,7 +5,7 @@ import test, { after } from "node:test";
 import assert from "node:assert/strict";
 import http from "node:http";
 import { EventEmitter } from "node:events";
-import { configureConnectorRoutes, createHelper, parseEulerConfig, parsePriorityUsers, probeTikTokLiveDirect, resolveRelaySlots, syncConnectorSignKey } from "../helper/server.mjs";
+import { cleanOverlayTag, configureConnectorRoutes, createHelper, parseEulerConfig, parsePriorityUsers, probeTikTokLiveDirect, resolveRelaySlots, syncConnectorSignKey } from "../helper/server.mjs";
 import { ALERT_AT, EULER_DEFAULT_CAP, Signing, capacity, deviceFacts, level, recommendedSlots, snapshot, statusPage } from "../helper/status.mjs";
 import { SlotAlerts, discordNotifier, termuxNotifier } from "../helper/alerts.mjs";
 
@@ -267,30 +267,35 @@ test("the status numbers say how many connections went through the signing servi
 // ── who is connected: names, for the owner's own screen only ───────────────────────────────────────────────────────────────────
 
 /** Opens a page's event stream for an account, as an overlay would, and resolves once the relay has let it in. Returns the request, to end it. */
-const listen = (user) => new Promise((resolve, reject) => {
-  const req = http.request({ host: "127.0.0.1", port, path: `/tiktok/stream?user=${user}`, headers: { Host: "relay.example.test", Origin: "https://site.example", Accept: "text/event-stream" } }, (res) => {
+const listen = (user, query = "") => new Promise((resolve, reject) => {
+  const req = http.request({ host: "127.0.0.1", port, path: `/tiktok/stream?user=${user}${query}`, headers: { Host: "relay.example.test", Origin: "https://site.example", Accept: "text/event-stream" } }, (res) => {
     res.once("data", () => resolve(req)); // the first thing sent is the status
   });
   req.on("error", reject);
   req.end();
 });
 
-test("the list of who is connected shows names, LIVE or not, and how long, only on the device itself", async () => {
+test("the list of who is connected shows names, LIVE or not, overlays, and how long, only on the device itself", async () => {
   await start();
-  const first = await listen("mochi_bun");
-  const second = await listen("pond.cafe");
+  const first = await listen("mochi_bun", "&overlay=jar&events=gift");
+  const firstChat = await listen("mochi_bun", "&overlay=chat");
+  const second = await listen("pond.cafe", "&overlay=alerts&events=follow,gift,share");
   try {
     const local = JSON.parse((await ask("/health", { Accept: "application/json" })).body);
     assert.deepEqual(local.roster.accounts.map((a) => a.user).sort(), ["mochi_bun", "pond.cafe"]);
     const one = local.roster.accounts.find((a) => a.user === "mochi_bun");
-    assert.deepEqual(Object.keys(one).sort(), ["connectMs", "counts", "detail", "endedS", "followers", "forS", "lastError", "lastS", "leavesInS", "live", "pages", "retryInS", "state", "user"]);
-    assert.equal(one.pages, 1);
+    assert.deepEqual(Object.keys(one).sort(), ["connectMs", "counts", "detail", "endedS", "followers", "forS", "lastError", "lastS", "leavesInS", "live", "overlays", "pages", "retryInS", "state", "user"]);
+    assert.equal(one.pages, 2);
+    assert.deepEqual(one.overlays, { chat: 1, jar: 1 });
+    assert.deepEqual(local.overlays, { alerts: 1, chat: 1, jar: 1 }, "aggregate overlay counts across all active rooms");
     assert.ok(one.forS >= 0);
     assert.deepEqual(local.roster.waiting, []);
     assert.deepEqual(local.slots.used, 2);
 
     const viaTunnel = await ask("/health", { Accept: "application/json", "CF-Connecting-IP": "203.0.113.9" });
-    assert.equal("roster" in JSON.parse(viaTunnel.body), false, "through the tunnel: numbers only");
+    const tunnelJson = JSON.parse(viaTunnel.body);
+    assert.equal("roster" in tunnelJson, false, "through the tunnel: numbers only");
+    assert.deepEqual(tunnelJson.overlays, { alerts: 1, chat: 1, jar: 1 }, "aggregate overlay counts are safe numbers without usernames");
     assert.ok(!viaTunnel.body.includes("mochi_bun") && !viaTunnel.body.includes("pond.cafe"), "no name anywhere");
     const viaProxy = await ask("/health", { Accept: "application/json", "X-Forwarded-For": "203.0.113.9" });
     assert.ok(!viaProxy.body.includes("mochi_bun"));
@@ -299,19 +304,42 @@ test("the list of who is connected shows names, LIVE or not, and how long, only 
     const ownPage = await ask("/health", { Accept: "text/html" });
     assert.ok(ownPage.body.includes("mochi_bun"), "the page on the device has them in it");
     assert.match(ownPage.body, /Who is connected/);
+    assert.match(ownPage.body, /<th>Overlays<\/th>/);
     assert.equal((await ask("/tiktok/ping")).body.includes("mochi_bun"), false, "the ping never lists anyone");
   } finally {
     first.destroy();
+    firstChat.destroy();
     second.destroy();
   }
 });
 
-test("the status page draws the table: a link to each LIVE, a status for each, and who is in line", () => {
-  const roster = { accounts: [{ user: "mochi_bun", state: "connected", live: true, pages: 2, followers: 1234, forS: 400, counts: { chat: 5, gift: 1, follow: 2, share: 0 }, endedS: null, lastS: 3, leavesInS: null }], waiting: ["late.comer"] };
-  const page = statusPage(snapshot({ stats: { used: 1, max: 50, waiting: 1 }, startedAt: 0, now: 1000, version: "0.5.1", features: [], signing: new Signing(), estimate: { estimate: 20, measured: false }, roster }));
+test("cleanOverlayTag accepts short slugs only and rejects hostile or oversized overlay params", async () => {
+  assert.equal(cleanOverlayTag("jar"), "jar");
+  assert.equal(cleanOverlayTag("  Matcha-Alerts-Editor "), "matcha-alerts-editor");
+  for (const bad of ["", "<script>", "bad space", "a".repeat(25), "../etc", "jar?x=1", null, undefined]) {
+    assert.equal(cleanOverlayTag(bad), "", String(bad));
+  }
+  await start();
+  const badTag = await listen("mochi_bun", "&overlay=%3Cscript%3E&events=gift");
+  const editorTag = await listen("mochi_bun", "&overlay=jar-editor&events=gift");
+  try {
+    const local = JSON.parse((await ask("/health", { Accept: "application/json" })).body);
+    assert.deepEqual(local.roster.accounts[0].overlays, { gift: 1, "jar-editor": 1 }, "invalid overlay falls back to safe event kind");
+    assert.deepEqual(local.overlays, { gift: 1, "jar-editor": 1 });
+  } finally {
+    badTag.destroy();
+    editorTag.destroy();
+  }
+});
+
+test("the status page draws the table: a link to each LIVE, overlays in use, a status for each, and who is in line", () => {
+  const roster = { accounts: [{ user: "mochi_bun", state: "connected", live: true, pages: 2, overlays: { chat: 1, jar: 1 }, followers: 1234, forS: 400, counts: { chat: 5, gift: 1, follow: 2, share: 0 }, endedS: null, lastS: 3, leavesInS: null }], waiting: ["late.comer"] };
+  const page = statusPage(snapshot({ stats: { used: 1, max: 50, waiting: 1 }, startedAt: 0, now: 1000, version: "0.5.1", features: [], signing: new Signing(), estimate: { estimate: 20, measured: false }, overlays: { chat: 1, jar: 1 }, roster }));
   assert.match(page, /id="who"/);
+  assert.match(page, /id="ovbar"/);
   assert.match(page, /tiktok\.com\/@"\+encodeURIComponent\(a\.user\)\+"\/live/, "each name links to their LIVE");
   assert.ok(page.includes('"user":"mochi_bun"'), "the first drawing already has the data");
+  assert.ok(page.includes('"overlays":{"chat":1,"jar":1}'));
   assert.ok(page.includes("late.comer"));
   const without = statusPage(snapshot({ stats: { used: 1, max: 50, waiting: 0 }, startedAt: 0, now: 1000, version: "0.5.1", features: [], signing: new Signing(), estimate: { estimate: 20, measured: false } }));
   assert.ok(!without.includes("mochi_bun"));

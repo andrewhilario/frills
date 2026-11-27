@@ -31,6 +31,13 @@ import { validTicketSecret, verifyRelayTicket } from "../worker/relay-ticket.mjs
 const VERSION = "0.7.5";
 /** What this program can do, so a page can tell an old one ("chat" only) from one that sends alerts. */
 const FEATURES = ["chat", "alerts", "info", "roles", "status", "viewers"];
+const OVERLAY_ID = /^[a-z0-9-]{1,24}$/;
+
+/** Accepts a short, safe overlay slug (e.g. "chat", "jar", "alerts", "jar-editor"); anything else becomes "". */
+export function cleanOverlayTag(raw) {
+  const s = String(raw ?? "").trim().toLowerCase();
+  return OVERLAY_ID.test(s) ? s : "";
+}
 
 const DIRECT_API_HEADERS = {
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
@@ -276,7 +283,8 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", apiK
       directGapMs: relay ? (hub.opts.directGapMs || 0) : 0,
     });
     const streams = relay ? { open: openCount(), limit: maxPerIp, turnedAway: away.total, replaced: away.replaced, lastTurnedAwayS: away.lastAt ? Math.round((Date.now() - away.lastAt) / 1000) : null } : null;
-    return snapshot({ stats, startedAt, now: Date.now(), version: VERSION, features: FEATURES, signing, estimate, streams, keyed: signing.hasKeys(), alertAt: relay?.alertAt ?? ALERT_AT, device: local ? deviceFacts(cpuFraction) : null, roster: local ? hub.roster() : null, ownerLogin: gate.enabled && !owned, actions: owned ? { restart: Boolean(relay?.restart) } : null });
+    const overlays = relay ? hub.overlayCounts() : null;
+    return snapshot({ stats, startedAt, now: Date.now(), version: VERSION, features: FEATURES, signing, estimate, streams, overlays, keyed: signing.hasKeys(), alertAt: relay?.alertAt ?? ALERT_AT, device: local ? deviceFacts(cpuFraction) : null, roster: local ? hub.roster() : null, ownerLogin: gate.enabled && !owned, actions: owned ? { restart: Boolean(relay?.restart) } : null });
   };
   const nothing = (req, res) => {
     res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
@@ -505,13 +513,15 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", apiK
     res.on("error", () => {}); // a page that has gone away mid-write is not worth stopping for
     res.write("retry: 3000\n\n");
     const events = new Set((url.searchParams.get("events") ?? "").split(",").filter((kind) => ALERT_KINDS.includes(kind)));
-    const client = { events, send: (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`) };
+    const overlay = cleanOverlayTag(url.searchParams.get("overlay"));
+    const client = { events, overlay, send: (event, data) => res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`) };
     const room = hub.subscribe(user, client);
     if (!room) {
       res.end(); // too many accounts at once: the page has been told why
       return;
     }
     const kinds = events.size ? [...events].join("+") : "chat"; // which kind of page it is: chat, or the alerts it asked for
+    const label = overlay ? (events.size && overlay !== kinds ? `${overlay} · ${kinds}` : overlay) : kinds;
     let beat = 0;
     let released = false;
     const release = () => {
@@ -523,14 +533,14 @@ export function createHelper({ distDir, factory = realFactory, apiKey = "", apiK
         if (!held.size && open.get(who) === held) open.delete(who);
       }
       room.remove(client);
-      if (relay) log(`@${user}: a page left (${kinds}), ${room.activeClientCount()} open`);
+      if (relay) log(`@${user}: a page left (${label}), ${room.activeClientCount()} open`);
     };
     const record = { user, page, end() { release(); res.end(); } };
     if (held) {
       if (!open.has(who)) open.set(who, held);
       held.add(record);
     }
-    if (relay) log(`@${user}: a page connected (${kinds}), ${room.activeClientCount()} open`);
+    if (relay) log(`@${user}: a page connected (${label}), ${room.activeClientCount()} open`);
     beat = setInterval(() => res.write("event: beat\ndata: {}\n\n"), tuning.beatMs ?? 15000); // so a page can tell a quiet chat from a dead connection (an event, because a page cannot see a comment)
     res.on("close", release);
   }

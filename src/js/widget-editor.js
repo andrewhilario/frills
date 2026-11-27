@@ -11,6 +11,8 @@ import { mountMediaPicker } from "./alerts-media.js";
 import { acceptInfo } from "./info.js";
 import { appendPlusCode } from "./plus-relay.js";
 import { mountCloudSave } from "./cloud-save.js";
+import { mountEditorMode } from "./editor-mode.js";
+import { mountSizeGuide } from "./size-guide.js";
 
 const $ = (id) => document.getElementById(id);
 const CANVASES = { vertical: [1080, 1920], landscape: [1920, 1080], square: [1080, 1080] };
@@ -87,6 +89,8 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
     },
     { dot: true },
   );
+  const cloudKind = String(overlayPath ?? "").replace(/^\/overlay\/|\/+$/g, "");
+  const editorMode = mountEditorMode({ kind: cloudKind });
   for (const control of widget.controls) {
     if (control.hidden) continue; // a setting the page fills in itself
     const { row, write } = control.type === "media" && $("media-ok")
@@ -96,6 +100,10 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
     rowsByControl.push({ control, row });
     $(control.section === "look" ? "look-controls" : "opt-controls").append(row);
   }
+  editorMode.markControls(rowsByControl);
+  if ($("look-controls")) editorMode.addAdvancePrompt($("look-controls"));
+  const hasAdvancedOpts = rowsByControl.some(({ control, row }) => control.section !== "look" && row.classList.contains("ed-adv"));
+  if (hasAdvancedOpts && $("opt-controls")) editorMode.addAdvancePrompt($("opt-controls"), "All options (Advanced) →");
   $("reset").addEventListener("click", () => {
     settings = { ...widget.defaults };
     syncControls();
@@ -141,7 +149,6 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
   const linkInput = $("link");
   const copyBtn = $("copy-link");
   copyButton(copyBtn, () => linkInput.value);
-  const cloudKind = String(overlayPath ?? "").replace(/^\/overlay\/|\/+$/g, "");
   const cloud = cloudKind ? mountCloudSave({ kind: cloudKind, storeKey, anchor: linkInput.closest(".linkfield"), getUrl: () => linkInput.value, defaultName: `My ${cloudKind} overlay`, onStatus: (st) => api.onPlusStatus?.(st) }) : { sync() {} };
   function refreshLink() {
     const platform = source.platform;
@@ -188,6 +195,7 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
 
   // ── the preview: a true copy of the page your streaming app shows, shrunk to fit ───────────────────────────────────────
   let canvas = CANVASES[saved?.canvas] ? saved.canvas : "vertical";
+  let sizeGuide = null;
   function fit() {
     const [w, h] = CANVASES[canvas];
     const room = $("stage").getBoundingClientRect();
@@ -200,11 +208,33 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
   const canvasControl = buildControl(
     { key: "canvas", type: "select", label: "Preview as", options: [{ id: "vertical", name: "Vertical LIVE, 1080 x 1920" }, { id: "landscape", name: "Landscape, 1920 x 1080" }, { id: "square", name: "Square, 1080 x 1080" }], hint: "Set your streaming app's source to the same size." },
     canvas,
-    (value) => { canvas = value; fit(); save(); },
+    (value) => { canvas = value; fit(); sizeGuide?.sync(); save(); },
   );
   $("preview-canvas").append(canvasControl.row);
   $("backdrop").addEventListener("change", (event) => { $("preview").dataset.back = event.target.value; });
   new ResizeObserver(fit).observe($("stage"));
+
+  sizeGuide = mountSizeGuide({
+    mode: "scene",
+    anchor: linkInput.closest(".linkfield"),
+    copyBtn,
+    getSize: () => {
+      const [w, h] = CANVASES[canvas] ?? CANVASES.vertical;
+      return {
+        width: w,
+        height: h,
+        canvas,
+        appHint: canvas === "landscape" || source.platform === "twitch" ? "obs" : "tiktok",
+      };
+    },
+    onPreset: (preset) => {
+      if (!CANVASES[preset.id]) return;
+      canvas = preset.id;
+      canvasControl.write(canvas);
+      fit();
+      save();
+    },
+  });
 
   function save() {
     try { localStorage.setItem(storeKey, JSON.stringify({ settings, channel: source.channel, twitch: source.twitchChannel, platform: source.platform, canvas })); } catch { /* storage can be blocked; the editor still works */ }

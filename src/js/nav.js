@@ -6,7 +6,7 @@ import "./stats.js";
 export function initAnnouncement() {
   const banner = document.getElementById("site-announcement");
   if (!banner) return;
-  const key = "frills:update:2026-10-14";
+  const key = "frills:update:2026-11-27";
   try {
     if (localStorage.getItem(key) === "dismissed") {
       banner.hidden = true;

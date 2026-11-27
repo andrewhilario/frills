@@ -7,11 +7,13 @@ import { MOD_ICONS } from "./settings.js";
 import { DECOS } from "./decor.js";
 import { fontsReady, matchaFaces, paintMatcha } from "./look.js";
 import { buildControl, chips, copyButton } from "./ui.js";
+import { MATCHA_HINTS, withHint } from "./chat-hints.js";
 import { mountSource } from "./source.js";
 import { sourcesOf } from "./both.js";
 import { DEFAULTS as ALERT_DEFAULTS, LOOKS as ALERT_LOOKS, alertsUrl } from "./alerts-settings.js";
 import { appendPlusCode } from "./plus-relay.js";
 import { mountCloudSave } from "./cloud-save.js";
+import { mountSizeGuide } from "./size-guide.js";
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -126,7 +128,14 @@ const decoChips = chips(
   },
 );
 $("backdrop").addEventListener("change", (event) => { preview.dataset.back = event.target.value; });
-const width = buildControl({ key: "previewW", type: "range", label: "Width", min: 280, max: 720, step: 10, unit: " px" }, 440, (value) => $("chat").style.setProperty("--preview-w", value + "px"), { id: "c-previewW" });
+let chatPreviewW = 440;
+let chatPreviewH = 800;
+let chatSizeGuide = null;
+const width = buildControl({ key: "previewW", type: "range", label: "Width", min: 280, max: 720, step: 10, unit: " px" }, chatPreviewW, (value) => {
+  chatPreviewW = value;
+  $("chat").style.setProperty("--preview-w", value + "px");
+  chatSizeGuide?.sync();
+}, { id: "c-previewW" });
 $("preview-width").append(width.row);
 
 // ── More options: built from the same kind of list the editor uses ────────────────────────────────────────────────────────
@@ -141,7 +150,7 @@ function change(key, value) {
 }
 const rows = {};
 for (const control of MATCHA_CONTROLS) {
-  const { row, write } = buildControl(control, settings[control.key], (value) => change(control.key, value), { id: "m-" + control.key });
+  const { row, write } = buildControl(withHint(control, MATCHA_HINTS), settings[control.key], (value) => change(control.key, value), { id: "m-" + control.key });
   writers[control.key] = write;
   rows[control.key] = row;
   $("more-controls").append(row);
@@ -193,6 +202,33 @@ alertsLink.addEventListener("focus", () => alertsLink.select());
 const copyBtn = $("copy-link");
 copyButton(copyBtn, () => link.value);
 link.addEventListener("focus", () => link.select());
+chatSizeGuide = mountSizeGuide({
+  mode: "chat",
+  anchor: link.closest(".linkfield"),
+  copyBtn,
+  getSize: () => ({
+    width: chatPreviewW,
+    height: chatPreviewH,
+    appHint: source.platform === "twitch" ? "obs" : "tiktok",
+  }),
+  onPreset: (preset) => {
+    chatPreviewW = preset.width;
+    chatPreviewH = preset.height;
+    width.write(preset.width);
+    $("chat").style.setProperty("--preview-w", preset.width + "px");
+  },
+});
+mountSizeGuide({
+  mode: "scene",
+  anchor: alertsLink.closest(".linkfield"),
+  copyBtn: alertsCopy,
+  getSize: () => ({
+    width: 1080,
+    height: 1920,
+    canvas: "vertical",
+    appHint: source.platform === "twitch" ? "obs" : "tiktok",
+  }),
+});
 const cloud = mountCloudSave({ kind: "matcha", storeKey: STORE, anchor: link.closest(".linkfield") ?? hint, getUrl: () => link.value, defaultName: "Matcha chat" });
 source.onChange(refresh);
 

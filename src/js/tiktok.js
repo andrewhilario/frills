@@ -135,6 +135,16 @@ export async function findTikTokSource(relayBase = "", { timeoutMs = 8000 } = {}
   return own ?? shared;
 }
 
+/** Which Frills overlay or editor page this is, from its path: "/overlay/" -> "chat" (or "matcha"), "/overlay/jar/" -> "jar", "/jar/" -> "jar-editor". */
+export function overlayFromPath(path = globalThis.location?.pathname || "", search = globalThis.location?.search || "") {
+  const s = String(path).toLowerCase().replace(/\/index\.html$/, "").replace(/^\/+|\/+$/g, "");
+  if (!s) return "";
+  if (s === "overlay") return /(?:^|[?&])style=/.test(search) ? "matcha" : "chat";
+  if (s.startsWith("overlay/")) return s.slice(8).replace(/[^a-z0-9-]/g, "").slice(0, 24);
+  const k = s.replace(/\//g, "-").replace(/[^a-z0-9-]/g, "").slice(0, 17);
+  return k === "editor" ? "editor" : k ? `${k}-editor` : "";
+}
+
 /**
  * A short random name for one connection. A page that opens a new stream after its connection dropped sends the same name again, so the relay
  * can tell "this page came back" from "another page": it then lets go of the stream the page left behind (which it may think is open for many
@@ -170,7 +180,7 @@ export async function explainRefusal(address, fetchFn = globalThis.fetch) {
  * `diagnose(address)` (optional) is asked why a stream was turned away; the text it resolves with replaces the vague first message.
  * States: connecting, connected, offline (not live yet), reconnecting, limited, helper-lost, refused, error, stopped. Returns { stop() }.
  */
-export function connectTikTok({ user, base = "", ticket = "", refreshTicket = null, onFallback = null, onMessage, onRemove, onClear, onStatus, onAlert, onInfo, events = [], eventSourceFactory, retryRefused = false, diagnose } = {}) {
+export function connectTikTok({ user, base = "", ticket = "", refreshTicket = null, onFallback = null, onMessage, onRemove, onClear, onStatus, onAlert, onInfo, events = [], overlay = "", eventSourceFactory, retryRefused = false, diagnose } = {}) {
   const name = cleanTikTokUser(user);
   const say = (state, detail, fatal = false, extra = {}) => onStatus && onStatus({ state, channel: name, detail, fatal, platform: "tiktok", ...extra });
   if (!name) {
@@ -193,7 +203,8 @@ export function connectTikTok({ user, base = "", ticket = "", refreshTicket = nu
   const wanted = events.filter((kind) => ALERT_KINDS.includes(kind));
   // A relay is told which page this is (see makePageId); the helper on this PC does not count pages, so it is not.
   const pageId = base ? makePageId() : "";
-  const buildAddress = () => `${baseUrl}/tiktok/stream?user=${encodeURIComponent(name)}${wanted.length ? `&events=${wanted.join(",")}` : ""}${pageId ? `&page=${pageId}` : ""}${currentTicket ? `&ticket=${encodeURIComponent(currentTicket)}` : ""}`;
+  const tag = (overlay || overlayFromPath()).toLowerCase().replace(/[^a-z0-9-]/g, "").slice(0, 24);
+  const buildAddress = () => `${baseUrl}/tiktok/stream?user=${encodeURIComponent(name)}${wanted.length ? `&events=${wanted.join(",")}` : ""}${pageId ? `&page=${pageId}` : ""}${tag ? `&overlay=${tag}` : ""}${currentTicket ? `&ticket=${encodeURIComponent(currentTicket)}` : ""}`;
   let refusals = 0; // how many times a stream was turned away, so only the answer about the latest one is shown
   const lost = base ? (currentTicket ? "Lost the Frills Plus relay. Reconnecting…" : "Lost the free Frills relay. This reconnects by itself.") : "";
   const turnedDown = "The free Frills relay turned the connection down. It may be busy, or too many pages are open from your address.";

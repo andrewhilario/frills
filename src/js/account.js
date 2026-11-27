@@ -507,7 +507,7 @@ if ($("acct-form")) {
             actRow.append(btn);
           }
           li.append(actRow);
-        } else if (plusOn && (item.kind === "alerts" || item.kind === "jar" || item.kind === "wheel" || item.kind === "goal" || item.kind === "gifters" || item.kind === "likers")) {
+        } else if (plusOn && (item.kind === "alerts" || item.kind === "jar" || item.kind === "wheel" || item.kind === "goal" || item.kind === "gifters" || item.kind === "likers" || item.kind === "outline")) {
           const deckRow = document.createElement("div");
           deckRow.className = "acct-row acct-cloud__timer";
           const deckBtns = item.kind === "alerts"
@@ -516,11 +516,13 @@ if ($("acct-form")) {
               ? [["+100 Drop", "jar:drop", 100], ["Fill & Celebrate", "jar:fill", 0], ["Empty Jar", "jar:clear", 0]]
               : item.kind === "wheel"
                 ? [["Spin Wheel Now", "wheel:spin", 0], ["Clear Queue", "wheel:clear", 0]]
-                : item.kind === "goal"
-                  ? [["+1", "goal:add", 1], ["+10", "goal:add", 10], ["Celebrate Goal", "goal:reach", 0], ["Reset", "goal:reset", 0]]
-                  : item.kind === "gifters"
-                    ? [["Reset leaderboard", "gifters:reset", 0]]
-                    : [["Reset leaderboard", "likers:reset", 0]];
+                : item.kind === "outline"
+                  ? [["◀ Prev spotlight", "outline:prev", 0], ["Next spotlight ▶", "outline:next", 0], ["Clear spotlight", "outline:reset", 0]]
+                  : item.kind === "goal"
+                    ? [["+1", "goal:add", 1], ["+10", "goal:add", 10], ["Celebrate Goal", "goal:reach", 0], ["Reset", "goal:reset", 0]]
+                    : item.kind === "gifters"
+                      ? [["Reset leaderboard", "gifters:reset", 0]]
+                      : [["Reset leaderboard", "likers:reset", 0]];
           for (const [label, action, value] of deckBtns) {
             const btn = document.createElement("button");
             btn.type = "button";
@@ -702,6 +704,7 @@ if ($("acct-form")) {
   let sceneSaveBound = false;
   let activeSceneId = "";
   const SCENE_SLOTS = [
+    ["frame", "Full-Screen Frame (background)"],
     ["tl", "Top-Left"],
     ["tc", "Top-Center"],
     ["tr", "Top-Right"],
@@ -713,6 +716,7 @@ if ($("acct-form")) {
     ["br", "Bottom-Right"],
   ];
   const DEFAULT_SLOT_BY_KIND = {
+    outline: "frame",
     chat: "bl",
     matcha: "bl",
     alerts: "tc",

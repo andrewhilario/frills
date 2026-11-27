@@ -19,6 +19,7 @@ export const OVERLAY_KINDS = Object.freeze({
   jar: { path: "/overlay/jar/", editorPath: "/jar/", label: "Gift jar" },
   wheel: { path: "/overlay/wheel/", editorPath: "/wheel/", label: "Spin the wheel" },
   actions: { path: "/overlay/actions/", editorPath: "/actions/", label: "OBS Actions" },
+  outline: { path: "/overlay/outline/", editorPath: "/outline/", label: "Stream outline" },
   goal: { path: "/overlay/goal/", editorPath: "/goal/", label: "Goal" },
   likers: { path: "/overlay/likers/", editorPath: "/likers/", label: "Top likers" },
   gifters: { path: "/overlay/gifters/", editorPath: "/gifters/", label: "Top gifters" },
@@ -31,7 +32,7 @@ export const OVERLAY_KINDS = Object.freeze({
   scene: { path: "/o/", editorPath: "/account/#acct-cloud", label: "Master scene (all-in-one)" },
 });
 
-export const SCENE_SLOTS = Object.freeze(["tl", "tc", "tr", "ml", "mc", "mr", "bl", "bc", "br"]);
+export const SCENE_SLOTS = Object.freeze(["frame", "tl", "tc", "tr", "ml", "mc", "mr", "bl", "bc", "br"]);
 
 /** Parses a Master Scene query (`aspect=16x9|9x16&items=id1:slot1,id2:slot2`) into normalized layer specs. */
 export function parseSceneQuery(rawQuery) {
@@ -111,6 +112,13 @@ export function applyThemeToQuery(kind, rawQuery, themeId) {
   for (const k of LOOK_CLEAR_KEYS) params.delete(k);
   const patch = kind === "chat" || kind === "matcha" ? theme.chat : theme.widget;
   for (const [k, v] of Object.entries(patch)) params.set(k, String(v));
+  if (kind === "outline") {
+    const packMap = { neko: "neko", bunny: "bunny", matcha: "frog2" };
+    if (packMap[themeId]) params.set("artPack", packMap[themeId]);
+    else if (themeId === "arcade") params.set("frameStyle", "pixel");
+    else if (themeId === "bubblegum") params.set("frameStyle", "neon");
+    else if (themeId === "sticker") params.set("frameStyle", "sticker");
+  }
   return cleanOverlayQuery(params.toString());
 }
 
@@ -489,7 +497,7 @@ export async function handleCloudOverlays(request, env, { now = Date.now() } = {
       const existing = await db.prepare("SELECT * FROM cloud_overlays WHERE id = ? AND account_id = ?").bind(id, who.accountId).first();
       if (!existing) return json(404, { ok: false, error: "not_found" });
       const rawAction = String(body.action ?? "").trim();
-      const ALLOWED_ACTIONS = ["alerts:gift", "alerts:sub", "tts:say", "tts:clear", "jar:drop", "jar:fill", "jar:clear", "wheel:spin", "wheel:clear", "actions:run", "actions:clear", "goal:add", "goal:reach", "goal:reset", "gifters:reset", "likers:reset"];
+      const ALLOWED_ACTIONS = ["alerts:gift", "alerts:sub", "tts:say", "tts:clear", "jar:drop", "jar:fill", "jar:clear", "wheel:spin", "wheel:clear", "actions:run", "actions:clear", "outline:prev", "outline:next", "outline:set", "outline:reset", "goal:add", "goal:reach", "goal:reset", "gifters:reset", "likers:reset"];
       if (!ALLOWED_ACTIONS.includes(rawAction)) return json(400, { ok: false, error: "bad_command" });
       const val = Math.max(-1000000, Math.min(1000000, Math.round(Number(body.value) || 0)));
       const needsText = rawAction === "tts:say" || rawAction === "actions:run";

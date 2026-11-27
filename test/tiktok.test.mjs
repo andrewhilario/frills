@@ -3,7 +3,7 @@
 
 import test, { mock } from "node:test";
 import assert from "node:assert/strict";
-import { acceptAlert, acceptMessage, cleanTikTokUser, connectTikTok, explainRefusal, isAvatarUrl } from "../src/js/tiktok.js";
+import { acceptAlert, acceptMessage, cleanTikTokUser, connectTikTok, explainRefusal, isAvatarUrl, overlayFromPath } from "../src/js/tiktok.js";
 import { acceptInfo } from "../src/js/info.js";
 import { cleanName, statusText } from "../src/js/connect.js";
 import { overlayUrl } from "../src/js/settings.js";
@@ -658,4 +658,31 @@ test("alerts carry the big picture too: the medium one, else the large one, only
   const accepted = acceptAlert({ kind: "follow", name: "Pond Pal", avatar: SMALL, avatarHd: MEDIUM });
   assert.deepEqual([accepted.avatar, accepted.hd], [SMALL, MEDIUM], "the page keeps the big picture as hd");
   assert.equal(acceptAlert({ kind: "follow", name: "Pond Pal", avatar: SMALL, avatarHd: "https://evil.example/x.webp" }).hd, "", "the page drops one it may not load");
+});
+
+test("overlayFromPath tags live overlays and editors cleanly and connectTikTok sends overlay on the stream URL", () => {
+  assert.equal(overlayFromPath(""), "");
+  assert.equal(overlayFromPath("/"), "");
+  assert.equal(overlayFromPath("/overlay/"), "chat");
+  assert.equal(overlayFromPath("/overlay/index.html"), "chat");
+  assert.equal(overlayFromPath("/overlay/", "?channel=pond.pal&style=latte"), "matcha");
+  assert.equal(overlayFromPath("/overlay/jar/"), "jar");
+  assert.equal(overlayFromPath("/overlay/alerts/"), "alerts");
+  assert.equal(overlayFromPath("/overlay/tts/index.html"), "tts");
+  assert.equal(overlayFromPath("/editor/"), "editor");
+  assert.equal(overlayFromPath("/jar/"), "jar-editor");
+  assert.equal(overlayFromPath("/matcha/"), "matcha-editor");
+  assert.equal(overlayFromPath("/matcha/alerts/"), "matcha-alerts-editor");
+  const urls = [];
+  const conn = connectTikTok({
+    user: "pond.pal",
+    base: "https://relay.example",
+    events: ["gift"],
+    overlay: "Jar!!",
+    eventSourceFactory: (u) => { urls.push(u); return fakeEventSource(); },
+  });
+  conn.stop();
+  const parsed = new URL(urls[0]);
+  assert.equal(parsed.searchParams.get("overlay"), "jar");
+  assert.equal(parsed.searchParams.get("events"), "gift");
 });

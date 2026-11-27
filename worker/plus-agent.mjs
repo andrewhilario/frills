@@ -57,7 +57,15 @@ export function lintPublicPost(text) {
 
 // ── What it looks at ────────────────────────────────────────────────────────────────────────────────────────
 
-const MOMENT_LABELS = { action_limit: "the free-actions limit", vts_locked: "the sticker and VTube Studio note", editor_tip: "the tip under an editor", checkout: "the checkout button" };
+const MOMENT_LABELS = {
+  action_limit: "the free-actions limit",
+  vts_locked: "the sticker and VTube Studio note",
+  editor_tip: "the tip under an editor",
+  copy_nudge: "the post-copy live link nudge",
+  outline_plus: "the Stream Outline Plus preview",
+  tts_voice: "the Talking Pet AI voice lock",
+  checkout: "the checkout button",
+};
 const pct = (num, den) => (den > 0 ? `${Math.round((num / den) * 100)}%` : "n/a");
 
 /** The Plus rows, counted. Rows with no payment provider (a complimentary grant) are not customers and are left out. */

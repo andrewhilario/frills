@@ -333,12 +333,17 @@ test("Plus prompts are counted anonymously: seen once for each moment in a tab, 
   await page.evaluate(`fetch("/api/account/logout", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })`); // (a Plus account sees the full cloud bar, not the offer)
   await page.evaluate("sessionStorage.clear(); localStorage.clear()");
   try {
-    // the tip under an editor, for a visitor who could buy Plus: seen once, and not again after a reload in the same tab
+    // the tip under an editor, for a visitor who could buy Plus: only counts once scrolled into view (never on an un-scrolled load), and not again after a reload
     await page.goto(`${served}/timer/`, { settle: 800 });
     await page.waitFor(`Boolean(document.querySelector(".cloud-tip"))`, { timeout: 8000 });
+    assert.equal((await beacons()).filter((b) => b === prompt("editor_tip", "shown")).length, 0, "does not inflate impressions before the visitor scrolls to Step 4");
+    await page.evaluate(`document.querySelector(".cloud-tip").scrollIntoView({ block: "center" })`);
+    await page.waitFor(`window.__beacons.some((b) => b.body === ${JSON.stringify(prompt("editor_tip", "shown"))})`, { timeout: 4000 });
     assert.equal((await beacons()).filter((b) => b === prompt("editor_tip", "shown")).length, 1);
     await page.goto(`${served}/timer/`, { settle: 800 });
     await page.waitFor(`Boolean(document.querySelector(".cloud-tip"))`, { timeout: 8000 });
+    await page.evaluate(`document.querySelector(".cloud-tip").scrollIntoView({ block: "center" })`);
+    await sleep(450);
     assert.equal((await beacons()).filter((b) => b === prompt("editor_tip", "shown")).length, 0, "a reload in the same tab is not a new person seeing it");
     assert.deepEqual(await page.evaluate(`(() => { document.querySelector(".cloud-tip a").click(); return window.__beacons.map((b) => b.body).filter((b) => b.includes("clicked")); })()`), [prompt("editor_tip", "clicked")]);
 

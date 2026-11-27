@@ -1209,6 +1209,7 @@ export function createJarView(host) {
       applyLook(root, next);
       const design = next.design || "boba";
       root.dataset.design = design;
+      root.dataset.jarSize = next.jarSize || "medium";
       title.hidden = !next.title;
       title.textContent = next.titleText || "Gift jar";
       if (!next.showThanks) thanks.hidden = true;

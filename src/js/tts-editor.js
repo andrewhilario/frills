@@ -6,6 +6,7 @@ import { createTtsView } from "./widgets-view.js";
 import { startWidgetEditor } from "./widget-editor.js";
 import { fakeAlert, practiceName } from "./fake-alerts.js";
 import { clearPlusCode, clearRelayTicketCache, savePlusCode, savedPlusCode } from "./plus-relay.js";
+import { countPrompt } from "./stats.js";
 
 const NOTICE_COPY = {
   no_pass: "AI voices are part of Frills Plus — speaking with the free browser voice instead.",
@@ -63,12 +64,15 @@ startWidgetEditor({
       statusEl.textContent = message;
     };
 
+    accountLink?.addEventListener("click", () => countPrompt("tts_voice", "clicked"));
+
     const setPaywall = (visible, title = "", body = "", canBuy = lastEligible) => {
       if (!paywallEl) return;
       paywallEl.hidden = !visible;
       if (visible) {
         paywallTitle.textContent = title;
         paywallBody.textContent = body;
+        if (canBuy && accountsOn) countPrompt("tts_voice", "shown");
       }
       // Buying happens on the account page, where the payment is tied to the person's account; the site must be built with the account pages for that link to exist.
       if (accountLink) {

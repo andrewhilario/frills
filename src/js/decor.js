@@ -3,18 +3,40 @@
 // site, only when the pack is chosen). More packs add a name and their pieces here.
 // Pure data and small functions, so it is tested without a page.
 
+const STD = [
+  ["frog2", "Frog pond V2", 0.413, 0.597],
+  ["hamster", "Hamster burrow", 0.488, 0.719],
+  ["bunny", "Bunny cloud", 0.463, 0.625],
+  ["shiba", "Shiba gamer", 0.609, 0.662],
+  ["capybara", "Chill capybara", 0.722, 0.613],
+  ["dino", "Retro dino", 0.694, 0.65],
+  ["astro", "Space bot", 0.738, 0.744],
+  ["skatecat", "Skate cat", 0.722, 0.625],
+  ["dragon", "RPG dragon", 0.603, 0.625],
+  ["sakura", "Sakura spring", 0.653, 0.706],
+  ["valentine", "Valentine café", 0.55, 0.659],
+  ["summer", "Summer matsuri", 0.659, 0.716],
+  ["autumn", "Cozy autumn", 0.644, 0.734],
+  ["anime-xmas", "Cozy winter", 0.728, 0.775],
+  ["anime-halloween", "Cozy witch", 0.7, 0.738],
+  ["halloween", "Halloween", 0.581, 0.406, "halloween"],
+  ["christmas", "Christmas", 0.7, 0.588, "christmas"],
+];
+
 export const DECOS = [
   { id: "none", name: "None" },
   { id: "frog", name: "Frog pond" },
   { id: "frog2", name: "Frog pond V2" },
   { id: "neko", name: "Neko cafe" },
-  { id: "hamster", name: "Hamster burrow" },
-  { id: "bunny", name: "Bunny cloud" },
-  // Seasonal packs: always understood (a saved overlay keeps its pictures), but the editors offer one only while its season lasts (see season.js).
-  { id: "halloween", name: "Halloween", season: "halloween" },
-  { id: "christmas", name: "Christmas", season: "christmas" },
+  ...STD.slice(1).map(([id, name, , , season]) => (season ? { id, name, season } : { id, name })),
 ];
 export const DECO_IDS = DECOS.map((d) => d.id);
+
+const std = (id, a, b) => ({
+  peek: [{ src: `/decor/${id}/peeker-a.webp`, ratio: a }, { src: `/decor/${id}/peeker-b.webp`, ratio: b }],
+  corner: [{ src: `/decor/${id}/corner.webp` }],
+  spark: [1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({ src: `/decor/${id}/confetti-${n}.webp` })),
+});
 
 // The pieces of each pack, by where they sit. A piece is a picture ({ src }). `peek` goes on the top edge, `corner` on a
 // bottom corner, `spark` scattered around. A role with no pieces is simply left out.
@@ -24,45 +46,12 @@ export const PACKS = {
     corner: [{ src: "/decor/frog/corner-pond.webp" }, { src: "/decor/frog/corner-lily.webp" }], // the frog on its lily pad, and the lotus (each message gets one)
     spark: [{ src: "/decor/frog/sparkle-a.webp" }, { src: "/decor/frog/sparkle-b.webp" }, { src: "/decor/frog/sparkle-c.webp" }],
   },
-  frog2: {
-    // the second frog pond (the first stays as it was): a frog peeking over the top (one with hearts above its head), a frog on a lily pad with a lotus, and eight little pond things
-    peek: [{ src: "/decor/frog2/peeker-a.webp", ratio: 0.413 }, { src: "/decor/frog2/peeker-b.webp", ratio: 0.597 }],
-    corner: [{ src: "/decor/frog2/corner.webp" }],
-    spark: [1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({ src: `/decor/frog2/confetti-${n}.webp` })),
-  },
   neko: {
-    // a cat peeking over the top (ratio = how tall the picture is for its width, so the stylesheet can leave room above the bubble), a sleeping kitten
-    // on a cushion, and little cat things scattered around
     peek: [{ src: "/decor/neko/peeker-a.webp", ratio: 0.525 }, { src: "/decor/neko/peeker-b.webp", ratio: 0.694 }],
     corner: [{ src: "/decor/neko/corner.webp" }],
     spark: ["paw-brown", "heart-pink", "fish", "star", "paw-cream", "yarn", "heart-yellow", "cat-face"].map((name) => ({ src: `/decor/neko/${name}.webp` })),
   },
-  hamster: {
-    // a hamster peeking over the top (one with seeds floating over its head), a hamster beside its wheel and a pile of sunflower seeds, and eight little hamster things
-    peek: [{ src: "/decor/hamster/peeker-a.webp", ratio: 0.488 }, { src: "/decor/hamster/peeker-b.webp", ratio: 0.719 }],
-    corner: [{ src: "/decor/hamster/corner.webp" }],
-    spark: [1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({ src: `/decor/hamster/confetti-${n}.webp` })),
-  },
-  bunny: {
-    // a bunny peeking over the top (a sleepy one with a moon and stars), a bunny on a cloud with a rainbow, and eight little sky and bunny things
-    peek: [{ src: "/decor/bunny/peeker-a.webp", ratio: 0.463 }, { src: "/decor/bunny/peeker-b.webp", ratio: 0.625 }],
-    corner: [{ src: "/decor/bunny/corner.webp" }],
-    spark: [1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({ src: `/decor/bunny/confetti-${n}.webp` })),
-  },
-  // The seasonal packs: shown in the editors only while their season lasts (see season.js), understood all year. Cut from the owner's ChatGPT sheets
-  // (ASSET-PROMPTS-SEASONAL.md, scripts/cut-seasonal-sheets.mjs).
-  halloween: {
-    // a ghost and a bat peeking over the top, a pumpkin with a little ghost and a candy corn, and eight small Halloween things (bat, candy corn, spider, moon, candy, pumpkin, ghost, star)
-    peek: [{ src: "/decor/halloween/peeker-a.webp", ratio: 0.581 }, { src: "/decor/halloween/peeker-b.webp", ratio: 0.406 }],
-    corner: [{ src: "/decor/halloween/corner.webp" }],
-    spark: [1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({ src: `/decor/halloween/confetti-${n}.webp` })),
-  },
-  christmas: {
-    // a snowman and a reindeer peeking over the top, a tree with presents and a snowman, and eight small Christmas things (snowflake, candy cane, ornament, star, holly, gingerbread man, bell, stocking)
-    peek: [{ src: "/decor/christmas/peeker-a.webp", ratio: 0.7 }, { src: "/decor/christmas/peeker-b.webp", ratio: 0.588 }],
-    corner: [{ src: "/decor/christmas/corner.webp" }],
-    spark: [1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({ src: `/decor/christmas/confetti-${n}.webp` })),
-  },
+  ...Object.fromEntries(STD.map(([id, , a, b]) => [id, std(id, a, b)])),
 };
 
 /** A small number from any text (a message's id), so the same message always gets the same pieces and a chat is not copy-pasted. */

@@ -6,9 +6,12 @@ import { SEASON_PRESETS, looksFor } from "./seasonal-looks.js";
 import { activeSeason } from "./season.js";
 import { fontsReady, generalFaces, paintGeneral } from "./look.js";
 import { buildControl, chips, copyButton } from "./ui.js";
+import { withHint } from "./chat-hints.js";
 import { mountSource } from "./source.js";
 import { appendPlusCode } from "./plus-relay.js";
 import { mountCloudSave } from "./cloud-save.js";
+import { mountEditorMode } from "./editor-mode.js";
+import { mountSizeGuide } from "./size-guide.js";
 import { sourcesOf } from "./both.js";
 import { luminance } from "./color.js";
 
@@ -70,22 +73,29 @@ presetChips = chips(
   { dot: true },
 );
 
+const editorMode = mountEditorMode({ kind: "chat" });
 const rows = {};
+const trackedRows = [];
 let lastGroup = "";
 for (const control of CONTROLS) {
-  const { row, write } = buildControl(control, settings[control.key], (value) => change(control.key, value));
+  const { row, write } = buildControl(withHint(control), settings[control.key], (value) => change(control.key, value));
   writers[control.key] = write;
   rows[control.key] = row;
+  trackedRows.push({ control, row });
   const host = $(control.where === "main" ? "main-controls" : "more-controls");
   if (control.group && control.group !== lastGroup) { // a small heading above each run of up-front controls, so the long panel reads as four short ones
     const heading = document.createElement("h3");
     heading.className = "stack__group";
+    if (control.group !== "Decorations") heading.classList.add("ed-adv");
     heading.textContent = control.group;
     host.append(heading);
     lastGroup = control.group;
   }
   host.append(row);
 }
+editorMode.markControls(trackedRows);
+document.querySelector(".more")?.classList.add("ed-adv");
+if ($("main-controls")) editorMode.addAdvancePrompt($("main-controls"));
 /** The settings that only matter once something is picked (the decoration's size and place) are hidden until it is. */
 function showNeeded() {
   for (const control of CONTROLS) {
@@ -167,8 +177,32 @@ function save() {
 
 // ── The preview itself: what sits behind the chat, and how wide it is ─────────────────────────────────────────────────
 $("backdrop").addEventListener("change", (event) => { preview.dataset.back = event.target.value; });
-const width = buildControl({ key: "previewW", type: "range", label: "Width", min: 280, max: 720, step: 10, unit: " px" }, 440, (value) => $("chat").style.setProperty("--preview-w", value + "px"), { id: "c-previewW" });
+let chatPreviewW = 440;
+let chatPreviewH = 800;
+let sizeGuide = null;
+const width = buildControl({ key: "previewW", type: "range", label: "Width", min: 280, max: 720, step: 10, unit: " px" }, chatPreviewW, (value) => {
+  chatPreviewW = value;
+  $("chat").style.setProperty("--preview-w", value + "px");
+  sizeGuide?.sync();
+}, { id: "c-previewW" });
 $("preview-width").append(width.row);
+
+sizeGuide = mountSizeGuide({
+  mode: "chat",
+  anchor: linkInput.closest(".linkfield"),
+  copyBtn,
+  getSize: () => ({
+    width: chatPreviewW,
+    height: chatPreviewH,
+    appHint: source.platform === "twitch" ? "obs" : "tiktok",
+  }),
+  onPreset: (preset) => {
+    chatPreviewW = preset.width;
+    chatPreviewH = preset.height;
+    width.write(preset.width);
+    $("chat").style.setProperty("--preview-w", preset.width + "px");
+  },
+});
 
 paint();
 refreshLink();

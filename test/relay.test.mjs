@@ -44,9 +44,9 @@ const raw = (path, { method = "GET", headers = {} } = {}) => new Promise((resolv
 });
 
 /** Listens to a stream like a page on the website would. */
-function listen(user, headers = {}, kinds = "", page = "") {
+function listen(user, headers = {}, kinds = "", page = "", overlay = "") {
   const events = [];
-  const req = http.get({ host: "127.0.0.1", port, path: `/tiktok/stream?user=${encodeURIComponent(user)}${kinds ? `&events=${kinds}` : ""}${page ? `&page=${page}` : ""}`, headers: { Host: "relay.example.test", Origin: SITE, ...headers } });
+  const req = http.get({ host: "127.0.0.1", port, path: `/tiktok/stream?user=${encodeURIComponent(user)}${kinds ? `&events=${kinds}` : ""}${page ? `&page=${page}` : ""}${overlay ? `&overlay=${encodeURIComponent(overlay)}` : ""}`, headers: { Host: "relay.example.test", Origin: SITE, ...headers } });
   let status = 0;
   const done = new Promise((resolve) => {
     req.on("response", (res) => {
@@ -443,4 +443,25 @@ test("Euler per-minute burst pacer spaces signed connects beyond the burst size"
   assert.ok(times[3] - times[0] >= 160, `4 connects with burst 2 at 100ms spacing should take >=160ms, got ${times[3] - times[0]}ms`);
   await Promise.all(pages.map((p) => p.close()));
   await h.close();
+});
+
+test("overlay tags are logged on connect/leave and tracked per room and globally until disconnect", async () => {
+  const lines = [];
+  await start({ relay: { slots: 10, maxPerIp: 10, trustProxy: false }, log: (line) => lines.push(line) });
+  const jar = listen("acct.a", {}, "gift", "", "jar");
+  const songs = listen("acct.a", {}, "", "", "songs");
+  await Promise.all([connected(jar), connected(songs)]);
+  const mid = await health();
+  assert.deepEqual(mid.overlays, { jar: 1, songs: 1 });
+  assert.deepEqual(mid.roster.accounts[0].overlays, { jar: 1, songs: 1 });
+  await jar.close();
+  await sleep(60);
+  const afterClose = await health();
+  assert.deepEqual(afterClose.overlays, { songs: 1 });
+  assert.deepEqual(afterClose.roster.accounts[0].overlays, { songs: 1 });
+  assert.ok(lines.includes("@acct.a: a page connected (jar · gift), 1 open"), lines.join(" | "));
+  assert.ok(lines.includes("@acct.a: a page connected (songs), 2 open"), lines.join(" | "));
+  assert.ok(lines.includes("@acct.a: a page left (jar · gift), 1 open"), lines.join(" | "));
+  await songs.close();
+  await helper.close();
 });

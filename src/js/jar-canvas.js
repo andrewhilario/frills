@@ -193,6 +193,272 @@ const VESSELS = {
       return dx <= 52 ? 268 : 268 - (dx - 52) * 0.9;
     },
   },
+
+  bunny: {
+    cx: 140, mouthY: 112, mouthRx: 50, mouthRy: 8, liqTop: 158, liqBot: 292, fullPile: 28,
+    art: { src: "/jar-art/bunny.webp", x: 26, y: 6, w: 228, h: 316, shadowY: 322, shadowRx: 78, spillY: 112, spillRx: 54 },
+    chamberPath(ctx) {
+      ctx.beginPath();
+      ctx.ellipse(140, 224, 93, 69, 0, 0, TAU);
+    },
+    dropPath(ctx) {
+      ctx.beginPath();
+      ctx.moveTo(88, 112);
+      ctx.lineTo(192, 112);
+      ctx.lineTo(192, 160);
+      ctx.bezierCurveTo(222, 174, 234, 198, 234, 224);
+      ctx.bezierCurveTo(234, 266, 194, 294, 140, 294);
+      ctx.bezierCurveTo(86, 294, 46, 266, 46, 224);
+      ctx.bezierCurveTo(46, 198, 58, 174, 88, 160);
+      ctx.closePath();
+    },
+    wallBounds(y) {
+      if (y < 158) return { cx: 140, left: 90, right: 190 };
+      return ellipseWall(140, 224, 91, 68, y);
+    },
+    bottomY: (x) => ellipseFloor(140, 224, 91, 68, x),
+  },
+
+  heart: {
+    cx: 140, mouthY: 65, mouthRx: 42, mouthRy: 7, liqTop: 108, liqBot: 266, fullPile: 26,
+    art: { src: "/jar-art/heart.webp", x: 14, y: 56, w: 252, h: 266, shadowY: 322, shadowRx: 64, spillY: 66, spillRx: 44 },
+    chamberPath(ctx) {
+      ctx.beginPath();
+      ctx.moveTo(140, 120);
+      ctx.bezierCurveTo(164, 98, 228, 102, 238, 150);
+      ctx.bezierCurveTo(246, 194, 198, 246, 140, 268);
+      ctx.bezierCurveTo(82, 246, 34, 194, 42, 150);
+      ctx.bezierCurveTo(52, 102, 116, 98, 140, 120);
+      ctx.closePath();
+    },
+    dropPath(ctx) {
+      ctx.beginPath();
+      ctx.moveTo(96, 65);
+      ctx.lineTo(184, 65);
+      ctx.lineTo(184, 106);
+      ctx.bezierCurveTo(216, 110, 238, 128, 238, 154);
+      ctx.bezierCurveTo(238, 198, 196, 248, 140, 268);
+      ctx.bezierCurveTo(84, 248, 42, 198, 42, 154);
+      ctx.bezierCurveTo(42, 128, 64, 110, 96, 106);
+      ctx.closePath();
+    },
+    wallBounds(y) {
+      if (y < 108) return { cx: 140, left: 98, right: 182 };
+      if (y <= 156) {
+        const t = (y - 108) / 48;
+        const hw = 42 + 54 * Math.sin(t * Math.PI * 0.5);
+        return { cx: 140, left: 140 - hw, right: 140 + hw };
+      }
+      const t = Math.min(1, (y - 156) / 110);
+      const hw = Math.max(24, 96 - 72 * Math.pow(t, 1.25));
+      return { cx: 140, left: 140 - hw, right: 140 + hw };
+    },
+    bottomY: (x) => {
+      const dx = Math.min(1, Math.abs(x - 140) / 96);
+      return 265 - 108 * Math.pow(dx, 1.85);
+    },
+  },
+
+  star: {
+    cx: 133, mouthY: 104, mouthRx: 36, mouthRy: 7, liqTop: 146, liqBot: 294, fullPile: 26,
+    art: { src: "/jar-art/star.webp", x: 27, y: 6, w: 226, h: 316, shadowY: 322, shadowRx: 68, spillY: 104, spillRx: 38 },
+    chamberPath(ctx) {
+      ctx.beginPath();
+      ctx.moveTo(92, 144);
+      ctx.lineTo(174, 144);
+      ctx.lineTo(220, 196);
+      ctx.lineTo(198, 236);
+      ctx.lineTo(202, 274);
+      ctx.lineTo(184, 296);
+      ctx.lineTo(82, 296);
+      ctx.lineTo(64, 274);
+      ctx.lineTo(68, 236);
+      ctx.lineTo(46, 196);
+      ctx.closePath();
+    },
+    dropPath(ctx) {
+      ctx.beginPath();
+      ctx.moveTo(96, 104);
+      ctx.lineTo(170, 104);
+      ctx.lineTo(174, 144);
+      ctx.lineTo(220, 196);
+      ctx.lineTo(198, 236);
+      ctx.lineTo(202, 274);
+      ctx.lineTo(184, 296);
+      ctx.lineTo(82, 296);
+      ctx.lineTo(64, 274);
+      ctx.lineTo(68, 236);
+      ctx.lineTo(46, 196);
+      ctx.lineTo(92, 144);
+      ctx.closePath();
+    },
+    wallBounds(y) {
+      if (y < 146) return { cx: 133, left: 97, right: 169 };
+      if (y <= 198) {
+        const t = (y - 146) / 52;
+        const hw = 40 + t * 44;
+        return { cx: 133, left: 133 - hw, right: 133 + hw };
+      }
+      if (y <= 236) {
+        const t = (y - 198) / 38;
+        const hw = 84 - t * 21;
+        return { cx: 133, left: 133 - hw, right: 133 + hw };
+      }
+      if (y <= 272) {
+        const t = (y - 236) / 36;
+        const hw = 63 + t * 4;
+        return { cx: 133, left: 133 - hw, right: 133 + hw };
+      }
+      const t = Math.min(1, (y - 272) / 22);
+      const hw = 67 - t * 17;
+      return { cx: 133, left: 133 - hw, right: 133 + hw };
+    },
+    bottomY: (x) => 293 - 6 * Math.pow(Math.min(1, Math.abs(x - 133) / 56), 2),
+  },
+
+  bear: {
+    cx: 140, mouthY: 77, mouthRx: 42, mouthRy: 7, liqTop: 124, liqBot: 284, fullPile: 30,
+    art: { src: "/jar-art/bear.webp", x: 14, y: 44, w: 252, h: 278, shadowY: 322, shadowRx: 86, spillY: 77, spillRx: 44 },
+    chamberPath(ctx) {
+      ctx.beginPath();
+      ctx.ellipse(140, 204, 104, 80, 0, 0, TAU);
+    },
+    dropPath(ctx) {
+      ctx.beginPath();
+      ctx.moveTo(96, 77);
+      ctx.lineTo(184, 77);
+      ctx.lineTo(184, 126);
+      ctx.bezierCurveTo(224, 140, 244, 170, 244, 204);
+      ctx.bezierCurveTo(244, 250, 198, 284, 140, 284);
+      ctx.bezierCurveTo(82, 284, 36, 250, 36, 204);
+      ctx.bezierCurveTo(36, 170, 56, 140, 96, 126);
+      ctx.closePath();
+    },
+    wallBounds(y) {
+      if (y < 124) return { cx: 140, left: 98, right: 182 };
+      return ellipseWall(140, 204, 102, 79, y);
+    },
+    bottomY: (x) => ellipseFloor(140, 204, 102, 79, x),
+  },
+
+  honey: {
+    cx: 135, mouthY: 113, mouthRx: 40, mouthRy: 7, liqTop: 156, liqBot: 298, fullPile: 26,
+    art: { src: "/jar-art/honey.webp", x: 32, y: 6, w: 215, h: 316, shadowY: 322, shadowRx: 66, spillY: 113, spillRx: 40 },
+    chamberPath(ctx) {
+      ctx.beginPath();
+      ctx.ellipse(135, 227, 86, 71, 0, 0, TAU);
+    },
+    dropPath(ctx) {
+      ctx.beginPath();
+      ctx.moveTo(95, 113);
+      ctx.lineTo(175, 113);
+      ctx.lineTo(175, 158);
+      ctx.bezierCurveTo(208, 172, 221, 198, 221, 227);
+      ctx.bezierCurveTo(221, 268, 184, 298, 135, 298);
+      ctx.bezierCurveTo(86, 298, 49, 268, 49, 227);
+      ctx.bezierCurveTo(49, 198, 62, 172, 95, 158);
+      ctx.closePath();
+    },
+    wallBounds(y) {
+      if (y < 156) return { cx: 135, left: 96, right: 174 };
+      return ellipseWall(135, 227, 84, 70, y);
+    },
+    bottomY: (x) => ellipseFloor(135, 227, 84, 70, x),
+  },
+
+  gacha: {
+    cx: 140, mouthY: 20, mouthRx: 41, mouthRy: 6, liqTop: 50, liqBot: 224, fullPile: 30,
+    art: { src: "/jar-art/gacha.webp", x: 18, y: 6, w: 245, h: 316, shadowY: 322, shadowRx: 80, spillY: 20, spillRx: 42 },
+    chamberPath(ctx) {
+      ctx.beginPath();
+      ctx.ellipse(140, 138, 108, 88, 0, 0, TAU);
+    },
+    dropPath(ctx) {
+      ctx.beginPath();
+      ctx.moveTo(98, 20);
+      ctx.lineTo(182, 20);
+      ctx.lineTo(182, 54);
+      ctx.bezierCurveTo(226, 68, 248, 102, 248, 138);
+      ctx.bezierCurveTo(248, 188, 200, 226, 140, 226);
+      ctx.bezierCurveTo(80, 226, 32, 188, 32, 138);
+      ctx.bezierCurveTo(32, 102, 54, 68, 98, 54);
+      ctx.closePath();
+    },
+    wallBounds(y) {
+      if (y < 50) return { cx: 140, left: 99, right: 181 };
+      return ellipseWall(140, 138, 106, 86, y);
+    },
+    bottomY: (x) => ellipseFloor(140, 138, 106, 86, x),
+  },
+
+  ghost: {
+    cx: 140, mouthY: 75, mouthRx: 46, mouthRy: 7, liqTop: 100, liqBot: 298, fullPile: 30,
+    art: { src: "/jar-art/ghost.webp", x: 14, y: 66, w: 252, h: 256, shadowY: 322, shadowRx: 90, spillY: 75, spillRx: 46 },
+    chamberPath(ctx) {
+      ctx.beginPath();
+      ctx.moveTo(86, 100);
+      ctx.lineTo(194, 100);
+      ctx.bezierCurveTo(222, 118, 238, 152, 238, 194);
+      ctx.lineTo(240, 286);
+      ctx.quadraticCurveTo(220, 306, 198, 294);
+      ctx.quadraticCurveTo(170, 282, 140, 298);
+      ctx.quadraticCurveTo(110, 282, 82, 294);
+      ctx.quadraticCurveTo(60, 306, 40, 286);
+      ctx.lineTo(42, 194);
+      ctx.bezierCurveTo(42, 152, 58, 118, 86, 100);
+      ctx.closePath();
+    },
+    dropPath(ctx) {
+      ctx.beginPath();
+      ctx.moveTo(92, 75);
+      ctx.lineTo(188, 75);
+      ctx.lineTo(194, 100);
+      ctx.bezierCurveTo(222, 118, 238, 152, 238, 194);
+      ctx.lineTo(240, 286);
+      ctx.quadraticCurveTo(220, 306, 198, 294);
+      ctx.quadraticCurveTo(170, 282, 140, 298);
+      ctx.quadraticCurveTo(110, 282, 82, 294);
+      ctx.quadraticCurveTo(60, 306, 40, 286);
+      ctx.lineTo(42, 194);
+      ctx.bezierCurveTo(42, 152, 58, 118, 86, 100);
+      ctx.closePath();
+    },
+    wallBounds(y) {
+      if (y < 100) return { cx: 140, left: 94, right: 186 };
+      if (y <= 170) {
+        const t = (y - 100) / 70;
+        const hw = 64 + 32 * Math.sin(t * Math.PI * 0.5);
+        return { cx: 140, left: 140 - hw, right: 140 + hw };
+      }
+      return { cx: 140, left: 44, right: 236 };
+    },
+    bottomY: (x) => 294 - 5 * Math.cos((x - 140) * 0.085),
+  },
+
+  aquarium: {
+    cx: 140, mouthY: 67, mouthRx: 48, mouthRy: 7, liqTop: 88, liqBot: 254, fullPile: 30,
+    art: { src: "/jar-art/aquarium.webp", x: 14, y: 55, w: 252, h: 267, shadowY: 322, shadowRx: 86, spillY: 67, spillRx: 48 },
+    chamberPath(ctx) {
+      ctx.beginPath();
+      ctx.ellipse(140, 171, 109, 83, 0, 0, TAU);
+    },
+    dropPath(ctx) {
+      ctx.beginPath();
+      ctx.moveTo(90, 67);
+      ctx.lineTo(190, 67);
+      ctx.lineTo(190, 92);
+      ctx.bezierCurveTo(230, 108, 249, 138, 249, 171);
+      ctx.bezierCurveTo(249, 218, 200, 254, 140, 254);
+      ctx.bezierCurveTo(80, 254, 31, 218, 31, 171);
+      ctx.bezierCurveTo(31, 138, 50, 108, 90, 92);
+      ctx.closePath();
+    },
+    wallBounds(y) {
+      if (y < 88) return { cx: 140, left: 92, right: 188 };
+      return ellipseWall(140, 171, 107, 82, y);
+    },
+    bottomY: (x) => ellipseFloor(140, 171, 107, 82, x),
+  },
 };
 
 function drawSparkles(ctx, cx, cy, spread, time) {
@@ -267,7 +533,8 @@ export function createJarCanvas(container, { reducedMotion = () => false } = {})
   }
 
   function resize() {
-    dpr = Math.min(2, globalThis.devicePixelRatio || 1);
+    const cssScale = container.clientWidth > 0 ? container.clientWidth / W : 1;
+    dpr = Math.min(3, Math.max(2, cssScale * (globalThis.devicePixelRatio || 1)));
     const pxW = Math.round(W * dpr);
     const pxH = Math.round(H * dpr);
     if (canvas.width !== pxW || canvas.height !== pxH) {
@@ -757,6 +1024,7 @@ export function createJarCanvas(container, { reducedMotion = () => false } = {})
       design = nextDesign;
       showLiquid = Boolean(liq);
       showDrops = Boolean(drops);
+      resize();
       if (VESSELS[design]?.art) getImg(VESSELS[design].art.src);
       if (vars) {
         palette = {

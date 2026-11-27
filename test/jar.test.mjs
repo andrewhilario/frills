@@ -3,7 +3,7 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
-import { JAR, JAR_DESIGNS, GiftJar, jarAmount, jarKey, loadJar, saveJar, MAX_JAR_ITEMS } from "../src/js/jar.js";
+import { JAR, JAR_DESIGNS, JAR_SIZES, GiftJar, jarAmount, jarKey, loadJar, saveJar, MAX_JAR_ITEMS } from "../src/js/jar.js";
 import { LOOKS, coerce } from "../src/js/widget-settings.js";
 
 const gift = (name, giftName, diamonds, count = 1, picture = "") => ({
@@ -19,15 +19,27 @@ const gift = (name, giftName, diamonds, count = 1, picture = "") => ({
   avatar: "",
 });
 
-test("Gift Jar offers the 6 prompted crystal designs, validates settings safely, and round-trips via URL", () => {
-  assert.equal(JAR_DESIGNS.length, 6, "offers the 6 prompted jar container designs");
+test("Gift Jar offers all 14 crystal designs, Small/Medium/Large sizes, validates settings safely, and round-trips via URL", () => {
+  assert.equal(JAR_DESIGNS.length, 14, "offers all 14 crystal jar container designs");
+  assert.deepEqual(JAR_SIZES.map(([id]) => id), ["small", "medium", "large"], "offers Small, Medium, and Large jar sizes");
+  assert.equal(JAR.defaults.jarSize, "medium", "defaults to medium for backward compatibility");
   for (const c of JAR.controls) {
     assert.notEqual(coerce(c, JAR.defaults[c.key]), undefined, `${c.key} default valid`);
   }
   assert.deepEqual(JAR.sanitize(undefined), JAR.defaults);
-  const bad = JAR.sanitize({ design: "unknown-jar", goalBy: "subs", whenFull: "explode", target: -10, step: 0, titleText: "My\u0000" + "x".repeat(60) });
-  assert.deepEqual([bad.design, bad.goalBy, bad.whenFull, bad.target, bad.step], ["boba", "diamonds", "stay", 1, 10]);
+  const bad = JAR.sanitize({ design: "unknown-jar", jarSize: "jumbo", goalBy: "subs", whenFull: "explode", target: -10, step: 0, titleText: "My\u0000" + "x".repeat(60) });
+  assert.deepEqual([bad.design, bad.jarSize, bad.goalBy, bad.whenFull, bad.target, bad.step], ["boba", "medium", "diamonds", "stay", 1, 10]);
   assert.equal(bad.titleText.length, 36);
+
+  // Medium (default) stays clean in URL; small and large serialize and round-trip cleanly
+  const defaultLink = new URL(JAR.url("https://x.test/overlay/jar/", { channel: "pondpal", settings: JAR.defaults }));
+  assert.equal(defaultLink.searchParams.get("jarSize"), null);
+  for (const sizeId of ["small", "large"]) {
+    const sized = JAR.sanitize({ ...JAR.defaults, jarSize: sizeId });
+    const link = new URL(JAR.url("https://x.test/overlay/jar/", { channel: "pondpal", settings: sized }));
+    assert.equal(link.searchParams.get("jarSize"), sizeId);
+    assert.deepEqual(JAR.sanitize(JAR.fromParams(link.searchParams)), sized);
+  }
 
   for (const [id] of JAR_DESIGNS.filter(([d]) => d !== "boba")) {
     const custom = JAR.sanitize({ ...JAR.defaults, design: id, goalBy: "count", whenFull: "empty", target: 25, showNumbers: false, capNumbers: false, showPercent: true, keep: true, accent: LOOKS.arcade.accent });
