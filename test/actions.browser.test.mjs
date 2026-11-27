@@ -399,6 +399,14 @@ test("actions editor connects to mock VTube Studio API, runs free 5-sticky-note 
   // Switch back to classic note for the live overlay assertions below
   await page.evaluate(`(() => { const r = [...document.querySelectorAll(".act-rule")][2]; const shapeSel = [...r.querySelectorAll("select")].find((s) => [...s.options].some((o) => o.value === "paw")); shapeSel.value = "note"; shapeSel.dispatchEvent(new Event("change", { bubbles: true })); })()`);
 
+  // Manual sticky note slap pins a specific viewer's name + gift directly onto VTS using active sticky rule settings
+  const pinsBeforeManual = mockVts.calls.filter(([t]) => t === "ItemPinRequest").length;
+  await type("#vts-manual-name", "AinzFan");
+  await type("#vts-manual-gift", "100 coins");
+  await click("#vts-manual-add");
+  await until(() => mockVts.calls.filter(([t]) => t === "ItemPinRequest").length > pinsBeforeManual);
+  assert.equal(await page.evaluate(`document.getElementById("vts-manual-name").value`), "", "clears name input after pinning");
+
   // Copy link carries vtsPort in query, and vtsToken strictly in #hash (never query string)
   await type("#source-channel", "pond.pal");
   const rawLink = await page.evaluate(`document.getElementById("link").value`);

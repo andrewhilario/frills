@@ -503,6 +503,45 @@ startWidgetEditor({
       setVtsMsg("Saved VTube Studio token cleared. Click Connect VTube Studio to pair again.", "");
     });
 
+    // Manual sticky note slap (for missed gifts, tips, or custom shoutouts using your current sticky note style & size)
+    const vtsManualName = $("vts-manual-name");
+    const vtsManualGift = $("vts-manual-gift");
+    const vtsManualAdd = $("vts-manual-add");
+    const runManualSticky = async () => {
+      const who = (vtsManualName?.value ?? "").trim().slice(0, 48);
+      if (!who) {
+        vtsManualName?.focus();
+        setVtsMsg("Type the viewer’s name first to pin a manual sticky note.", "error");
+        return;
+      }
+      const gift = (vtsManualGift?.value ?? "").trim().slice(0, 48);
+      const soundReady = sounds.unlock();
+      const stickyRule = rules.find((r) => r.steps.some((s) => s.type === "vts.sticky"));
+      const baseStep = stickyRule?.steps.find((s) => s.type === "vts.sticky")
+        ?? sanitizeStep({ type: "vts.sticky", title: "{name}", subtitle: "{gift}", shape: "note", color: "random", pinMode: "face", size: 22 });
+      const step = sanitizeStep({ ...baseStep, title: "{name}", subtitle: gift ? "{gift}" : "" });
+      if (vtsManualAdd) vtsManualAdd.disabled = true;
+      try {
+        const res = await vtsExecutor.run(step, { who, name: who, gift, label: gift || "Manual", ruleName: "Manual sticky note" });
+        soundReady.then(() => sounds.play("pop", { volume: 75, tier: 2 }));
+        pushLog({ ruleName: "Manual sticky note", who, status: res?.ok === false ? "error" : "ok", detail: res?.detail || "Pinned" });
+        if (res?.ok !== false && vtsManualName) {
+          vtsManualName.value = "";
+          if (vtsManualGift) vtsManualGift.value = "";
+        }
+      } catch (err) {
+        const detail = err?.message || "Could not pin sticky note.";
+        pushLog({ ruleName: "Manual sticky note", who, status: "error", detail });
+        setVtsMsg(detail, "error");
+      } finally {
+        if (vtsManualAdd) vtsManualAdd.disabled = false;
+      }
+    };
+    vtsManualAdd?.addEventListener("click", () => void runManualSticky());
+    const submitManualOnEnter = (e) => { if (e.key === "Enter") { e.preventDefault(); void runManualSticky(); } };
+    vtsManualName?.addEventListener("keydown", submitManualOnEnter);
+    vtsManualGift?.addEventListener("keydown", submitManualOnEnter);
+
     // ── Step 3: Visual "When → Do" Rule Builder (10 Free · Unlimited + Live VTS with Plus) ──────────────────────
     const startersHost = $("act-starters");
     const rulesHost = $("act-rules");

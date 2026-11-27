@@ -144,6 +144,21 @@
             <button class="btn btn--soft btn--sm" type="button" id="vts-refresh">Refresh VTS lists</button>
             <button class="btn btn--soft btn--sm" type="button" id="vts-clear-items">Clear sticky notes</button>
           </div>
+          <div class="act-obs__sub" id="vts-manual-sub">
+            <div class="act-grid">
+              <label class="act-field">
+                <span class="act-field__label">Manual sticky note · Viewer name</span>
+                <input type="text" id="vts-manual-name" maxlength="48" autocomplete="off" spellcheck="false" placeholder="e.g. Viewer name">
+              </label>
+              <label class="act-field">
+                <span class="act-field__label">Gift / second line (optional)</span>
+                <input type="text" id="vts-manual-gift" maxlength="48" autocomplete="off" spellcheck="false" placeholder="e.g. 100 coins">
+              </label>
+            </div>
+            <div class="act-obs__bar">
+              <button class="btn btn--sm" type="button" id="vts-manual-add">Add sticky note</button>
+            </div>
+          </div>
         </div>
       </div>
       <datalist id="obs-scenes-dl"></datalist>
