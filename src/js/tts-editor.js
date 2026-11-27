@@ -6,6 +6,7 @@ import { createTtsView } from "./widgets-view.js";
 import { startWidgetEditor } from "./widget-editor.js";
 import { fakeAlert, practiceName } from "./fake-alerts.js";
 import { clearPlusCode, clearRelayTicketCache, savePlusCode, savedPlusCode } from "./plus-relay.js";
+import { closePlusModal, openPlusModal } from "./plus-modal.js";
 import { countPrompt } from "./stats.js";
 
 const NOTICE_COPY = {
@@ -136,9 +137,27 @@ startWidgetEditor({
 
     let loadedAccount = false;
     let hasActivePlus = false;
+    let plusChecked = false;
+
+    const TTS_PLUS_PERKS = [
+      { lead: "Studio AI voices", text: "150,000 natural neural AI voice characters every month (about 3,000 spoken messages)." },
+      { lead: "Custom 3-frame PNGTuber", text: "Upload your own Idle, Talking (mouth open), and Excited PNG/WebP/GIF mascot frames." },
+      { lead: "Alert voices & role filters", text: "Set a separate alert voice persona and limit !say chat TTS to Subs, VIPs, or Moderators." },
+    ];
+    const openTtsPlusModal = (title, summary) => {
+      openPlusModal({
+        title,
+        summary,
+        perks: TTS_PLUS_PERKS,
+        moment: "tts_voice",
+        eligible: lastEligible,
+        checked: plusChecked,
+      });
+    };
+
     const syncPlusFeatureControls = () => {
-      const showPlusExtras = Boolean(hasActivePlus || (devSite && !simCountry));
-      const discoverPlus = Boolean(lastEligible && (accountsOn || devSite));
+      const showPlusExtras = Boolean(hasActivePlus);
+      const discoverPlus = Boolean(lastEligible);
 
       let customChip = document.querySelector('#opt-controls .chip[data-pet-custom="1"]');
       if (!customChip) {
@@ -147,7 +166,7 @@ startWidgetEditor({
       }
       if (customChip) {
         customChip.hidden = !discoverPlus && settings.pet !== "custom";
-        customChip.textContent = !showPlusExtras && discoverPlus ? "Custom PNG / GIF · Plus" : "Custom PNG / GIF";
+        customChip.textContent = !showPlusExtras ? "Custom PNG / GIF (Plus)" : "Custom PNG / GIF";
       }
 
       const giftVoiceRow = document.getElementById("c-giftVoice")?.closest(".ctl");
@@ -156,32 +175,13 @@ startWidgetEditor({
       if (whoRow) whoRow.hidden = !discoverPlus && (settings.who || "all") === "all";
 
       const customPicked = settings.pet === "custom";
-      const allowUpload = Boolean(customPicked && lastEligible && (showPlusExtras || settings.petIdle || settings.petTalk || settings.petExcited));
+      const allowUpload = Boolean(customPicked && showPlusExtras);
       const consent = document.getElementById("media-consent");
       if (consent) consent.hidden = !allowUpload;
       for (const el of document.querySelectorAll("#opt-controls .media")) el.hidden = !allowUpload;
 
       const featureHint = document.getElementById("plus-feature-hint");
-      if (featureHint) {
-        const tryingLockedPreview = Boolean(
-          discoverPlus &&
-          !showPlusExtras &&
-          (customPicked || (settings.giftVoice && settings.giftVoice !== "same") || (settings.who && settings.who !== "all")),
-        );
-        featureHint.hidden = !tryingLockedPreview;
-        if (tryingLockedPreview) {
-          featureHint.replaceChildren(document.createTextNode("Custom 3-frame PNGTuber uploads, separate alert voices, and Sub/VIP/Mod chat filters unlock with "));
-          if (accountsOn) {
-            const link = document.createElement("a");
-            link.href = "/plus/";
-            link.textContent = "Frills Plus";
-            featureHint.append(link);
-          } else {
-            featureHint.append(document.createTextNode("Frills Plus"));
-          }
-          featureHint.append(document.createTextNode(" — explore the setup here, then subscribe to use them live on stream."));
-        }
-      }
+      if (featureHint) featureHint.hidden = true;
     };
 
     const syncRegionUi = (eligible) => {
@@ -311,7 +311,9 @@ startWidgetEditor({
       };
       const draw = (me) => {
         const plus = Boolean(me.signedIn && me.plus?.active);
+        plusChecked = true;
         hasActivePlus = plus;
+        if (plus) closePlusModal();
         syncPlusFeatureControls();
         const mine = Boolean(settings.code) && Boolean(me.overlayLink);
         let words;
@@ -473,6 +475,47 @@ startWidgetEditor({
     });
 
     return {
+      beforeChange(key, value) {
+        if (hasActivePlus) return true;
+        if (key === "engine" && value === "ai") {
+          openTtsPlusModal(
+            "Subscribe for Studio AI pet voices",
+            "Built-in browser voices stay free forever with no account. Subscribe to Frills Plus to unlock 150,000 neural AI voice characters every month.",
+          );
+          return false;
+        }
+        if (key === "pet" && value === "custom") {
+          openTtsPlusModal(
+            "Subscribe for custom 3-frame PNGTubers",
+            "All 16 hand-drawn Talking Pet mascots stay free forever. Subscribe to Frills Plus to upload your own Idle, Talking, and Excited PNG/WebP/GIF mascot.",
+          );
+          return false;
+        }
+        if (key === "giftVoice" && value !== "same") {
+          openTtsPlusModal(
+            "Subscribe for separate gift & alert voices",
+            "Matching your chat voice stays free. Subscribe to Frills Plus to assign a separate voice persona for gifts, subs, and cheers.",
+          );
+          return false;
+        }
+        if (key === "who" && value !== "all") {
+          openTtsPlusModal(
+            "Subscribe for Sub, VIP & Mod TTS filters",
+            "Open chat command TTS stays free for everyone. Subscribe to Frills Plus to restrict !say triggers to Subs, VIPs, or Moderators.",
+          );
+          return false;
+        }
+        return true;
+      },
+      onPlusStatus(status) {
+        plusChecked = true;
+        if (typeof status?.eligible === "boolean") lastEligible = status.eligible;
+        if (status?.plusActive) {
+          hasActivePlus = true;
+          closePlusModal();
+        }
+        syncPlusFeatureControls();
+      },
       apply(next) {
         settings = next;
         view.apply(next);

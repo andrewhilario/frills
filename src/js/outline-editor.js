@@ -12,7 +12,7 @@ import { mountMediaPicker } from "./alerts-media.js";
 import { mountCloudSave } from "./cloud-save.js";
 import { mountEditorMode } from "./editor-mode.js";
 import { mountSizeGuide } from "./size-guide.js";
-import { countPrompt } from "./stats.js";
+import { closePlusModal, openPlusModal } from "./plus-modal.js";
 import {
   DEFAULT_GIFT_MENU,
   DEFAULT_INFO_ITEMS,
@@ -24,6 +24,10 @@ import {
   encodeCardRows,
   encodeCustomBoxes,
   hasSideCard,
+  isPlusCardStyle,
+  isPlusFrameStyle,
+  isPlusMatMode,
+  isPlusMotion,
   listEditableBoxes,
   outlineUrl,
   parseCardRows,
@@ -46,10 +50,28 @@ const saved = loadSaved();
 let settings = OUTLINE.sanitize({ ...saved?.settings, ...OUTLINE.fromParams(params) });
 let plusActive = false;
 let plusEligible = false;
+let plusChecked = false;
 let showSafeZones = false;
 let showCutoutHints = true;
 let editBoxes = false;
 let selectedBox = "";
+
+const OUTLINE_PLUS_PERKS = [
+  { lead: "Drag & resize any box", text: "Move or resize cutouts, cards, and banners with 8 handles, snapping, and exact px inputs." },
+  { lead: "Collector styles & backdrops", text: "Cyber HUD, Celestial Filigree, Scrapbook Washi, Plush Ribbon, animated glows, starry mats, and custom art." },
+  { lead: "10-row cards, socials & 4K PNG", text: "Up to 10 Gift Rewards rows, Plus card layouts, rotating socials, 4K PNG export, and /o/… cloud links." },
+];
+
+function openOutlinePlusModal(title, summary) {
+  openPlusModal({
+    title,
+    summary,
+    perks: OUTLINE_PLUS_PERKS,
+    moment: "outline_plus",
+    eligible: plusEligible,
+    checked: plusChecked,
+  });
+}
 
 let liveChannel = null;
 try {
@@ -65,16 +87,18 @@ if (backdropSel && previewEl) {
 }
 
 const view = createOutlineView($("widget"), {
-  previewAll: true,
+  previewAll: false,
   editorOnly: true,
   onRowClick: (idx) => toggleHighlightRow(idx),
   onSelectBox: (id) => {
+    if (!plusActive) return;
     if (selectedBox !== id) {
       selectedBox = id;
       paint();
     }
   },
   onBoxChange: (id, rect) => {
+    if (!plusActive) return;
     selectedBox = id;
     const map = parseCustomBoxes(settings.customBoxes);
     map[id] = rect;
@@ -82,6 +106,7 @@ const view = createOutlineView($("widget"), {
     paint();
   },
   onBoxCommit: () => {
+    if (!plusActive) return;
     saveLocal();
     paint();
   },
@@ -200,15 +225,17 @@ function syncVisibility() {
     hintsBtn.hidden = false;
     hintsBtn.setAttribute("aria-pressed", String(showCutoutHints));
   }
+  if (!plusActive && editBoxes) editBoxes = false;
+  const editOn = plusActive && editBoxes;
   const editBtn = $("ol-edit-toggle");
   if (editBtn) {
-    editBtn.setAttribute("aria-pressed", String(editBoxes));
+    editBtn.setAttribute("aria-pressed", String(editOn));
   }
-  const hasCustomBoxes = Object.keys(parseCustomBoxes(settings.customBoxes)).length > 0;
+  const hasCustomBoxes = plusActive && Object.keys(parseCustomBoxes(settings.customBoxes)).length > 0;
   const resetBoxesBtn = $("ol-reset-boxes");
   if (resetBoxesBtn) resetBoxesBtn.hidden = !hasCustomBoxes;
   const boxInspector = $("ol-box-inspector");
-  if (boxInspector) boxInspector.hidden = !editBoxes;
+  if (boxInspector) boxInspector.hidden = !editOn;
   const prevBtn = $("ol-prev-step");
   const nextBtn = $("ol-next-step");
   if (prevBtn) prevBtn.hidden = !cardOn;
@@ -265,8 +292,6 @@ function syncPlusBanner() {
   const export4k = $("ol-export-2x");
   const editBtn = $("ol-edit-toggle");
   const boxBadge = $("ol-box-badge");
-  const used = plusFeaturesUsed(settings);
-  const showPlusCta = document.body?.dataset?.plusAccounts === "on" && plusEligible;
   if (export4k) {
     export4k.textContent = plusActive ? "4K PNG" : "4K PNG (Plus)";
   }
@@ -276,24 +301,9 @@ function syncPlusBanner() {
   if (boxBadge) {
     boxBadge.textContent = plusActive ? "Plus active" : "Frills Plus";
   }
-  if (!banner) return;
-  if (plusActive || used.length === 0) {
+  if (banner) {
     banner.hidden = true;
     banner.replaceChildren();
-    return;
-  }
-  banner.hidden = false;
-  banner.replaceChildren();
-  banner.append(`Previewing Frills Plus features (${used.join(", ")}). Free Browser links fall back to Free styles automatically — `);
-  if (showPlusCta) {
-    countPrompt("outline_plus", "shown");
-    const link = document.createElement("a");
-    link.href = "/plus/";
-    link.textContent = "unlock live with Frills Plus →";
-    link.addEventListener("click", () => countPrompt("outline_plus", "clicked"));
-    banner.append(link);
-  } else {
-    banner.append("save as a live /o/… cloud link with Frills Plus to go live with them.");
   }
 }
 
@@ -309,8 +319,11 @@ const cloud = mountCloudSave({
   getUrl: () => linkInput.value,
   defaultName: "My stream outline",
   onStatus: (st) => {
+    plusChecked = true;
     plusActive = Boolean(st?.plusActive);
     plusEligible = Boolean(st?.eligible);
+    if (plusActive) closePlusModal();
+    renderCardRows();
     syncPlusBanner();
     paint();
   },
@@ -350,13 +363,46 @@ function paint() {
   syncVisibility();
   syncBoxInspector();
   syncPlusBanner();
-  view.apply(settings, { plusActive, showSafeZones, showCutoutHints, editBoxes, selectedBox });
+  view.apply(settings, { plusActive, showSafeZones, showCutoutHints, editBoxes: plusActive && editBoxes, selectedBox });
   refreshLink();
 }
 
 const RESET_BOXES_KEYS = new Set(["mode", "layout9", "layout16", "boxAspect"]);
 
+function guardPlusOption(key, value) {
+  if (plusActive) return true;
+  if (key === "frameStyle" && isPlusFrameStyle(value)) {
+    openOutlinePlusModal("Subscribe for collector frame styles", "5 frame styles stay free forever. Subscribe to Frills Plus to unlock Cyber Tactical HUD, Celestial Filigree, Scrapbook Washi, and Plush Ribbon.");
+    return false;
+  }
+  if (key === "motion" && isPlusMotion(value)) {
+    openOutlinePlusModal("Subscribe for Plus border animations", "Static, Breathing glow, and Soft sheen stay free. Subscribe to Frills Plus to unlock Orbiting neon beam, Flowing gradient, and Twinkling stars.");
+    return false;
+  }
+  if (key === "matMode" && isPlusMatMode(value)) {
+    openOutlinePlusModal("Subscribe for starry & custom backdrops", "Soft tinted, solid, dots, grid, stripes, and all 4 watercolor skies stay free. Subscribe to Frills Plus for starry night mats and custom wallpaper uploads.");
+    return false;
+  }
+  if (key === "cardStyle" && isPlusCardStyle(value)) {
+    openOutlinePlusModal("Subscribe for Plus card layouts", "Clean stacked cards and compact badge rows stay free. Subscribe to Frills Plus for Horizontal pill strip and RPG Loot / Quest board layouts.");
+    return false;
+  }
+  if ((key === "matImage" || key === "customBadge") && value) {
+    openOutlinePlusModal("Subscribe to upload custom art & wallpapers", "All 18 built-in mascot packs and 4 watercolor skies stay free. Subscribe to Frills Plus to upload your own backdrop wallpaper or custom corner mascot.");
+    return false;
+  }
+  if (key === "socials" && String(value || "").trim()) {
+    openOutlinePlusModal("Subscribe for rotating socials pills", "Your channel handle, status line, and LIVE pill stay free. Subscribe to Frills Plus to add a rotating socials pill right on your nameplate.");
+    return false;
+  }
+  return true;
+}
+
 function change(key, value) {
+  if (!guardPlusOption(key, value)) {
+    writers[key]?.(settings[key]);
+    return;
+  }
   settings[key] = value;
   if (RESET_BOXES_KEYS.has(key)) {
     settings.customBoxes = "";
@@ -434,6 +480,13 @@ for (const control of OUTLINE.controls) {
         label: control.label,
         hint: control.hint,
         value: settings[control.key],
+        onBeforePick: (control.key === "matImage" || control.key === "customBadge")
+          ? () => {
+              if (plusActive) return true;
+              openOutlinePlusModal("Subscribe to upload custom art & wallpapers", "All 18 built-in mascot packs and 4 watercolor skies stay free. Subscribe to Frills Plus to upload your own backdrop wallpaper or custom corner mascot.");
+              return false;
+            }
+          : null,
         onSet: (val) => change(control.key, val),
       })
     : buildControl(control, settings[control.key], (val) => change(control.key, val));
@@ -446,6 +499,15 @@ for (const control of OUTLINE.controls) {
 editorMode.markControls(outlineTracked);
 $("media-ok-wrap")?.classList.add("ed-adv");
 if ($("look-controls")) editorMode.addAdvancePrompt($("look-controls"), "All colors & spacing →");
+
+// Gate clicking into the Rotating socials (Plus) input for non-subscribers
+const socialsInput = $("c-socials");
+socialsInput?.addEventListener("pointerdown", (e) => {
+  if (plusActive) return;
+  e.preventDefault();
+  socialsInput.blur();
+  openOutlinePlusModal("Subscribe for rotating socials pills", "Your channel handle, status line, and LIVE pill stay free. Subscribe to Frills Plus to add a rotating socials pill right on your nameplate.");
+});
 
 // ── 1-Click TikTok Vertical Starter Presets ───────────────────────────────────────────────────────────────────
 const TIKTOK_PRESETS = {
@@ -673,16 +735,26 @@ function renderCardRows() {
     rowListEl.append(row);
   });
 
-  if (rowAddBtn) rowAddBtn.disabled = rows.length >= PLUS_ROW_LIMIT;
+  if (rowAddBtn) {
+    rowAddBtn.disabled = plusActive && rows.length >= PLUS_ROW_LIMIT;
+    rowAddBtn.textContent = !plusActive && rows.length >= FREE_ROW_LIMIT ? "+ Add row (Plus)" : "+ Add row";
+  }
   if (rowHintEl) {
-    rowHintEl.textContent = rows.length > FREE_ROW_LIMIT && !plusActive
-      ? `${rows.length} rows (Free links show the first ${FREE_ROW_LIMIT}; save as a Frills Plus cloud link for up to ${PLUS_ROW_LIMIT}).`
+    rowHintEl.textContent = !plusActive && rows.length >= FREE_ROW_LIMIT
+      ? `${rows.length} / ${FREE_ROW_LIMIT} free rows. Subscribe to Frills Plus for up to ${PLUS_ROW_LIMIT} rows.`
       : "Tap a row number (or click a row in the preview) to spotlight a featured gift or command with ★.";
   }
 }
 
 rowAddBtn?.addEventListener("click", () => {
   const next = getRows();
+  if (!plusActive && next.length >= FREE_ROW_LIMIT) {
+    openOutlinePlusModal(
+      "Subscribe for up to 10 Gift & Command rows",
+      `Up to ${FREE_ROW_LIMIT} rows stay free forever. Subscribe to Frills Plus to add up to ${PLUS_ROW_LIMIT} rows on your Gift Rewards or Commands card.`,
+    );
+    return;
+  }
   if (next.length >= PLUS_ROW_LIMIT) return;
   const isGifts = settings.sideMode === "gifts";
   next.push(isGifts ? { label: "🎁 Gift", value: "Custom reward" } : { label: "!cmd", value: "Command info" });
@@ -724,12 +796,19 @@ $("ol-hints-toggle")?.addEventListener("click", () => {
   paint();
 });
 $("ol-edit-toggle")?.addEventListener("click", () => {
+  if (!plusActive) {
+    openOutlinePlusModal(
+      "Subscribe to resize & move boxes",
+      "Free layouts stay free with preset spacing and split sliders. Subscribe to Frills Plus to drag and resize boxes directly on the canvas.",
+    );
+    return;
+  }
   editBoxes = !editBoxes;
   paint();
 });
 
 function clearAllCustomBoxes() {
-  if (!settings.customBoxes) return;
+  if (!plusActive || !settings.customBoxes) return;
   settings.customBoxes = "";
   paint();
   saveLocal();
@@ -739,11 +818,13 @@ $("ol-reset-boxes")?.addEventListener("click", clearAllCustomBoxes);
 $("ol-box-reset-all")?.addEventListener("click", clearAllCustomBoxes);
 
 $("ol-box-select")?.addEventListener("change", (e) => {
+  if (!plusActive) return;
   selectedBox = e.currentTarget.value;
   paint();
 });
 
 function updateSelectedBoxFromInputs(commit) {
+  if (!plusActive) return;
   const geom = computeOutlineGeometry(settings);
   const active = listEditableBoxes(geom).find((b) => b.id === selectedBox);
   if (!active) return;
@@ -776,6 +857,7 @@ for (const id of ["ol-box-w", "ol-box-h", "ol-box-x", "ol-box-y"]) {
 }
 
 $("ol-box-center")?.addEventListener("click", () => {
+  if (!plusActive) return;
   const geom = computeOutlineGeometry(settings);
   const active = listEditableBoxes(geom).find((b) => b.id === selectedBox);
   if (!active) return;
@@ -788,6 +870,7 @@ $("ol-box-center")?.addEventListener("click", () => {
 });
 
 $("ol-box-reset-one")?.addEventListener("click", () => {
+  if (!plusActive) return;
   const map = parseCustomBoxes(settings.customBoxes);
   if (!map[selectedBox]) return;
   delete map[selectedBox];
@@ -798,7 +881,7 @@ $("ol-box-reset-one")?.addEventListener("click", () => {
 
 // Keyboard Arrow nudging when Resize boxes mode is active (outside text inputs)
 document.addEventListener("keydown", (e) => {
-  if (!editBoxes || !selectedBox) return;
+  if (!plusActive || !editBoxes || !selectedBox) return;
   if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) return;
   const tag = document.activeElement?.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
@@ -837,22 +920,10 @@ $("reset")?.addEventListener("click", () => {
 // ── Transparent PNG Export (1080p Free / 4K Plus) ─────────────────────────────────────────────────────────────
 async function handlePngExport(scale, button) {
   if (scale > 1 && !plusActive) {
-    if (document.body?.dataset?.plusAccounts === "on" && plusEligible) {
-      countPrompt("outline_plus", "shown");
-    }
-    if (linkHint) {
-      linkHint.replaceChildren("4K PNG export is part of Frills Plus. Use Download PNG (1080p) free right beside it");
-      if (document.body?.dataset?.plusAccounts === "on" && plusEligible) {
-        linkHint.append(", or ");
-        const link = document.createElement("a");
-        link.href = "/plus/";
-        link.textContent = "see Frills Plus →";
-        link.addEventListener("click", () => countPrompt("outline_plus", "clicked"));
-        linkHint.append(link);
-      } else {
-        linkHint.append(".");
-      }
-    }
+    openOutlinePlusModal(
+      "Subscribe for 4K transparent PNG exports",
+      "1080p transparent PNG export stays free forever right beside this button. Subscribe to Frills Plus to export crisp 4K (2×) transparent PNGs.",
+    );
     return;
   }
   const prevText = button.textContent;

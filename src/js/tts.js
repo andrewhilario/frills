@@ -40,9 +40,9 @@ export const PET_OPTIONS = [
 
 export const WHO_OPTIONS = [
   ["all", "Everyone"],
-  ["subs", "Subs, gifters, VIPs & mods"],
-  ["vips", "VIPs & mods"],
-  ["mods", "Mods only"],
+  ["subs", "Subs & VIPs (Plus)"],
+  ["vips", "VIPs & mods (Plus)"],
+  ["mods", "Mods only (Plus)"],
 ];
 
 export const TTS = defineWidget({
@@ -71,7 +71,7 @@ export const TTS = defineWidget({
   controls: [
     { section: "voice", ...chipsOf("engine", "Voice mode", [["auto", "Auto (Plus AI voice, free voice if not)"], ["browser", "Browser voice (free)"], ["ai", "Plus AI voice only"]]) },
     { section: "voice", ...selectOf("voice", "Voice style (chat)", VOICES, "The AI voices are part of Frills Plus. Without Plus, each style is matched to a free voice installed in your browser.") },
-    { section: "voice", ...selectOf("giftVoice", "Voice style (gifts, subs & bits)", GIFT_VOICES, "Pick a different voice persona for gift, sub, and cheer alerts, or keep it the same as chat.") },
+    { section: "voice", ...selectOf("giftVoice", "Voice style · alerts (Plus)", GIFT_VOICES, "Pick a different voice persona for gift, sub, and cheer alerts, or keep it the same as chat.") },
     { section: "voice", ...text("browserVoice", "Browser voice filter", 64, "Auto-matches your voice style, or pick/type any installed Windows/Edge voice name.") },
     { section: "voice", ...range("rate", "Voice speed", 70, 150, 5, "%") },
     { section: "voice", ...range("volume", "Volume", 10, 100, 5, "%") },

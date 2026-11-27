@@ -9,6 +9,7 @@
 import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
+import { createServer } from "node:http";
 import { join } from "node:path";
 import { findChrome, launch } from "../scripts/lib/chrome.mjs";
 import { createHelper } from "../helper/server.mjs";
@@ -113,20 +114,26 @@ test("Stream Outline editor loads TikTok 9:16 with transparent widget slot defau
   assert.equal(tt.hasChatCard, true);
   assert.match(tt.link, /layout9=tt-vtuber/);
 
-  // Preview a Frills Plus collector style (cyber) -> renders in editor and shows Plus banner
-  await page.evaluate(`(() => {
+  // Selecting a Frills Plus collector frame style (cyber) reverts to Free & opens the subscribe popup
+  const plusGate = await page.evaluate(`(() => {
     const sel = document.getElementById("c-frameStyle");
     sel.value = "cyber";
     sel.dispatchEvent(new Event("change", { bubbles: true }));
+    const dlg = document.getElementById("frills-plus-dlg");
+    const open = Boolean(dlg?.open);
+    const title = document.getElementById("frills-plus-dlg-title")?.textContent?.trim() || "";
+    if (open) dlg.close();
+    return {
+      open,
+      title,
+      revertedValue: sel.value,
+      hasCyber: Boolean(document.querySelector("#widget .ol-frame--cyber")),
+    };
   })()`);
-  const plusPreview = await page.evaluate(`(() => ({
-    hasCyber: Boolean(document.querySelector("#widget .ol-frame--cyber")),
-    bannerHidden: document.getElementById("ol-plus-banner").hidden,
-    bannerText: document.getElementById("ol-plus-banner").textContent,
-  }))()`);
-  assert.equal(plusPreview.hasCyber, true);
-  assert.equal(plusPreview.bannerHidden, false);
-  assert.match(plusPreview.bannerText, /Frills Plus/);
+  assert.equal(plusGate.open, true, "selecting Plus frame style opens subscribe popup");
+  assert.match(plusGate.title, /collector frame styles/i);
+  assert.equal(plusGate.revertedValue, "sticker");
+  assert.equal(plusGate.hasCyber, false);
 
   // Switch to Full-Screen 16:9 & Webcam Box modes (and confirm standalone Gift Menu mode chip is removed)
   const modeChips = await page.evaluate(`[...document.querySelectorAll("#mode-controls .chip")].map((b) => b.textContent.trim())`);
@@ -262,7 +269,29 @@ test("Overlay Size Guide bar displays live dimensions and opens a centered popup
   assert.deepEqual(page.problems, [], page.problems.join(" | "));
 });
 
-test("Frills Plus Resize boxes mode lets users drag handles, edit exact px, center/reset boxes, and stays overflow-free", { skip }, async () => {
+async function withPlusServer() {
+  const upstream = await withServer();
+  const server = createServer(async (req, res) => {
+    const url = req.url || "/";
+    if (url.startsWith("/api/cloud-overlays")) {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: true, signedIn: true, plusActive: true, eligible: true, overlays: [] }));
+      return;
+    }
+    const r = await fetch(`${upstream}${url}`);
+    const body = Buffer.from(await r.arrayBuffer());
+    const headers = Object.fromEntries(r.headers.entries());
+    delete headers["content-encoding"];
+    headers["content-length"] = String(body.length);
+    res.writeHead(r.status, headers);
+    res.end(body);
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  opened.push({ close: () => new Promise((r) => server.close(() => r())) });
+  return `http://127.0.0.1:${server.address().port}`;
+}
+
+test("Free visitors clicking any Plus option on /outline/ see the centered subscribe popup and controls revert cleanly", { skip }, async () => {
   const base = await withServer();
   await page.viewport(1280, 900);
   await page.goto(`${base}/outline/`, { settle: 450 });
@@ -270,10 +299,121 @@ test("Frills Plus Resize boxes mode lets users drag handles, edit exact px, cent
   await page.goto(`${base}/outline/`, { settle: 450 });
   assert.deepEqual(page.problems, [], page.problems.join(" | "));
 
-  // Toggle Resize boxes ON -> renders 8 handles + inspector
+  const freeClick = await page.evaluate(`(() => {
+    document.getElementById("ol-edit-toggle")?.click();
+    const dlg = document.getElementById("frills-plus-dlg");
+    const r = dlg.getBoundingClientRect();
+    return {
+      dlgOpen: Boolean(dlg?.open),
+      centered: r.left > 100 && r.right < window.innerWidth - 100 && r.top > 20 && r.bottom < window.innerHeight - 20,
+      ctaHref: document.getElementById("frills-plus-dlg-cta")?.getAttribute("href"),
+      ctaText: document.getElementById("frills-plus-dlg-cta")?.textContent?.trim(),
+      pressed: document.getElementById("ol-edit-toggle")?.getAttribute("aria-pressed"),
+      inspectorHidden: document.getElementById("ol-box-inspector")?.hidden,
+      handles: document.querySelectorAll("#widget [data-ol-handle]").length,
+    };
+  })()`);
+  assert.equal(freeClick.dlgOpen, true, "subscribe popup opens for non-Plus visitor");
+  assert.equal(freeClick.centered, true, "subscribe popup is centered in viewport");
+  assert.equal(freeClick.ctaHref, "/plus/");
+  assert.match(freeClick.ctaText, /Subscribe to Frills Plus/);
+  assert.equal(freeClick.pressed, "false");
+  assert.equal(freeClick.inspectorHidden, true);
+  assert.equal(freeClick.handles, 0, "non-Plus visitor gets 0 resize handles");
+
+  // Close popup cleanly via Not now button, then verify 4K PNG, Plus motion, Plus mat, and >5 rows all gate with popup
+  const otherGates = await page.evaluate(`(() => {
+    document.getElementById("frills-plus-dlg-cancel")?.click();
+    const closed = !document.getElementById("frills-plus-dlg")?.open;
+
+    document.getElementById("ol-export-2x")?.click();
+    const fourKOpen = Boolean(document.getElementById("frills-plus-dlg")?.open);
+    document.getElementById("frills-plus-dlg")?.close();
+
+    document.querySelector(".ed-mode__btn[data-mode='advanced']")?.click();
+    const mot = document.getElementById("c-motion");
+    mot.value = "orbit";
+    mot.dispatchEvent(new Event("change", { bubbles: true }));
+    const motOpen = Boolean(document.getElementById("frills-plus-dlg")?.open);
+    const motReverted = mot.value;
+    document.getElementById("frills-plus-dlg")?.close();
+
+    const mat = document.getElementById("c-matMode");
+    mat.value = "stars";
+    mat.dispatchEvent(new Event("change", { bubbles: true }));
+    const matOpen = Boolean(document.getElementById("frills-plus-dlg")?.open);
+    const matReverted = mat.value;
+    document.getElementById("frills-plus-dlg")?.close();
+
+    const side = document.getElementById("c-sideMode");
+    side.value = "gifts";
+    side.dispatchEvent(new Event("change", { bubbles: true }));
+    document.getElementById("ol-seg-add")?.click(); // 5th free row
+    const fiveRows = document.querySelectorAll("#ol-seg-list .ol-seg-row").length;
+    document.getElementById("ol-seg-add")?.click(); // 6th row -> Plus popup
+    const rowOpen = Boolean(document.getElementById("frills-plus-dlg")?.open);
+    const stillFive = document.querySelectorAll("#ol-seg-list .ol-seg-row").length;
+    document.getElementById("frills-plus-dlg")?.close();
+
+    return { closed, fourKOpen, motOpen, motReverted, matOpen, matReverted, fiveRows, rowOpen, stillFive };
+  })()`);
+  assert.equal(otherGates.closed, true);
+  assert.equal(otherGates.fourKOpen, true);
+  assert.equal(otherGates.motOpen, true);
+  assert.equal(otherGates.motReverted, "breathe");
+  assert.equal(otherGates.matOpen, true);
+  assert.equal(otherGates.matReverted, "gradient");
+  assert.equal(otherGates.fiveRows, 5);
+  assert.equal(otherGates.rowOpen, true);
+  assert.equal(otherGates.stillFive, 5);
+
+  // Mobile 320px popup check: zero overflow and buttons stay inside dialog bounds
+  await page.viewport(320, 840);
+  const mobileModal = await page.evaluate(`(() => {
+    document.getElementById("ol-edit-toggle")?.click();
+    const dlg = document.getElementById("frills-plus-dlg");
+    const dr = dlg.getBoundingClientRect();
+    const cta = document.getElementById("frills-plus-dlg-cta").getBoundingClientRect();
+    dlg.close();
+    return {
+      dlgW: Math.round(dr.width),
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      ctaFits: cta.right <= dr.right + 1 && cta.height <= 54,
+    };
+  })()`);
+  assert.ok(mobileModal.dlgW <= 320, `dialog width ${mobileModal.dlgW} must fit 320px`);
+  assert.ok(mobileModal.overflow <= 2);
+  assert.equal(mobileModal.ctaFits, true);
+  assert.deepEqual(page.problems, [], page.problems.join(" | "));
+});
+
+test("Active Frills Plus subscribers unlock collector styles, Resize boxes handles, exact px inputs, drag-resize, Center H, and Reset", { skip }, async () => {
+  const base = await withPlusServer();
+  await page.viewport(1280, 900);
+  await page.goto(`${base}/outline/`, { settle: 500 });
+  await page.evaluate(`localStorage.clear(); location.reload();`);
+  await page.goto(`${base}/outline/`, { settle: 500 });
+  await page.waitFor(`document.getElementById("ol-edit-toggle")?.textContent?.trim() === "Resize boxes"`, { timeout: 4000 });
+  assert.deepEqual(page.problems, [], page.problems.join(" | "));
+
+  // Plus subscriber can switch to Cyber collector frame without any popup
+  const plusStyle = await page.evaluate(`(() => {
+    const sel = document.getElementById("c-frameStyle");
+    sel.value = "cyber";
+    sel.dispatchEvent(new Event("change", { bubbles: true }));
+    return {
+      dlgOpen: Boolean(document.getElementById("frills-plus-dlg")?.open),
+      hasCyber: Boolean(document.querySelector("#widget .ol-frame--cyber")),
+    };
+  })()`);
+  assert.equal(plusStyle.dlgOpen, false);
+  assert.equal(plusStyle.hasCyber, true);
+
+  // Toggle Resize boxes ON -> no subscribe modal, renders 8 handles + inspector
   const opened = await page.evaluate(`(() => {
     document.getElementById("ol-edit-toggle")?.click();
     return {
+      dlgOpen: Boolean(document.getElementById("frills-plus-dlg")?.open),
       pressed: document.getElementById("ol-edit-toggle")?.getAttribute("aria-pressed"),
       inspectorHidden: document.getElementById("ol-box-inspector")?.hidden,
       handles: document.querySelectorAll("#widget [data-ol-handle]").length,
@@ -281,13 +421,14 @@ test("Frills Plus Resize boxes mode lets users drag handles, edit exact px, cent
       badge: document.querySelector("#widget .ol-edit-badge-text")?.textContent || "",
     };
   })()`);
+  assert.equal(opened.dlgOpen, false);
   assert.equal(opened.pressed, "true");
   assert.equal(opened.inspectorHidden, false);
   assert.equal(opened.handles, 8);
   assert.ok(opened.boxOptions >= 5);
   assert.match(opened.badge, /\d+ × \d+ px/);
 
-  // Edit exact width/height via inspector + click Center H -> updates URL, Plus banner, and SVG badge
+  // Edit exact width/height via inspector + click Center H -> updates URL & SVG badge
   const resized = await page.evaluate(`(() => {
     const wIn = document.getElementById("ol-box-w");
     const hIn = document.getElementById("ol-box-h");
@@ -301,7 +442,6 @@ test("Frills Plus Resize boxes mode lets users drag handles, edit exact px, cent
       wVal: document.getElementById("ol-box-w")?.value,
       hVal: document.getElementById("ol-box-h")?.value,
       link: document.getElementById("link")?.value || "",
-      banner: document.getElementById("ol-plus-banner")?.textContent || "",
       resetHidden: document.getElementById("ol-reset-boxes")?.hidden,
       badge: document.querySelector("#widget .ol-edit-badge-text")?.textContent || "",
     };
@@ -310,7 +450,6 @@ test("Frills Plus Resize boxes mode lets users drag handles, edit exact px, cent
   assert.equal(resized.wVal, "760");
   assert.equal(resized.hVal, "400");
   assert.match(resized.link, /customBoxes=game%3A160%2C\d+%2C760%2C400/);
-  assert.match(resized.banner, /custom box resize/);
   assert.equal(resized.resetHidden, false);
   assert.match(resized.badge, /760 × 400 px/);
 

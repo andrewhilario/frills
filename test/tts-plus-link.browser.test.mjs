@@ -71,6 +71,45 @@ test("a visitor who is not signed in is pointed to sign in, and an account witho
   assert.match(await text("#plus-link-state"), /You do not have Frills Plus/);
   assert.deepEqual([await text("#plus-link-account"), await visible("plus-link-make")], ["Get Frills Plus", false]);
   assert.deepEqual((await inPage("overlay-link"))[1], { ok: false, error: "plus_required" }, "the server refuses too");
+
+  // Clicking any Frills Plus TTS option while not subscribed opens #frills-plus-dlg and reverts cleanly
+  const ttsGates = await page.evaluate(`(() => {
+    document.querySelector(".ed-mode__btn[data-mode='advanced']")?.click();
+    const customBtn = [...document.querySelectorAll("#opt-controls .chip")].find((b) => b.textContent.includes("Custom PNG"));
+    customBtn?.click();
+    const petOpen = Boolean(document.getElementById("frills-plus-dlg")?.open);
+    const petPressed = customBtn?.getAttribute("aria-pressed");
+    document.getElementById("frills-plus-dlg")?.close();
+
+    const aiBtn = [...document.querySelectorAll("#opt-controls .chip")].find((b) => b.textContent.includes("Plus AI voice only"));
+    aiBtn?.click();
+    const aiOpen = Boolean(document.getElementById("frills-plus-dlg")?.open);
+    const aiPressed = aiBtn?.getAttribute("aria-pressed");
+    document.getElementById("frills-plus-dlg")?.close();
+
+    const gv = document.getElementById("c-giftVoice");
+    gv.value = "fable";
+    gv.dispatchEvent(new Event("change", { bubbles: true }));
+    const gvOpen = Boolean(document.getElementById("frills-plus-dlg")?.open);
+    const gvReverted = gv.value;
+    document.getElementById("frills-plus-dlg")?.close();
+
+    const subsBtn = [...document.querySelectorAll('[aria-label="Who can trigger chat TTS"] .chip')].find((b) => b.textContent.includes("Subs"));
+    subsBtn?.click();
+    const whoOpen = Boolean(document.getElementById("frills-plus-dlg")?.open);
+    const whoPressed = subsBtn?.getAttribute("aria-pressed");
+    document.getElementById("frills-plus-dlg")?.close();
+
+    return { petOpen, petPressed, aiOpen, aiPressed, gvOpen, gvReverted, whoOpen, whoPressed };
+  })()`);
+  assert.equal(ttsGates.petOpen, true);
+  assert.equal(ttsGates.petPressed, "false");
+  assert.equal(ttsGates.aiOpen, true);
+  assert.equal(ttsGates.aiPressed, "false");
+  assert.equal(ttsGates.gvOpen, true);
+  assert.equal(ttsGates.gvReverted, "same");
+  assert.equal(ttsGates.whoOpen, true);
+  assert.equal(ttsGates.whoPressed, "false");
 });
 
 test("with Plus: make a link (the code rides in the overlay link), replace it (the old stops working), keep it after a reload, turn it off", { skip }, async () => {
@@ -81,6 +120,20 @@ test("with Plus: make a link (the code rides in the overlay link), replace it (t
   await open();
   assert.match(await text("#plus-link-state"), /Make your Plus link/);
   assert.deepEqual([await text("#plus-link-make"), await visible("plus-link-make"), await visible("plus-link-off"), await visible("plus-link-hint")], ["Make my Plus link", true, false, true]);
+
+  // Active Frills Plus subscriber unlocks Custom PNGTuber & Plus TTS options with zero popup
+  const ttsUnlocked = await page.evaluate(`(() => {
+    document.querySelector(".ed-mode__btn[data-mode='advanced']")?.click();
+    const customBtn = [...document.querySelectorAll("#opt-controls .chip")].find((b) => b.textContent.includes("Custom PNG"));
+    customBtn?.click();
+    const open = Boolean(document.getElementById("frills-plus-dlg")?.open);
+    const pressed = customBtn?.getAttribute("aria-pressed");
+    const frogBtn = [...document.querySelectorAll("#opt-controls .chip")].find((b) => b.textContent.trim() === "Frog");
+    frogBtn?.click();
+    return { open, pressed };
+  })()`);
+  assert.equal(ttsUnlocked.open, false);
+  assert.equal(ttsUnlocked.pressed, "true");
   await typeChannel();
   assert.equal(await codeOf(), null, "no code in the link yet");
 

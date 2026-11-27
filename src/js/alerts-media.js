@@ -30,7 +30,7 @@ const forget = (id) => { try { const all = codes(); delete all[id]; localStorage
  * One picker. `kind` is "image" or "sound". `onSet(id)` runs when the file changes ("" when removed). Returns { row, write(id) } like
  * buildControl does, so the editor treats it as any other control.
  */
-export function mountMediaPicker({ kind, label, hint, value, onSet, consentBox }) {
+export function mountMediaPicker({ kind, label, hint, value, onSet, consentBox, onBeforePick = null }) {
   const id = "media-" + Math.random().toString(36).slice(2, 8);
   const row = el("div", { className: "ctl ctl--wide media" });
   const title = el("span", { className: "ctl__label", textContent: label });
@@ -65,6 +65,17 @@ export function mountMediaPicker({ kind, label, hint, value, onSet, consentBox }
   };
   consentBox.addEventListener("change", refreshChoose);
   refreshChoose();
+
+  if (typeof onBeforePick === "function") {
+    const guardPick = (e) => {
+      if (onBeforePick() === false) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    choose.addEventListener("click", guardPick);
+    input.addEventListener("click", guardPick);
+  }
 
   input.addEventListener("change", async () => {
     const file = input.files?.[0];

@@ -284,6 +284,41 @@ body[data-editor-mode="advanced"] .ed-adv-link { display: none !important; }
   .size-dlg__close, .size-dlg__tab { transition-duration: 1ms; }
 }
 
+/* Shared Frills Plus subscribe popup (<dialog class="plus-dlg">) — separate from .size-dlg so selectors never collide */
+.plus-dlg {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  width: min(calc(100% - 2rem), 34rem);
+  height: fit-content;
+  max-height: min(88dvh, 46rem);
+  padding: 0;
+  border: 2px solid var(--color-ink);
+  border-radius: var(--radius-card);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-pop);
+  overflow: hidden;
+}
+.plus-dlg[open] { display: flex; flex-direction: column; }
+.plus-dlg::backdrop { background: color-mix(in oklch, var(--color-ink) 55%, transparent); }
+.plus-dlg:not([open]) { display: none; }
+.plus-dlg__list { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-xs); margin: 0; padding-left: 1.25rem; font-size: var(--text-sm); line-height: 1.5; color: var(--color-ink); }
+.plus-dlg__list[hidden] { display: none; }
+.plus-dlg__list li::marker { color: var(--color-ink); }
+.plus-dlg__foot { justify-content: flex-end; }
+.plus-dlg__foot .btn { min-height: 44px; }
+.plus-dlg__cta { white-space: nowrap; }
+@media (max-width: 24rem) {
+  .plus-dlg { max-height: min(92dvh, 46rem); }
+  .plus-dlg .size-dlg__inner { gap: var(--space-xs); padding: var(--space-sm) var(--space-md); }
+  .plus-dlg .size-dlg__title { font-size: var(--text-md); }
+  .plus-dlg .size-dlg__note, .plus-dlg__list { font-size: var(--text-xs); line-height: 1.45; }
+  .plus-dlg .size-dlg__tip { padding: var(--space-xs) var(--space-sm); }
+  .plus-dlg__foot { flex-direction: column-reverse; align-items: stretch; padding: var(--space-sm) var(--space-md); }
+  .plus-dlg__foot .btn { width: 100%; justify-content: center; }
+}
+
 /* Hallmark · component: Frills Plus cloud box, editor tip & post-copy nudge · genre: playful · theme: Hum (site tokens)
  * states: default · hover · focus · active · disabled · contrast: pass (40–41) · widths checked 320 / 375 / 414 / 768 / 1280 */
 .cloud-box { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-sm); min-width: 0; margin-top: var(--space-md); padding: var(--space-md); border-radius: var(--radius-card); background: var(--color-accent-tint); border: 2px solid var(--color-ink); box-shadow: 0 4px 0 var(--color-ink); }

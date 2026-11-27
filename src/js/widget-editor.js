@@ -53,6 +53,10 @@ export function startWidgetEditor({ widget, storeKey, overlayPath, events, needs
   let lookChips;
   const paint = () => api.apply(settings, currentPlatform);
   function change(key, value) {
+    if (api.beforeChange?.(key, value, settings[key]) === false) {
+      writers[key]?.(settings[key]);
+      return;
+    }
     settings[key] = value;
     if (key === "font") fontsReady(generalFaces(settings), 600).then(paint);
     else paint();

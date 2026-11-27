@@ -243,6 +243,27 @@ async function withHelper() {
   opened.push(helper);
   return { base: `http://127.0.0.1:${port}`, made };
 }
+async function withPlusHelper() {
+  const { base: upstream, made } = await withHelper();
+  const server = http.createServer(async (req, res) => {
+    const url = req.url || "/";
+    if (url.startsWith("/api/cloud-overlays")) {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: true, signedIn: true, plusActive: true, eligible: true, overlays: [] }));
+      return;
+    }
+    const r = await fetch(`${upstream}${url}`);
+    const body = Buffer.from(await r.arrayBuffer());
+    const headers = Object.fromEntries(r.headers.entries());
+    delete headers["content-encoding"];
+    headers["content-length"] = String(body.length);
+    res.writeHead(r.status, headers);
+    res.end(body);
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  opened.push({ close: () => new Promise((r) => server.close(() => r())) });
+  return { base: `http://127.0.0.1:${server.address().port}`, made, helperBase: upstream };
+}
 const until = async (check, ms = 6000, label = "") => {
   const t0 = Date.now();
   while (Date.now() - t0 < ms) { if (await check()) return; await sleep(40); }
@@ -317,11 +338,20 @@ test("actions editor connects to real mock OBS WebSocket v5, creates Replay Cam,
   await until(async () => mockObs.calls.some(([t, d]) => t === "SetInputSettings" && d.inputSettings?.local_file === "C:/Replays/moment.mp4"));
   await until(async () => mockObs.calls.some(([t, d]) => t === "SetSceneItemEnabled" && d.sceneItemId === 9 && d.sceneItemEnabled === false));
 
-  // Add actions up to 10 free cap -> add buttons disable and free-limit note shows
+  // Add actions up to 10 free cap -> 11th click opens the Frills Plus subscribe popup & stays capped at 10
   for (let i = 0; i < 8; i++) await click("#act-add-blank");
   assert.equal(await text("#act-count"), "10 / 10 free");
-  assert.equal(await page.evaluate(`document.getElementById("act-add-blank").disabled`), true);
+  assert.equal(await text("#act-add-blank"), "+ Add action (Plus)");
   assert.equal(await page.evaluate(`document.getElementById("act-limit-note").hidden`), false);
+  await click("#act-add-blank");
+  const capModal = await page.evaluate(`(() => {
+    const dlg = document.getElementById("frills-plus-dlg");
+    const open = Boolean(dlg?.open);
+    if (open) dlg.close();
+    return { open, count: document.getElementById("act-count")?.textContent?.trim() };
+  })()`);
+  assert.equal(capModal.open, true, "clicking + Add action at 10 free cap opens subscribe popup");
+  assert.equal(capModal.count, "10 / 10 free");
 
   // Copy link carries port & rules in query, and password ONLY in #hash
   await type("#source-channel", "pond.pal");
@@ -373,23 +403,69 @@ test("actions editor connects to mock VTube Studio API, runs free 5-sticky-note 
   // Disable default OBS rules so this VTS-only setup never attempts to connect to OBS port 4455
   await page.evaluate(`for (const cb of document.querySelectorAll(".act-rule__on")) { if (cb.checked) cb.click(); }`);
 
-  // Add "+ VTS Sticky note" (free up to 5) and "+ VTS Face zoom" (Plus-only live) starter rules
+  // Free visitor: clicking Plus VTS starter (+ VTS Face zoom) opens subscribe popup & does NOT add a rule
+  const freeVtsGates = await page.evaluate(`(() => {
+    const beforeCount = document.querySelectorAll(".act-rule").length;
+    [...document.querySelectorAll(".act-starter")].find((b) => b.textContent.includes("Face zoom")).click();
+    const zoomDlg = Boolean(document.getElementById("frills-plus-dlg")?.open);
+    document.getElementById("frills-plus-dlg")?.close();
+    const afterZoomCount = document.querySelectorAll(".act-rule").length;
+
+    // Add free "+ VTS Sticky note" rule
+    [...document.querySelectorAll(".act-starter")].find((b) => b.textContent.includes("Sticky note")).click();
+    const r = [...document.querySelectorAll(".act-rule")].pop();
+    // Try picking a Plus custom sticker shape (paw) -> reverts to "note" & opens subscribe popup
+    const shapeSel = [...r.querySelectorAll("select")].find((s) => [...s.options].some((o) => o.value === "paw"));
+    shapeSel.value = "paw";
+    shapeSel.dispatchEvent(new Event("change", { bubbles: true }));
+    const pawDlg = Boolean(document.getElementById("frills-plus-dlg")?.open);
+    const pawReverted = shapeSel.value;
+    document.getElementById("frills-plus-dlg")?.close();
+
+    // Try switching step type to a Plus VTS action (vts.hotkey) -> reverts & opens subscribe popup
+    const typeSel = r.querySelector(".act-step__head select");
+    typeSel.value = "vts.hotkey";
+    typeSel.dispatchEvent(new Event("change", { bubbles: true }));
+    const hotkeyDlg = Boolean(document.getElementById("frills-plus-dlg")?.open);
+    const typeReverted = typeSel.value;
+    document.getElementById("frills-plus-dlg")?.close();
+
+    return { beforeCount, afterZoomCount, zoomDlg, pawDlg, pawReverted, hotkeyDlg, typeReverted };
+  })()`);
+  assert.equal(freeVtsGates.zoomDlg, true, "Plus VTS starter opens subscribe popup for Free visitor");
+  assert.equal(freeVtsGates.afterZoomCount, freeVtsGates.beforeCount);
+  assert.equal(freeVtsGates.pawDlg, true, "Plus sticker shape opens subscribe popup for Free visitor");
+  assert.equal(freeVtsGates.pawReverted, "note");
+  assert.equal(freeVtsGates.hotkeyDlg, true, "Plus VTS step type opens subscribe popup for Free visitor");
+  assert.equal(freeVtsGates.typeReverted, "vts.sticky");
+
+  // Active Frills Plus subscriber: unlocks Plus VTS Face zoom & custom sticker shapes with zero popup
+  const plusCtx = await withPlusHelper();
+  await page.goto(plusCtx.base + "/actions/", { settle: 700 });
+  await page.evaluate(`localStorage.clear()`);
+  await page.goto(plusCtx.base + "/actions/", { settle: 700 });
+  await until(async () => (await text("#act-count") ?? "").includes("Unlimited (Plus)"));
+  await type("#vts-port", String(mockVts.port));
+  await click("#vts-connect");
+  await until(async () => (await text("#vts-status") ?? "").includes("Model “Mochi Live2D”"));
+  await page.evaluate(`for (const cb of document.querySelectorAll(".act-rule__on")) { if (cb.checked) cb.click(); }`);
+
   await page.evaluate(`[...document.querySelectorAll(".act-starter")].find((b) => b.textContent.includes("Sticky note")).click()`);
-  // Set cooldown to 0 so test can rapid-fire 6 gifts in browser test
   await page.evaluate(`(() => { const r = [...document.querySelectorAll(".act-rule")].pop(); const cd = r.querySelector('input[type="number"]'); cd.value = "0"; cd.dispatchEvent(new Event("input", { bubbles: true })); })()`);
   await page.evaluate(`[...document.querySelectorAll(".act-starter")].find((b) => b.textContent.includes("Face zoom")).click()`);
+  assert.equal(await page.evaluate(`Boolean(document.getElementById("frills-plus-dlg")?.open)`), false, "Plus subscriber adds VTS Face zoom with no popup");
   // Change Face zoom trigger from Twitch bits to TikTok gift (minDiamonds 100) so one helper tests both on same stream
   await page.evaluate(`(() => { const r = [...document.querySelectorAll(".act-rule")].pop(); const sel = r.querySelector(".act-sub select"); sel.value = "gift"; sel.dispatchEvent(new Event("change", { bubbles: true })); })()`);
 
-  assert.equal(await page.evaluate(`document.getElementById("vts-plus-note").hidden`), false);
   const beforePins = mockVts.calls.filter(([t]) => t === "ItemPinRequest").length;
   await page.evaluate(`[...document.querySelectorAll(".act-rule")][2].querySelector(".act-rule__test").click()`);
   await until(async () => mockVts.calls.filter(([t, d]) => t === "ItemPinRequest" && d.pinInfo?.artMeshID === "Face_Skin").length > beforePins);
   const editorLoad = mockVts.calls.filter(([t, d]) => t === "ItemLoadRequest" && d.customDataBase64).at(-1);
   assert.ok(editorLoad && editorLoad[1].customDataBase64.startsWith("iVBORw0KGgo"), "editor draws real base64 PNG sticky note with viewer name");
 
-  // Selecting a Plus custom sticker shape (chibi paw) renders a distinct valid base64 PNG in editor preview
+  // Selecting a Plus custom sticker shape (chibi paw) works unlocked for Plus subscriber & renders a distinct valid base64 PNG
   await page.evaluate(`(() => { const r = [...document.querySelectorAll(".act-rule")][2]; const shapeSel = [...r.querySelectorAll("select")].find((s) => [...s.options].some((o) => o.value === "paw")); shapeSel.value = "paw"; shapeSel.dispatchEvent(new Event("change", { bubbles: true })); })()`);
+  assert.equal(await page.evaluate(`Boolean(document.getElementById("frills-plus-dlg")?.open)`), false);
   const beforePawPins = mockVts.calls.filter(([t]) => t === "ItemPinRequest").length;
   await page.evaluate(`[...document.querySelectorAll(".act-rule")][2].querySelector(".act-rule__test").click()`);
   await until(async () => mockVts.calls.filter(([t]) => t === "ItemPinRequest").length > beforePawPins);

@@ -3,6 +3,7 @@
 // setup, visual "When → Do" rule builder (10 actions free · unlimited + live VTS with Frills Plus), and live log.
 
 import { countPrompt } from "./stats.js";
+import { closePlusModal, openPlusModal } from "./plus-modal.js";
 import {
   ACTIONS,
   ACTION_STARTERS,
@@ -29,6 +30,8 @@ import {
   hasFreeVtsSteps,
   hasPlusStickyShape,
   hasPlusVtsSteps,
+  isPlusStickyShape,
+  isPlusVtsStep,
   sanitizeRule,
   sanitizeRules,
   sanitizeStep,
@@ -90,8 +93,25 @@ startWidgetEditor({
     let current = settings;
     let plusActive = false;
     let plusEligible = false;
+    let plusChecked = false;
     let rules = decodeRules(settings.rules, { limit: FREE_ACTIONS_LIMIT });
     let openRuleId = rules[0]?.id ?? "";
+
+    const ACTIONS_PLUS_PERKS = [
+      { lead: "Unlimited OBS & VTS actions", text: `Go past the ${FREE_ACTIONS_LIMIT}-action free limit with up to ${PLUS_ACTIONS_LIMIT} custom When → Do rules.` },
+      { lead: "Full VTube Studio control", text: "Trigger VTS hotkeys, item props, expressions, zooms/flips, and color tints live from gifts, bits, subs, or chat." },
+      { lead: "Custom sticker shapes & unlimited notes", text: "Unlock heart, star, chibi paw, and cloud shapes plus unlimited viewer stickers stacking on your avatar." },
+    ];
+    const openActionsPlusModal = (title, summary, moment = "vts_locked") => {
+      openPlusModal({
+        title,
+        summary,
+        perks: ACTIONS_PLUS_PERKS,
+        moment,
+        eligible: plusEligible,
+        checked: plusChecked,
+      });
+    };
 
     const limitNow = () => (plusActive ? PLUS_ACTIONS_LIMIT : FREE_ACTIONS_LIMIT);
     const view = createActionsView(host);
@@ -565,10 +585,16 @@ startWidgetEditor({
           ? `${rules.length} · Unlimited (Plus)`
           : `${rules.length} / ${FREE_ACTIONS_LIMIT} free`;
       }
-      if (addBlankBtn) addBlankBtn.disabled = rules.length >= cap;
+      if (addBlankBtn) {
+        addBlankBtn.disabled = plusActive && rules.length >= PLUS_ACTIONS_LIMIT;
+        addBlankBtn.textContent = atFreeCap ? "+ Add action (Plus)" : "+ Add action";
+      }
       if (startersHost) {
         for (const btn of startersHost.querySelectorAll("button")) {
-          btn.disabled = rules.length >= cap;
+          btn.disabled = plusActive && rules.length >= PLUS_ACTIONS_LIMIT;
+          if (btn.dataset.plusStarter === "1") {
+            btn.textContent = plusActive ? btn.dataset.baseChip : `${btn.dataset.baseChip} (Plus)`;
+          }
         }
       }
       if (limitNote) {
@@ -643,8 +669,23 @@ startWidgetEditor({
     };
 
     const addRule = (templateRule) => {
+      if (!plusActive && (templateRule?.steps ?? []).some(isPlusVtsStep)) {
+        openActionsPlusModal(
+          "Subscribe for full VTube Studio actions",
+          "Pastel viewer sticky notes stay free (up to 5 on your face at once). Subscribe to Frills Plus to add VTS hotkeys, props, expressions, avatar zooms/flips, and color tints.",
+          "vts_locked",
+        );
+        return;
+      }
       const cap = limitNow();
       if (rules.length >= cap) {
+        if (!plusActive) {
+          openActionsPlusModal(
+            "Subscribe for unlimited OBS & VTS actions",
+            `Your first ${FREE_ACTIONS_LIMIT} OBS & sticky-note actions stay free forever. Subscribe to Frills Plus to add more than ${FREE_ACTIONS_LIMIT} actions.`,
+            "action_limit",
+          );
+        }
         syncQuotaUi();
         return;
       }
@@ -657,7 +698,14 @@ startWidgetEditor({
 
     if (startersHost) {
       for (const starter of ACTION_STARTERS) {
-        const btn = el("button", { type: "button", className: "chip items__preset act-starter", textContent: starter.chip });
+        const isPlusStarter = (starter.rule?.steps ?? []).some(isPlusVtsStep);
+        const btn = el("button", {
+          type: "button",
+          className: "chip items__preset act-starter",
+          textContent: isPlusStarter ? `${starter.chip} (Plus)` : starter.chip,
+        });
+        btn.dataset.baseChip = starter.chip;
+        if (isPlusStarter) btn.dataset.plusStarter = "1";
         btn.addEventListener("click", () => addRule(starter.rule));
         startersHost.append(btn);
       }
@@ -991,6 +1039,19 @@ startWidgetEditor({
         };
         sizeSlider.addEventListener("input", () => applyStickySize(sizeSlider.value));
         const sizeBox = el("div", { className: "act-size-box" }, el("div", { className: "act-size-row" }, sizeSlider, sizeValEl), sizeChips);
+        const shapeSelect = makeSelect(VTS_STICKY_SHAPES, step.shape || "note", (v) => {
+          if (!plusActive && isPlusStickyShape(v)) {
+            shapeSelect.value = step.shape || "note";
+            openActionsPlusModal(
+              "Subscribe for custom sticker shapes",
+              "Classic pastel sticky notes stay free (up to 5 on your face at once). Subscribe to Frills Plus to unlock Heart, Star, Chibi Paw, Dreamy Cloud, and Random shapes.",
+              "vts_locked",
+            );
+            return;
+          }
+          step.shape = v;
+          commitRules();
+        });
         hostEl.append(
           fieldRow("Name on note ({name}, {gift}, {text})", makeInput({
             value: step.title,
@@ -1004,7 +1065,7 @@ startWidgetEditor({
             maxLength: 48,
             onInput: (v) => { step.subtitle = v.slice(0, 48); commitRules(); },
           })),
-          fieldRow("Sticker shape", makeSelect(VTS_STICKY_SHAPES, step.shape || "note", (v) => { step.shape = v; commitRules(); })),
+          fieldRow("Sticker shape", shapeSelect),
           fieldRow("Note color", makeSelect(VTS_STICKY_COLORS, step.color, (v) => { step.color = v; commitRules(); })),
           fieldRow("Note size (5–100%)", sizeBox),
           fieldRow("Placement", makeSelect(VTS_STICKY_PIN_MODES, step.pinMode, (v) => { step.pinMode = v; commitRules(); })),
@@ -1243,6 +1304,15 @@ startWidgetEditor({
             const stepHead = el("div", { className: "act-step__head" });
             const stepFields = el("div", { className: "act-grid" });
             const typeSelect = makeSelect(ACTION_TYPES, step.type, (nextType) => {
+              if (!plusActive && isPlusVtsStep({ type: nextType })) {
+                typeSelect.value = step.type;
+                openActionsPlusModal(
+                  "Subscribe for full VTube Studio actions",
+                  "All OBS actions and pastel VTS sticky notes stay free. Subscribe to Frills Plus to unlock VTS hotkeys, props, expressions, avatar zooms/flips, and color tints.",
+                  "vts_locked",
+                );
+                return;
+              }
               rule.steps[sIdx] = sanitizeStep({ type: nextType });
               renderStepFields(stepFields, rule.steps[sIdx]);
               commitRules();
@@ -1357,8 +1427,10 @@ startWidgetEditor({
         const nextEligible = Boolean(status?.eligible);
         const activeChanged = nextActive !== plusActive;
         const eligibleChanged = nextEligible !== plusEligible;
+        plusChecked = true;
         plusActive = nextActive;
         plusEligible = nextEligible;
+        if (plusActive) closePlusModal();
         vtsExecutor.setMaxStickyNotes(plusActive ? 0 : FREE_STICKY_NOTES_LIMIT);
         if (activeChanged) {
           rules = decodeRules(current.rules, { limit: limitNow() });

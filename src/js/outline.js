@@ -210,7 +210,7 @@ export const OUTLINE = defineWidget({
     { section: "mode", ...text("slot2Label", "Second window title (optional)", 28) },
 
     // Frame, backdrop & decor
-    { section: "frame", group: "Border & motion", ...selectOf("frameStyle", "Frame style", FRAME_STYLES, "5 styles work free live; preview all 4 Frills Plus styles right here.") },
+    { section: "frame", group: "Border & motion", ...selectOf("frameStyle", "Frame style", FRAME_STYLES, "5 styles work free; 4 collector styles unlock with Frills Plus.") },
     { section: "frame", ...selectOf("motion", "Animation & glow", MOTION_STYLES) },
     { section: "frame", ...range("strokeW", "Border thickness", 2, 18, 1, "px") },
     { section: "frame", group: "Backdrop mat (outside cutouts)", ...selectOf("matMode", "Backdrop pattern", MAT_MODES, "Cutouts stay 100% transparent so your game, cam, and Frills widgets show through.") },
