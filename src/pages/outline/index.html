@@ -29,6 +29,8 @@
     </div>
     <div class="chatstage" id="stage"><div id="widget"></div></div>
     <div class="preview__tests" role="group" aria-label="Preview tools">
+      <button class="btn btn--soft btn--sm ol-edit-btn" type="button" id="ol-edit-toggle" aria-pressed="false">Resize boxes (Plus)</button>
+      <button class="btn btn--soft btn--sm" type="button" id="ol-reset-boxes" hidden>Reset boxes</button>
       <button class="btn btn--soft btn--sm" type="button" id="ol-prev-step" hidden>◀ Spotlight</button>
       <button class="btn btn--soft btn--sm" type="button" id="ol-next-step" hidden>Spotlight ▶</button>
       <button class="btn btn--soft btn--sm ol-safe-btn" type="button" id="ol-safe-toggle" aria-pressed="false" hidden>TikTok safe zones</button>
@@ -55,6 +57,40 @@
         <button class="btn btn--soft btn--sm" type="button" data-tt-preset="pk-duo">PK / Co-Host</button>
       </div>
       <div class="stack" id="mode-controls"></div>
+      <div class="ol-box-inspector" id="ol-box-inspector" hidden>
+        <div class="ol-box-inspector__head">
+          <h3 class="ol-box-inspector__title">Resize &amp; move boxes</h3>
+          <span class="ol-box-inspector__badge" id="ol-box-badge">Frills Plus</span>
+        </div>
+        <p class="ctl__hint" id="ol-box-hint">Drag any box or handle on the preview (hold Shift for 1 px precision), or enter exact pixels below.</p>
+        <div class="ctl ol-box-inspector__pick">
+          <label class="ctl__label" for="ol-box-select">Selected box</label>
+          <select id="ol-box-select"></select>
+        </div>
+        <div class="ol-box-dims">
+          <label class="ol-dim">
+            <span class="ol-dim__label">Width (px)</span>
+            <input class="ol-dim__input" type="number" id="ol-box-w" step="8" min="160" inputmode="numeric">
+          </label>
+          <label class="ol-dim">
+            <span class="ol-dim__label">Height (px)</span>
+            <input class="ol-dim__input" type="number" id="ol-box-h" step="8" min="38" inputmode="numeric">
+          </label>
+          <label class="ol-dim">
+            <span class="ol-dim__label">Left X (px)</span>
+            <input class="ol-dim__input" type="number" id="ol-box-x" step="8" min="8" inputmode="numeric">
+          </label>
+          <label class="ol-dim">
+            <span class="ol-dim__label">Top Y (px)</span>
+            <input class="ol-dim__input" type="number" id="ol-box-y" step="8" min="8" inputmode="numeric">
+          </label>
+        </div>
+        <div class="ol-box-actions">
+          <button class="btn btn--soft btn--sm" type="button" id="ol-box-center">Center H</button>
+          <button class="btn btn--soft btn--sm" type="button" id="ol-box-reset-one">Reset box</button>
+          <button class="btn btn--soft btn--sm" type="button" id="ol-box-reset-all">Reset all</button>
+        </div>
+      </div>
       <h3 class="stack__group">Starting look &amp; colors</h3>
       <div class="chips" id="looks" role="group" aria-label="Starting looks"></div>
       <div class="stack" id="look-controls"></div>

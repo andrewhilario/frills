@@ -293,8 +293,8 @@ export function mountCloudSave({ kind, storeKey, anchor, getUrl, defaultName = "
       body: "Crash-proof cloud memory, phone remote controls (+1, +10, reset), and 1-click OBS theme sync.",
     },
     outline: {
-      title: "Unlock collector frames, custom wallpapers & 4K PNG",
-      body: "Cyber HUD, Celestial Filigree, Scrapbook & Plush Ribbon frames, custom wallpapers behind cutouts, orbiting glows, 10-row Gift Rewards boards & 4K PNG.",
+      title: "Unlock freeform box resizing, collector frames & 4K PNG",
+      body: "Drag & resize any cutout or panel to exact pixels, plus Cyber HUD, Celestial Filigree, Scrapbook & Plush Ribbon frames, custom wallpapers, orbiting glows, 10-row Gift Rewards boards & 4K PNG.",
     },
   };
 

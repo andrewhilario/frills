@@ -8,11 +8,15 @@ import {
   PLUS_FRAME_STYLES,
   PLUS_ROW_LIMIT,
   TIKTOK_SAFE_ZONES,
+  clampBoxRect,
   computeOutlineGeometry,
   effectiveOutlineSettings,
   encodeCardRows,
+  encodeCustomBoxes,
+  listEditableBoxes,
   outlineUrl,
   parseCardRows,
+  parseCustomBoxes,
   parseSocials,
   plusFeaturesUsed,
 } from "../src/js/outline.js";
@@ -129,8 +133,8 @@ test("all 7 TikTok LIVE 9:16 layouts stay horizontally symmetric, respect spacin
   assert.ok(b.cutouts[1].x > a.cutouts[1].x + 300, "swapSides flips camera and side slot horizontally");
 });
 
-test("all 4 outline modes compute valid non-overflowing geometry and URLs", () => {
-  for (const mode of ["screen9x16", "screen16x9", "box", "card"]) {
+test("all 3 outline modes compute valid non-overflowing geometry and URLs, and legacy card links fall back safely", () => {
+  for (const mode of ["screen9x16", "screen16x9", "box"]) {
     const geom = computeOutlineGeometry({ ...OUTLINE.defaults, mode });
     assert.ok(geom.width > 0 && geom.height > 0);
     for (const c of geom.cutouts) {
@@ -141,5 +145,45 @@ test("all 4 outline modes compute valid non-overflowing geometry and URLs", () =
     assert.equal(parsed.pathname, "/overlay/outline/");
     assert.ok(parsed.searchParams.toString().length > 0);
   }
+  const legacy = effectiveOutlineSettings({ ...OUTLINE.defaults, mode: "card" });
+  assert.equal(legacy.mode, "screen9x16");
+  assert.equal(computeOutlineGeometry({ ...OUTLINE.defaults, mode: "card" }).width, 1080);
+  assert.equal(plusFeaturesUsed({ ...OUTLINE.defaults, mode: "box", sideMode: "gifts", cardStyle: "quest" }).includes("Plus card layout"), false);
   assert.deepEqual(parseSocials("  TikTok @a | | Twitch /b "), ["TikTok @a", "Twitch /b"]);
+});
+
+test("Frills Plus custom box resize & placement round-trips, clamps safely, syncs decorAnchor, and falls back on Free links", () => {
+  const encoded = encodeCustomBoxes({
+    game: { x: 100, y: 280, w: 800, h: 420 },
+    cam: { x: 60, y: 740, w: 400, h: 360 },
+    bogus: { x: 1, y: 2, w: 3, h: 4 },
+  });
+  assert.equal(encoded, "game:100,280,800,420|cam:60,740,400,360");
+  assert.deepEqual(parseCustomBoxes(encoded), {
+    game: { x: 100, y: 280, w: 800, h: 420 },
+    cam: { x: 60, y: 740, w: 400, h: 360 },
+  });
+
+  // Circle clamping preserves square bounds inside the canvas
+  const circ = clampBoxRect("cam", { x: -50, y: 20, w: 600, h: 320 }, 900, 900, { shape: "circle" });
+  assert.equal(circ.w, circ.h);
+  assert.ok(circ.x >= 8 && circ.x + circ.w <= 892);
+
+  const raw = { ...OUTLINE.defaults, mode: "screen9x16", layout9: "tt-game-cam", customBoxes: encoded };
+  assert.ok(plusFeaturesUsed(raw).includes("custom box resize & placement"));
+
+  // Free direct link strips customBoxes; Plus link preserves it and updates decorAnchor
+  const freeEff = effectiveOutlineSettings(raw, { plusActive: false, previewAll: false });
+  assert.equal(freeEff.customBoxes, "");
+  const freeGeom = computeOutlineGeometry(freeEff);
+  assert.notEqual(freeGeom.cutouts[0].w, 800);
+
+  const plusEff = effectiveOutlineSettings(raw, { plusActive: true });
+  assert.equal(plusEff.customBoxes, encoded);
+  const plusGeom = computeOutlineGeometry(plusEff);
+  assert.equal(plusGeom.cutouts[0].x, 100);
+  assert.equal(plusGeom.cutouts[0].w, 800);
+  assert.equal(plusGeom.cutouts[0].h, 420);
+  assert.equal(plusGeom.decorAnchor.w, 800, "mascot decorAnchor follows resized primary cutout");
+  assert.ok(listEditableBoxes(plusGeom).length >= 5);
 });

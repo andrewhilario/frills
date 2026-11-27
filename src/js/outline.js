@@ -1,5 +1,5 @@
 // Stream Outline & Border Designer (/outline/ & /overlay/outline/):
-// Pure settings schema, TikTok-first Vertical 9:16 + 16:9 + Box + Info Card geometry engine with switchable Side Slot
+// Pure settings schema, TikTok-first Vertical 9:16 + 16:9 + Box geometry engine with switchable Side Slot
 // (Transparent Widget Cutout, TikTok Gift Menu / Rewards, Commands & Rules, or Hidden Wide Cam), spacing/split/swap
 // customization, TikTok LIVE UI safe-zone metrics, and Free vs. Frills Plus capability bounds.
 
@@ -15,7 +15,6 @@ export const OUTLINE_MODES = [
   ["screen9x16", "Vertical 9:16 (TikTok LIVE)"],
   ["screen16x9", "Full-Screen 16:9 (OBS / Twitch)"],
   ["box", "Webcam / VTuber Box"],
-  ["card", "Gift Menu / Info Card"],
 ];
 
 export const SIDE_MODES = [
@@ -191,6 +190,7 @@ export const OUTLINE = defineWidget({
     cardStyle: "cards",
     cardItems: DEFAULT_GIFT_MENU,
     highlightRow: -1,
+    customBoxes: "",
   },
   controls: [
     // Mode & layout geometry
@@ -238,6 +238,7 @@ export const OUTLINE = defineWidget({
     { section: "card", ...selectOf("cardStyle", "Card layout style", CARD_STYLES) },
     { section: "card", ...text("cardItems", "Card rows (encoded)", 600), hidden: true },
     { section: "card", ...number("highlightRow", "Highlighted row index", -1, PLUS_ROW_LIMIT - 1), hidden: true },
+    { section: "mode", ...text("customBoxes", "Custom box positions & sizes (Plus · encoded)", 700), hidden: true },
   ],
 });
 
@@ -297,7 +298,87 @@ export const isPlusFrameStyle = (style) => PLUS_FRAME_STYLES.includes(style);
 export const isPlusMotion = (motion) => PLUS_MOTIONS.includes(motion);
 export const isPlusCardStyle = (style) => PLUS_CARD_STYLES.includes(style);
 export const isPlusMatMode = (matMode) => matMode === "stars";
-export const hasSideCard = (s) => s.mode === "card" || s.sideMode === "gifts" || s.sideMode === "info";
+export const hasSideCard = (s) => (s.mode === "screen9x16" || s.mode === "screen16x9") && (s.sideMode === "gifts" || s.sideMode === "info");
+
+/** Allowed editable box IDs in `customBoxes` (`id:x,y,w,h|...`). */
+const VALID_BOX_IDS = new Set(["game", "cam", "widget", "chat", "host1", "host2", "main", "card", "nameplate", "banner", "promo"]);
+const STRIP_BOX_IDS = new Set(["nameplate", "banner", "promo"]);
+
+/** Returns the minimum safe logical pixel size for editable box `id`. */
+export function boxMinSize(id) {
+  return STRIP_BOX_IDS.has(id) ? { minW: 200, minH: 38 } : { minW: 160, minH: 110 };
+}
+
+/** Clamps one `{ x, y, w, h }` box cleanly inside the logical SVG canvas (preserving square bounds for circles). */
+export function clampBoxRect(id, rect, canvasW, canvasH, { shape = "rect" } = {}) {
+  const margin = 8;
+  const { minW, minH } = boxMinSize(id);
+  const maxW = Math.max(minW, canvasW - margin * 2);
+  const maxH = Math.max(minH, canvasH - margin * 2);
+  let w = Math.max(minW, Math.min(maxW, Math.round(Number(rect?.w) || minW)));
+  let h = Math.max(minH, Math.min(maxH, Math.round(Number(rect?.h) || minH)));
+  if (shape === "circle") {
+    const side = Math.max(minW, Math.min(maxW, maxH, Math.round((w + h) / 2)));
+    w = side;
+    h = side;
+  }
+  const x = Math.max(margin, Math.min(canvasW - w - margin, Math.round(Number(rect?.x) || margin)));
+  const y = Math.max(margin, Math.min(canvasH - h - margin, Math.round(Number(rect?.y) || margin)));
+  return { x, y, w, h };
+}
+
+/** Parses `game:48,260,984,540|cam:48,822,480,390` into `{ [id]: { x, y, w, h } }`. */
+export function parseCustomBoxes(raw) {
+  const out = {};
+  for (const chunk of String(raw ?? "").split("|")) {
+    const trimmed = chunk.trim();
+    if (!trimmed) continue;
+    const colon = trimmed.indexOf(":");
+    if (colon <= 0) continue;
+    const id = trimmed.slice(0, colon).trim();
+    if (!VALID_BOX_IDS.has(id)) continue;
+    const nums = trimmed.slice(colon + 1).split(",").map((n) => Math.round(Number(n)));
+    if (nums.length !== 4 || nums.some((n) => !Number.isFinite(n))) continue;
+    const [x, y, w, h] = nums;
+    if (w <= 0 || h <= 0) continue;
+    out[id] = { x, y, w, h };
+  }
+  return out;
+}
+
+/** Encodes `{ [id]: { x, y, w, h } }` back into a compact URL-safe string. */
+export function encodeCustomBoxes(map) {
+  const parts = [];
+  for (const [id, r] of Object.entries(map ?? {})) {
+    if (!VALID_BOX_IDS.has(id) || !r) continue;
+    const vals = [r.x, r.y, r.w, r.h].map((n) => Math.round(Number(n)));
+    if (vals.some((n) => !Number.isFinite(n)) || vals[2] <= 0 || vals[3] <= 0) continue;
+    parts.push(`${id}:${vals.join(",")}`);
+  }
+  return parts.join("|");
+}
+
+/** Lists every box on `geom` that can be selected, dragged, or resized in Frills Plus edit mode. */
+export function listEditableBoxes(geom) {
+  if (!geom) return [];
+  const list = [];
+  for (const c of geom.cutouts ?? []) {
+    list.push({ id: c.id, label: c.label || c.id, x: c.x, y: c.y, w: c.w, h: c.h, shape: c.shape || "rect", kind: "cutout" });
+  }
+  if (geom.cardRect) {
+    list.push({ id: "card", label: "Side Card", x: geom.cardRect.x, y: geom.cardRect.y, w: geom.cardRect.w, h: geom.cardRect.h, shape: "rect", kind: "card" });
+  }
+  if (geom.bannerRect) {
+    list.push({ id: "banner", label: "Top Banner", x: geom.bannerRect.x, y: geom.bannerRect.y, w: geom.bannerRect.w, h: geom.bannerRect.h, shape: "rect", kind: "banner" });
+  }
+  if (geom.nameplateRect) {
+    list.push({ id: "nameplate", label: "Nameplate", x: geom.nameplateRect.x, y: geom.nameplateRect.y, w: geom.nameplateRect.w, h: geom.nameplateRect.h, shape: "rect", kind: "nameplate" });
+  }
+  if (geom.promoRect) {
+    list.push({ id: "promo", label: "Callout Strip", x: geom.promoRect.x, y: geom.promoRect.y, w: geom.promoRect.w, h: geom.promoRect.h, shape: "rect", kind: "promo" });
+  }
+  return list;
+}
 
 /** Lists all Frills Plus features currently selected in `settings` (for editor badges and subtle prompts). */
 export function plusFeaturesUsed(settings) {
@@ -306,6 +387,7 @@ export function plusFeaturesUsed(settings) {
   if (isPlusMotion(settings.motion)) used.push("animated border motion");
   if (isPlusMatMode(settings.matMode)) used.push("starry backdrop");
   if (settings.matImage) used.push("custom wallpaper backdrop");
+  if (Object.keys(parseCustomBoxes(settings.customBoxes)).length > 0) used.push("custom box resize & placement");
   if (hasSideCard(settings)) {
     if (isPlusCardStyle(settings.cardStyle)) used.push("Plus card layout");
     if (parseCardRows(settings.cardItems, { limit: PLUS_ROW_LIMIT }).length > FREE_ROW_LIMIT) {
@@ -323,8 +405,7 @@ export function plusFeaturesUsed(settings) {
  * - On Free direct links (`plusActive: false, previewAll: false`), Plus-only picks gracefully fall back to clean Free defaults.
  */
 export function effectiveOutlineSettings(rawSettings, { plusActive = false, previewAll = false } = {}) {
-  const normalizedRaw = rawSettings?.mode === "agenda" ? { ...rawSettings, mode: "card" } : rawSettings;
-  const s = OUTLINE.sanitize(normalizedRaw);
+  const s = OUTLINE.sanitize(rawSettings);
   const allowPlus = Boolean(plusActive || previewAll);
   const frameStyle = allowPlus || !isPlusFrameStyle(s.frameStyle) ? s.frameStyle : "sticker";
   const motion = allowPlus || !isPlusMotion(s.motion) ? s.motion : "breathe";
@@ -337,6 +418,7 @@ export function effectiveOutlineSettings(rawSettings, { plusActive = false, prev
   const socials = allowPlus ? parseSocials(s.socials) : [];
   const customBadge = allowPlus ? s.customBadge : "";
   const matImage = allowPlus ? s.matImage : "";
+  const customBoxes = allowPlus ? encodeCustomBoxes(parseCustomBoxes(s.customBoxes)) : "";
   return {
     ...s,
     frameStyle,
@@ -348,6 +430,7 @@ export function effectiveOutlineSettings(rawSettings, { plusActive = false, prev
     socials,
     customBadge,
     matImage,
+    customBoxes,
     plusUnlocked: allowPlus,
   };
 }
@@ -361,39 +444,54 @@ export const TIKTOK_SAFE_ZONES = Object.freeze({
   safeRect: { x: 40, y: 204, w: 1000, h: 1252 },
 });
 
+/** Applies validated Frills Plus `customBoxes` overrides on top of preset layout geometry. */
+function applyCustomBoxes(geom, rawOverrides) {
+  const overrides = parseCustomBoxes(rawOverrides);
+  if (Object.keys(overrides).length === 0) return geom;
+  const cutouts = geom.cutouts.map((c) => {
+    const ov = overrides[c.id];
+    if (!ov) return c;
+    return { ...c, ...clampBoxRect(c.id, ov, geom.width, geom.height, { shape: c.shape }) };
+  });
+  let cardRect = geom.cardRect;
+  if (cardRect && overrides.card) {
+    const next = clampBoxRect("card", overrides.card, geom.width, geom.height);
+    cardRect = { ...cardRect, ...next, compact: next.w > next.h * 2.4 };
+  }
+  const bannerRect = geom.bannerRect && overrides.banner
+    ? { ...geom.bannerRect, ...clampBoxRect("banner", overrides.banner, geom.width, geom.height) }
+    : geom.bannerRect;
+  const nameplateRect = geom.nameplateRect && overrides.nameplate
+    ? { ...geom.nameplateRect, ...clampBoxRect("nameplate", overrides.nameplate, geom.width, geom.height) }
+    : geom.nameplateRect;
+  const promoRect = geom.promoRect && overrides.promo
+    ? { ...geom.promoRect, ...clampBoxRect("promo", overrides.promo, geom.width, geom.height) }
+    : geom.promoRect;
+  const anchorId = geom.decorAnchor?.id;
+  const decorAnchor = anchorId ? (cutouts.find((c) => c.id === anchorId) || geom.decorAnchor) : geom.decorAnchor;
+  return { ...geom, cutouts, cardRect, bannerRect, nameplateRect, promoRect, decorAnchor };
+}
+
 /**
  * Computes the logical SVG canvas dimensions (`width`, `height`), transparent `cutouts` (including the
  * transparent Widget Box cutout when `sideMode === "widget"`), optional `cardRect` (when `sideMode` is
- * `"gifts"` or `"info"`, or standalone `mode === "card"`), `nameplateRect`, `bannerRect`, `promoRect`,
- * and `lowerChatRect`.
+ * `"gifts"` or `"info"`), `nameplateRect`, `bannerRect`, `promoRect`, and `lowerChatRect`.
  */
 export function computeOutlineGeometry(settings) {
-  const mode = settings.mode === "agenda" ? "card" : (settings.mode || "screen9x16");
+  return applyCustomBoxes(computeBaseOutlineGeometry(settings), settings?.customBoxes);
+}
+
+function computeBaseOutlineGeometry(settings) {
+  const rawMode = settings.mode || "screen9x16";
+  const mode = rawMode === "screen16x9" || rawMode === "box" ? rawMode : "screen9x16";
   const sideMode = settings.sideMode || "widget";
   const sideIsWidget = sideMode === "widget";
   const sideIsCard = sideMode === "gifts" || sideMode === "info";
   const hasSide = sideIsWidget || sideIsCard;
-  const showName = mode === "card" ? false : Boolean(settings.showName);
+  const showName = Boolean(settings.showName);
   const lbl1 = (fallback) => String(settings.slot1Label || "").trim() || fallback;
   const lbl2 = (fallback) => String(settings.slot2Label || "").trim() || fallback;
   const widgetLbl = String(settings.widgetSlotLabel || "").trim() || "CHAT / WIDGETS";
-
-  if (mode === "card") {
-    const isTicker = settings.cardStyle === "ticker";
-    return {
-      mode,
-      width: isTicker ? 1280 : 540,
-      height: isTicker ? 156 : 700,
-      hasMat: false,
-      cutouts: [],
-      cardRect: isTicker ? { x: 24, y: 20, w: 1232, h: 116 } : { x: 24, y: 24, w: 492, h: 652 },
-      nameplateRect: null,
-      bannerRect: null,
-      promoRect: null,
-      lowerChatRect: null,
-      decorAnchor: isTicker ? { x: 24, y: 20, w: 1232, h: 116 } : { x: 24, y: 24, w: 492, h: 652 },
-    };
-  }
 
   if (mode === "box") {
     const dims = {

@@ -1,5 +1,5 @@
 // Stream Outline & Border Designer editor (/outline/):
-// Purely visual (no channel or relay required), TikTok-first 9:16 + 16:9 + Webcam Box + Gift Menu / Info Card,
+// Purely visual (no channel or relay required), TikTok-first 9:16 + 16:9 + Webcam Box,
 // switchable Side Slot (Transparent Widget Box, Gift Menu, Commands & Rules, or Hidden Wide Cam),
 // TikTok LIVE safe-zone toggle, client-side transparent PNG exporter (1080p Free / 4K Plus), and Frills Plus cloud sync.
 
@@ -19,11 +19,15 @@ import {
   FREE_ROW_LIMIT,
   OUTLINE,
   PLUS_ROW_LIMIT,
+  clampBoxRect,
   computeOutlineGeometry,
   encodeCardRows,
+  encodeCustomBoxes,
   hasSideCard,
+  listEditableBoxes,
   outlineUrl,
   parseCardRows,
+  parseCustomBoxes,
   plusFeaturesUsed,
 } from "./outline.js";
 import { createOutlineView } from "./outline-view.js";
@@ -44,6 +48,8 @@ let plusActive = false;
 let plusEligible = false;
 let showSafeZones = false;
 let showCutoutHints = true;
+let editBoxes = false;
+let selectedBox = "";
 
 let liveChannel = null;
 try {
@@ -62,6 +68,23 @@ const view = createOutlineView($("widget"), {
   previewAll: true,
   editorOnly: true,
   onRowClick: (idx) => toggleHighlightRow(idx),
+  onSelectBox: (id) => {
+    if (selectedBox !== id) {
+      selectedBox = id;
+      paint();
+    }
+  },
+  onBoxChange: (id, rect) => {
+    selectedBox = id;
+    const map = parseCustomBoxes(settings.customBoxes);
+    map[id] = rect;
+    settings.customBoxes = encodeCustomBoxes(map);
+    paint();
+  },
+  onBoxCommit: () => {
+    saveLocal();
+    paint();
+  },
 });
 
 const writers = {};
@@ -93,9 +116,8 @@ function syncVisibility() {
   const is9 = m === "screen9x16";
   const is16 = m === "screen16x9";
   const isBox = m === "box";
-  const isCardOnly = m === "card";
   const cardOn = hasSideCard(settings);
-  const sideIsWidget = !isCardOnly && !isBox && settings.sideMode === "widget";
+  const sideIsWidget = !isBox && settings.sideMode === "widget";
   const setHidden = (key, hide) => {
     const row = rowsByKey.get(key);
     if (row) row.hidden = hide;
@@ -112,7 +134,7 @@ function syncVisibility() {
   // Spacing & split customization controls
   setHidden("topPad", !is9);
   setHidden("botPad", !is9);
-  setHidden("sidePad", isCardOnly);
+  setHidden("sidePad", false);
   const hasSplit = is9 && !["tt-perimeter", "tt-vtuber", "tt-split-cam"].includes(settings.layout9);
   setHidden("splitPct", !hasSplit);
   const canSwap = (is9 && ["tt-game-cam", "tt-cam-top", "tt-chat-focus", "tt-split-cam"].includes(settings.layout9))
@@ -143,12 +165,12 @@ function syncVisibility() {
   setHidden("showPromo", !showExtras);
   setHidden("promoText", !showExtras || !settings.showPromo);
 
-  setHidden("showName", isCardOnly);
-  setHidden("handle", isCardOnly || !settings.showName);
-  setHidden("tagline", isCardOnly || !settings.showName);
-  setHidden("socials", isCardOnly || !settings.showName);
-  setHidden("namePos", isCardOnly || !settings.showName);
-  setHidden("liveBadge", isCardOnly || !settings.showName);
+  setHidden("showName", false);
+  setHidden("handle", !settings.showName);
+  setHidden("tagline", !settings.showName);
+  setHidden("socials", !settings.showName);
+  setHidden("namePos", !settings.showName);
+  setHidden("liveBadge", !settings.showName);
 
   // Gift Menu / Commands card controls
   setHidden("cardTitle", !cardOn);
@@ -175,9 +197,18 @@ function syncVisibility() {
   }
   const hintsBtn = $("ol-hints-toggle");
   if (hintsBtn) {
-    hintsBtn.hidden = isCardOnly;
+    hintsBtn.hidden = false;
     hintsBtn.setAttribute("aria-pressed", String(showCutoutHints));
   }
+  const editBtn = $("ol-edit-toggle");
+  if (editBtn) {
+    editBtn.setAttribute("aria-pressed", String(editBoxes));
+  }
+  const hasCustomBoxes = Object.keys(parseCustomBoxes(settings.customBoxes)).length > 0;
+  const resetBoxesBtn = $("ol-reset-boxes");
+  if (resetBoxesBtn) resetBoxesBtn.hidden = !hasCustomBoxes;
+  const boxInspector = $("ol-box-inspector");
+  if (boxInspector) boxInspector.hidden = !editBoxes;
   const prevBtn = $("ol-prev-step");
   const nextBtn = $("ol-next-step");
   if (prevBtn) prevBtn.hidden = !cardOn;
@@ -187,13 +218,63 @@ function syncVisibility() {
   if (okWrap) okWrap.hidden = false;
 }
 
+function syncBoxInspector() {
+  const inspector = $("ol-box-inspector");
+  if (!inspector) return;
+  const geom = computeOutlineGeometry(settings);
+  const boxes = listEditableBoxes(geom);
+  if (!boxes.length) {
+    selectedBox = "";
+    return;
+  }
+  if (!boxes.some((b) => b.id === selectedBox)) selectedBox = boxes[0].id;
+  const active = boxes.find((b) => b.id === selectedBox) || boxes[0];
+  const sel = $("ol-box-select");
+  if (sel) {
+    const sig = boxes.map((b) => `${b.id}:${b.label}`).join("|");
+    if (sel.dataset.sig !== sig) {
+      sel.replaceChildren(
+        ...boxes.map((b) => {
+          const opt = document.createElement("option");
+          opt.value = b.id;
+          opt.textContent = b.label;
+          return opt;
+        }),
+      );
+      sel.dataset.sig = sig;
+    }
+    sel.value = active.id;
+  }
+  const setVal = (id, v) => {
+    const el = $(id);
+    if (el && document.activeElement !== el) el.value = String(v);
+  };
+  setVal("ol-box-w", active.w);
+  setVal("ol-box-h", active.h);
+  setVal("ol-box-x", active.x);
+  setVal("ol-box-y", active.y);
+  const map = parseCustomBoxes(settings.customBoxes);
+  const resetOne = $("ol-box-reset-one");
+  const resetAll = $("ol-box-reset-all");
+  if (resetOne) resetOne.disabled = !map[active.id];
+  if (resetAll) resetAll.disabled = Object.keys(map).length === 0;
+}
+
 function syncPlusBanner() {
   const banner = $("ol-plus-banner");
   const export4k = $("ol-export-2x");
+  const editBtn = $("ol-edit-toggle");
+  const boxBadge = $("ol-box-badge");
   const used = plusFeaturesUsed(settings);
   const showPlusCta = document.body?.dataset?.plusAccounts === "on" && plusEligible;
   if (export4k) {
     export4k.textContent = plusActive ? "4K PNG" : "4K PNG (Plus)";
+  }
+  if (editBtn) {
+    editBtn.textContent = plusActive ? "Resize boxes" : "Resize boxes (Plus)";
+  }
+  if (boxBadge) {
+    boxBadge.textContent = plusActive ? "Plus active" : "Frills Plus";
   }
   if (!banner) return;
   if (plusActive || used.length === 0) {
@@ -243,8 +324,7 @@ const sizeGuide = mountSizeGuide({
     const geom = computeOutlineGeometry(settings);
     const label = settings.mode === "screen9x16" ? "9:16 TikTok LIVE"
       : settings.mode === "screen16x9" ? "16:9 Full-Screen"
-      : settings.mode === "box" ? "Webcam / VTuber Box"
-      : "Gift Menu / Info Card";
+      : "Webcam / VTuber Box";
     return {
       width: geom.width,
       height: geom.height,
@@ -268,13 +348,20 @@ function refreshLink() {
 
 function paint() {
   syncVisibility();
+  syncBoxInspector();
   syncPlusBanner();
-  view.apply(settings, { plusActive, showSafeZones, showCutoutHints });
+  view.apply(settings, { plusActive, showSafeZones, showCutoutHints, editBoxes, selectedBox });
   refreshLink();
 }
 
+const RESET_BOXES_KEYS = new Set(["mode", "layout9", "layout16", "boxAspect"]);
+
 function change(key, value) {
   settings[key] = value;
+  if (RESET_BOXES_KEYS.has(key)) {
+    settings.customBoxes = "";
+    selectedBox = "";
+  }
   // Auto-swap default card rows when flipping between Gift Menu & Commands/Rules
   if (key === "sideMode") {
     if (value === "gifts" && settings.cardItems === DEFAULT_INFO_ITEMS) {
@@ -469,7 +556,8 @@ for (const btn of document.querySelectorAll("[data-tt-preset]")) {
   btn.addEventListener("click", () => {
     const preset = TIKTOK_PRESETS[btn.dataset.ttPreset];
     if (!preset) return;
-    settings = OUTLINE.sanitize({ ...settings, ...preset });
+    settings = OUTLINE.sanitize({ ...settings, ...preset, customBoxes: "" });
+    selectedBox = "";
     syncAllControls();
     paint();
     saveLocal();
@@ -526,7 +614,7 @@ function commitRows(rows) {
 function renderCardRows() {
   if (!rowListEl) return;
   const rows = getRows();
-  const isGifts = settings.sideMode === "gifts" || (settings.mode === "card" && settings.sideMode !== "info");
+  const isGifts = settings.sideMode === "gifts";
   rowListEl.replaceChildren();
   rows.forEach((rowData, idx) => {
     const row = document.createElement("div");
@@ -596,7 +684,7 @@ function renderCardRows() {
 rowAddBtn?.addEventListener("click", () => {
   const next = getRows();
   if (next.length >= PLUS_ROW_LIMIT) return;
-  const isGifts = settings.sideMode === "gifts" || (settings.mode === "card" && settings.sideMode !== "info");
+  const isGifts = settings.sideMode === "gifts";
   next.push(isGifts ? { label: "🎁 Gift", value: "Custom reward" } : { label: "!cmd", value: "Command info" });
   settings.cardItems = encodeCardRows(next, { limit: PLUS_ROW_LIMIT });
   renderCardRows();
@@ -624,7 +712,7 @@ sampleInfoBtn?.addEventListener("click", () => {
   saveLocal();
 });
 
-// ── Preview bar actions ───────────────────────────────────────────────────────────────────────────────────────
+// ── Preview bar actions & Frills Plus box resize inspector ────────────────────────────────────────────────────
 $("ol-prev-step")?.addEventListener("click", () => stepHighlight(-1));
 $("ol-next-step")?.addEventListener("click", () => stepHighlight(1));
 $("ol-safe-toggle")?.addEventListener("click", () => {
@@ -634,6 +722,98 @@ $("ol-safe-toggle")?.addEventListener("click", () => {
 $("ol-hints-toggle")?.addEventListener("click", () => {
   showCutoutHints = !showCutoutHints;
   paint();
+});
+$("ol-edit-toggle")?.addEventListener("click", () => {
+  editBoxes = !editBoxes;
+  paint();
+});
+
+function clearAllCustomBoxes() {
+  if (!settings.customBoxes) return;
+  settings.customBoxes = "";
+  paint();
+  saveLocal();
+}
+
+$("ol-reset-boxes")?.addEventListener("click", clearAllCustomBoxes);
+$("ol-box-reset-all")?.addEventListener("click", clearAllCustomBoxes);
+
+$("ol-box-select")?.addEventListener("change", (e) => {
+  selectedBox = e.currentTarget.value;
+  paint();
+});
+
+function updateSelectedBoxFromInputs(commit) {
+  const geom = computeOutlineGeometry(settings);
+  const active = listEditableBoxes(geom).find((b) => b.id === selectedBox);
+  if (!active) return;
+  const readNum = (id, fallback) => {
+    const raw = Number($(id)?.value);
+    return Number.isFinite(raw) ? raw : fallback;
+  };
+  const next = clampBoxRect(
+    active.id,
+    {
+      x: readNum("ol-box-x", active.x),
+      y: readNum("ol-box-y", active.y),
+      w: readNum("ol-box-w", active.w),
+      h: readNum("ol-box-h", active.h),
+    },
+    geom.width,
+    geom.height,
+    { shape: active.shape },
+  );
+  const map = parseCustomBoxes(settings.customBoxes);
+  map[active.id] = next;
+  settings.customBoxes = encodeCustomBoxes(map);
+  paint();
+  if (commit) saveLocal();
+}
+
+for (const id of ["ol-box-w", "ol-box-h", "ol-box-x", "ol-box-y"]) {
+  $(id)?.addEventListener("input", () => updateSelectedBoxFromInputs(false));
+  $(id)?.addEventListener("change", () => updateSelectedBoxFromInputs(true));
+}
+
+$("ol-box-center")?.addEventListener("click", () => {
+  const geom = computeOutlineGeometry(settings);
+  const active = listEditableBoxes(geom).find((b) => b.id === selectedBox);
+  if (!active) return;
+  const cx = Math.round((geom.width - active.w) / 2);
+  const map = parseCustomBoxes(settings.customBoxes);
+  map[active.id] = clampBoxRect(active.id, { ...active, x: cx }, geom.width, geom.height, { shape: active.shape });
+  settings.customBoxes = encodeCustomBoxes(map);
+  paint();
+  saveLocal();
+});
+
+$("ol-box-reset-one")?.addEventListener("click", () => {
+  const map = parseCustomBoxes(settings.customBoxes);
+  if (!map[selectedBox]) return;
+  delete map[selectedBox];
+  settings.customBoxes = encodeCustomBoxes(map);
+  paint();
+  saveLocal();
+});
+
+// Keyboard Arrow nudging when Resize boxes mode is active (outside text inputs)
+document.addEventListener("keydown", (e) => {
+  if (!editBoxes || !selectedBox) return;
+  if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) return;
+  const tag = document.activeElement?.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+  const geom = computeOutlineGeometry(settings);
+  const active = listEditableBoxes(geom).find((b) => b.id === selectedBox);
+  if (!active) return;
+  e.preventDefault();
+  const step = e.shiftKey ? 1 : 8;
+  const dx = e.key === "ArrowLeft" ? -step : e.key === "ArrowRight" ? step : 0;
+  const dy = e.key === "ArrowUp" ? -step : e.key === "ArrowDown" ? step : 0;
+  const map = parseCustomBoxes(settings.customBoxes);
+  map[active.id] = clampBoxRect(active.id, { ...active, x: active.x + dx, y: active.y + dy }, geom.width, geom.height, { shape: active.shape });
+  settings.customBoxes = encodeCustomBoxes(map);
+  paint();
+  saveLocal();
 });
 
 function syncAllControls() {
@@ -647,6 +827,8 @@ function syncAllControls() {
 $("reset")?.addEventListener("click", () => {
   settings = { ...OUTLINE.defaults };
   showSafeZones = false;
+  editBoxes = false;
+  selectedBox = "";
   syncAllControls();
   paint();
   saveLocal();
@@ -676,14 +858,30 @@ async function handlePngExport(scale, button) {
   const prevText = button.textContent;
   button.disabled = true;
   button.textContent = "Rendering PNG…";
+  const usedPlus = plusFeaturesUsed(settings);
+  const useFreeFallback = !plusActive && usedPlus.length > 0;
+  let tempHost = null;
+  let tempView = null;
   try {
-    const { blob, width, height } = await exportOutlinePng(view.getSvg(), { scale });
+    let sourceSvg = view.getSvg();
+    if (useFreeFallback) {
+      tempHost = document.createElement("div");
+      tempView = createOutlineView(tempHost, { previewAll: false, editorOnly: false });
+      tempView.apply(settings, { plusActive: false, showSafeZones: false, showCutoutHints: false });
+      sourceSvg = tempView.getSvg();
+    }
+    const { blob, width, height } = await exportOutlinePng(sourceSvg, { scale });
     const name = `frills-outline-${settings.mode}-${settings.frameStyle}-${width}x${height}.png`;
     downloadBlob(blob, name);
-    if (linkHint) linkHint.textContent = `Downloaded transparent PNG (${width} × ${height} px). Add as an Image Source in OBS or TikTok LIVE Studio.`;
+    if (linkHint) {
+      linkHint.textContent = useFreeFallback
+        ? `Downloaded Free 1080p PNG (${width} × ${height} px, Plus preview features fell back to Free defaults). Unlock custom box sizing & Plus styles with Frills Plus.`
+        : `Downloaded transparent PNG (${width} × ${height} px). Add as an Image Source in OBS or TikTok LIVE Studio.`;
+    }
   } catch (err) {
     if (linkHint) linkHint.textContent = err?.message || "Could not export PNG in this browser.";
   } finally {
+    tempView?.destroy();
     button.disabled = false;
     button.textContent = prevText;
   }

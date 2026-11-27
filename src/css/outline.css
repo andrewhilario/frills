@@ -300,3 +300,147 @@
   text-transform: uppercase;
   color: var(--color-ink-2);
 }
+
+/* Interactive Frills Plus box drag & resize canvas cursors + precision inspector */
+.ol-wrap[data-editing="true"] {
+  touch-action: none;
+  user-select: none;
+}
+.ol-edit-hit {
+  cursor: pointer;
+}
+.ol-edit-hit--selected {
+  cursor: move;
+}
+.ol-edit-outline,
+.ol-edit-badge,
+.ol-edit-badge-text,
+.ol-snap-line {
+  pointer-events: none;
+}
+.ol-edit-handle--nw,
+.ol-edit-handle--se {
+  cursor: nwse-resize;
+}
+.ol-edit-handle--ne,
+.ol-edit-handle--sw {
+  cursor: nesw-resize;
+}
+.ol-edit-handle--n,
+.ol-edit-handle--s {
+  cursor: ns-resize;
+}
+.ol-edit-handle--e,
+.ol-edit-handle--w {
+  cursor: ew-resize;
+}
+
+.ol-edit-btn[aria-pressed="true"] {
+  --btn-face: var(--color-accent);
+  --btn-ink: var(--color-accent-ink);
+  --btn-edge: var(--color-accent-deep);
+  --btn-cast: var(--color-accent-cast);
+  box-shadow: 0 4px 0 0 var(--btn-edge), 0 6px 12px -3px var(--btn-cast);
+}
+
+.ol-box-inspector {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  border-radius: var(--radius-input);
+  background: var(--color-paper-2);
+  border: 1px dashed var(--color-rule-2);
+  min-width: 0;
+}
+.ol-box-inspector[hidden] {
+  display: none;
+}
+.ol-box-inspector__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+.ol-box-inspector__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-ink);
+  line-height: 1.2;
+}
+.ol-box-inspector__badge {
+  flex: none;
+  padding: var(--space-3xs) var(--space-xs);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-tint);
+  border: 1px solid var(--color-ink);
+  color: var(--color-ink);
+  font-family: var(--font-label);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.ol-box-inspector__pick {
+  margin: 0;
+}
+.ol-box-dims {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-xs);
+  min-width: 0;
+}
+.ol-dim {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2xs);
+  min-width: 0;
+}
+.ol-dim__label {
+  font-family: var(--font-label);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-ink-2);
+  line-height: 1.2;
+}
+.ol-dim__input {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-input);
+  border: 1px solid var(--color-rule-2);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-label);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  outline: 2px solid transparent;
+  outline-offset: 1px;
+  transition: background-color var(--dur-micro) var(--ease-out), border-color var(--dur-micro) var(--ease-out);
+}
+@media (hover: hover) {
+  .ol-dim__input:hover:not(:disabled) {
+    background: var(--color-paper-3);
+    border-color: var(--color-ink-2);
+  }
+}
+.ol-dim__input:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+  border-color: var(--color-ink);
+  transition: none;
+}
+.ol-dim__input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.ol-box-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}

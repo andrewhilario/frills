@@ -8,8 +8,11 @@ import { mediaUrl } from "./alerts-settings.js";
 import {
   OUTLINE_BACKDROPS,
   TIKTOK_SAFE_ZONES,
+  boxMinSize,
+  clampBoxRect,
   computeOutlineGeometry,
   effectiveOutlineSettings,
+  listEditableBoxes,
 } from "./outline.js";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
@@ -527,7 +530,7 @@ function buildNameplate(rect, s, ids, socialIdx) {
 function buildSideCardPanel(rect, s, ids, { onRowClick } = {}) {
   const { x, y, w, h, compact = false } = rect;
   const font = FONTS[s.font] || FONTS.Fredoka;
-  const isGifts = s.sideMode === "gifts" || (s.mode === "card" && s.sideMode !== "info");
+  const isGifts = s.sideMode === "gifts";
   const rows = s.rows.length ? s.rows : [{ label: isGifts ? "🌹 Rose" : "!sr", value: isGifts ? "Shoutout" : "Request a song" }];
   const hi = s.highlightRow;
   const useTicker = s.cardStyle === "ticker" || (compact && w > h * 2.4);
@@ -604,22 +607,20 @@ function buildSideCardPanel(rect, s, ids, { onRowClick } = {}) {
   // Vertical card styles: cards, pills, quest
   const isQuest = s.cardStyle === "quest";
   const isPills = s.cardStyle === "pills";
-  const hasCardDecor = s.mode === "card" && ((s.artPack && s.artPack !== "none") || Boolean(s.customBadge));
-  const topOffset = hasCardDecor ? 24 : 0;
-  const headerH = (isQuest ? 62 : 56) + topOffset;
+  const headerH = isQuest ? 62 : 56;
 
   if (isQuest) {
     g.append(
-      svgEl("rect", { x: x + 16, y: y + 14 + topOffset, width: w - 32, height: 42, rx: 10, fill: rgba(s.accent, 0.22), stroke: s.accent, "stroke-width": 2 }),
-      svgEl("path", { d: star4Path(x + 36, y + 35 + topOffset, 9), fill: s.pop }),
-      svgEl("text", { x: x + 54, y: y + 41 + topOffset, fill: textCol, "font-family": font, "font-size": 19, "font-weight": 800, "letter-spacing": "0.06em" }, heading.toUpperCase()),
-      svgEl("text", { x: x + w - 28, y: y + 40 + topOffset, "text-anchor": "end", fill: s.pop, "font-family": font, "font-size": 13, "font-weight": 800 }, isGifts ? "LOOT" : "GUIDE"),
+      svgEl("rect", { x: x + 16, y: y + 14, width: w - 32, height: 42, rx: 10, fill: rgba(s.accent, 0.22), stroke: s.accent, "stroke-width": 2 }),
+      svgEl("path", { d: star4Path(x + 36, y + 35, 9), fill: s.pop }),
+      svgEl("text", { x: x + 54, y: y + 41, fill: textCol, "font-family": font, "font-size": 19, "font-weight": 800, "letter-spacing": "0.06em" }, heading.toUpperCase()),
+      svgEl("text", { x: x + w - 28, y: y + 40, "text-anchor": "end", fill: s.pop, "font-family": font, "font-size": 13, "font-weight": 800 }, isGifts ? "LOOT" : "GUIDE"),
     );
   } else {
     g.append(
-      svgEl("text", { x: x + padX, y: y + 40 + topOffset, fill: textCol, "font-family": font, "font-size": 23, "font-weight": 800 }, heading),
-      svgEl("rect", { x: x + w - 92, y: y + 18 + topOffset, width: 70, height: 28, rx: 14, fill: rgba(s.accent, 0.24), stroke: s.accent, "stroke-width": 1.5 }),
-      svgEl("text", { x: x + w - 57, y: y + 37 + topOffset, "text-anchor": "middle", fill: textCol, "font-family": font, "font-size": 12, "font-weight": 800, "letter-spacing": "0.06em" }, isGifts ? "GIFTS" : "INFO"),
+      svgEl("text", { x: x + padX, y: y + 40, fill: textCol, "font-family": font, "font-size": 23, "font-weight": 800 }, heading),
+      svgEl("rect", { x: x + w - 92, y: y + 18, width: 70, height: 28, rx: 14, fill: rgba(s.accent, 0.24), stroke: s.accent, "stroke-width": 1.5 }),
+      svgEl("text", { x: x + w - 57, y: y + 37, "text-anchor": "middle", fill: textCol, "font-family": font, "font-size": 12, "font-weight": 800, "letter-spacing": "0.06em" }, isGifts ? "GIFTS" : "INFO"),
     );
   }
 
@@ -899,21 +900,317 @@ function buildSafeZoneGuide() {
   return g;
 }
 
+/** Editor-only interactive box selection, 8 resize handles, live pixel readout, and snap guides (Frills Plus). */
+function buildEditOverlay(geom, selectedId, snapLines) {
+  const g = svgEl("g", { class: "ol-edit-layer", "data-editor-only": "1" });
+  const boxes = listEditableBoxes(geom);
+  if (!boxes.length) return g;
+
+  // Magnetic snap guide lines shown while dragging/resizing
+  for (const vx of snapLines?.vertical ?? []) {
+    g.append(svgEl("line", { class: "ol-snap-line", x1: vx, y1: 0, x2: vx, y2: geom.height, stroke: "#5ce1e6", "stroke-width": 2.5, "stroke-dasharray": "10 8" }));
+  }
+  for (const hy of snapLines?.horizontal ?? []) {
+    g.append(svgEl("line", { class: "ol-snap-line", x1: 0, y1: hy, x2: geom.width, y2: hy, stroke: "#5ce1e6", "stroke-width": 2.5, "stroke-dasharray": "10 8" }));
+  }
+
+  const active = boxes.find((b) => b.id === selectedId) || boxes[0];
+  for (const b of boxes) {
+    const isSel = b.id === active.id;
+    g.append(
+      svgEl("rect", {
+        class: isSel ? "ol-edit-hit ol-edit-hit--selected" : "ol-edit-hit",
+        "data-ol-box": b.id,
+        x: b.x,
+        y: b.y,
+        width: b.w,
+        height: b.h,
+        rx: b.shape === "circle" ? Math.round(Math.min(b.w, b.h) / 2) : 10,
+        fill: isSel ? "rgba(246, 211, 74, 0.08)" : "rgba(255, 255, 255, 0.001)",
+        stroke: isSel ? "none" : "rgba(255, 255, 255, 0.48)",
+        "stroke-width": isSel ? 0 : 2.5,
+        "stroke-dasharray": isSel ? undefined : "10 8",
+      }),
+    );
+  }
+
+  // High-contrast double-stroke selection box on active target
+  const { x, y, w, h } = active;
+  const strokeW = Math.max(3, Math.round(geom.width * 0.0032));
+  g.append(
+    svgEl("rect", {
+      class: "ol-edit-outline",
+      x,
+      y,
+      width: w,
+      height: h,
+      rx: 6,
+      fill: "none",
+      stroke: "#141720",
+      "stroke-width": strokeW + 3,
+    }),
+    svgEl("rect", {
+      class: "ol-edit-outline",
+      x,
+      y,
+      width: w,
+      height: h,
+      rx: 6,
+      fill: "none",
+      stroke: "#f6d34a",
+      "stroke-width": strokeW,
+      "stroke-dasharray": "12 8",
+    }),
+  );
+
+  // Live logical pixel readout badge (`W × H px`), tucked cleanly clear of handles and neighboring banners
+  const hs = Math.max(18, Math.round(geom.width * 0.017));
+  const badgeFont = Math.max(20, Math.round(geom.width * 0.02));
+  const badgeText = `${active.label}: ${w} × ${h} px`;
+  const badgeW = Math.min(geom.width - 24, Math.max(196, Math.round(badgeText.length * badgeFont * 0.58 + 32)));
+  const badgeH = Math.round(badgeFont * 1.75);
+  const badgeX = Math.max(12, Math.min(geom.width - badgeW - 12, Math.round(x + w / 2 - badgeW / 2)));
+  const insideTop = y + Math.round(hs / 2) + 14;
+  const aboveTop = y - badgeH - Math.round(hs / 2) - 10;
+  const belowBot = y + h + Math.round(hs / 2) + 10;
+  const badgeY = h >= badgeH + hs + 34
+    ? insideTop
+    : aboveTop >= 12
+      ? aboveTop
+      : Math.min(geom.height - badgeH - 12, belowBot);
+  g.append(
+    svgEl("rect", { class: "ol-edit-badge", x: badgeX, y: badgeY, width: badgeW, height: badgeH, rx: Math.round(badgeH / 2), fill: "#141720", stroke: "#f6d34a", "stroke-width": 2.5 }),
+    svgEl("text", {
+      class: "ol-edit-badge-text",
+      x: badgeX + badgeW / 2,
+      y: badgeY + badgeH / 2 + Math.round(badgeFont * 0.34),
+      "text-anchor": "middle",
+      fill: "#fffdf6",
+      "font-family": "system-ui, sans-serif",
+      "font-size": badgeFont,
+      "font-weight": 800,
+    }, badgeText),
+  );
+
+  // 8 corner & edge handles with generous invisible hit targets
+  const hit = Math.round(hs * 2.2);
+  const handles = [
+    ["nw", x, y],
+    ["n", x + w / 2, y],
+    ["ne", x + w, y],
+    ["e", x + w, y + h / 2],
+    ["se", x + w, y + h],
+    ["s", x + w / 2, y + h],
+    ["sw", x, y + h],
+    ["w", x, y + h / 2],
+  ];
+  for (const [dir, hx, hy] of handles) {
+    const hg = svgEl("g", { class: `ol-edit-handle ol-edit-handle--${dir}`, "data-ol-handle": dir, "data-ol-box": active.id });
+    hg.append(
+      svgEl("rect", { x: hx - hit / 2, y: hy - hit / 2, width: hit, height: hit, fill: "rgba(255, 255, 255, 0.001)" }),
+      svgEl("rect", { x: hx - hs / 2, y: hy - hs / 2, width: hs, height: hs, rx: Math.round(hs * 0.25), fill: "#fffdf6", stroke: "#141720", "stroke-width": 3.5 }),
+    );
+    g.append(hg);
+  }
+  return g;
+}
+
 /**
  * Mounts the live Stream Outline SVG renderer into `host`.
- * Returns `{ apply(settings, opts?), getSvg(), getGeometry(), setStep(index), destroy() }`.
+ * Returns `{ apply(settings, opts?), getSvg(), getGeometry(), setHighlight(index), destroy() }`.
  */
-export function createOutlineView(host, { previewAll = false, editorOnly = false, onRowClick = null } = {}) {
+export function createOutlineView(
+  host,
+  { previewAll = false, editorOnly = false, onRowClick = null, onSelectBox = null, onBoxChange = null, onBoxCommit = null } = {},
+) {
   const wrap = document.createElement("div");
   wrap.className = "ol-wrap";
   host.replaceChildren(wrap);
 
   let lastSettings = null;
-  let lastOpts = { plusActive: false, showSafeZones: false, showCutoutHints: editorOnly };
+  let lastOpts = { plusActive: false, showSafeZones: false, showCutoutHints: editorOnly, editBoxes: false, selectedBox: "" };
   let lastGeom = null;
   let currentSvg = null;
   let socialIdx = 0;
   let socialTimer = 0;
+  let drag = null;
+  let activeSnapLines = null;
+
+  const clientToSvg = (clientX, clientY) => {
+    if (!currentSvg || !lastGeom) return null;
+    const ctm = currentSvg.getScreenCTM();
+    if (ctm) {
+      const pt = currentSvg.createSVGPoint();
+      pt.x = clientX;
+      pt.y = clientY;
+      const out = pt.matrixTransform(ctm.inverse());
+      return { x: out.x, y: out.y };
+    }
+    const r = currentSvg.getBoundingClientRect();
+    if (!r.width || !r.height) return null;
+    return {
+      x: ((clientX - r.left) / r.width) * lastGeom.width,
+      y: ((clientY - r.top) / r.height) * lastGeom.height,
+    };
+  };
+
+  const snapScalar = (val, targets, threshold = 12) => {
+    let best = null;
+    let bestDist = threshold + 1;
+    for (const t of targets) {
+      const d = Math.abs(val - t);
+      if (d <= threshold && d < bestDist) {
+        best = t;
+        bestDist = d;
+      }
+    }
+    return best;
+  };
+
+  const handlePointerDown = (e) => {
+    if (!editorOnly || !lastOpts.editBoxes || !lastGeom || !currentSvg) return;
+    if (e.button !== 0 && e.pointerType === "mouse") return;
+    const handleNode = e.target.closest?.("[data-ol-handle]");
+    const boxNode = handleNode || e.target.closest?.("[data-ol-box]");
+    if (!boxNode) return;
+    const id = boxNode.getAttribute("data-ol-box");
+    const boxes = listEditableBoxes(lastGeom);
+    const target = boxes.find((b) => b.id === id);
+    if (!target) return;
+    const pt = clientToSvg(e.clientX, e.clientY);
+    if (!pt) return;
+    e.preventDefault();
+    onSelectBox?.(id);
+    const handle = handleNode?.getAttribute("data-ol-handle") || "";
+    const snapX = [lastGeom.width / 2];
+    const snapY = [lastGeom.height / 2];
+    for (const sib of boxes) {
+      if (sib.id === id) continue;
+      snapX.push(sib.x, sib.x + sib.w / 2, sib.x + sib.w);
+      snapY.push(sib.y, sib.y + sib.h / 2, sib.y + sib.h);
+    }
+    drag = {
+      pointerId: e.pointerId,
+      mode: handle ? "resize" : "move",
+      handle,
+      id,
+      shape: target.shape,
+      startPt: pt,
+      orig: { x: target.x, y: target.y, w: target.w, h: target.h },
+      snapX,
+      snapY,
+      moved: false,
+    };
+    try { wrap.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+  };
+
+  const handlePointerMove = (e) => {
+    if (!drag || e.pointerId !== drag.pointerId || !lastGeom) return;
+    const pt = clientToSvg(e.clientX, e.clientY);
+    if (!pt) return;
+    const dx = pt.x - drag.startPt.x;
+    const dy = pt.y - drag.startPt.y;
+    if (!drag.moved && Math.hypot(dx, dy) < 2) return;
+    drag.moved = true;
+
+    const { orig, handle, id, shape, snapX, snapY } = drag;
+    const { minW, minH } = boxMinSize(id);
+    const fine = Boolean(e.shiftKey);
+    const grid = (n) => (fine ? Math.round(n) : Math.round(n / 8) * 8);
+    const vLines = [];
+    const hLines = [];
+    let x = orig.x;
+    let y = orig.y;
+    let w = orig.w;
+    let h = orig.h;
+
+    if (drag.mode === "move") {
+      x = grid(orig.x + dx);
+      y = grid(orig.y + dy);
+      if (!fine) {
+        const sLeft = snapScalar(x, snapX);
+        const sCenter = snapScalar(x + w / 2, snapX);
+        const sRight = snapScalar(x + w, snapX);
+        if (sCenter !== null) { x = Math.round(sCenter - w / 2); vLines.push(sCenter); }
+        else if (sLeft !== null) { x = Math.round(sLeft); vLines.push(sLeft); }
+        else if (sRight !== null) { x = Math.round(sRight - w); vLines.push(sRight); }
+
+        const sTop = snapScalar(y, snapY);
+        const sMid = snapScalar(y + h / 2, snapY);
+        const sBot = snapScalar(y + h, snapY);
+        if (sMid !== null) { y = Math.round(sMid - h / 2); hLines.push(sMid); }
+        else if (sTop !== null) { y = Math.round(sTop); hLines.push(sTop); }
+        else if (sBot !== null) { y = Math.round(sBot - h); hLines.push(sBot); }
+      }
+    } else {
+      const right = orig.x + orig.w;
+      const bottom = orig.y + orig.h;
+      if (handle.includes("e")) {
+        let nr = grid(right + dx);
+        if (!fine) {
+          const s = snapScalar(nr, snapX);
+          if (s !== null) { nr = s; vLines.push(s); }
+        }
+        w = Math.max(minW, nr - orig.x);
+      }
+      if (handle.includes("s")) {
+        let nb = grid(bottom + dy);
+        if (!fine) {
+          const s = snapScalar(nb, snapY);
+          if (s !== null) { nb = s; hLines.push(s); }
+        }
+        h = Math.max(minH, nb - orig.y);
+      }
+      if (handle.includes("w")) {
+        let nl = grid(orig.x + dx);
+        if (!fine) {
+          const s = snapScalar(nl, snapX);
+          if (s !== null) { nl = s; vLines.push(s); }
+        }
+        nl = Math.min(right - minW, nl);
+        x = nl;
+        w = right - nl;
+      }
+      if (handle.includes("n")) {
+        let nt = grid(orig.y + dy);
+        if (!fine) {
+          const s = snapScalar(nt, snapY);
+          if (s !== null) { nt = s; hLines.push(s); }
+        }
+        nt = Math.min(bottom - minH, nt);
+        y = nt;
+        h = bottom - nt;
+      }
+      if (shape === "circle") {
+        const side = Math.max(minW, Math.abs(dx) >= Math.abs(dy) ? w : h);
+        if (handle.includes("w")) x = right - side;
+        if (handle.includes("n")) y = bottom - side;
+        w = side;
+        h = side;
+      }
+    }
+
+    const clamped = clampBoxRect(id, { x, y, w, h }, lastGeom.width, lastGeom.height, { shape });
+    activeSnapLines = vLines.length || hLines.length ? { vertical: vLines, horizontal: hLines } : null;
+    onBoxChange?.(id, clamped);
+  };
+
+  const finishDrag = (e) => {
+    if (!drag || (e && e.pointerId !== drag.pointerId)) return;
+    const didMove = drag.moved;
+    try { if (e) wrap.releasePointerCapture(e.pointerId); } catch { /* ignore */ }
+    drag = null;
+    activeSnapLines = null;
+    if (didMove) onBoxCommit?.();
+    else render();
+  };
+
+  if (editorOnly) {
+    wrap.addEventListener("pointerdown", handlePointerDown);
+    wrap.addEventListener("pointermove", handlePointerMove);
+    wrap.addEventListener("pointerup", finishDrag);
+    wrap.addEventListener("pointercancel", finishDrag);
+  }
 
   const render = () => {
     if (!lastSettings) return;
@@ -1111,9 +1408,9 @@ export function createOutlineView(host, { previewAll = false, editorOnly = false
       svg.append(buildFrameGroup(c, eff, ids));
     }
 
-    // 4. Docked or standalone Gift Menu / Commands Card
+    // 4. Docked Gift Menu / Commands Card
     if (geom.cardRect) {
-      svg.append(buildSideCardPanel(geom.cardRect, eff, ids, { onRowClick }));
+      svg.append(buildSideCardPanel(geom.cardRect, eff, ids, { onRowClick: lastOpts.editBoxes ? null : onRowClick }));
     }
 
     // 5. Top stream title banner, nameplate & TikTok gift/tap callout strip
@@ -1135,8 +1432,14 @@ export function createOutlineView(host, { previewAll = false, editorOnly = false
       svg.append(buildSafeZoneGuide());
     }
 
+    // 8. Editor-only Frills Plus interactive box drag & resize handles
+    if (editorOnly && lastOpts.editBoxes) {
+      svg.append(buildEditOverlay(geom, lastOpts.selectedBox, activeSnapLines));
+    }
+
     wrap.dataset.mode = eff.mode;
     wrap.dataset.motion = eff.motion;
+    wrap.dataset.editing = String(Boolean(editorOnly && lastOpts.editBoxes));
     wrap.replaceChildren(svg);
     currentSvg = svg;
 
@@ -1165,6 +1468,12 @@ export function createOutlineView(host, { previewAll = false, editorOnly = false
     getGeometry: () => lastGeom,
     destroy() {
       clearInterval(socialTimer);
+      if (editorOnly) {
+        wrap.removeEventListener("pointerdown", handlePointerDown);
+        wrap.removeEventListener("pointermove", handlePointerMove);
+        wrap.removeEventListener("pointerup", finishDrag);
+        wrap.removeEventListener("pointercancel", finishDrag);
+      }
       wrap.replaceChildren();
     },
   };

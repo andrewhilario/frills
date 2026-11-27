@@ -1,5 +1,5 @@
 // Browser tests for Stream Outline & Border Designer (/outline/ editor & /overlay/outline/ live source) in headless Chrome:
-//   - Strict CSP clean check (0 console/page errors across all 4 modes & 9 frame styles)
+//   - Strict CSP clean check (0 console/page errors across all 3 modes & 9 frame styles)
 //   - Switchable Side Slot (Transparent Widget Box default, TikTok Gift Menu, Commands & Rules, Hide Wide Cam)
 //   - TikTok 9:16 Quick Starters, safe-zone toggle, and centered stage containment
 //   - Client-side transparent PNG export producing a valid non-empty PNG Blob
@@ -30,7 +30,7 @@ let page;
 before(async () => { if (!skip) { page = await launch(); await page.viewport(1280, 900); } });
 after(async () => { await page?.close(); for (const h of opened) await h.close(); });
 
-test("Stream Outline editor loads TikTok 9:16 with transparent widget slot default, switches to Gift Menu & Commands, and supports all 4 modes", { skip }, async () => {
+test("Stream Outline editor loads TikTok 9:16 with transparent widget slot default, switches to Gift Menu & Commands, and supports all 3 modes", { skip }, async () => {
   const base = await withServer();
   await page.goto(`${base}/outline/`, { settle: 500 });
   assert.deepEqual(page.problems, [], page.problems.join(" | "));
@@ -128,7 +128,11 @@ test("Stream Outline editor loads TikTok 9:16 with transparent widget slot defau
   assert.equal(plusPreview.bannerHidden, false);
   assert.match(plusPreview.bannerText, /Frills Plus/);
 
-  // Switch to Full-Screen 16:9, Webcam Box & Standalone Gift Menu Card modes
+  // Switch to Full-Screen 16:9 & Webcam Box modes (and confirm standalone Gift Menu mode chip is removed)
+  const modeChips = await page.evaluate(`[...document.querySelectorAll("#mode-controls .chip")].map((b) => b.textContent.trim())`);
+  assert.equal(modeChips.length, 3);
+  assert.equal(modeChips.some((t) => t.includes("Gift Menu")), false);
+
   await page.evaluate(`(() => {
     const chips = [...document.querySelectorAll("#mode-controls .chip")];
     chips.find((b) => b.textContent.includes("Full-Screen 16:9"))?.click();
@@ -140,12 +144,6 @@ test("Stream Outline editor loads TikTok 9:16 with transparent widget slot defau
     chips.find((b) => b.textContent.includes("Webcam"))?.click();
   })()`);
   assert.equal(await page.evaluate(`document.querySelector("#widget svg.ol-svg")?.getAttribute("viewBox")`), "0 0 1280 720");
-
-  await page.evaluate(`(() => {
-    const chips = [...document.querySelectorAll("#mode-controls .chip")];
-    chips.find((b) => b.textContent.includes("Gift Menu"))?.click();
-  })()`);
-  assert.equal(await page.evaluate(`document.querySelector("#widget svg.ol-svg")?.getAttribute("viewBox")`), "0 0 540 700");
 
   assert.deepEqual(page.problems, [], page.problems.join(" | "));
 });
@@ -261,5 +259,115 @@ test("Overlay Size Guide bar displays live dimensions and opens a centered popup
   assert.match(modal.obsStep, /1920/);
   assert.equal(modal.centered, true);
   assert.equal(modal.closedAfterDone, true);
+  assert.deepEqual(page.problems, [], page.problems.join(" | "));
+});
+
+test("Frills Plus Resize boxes mode lets users drag handles, edit exact px, center/reset boxes, and stays overflow-free", { skip }, async () => {
+  const base = await withServer();
+  await page.viewport(1280, 900);
+  await page.goto(`${base}/outline/`, { settle: 450 });
+  await page.evaluate(`localStorage.clear(); location.reload();`);
+  await page.goto(`${base}/outline/`, { settle: 450 });
+  assert.deepEqual(page.problems, [], page.problems.join(" | "));
+
+  // Toggle Resize boxes ON -> renders 8 handles + inspector
+  const opened = await page.evaluate(`(() => {
+    document.getElementById("ol-edit-toggle")?.click();
+    return {
+      pressed: document.getElementById("ol-edit-toggle")?.getAttribute("aria-pressed"),
+      inspectorHidden: document.getElementById("ol-box-inspector")?.hidden,
+      handles: document.querySelectorAll("#widget [data-ol-handle]").length,
+      boxOptions: document.querySelectorAll("#ol-box-select option").length,
+      badge: document.querySelector("#widget .ol-edit-badge-text")?.textContent || "",
+    };
+  })()`);
+  assert.equal(opened.pressed, "true");
+  assert.equal(opened.inspectorHidden, false);
+  assert.equal(opened.handles, 8);
+  assert.ok(opened.boxOptions >= 5);
+  assert.match(opened.badge, /\d+ × \d+ px/);
+
+  // Edit exact width/height via inspector + click Center H -> updates URL, Plus banner, and SVG badge
+  const resized = await page.evaluate(`(() => {
+    const wIn = document.getElementById("ol-box-w");
+    const hIn = document.getElementById("ol-box-h");
+    wIn.value = "760";
+    wIn.dispatchEvent(new Event("input", { bubbles: true }));
+    hIn.value = "400";
+    hIn.dispatchEvent(new Event("change", { bubbles: true }));
+    document.getElementById("ol-box-center")?.click();
+    return {
+      xVal: document.getElementById("ol-box-x")?.value,
+      wVal: document.getElementById("ol-box-w")?.value,
+      hVal: document.getElementById("ol-box-h")?.value,
+      link: document.getElementById("link")?.value || "",
+      banner: document.getElementById("ol-plus-banner")?.textContent || "",
+      resetHidden: document.getElementById("ol-reset-boxes")?.hidden,
+      badge: document.querySelector("#widget .ol-edit-badge-text")?.textContent || "",
+    };
+  })()`);
+  assert.equal(resized.xVal, "160", "Center H puts 760px wide box at x=(1080-760)/2=160");
+  assert.equal(resized.wVal, "760");
+  assert.equal(resized.hVal, "400");
+  assert.match(resized.link, /customBoxes=game%3A160%2C\d+%2C760%2C400/);
+  assert.match(resized.banner, /custom box resize/);
+  assert.equal(resized.resetHidden, false);
+  assert.match(resized.badge, /760 × 400 px/);
+
+  // Drag the south-east handle via pointer events -> smoothly changes box size
+  const dragged = await page.evaluate(`(() => {
+    const handle = document.querySelector("#widget [data-ol-handle='se']");
+    const r = handle.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    handle.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, clientX: cx, clientY: cy, button: 0, pointerId: 1, pointerType: "mouse" }));
+    const wrap = document.querySelector("#widget .ol-wrap");
+    wrap.dispatchEvent(new PointerEvent("pointermove", { bubbles: true, clientX: cx + 28, clientY: cy + 28, pointerId: 1, pointerType: "mouse" }));
+    wrap.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, clientX: cx + 28, clientY: cy + 28, pointerId: 1, pointerType: "mouse" }));
+    return {
+      wVal: Number(document.getElementById("ol-box-w")?.value),
+      hVal: Number(document.getElementById("ol-box-h")?.value),
+    };
+  })()`);
+  assert.ok(dragged.wVal > 760, `dragging SE handle should widen box (got ${dragged.wVal})`);
+  assert.ok(dragged.hVal > 400, `dragging SE handle should heighten box (got ${dragged.hVal})`);
+
+  // Verify mobile 320px with Resize boxes inspector open has zero overflow or clipped buttons
+  await page.viewport(320, 840);
+  const mobileCheck = await page.evaluate(`(() => {
+    const clipped = [];
+    for (const el of document.querySelectorAll("#ol-box-inspector input, #ol-box-inspector select, #ol-box-inspector button, .preview__tests button")) {
+      const r = el.getBoundingClientRect();
+      if (r.width < 1 || r.height < 1) continue;
+      if (r.right > window.innerWidth + 2) clipped.push({ text: el.textContent.trim().slice(0, 24), right: Math.round(r.right) });
+    }
+    return {
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      clipped,
+    };
+  })()`);
+  assert.ok(mobileCheck.overflow <= 2, `320px overflow was ${mobileCheck.overflow}px`);
+  assert.deepEqual(mobileCheck.clipped, [], JSON.stringify(mobileCheck.clipped));
+
+  // Reset all boxes -> restores defaults and clears customBoxes from URL
+  const afterReset = await page.evaluate(`(() => {
+    document.getElementById("ol-box-reset-all")?.click();
+    return {
+      link: document.getElementById("link")?.value || "",
+      resetHidden: document.getElementById("ol-reset-boxes")?.hidden,
+    };
+  })()`);
+  assert.equal(afterReset.link.includes("customBoxes="), false);
+  assert.equal(afterReset.resetHidden, true);
+
+  // Free direct overlay link ignores customBoxes & renders zero edit handles
+  await page.viewport(1280, 900);
+  await page.goto(`${base}/overlay/outline/?mode=screen9x16&customBoxes=game:160,300,760,400`, { settle: 400 });
+  const freeOverlay = await page.evaluate(`(() => ({
+    editHandles: document.querySelectorAll("#outline-root [data-ol-handle]").length,
+    editorOnly: document.querySelectorAll("#outline-root [data-editor-only]").length,
+  }))()`);
+  assert.equal(freeOverlay.editHandles, 0);
+  assert.equal(freeOverlay.editorOnly, 0);
   assert.deepEqual(page.problems, [], page.problems.join(" | "));
 });
