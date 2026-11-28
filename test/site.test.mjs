@@ -28,7 +28,7 @@ const assetOf = (html, kind) => (new RegExp(`${kind === "css" ? 'href="(/assets/
 test("the pages we expect are all there", () => {
   const urls = pages.map((p) => p.url).sort();
   const base = ["/","/404.html","/actions/","/admin/","/admin/office/","/admin/stats/","/alerts/","/changelog/","/check/","/counter/","/editor/","/feedback/","/gallery/","/gifters/","/gifts/","/goal/","/guides/alerts/","/guides/both/","/guides/live-studio/","/guides/not-showing/","/guides/obs/","/guides/setup/","/guides/sizes/","/guides/songs/","/guides/test/","/guides/tiktok/","/jar/","/labels/","/likers/","/looks/","/looks/bunny-cloud/","/looks/frog-pond/","/looks/hamster-burrow/","/looks/neko-cafe/","/matcha/","/matcha/actions/","/matcha/alerts/","/matcha/counter/","/matcha/gallery/","/matcha/gifters/","/matcha/gifts/","/matcha/goal/","/matcha/jar/","/matcha/labels/","/matcha/likers/","/matcha/outline/","/matcha/songs/","/matcha/timer/","/matcha/tts/","/matcha/wheel/","/outline/","/overlay/","/overlay/actions/","/overlay/alerts/","/overlay/counter/","/overlay/gallery/","/overlay/gifters/","/overlay/gifts/","/overlay/goal/","/overlay/jar/","/overlay/labels/","/overlay/likers/","/overlay/outline/","/overlay/songs/","/overlay/timer/","/overlay/tts/","/overlay/wheel/","/overlays/","/overlays/faq/","/privacy/","/songs/","/spotify/","/spotify/callback/","/start/","/status/","/timer/","/tts/","/twitch/","/twitch/callback/","/wheel/"];
-  const expected = site.plusAccounts ? [...base, "/account/", "/account/verify/", "/o/", "/plus/"].sort() : base;
+  const expected = site.plusAccounts ? [...base, "/account/", "/account/verify/", "/guides/plus/", "/o/", "/plus/"].sort() : base;
   assert.deepEqual(urls, expected);
 });
 

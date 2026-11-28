@@ -1,0 +1,132 @@
+<!--
+{
+  "title": "How to use Frills Plus, step by step | Frills",
+  "description": "Set up every Frills Plus feature: your dedicated TikTok connection, live links, one link for a whole scene, the phone deck, AI voices, stream outlines and Actions.",
+  "path": "/guides/plus/",
+  "updated": "2026-11-28",
+  "published": "2026-11-28",
+  "css": "page",
+  "js": "page",
+  "bodyClass": "page-guide",
+  "chrome": "nav",
+  "footer": true,
+  "feature": "plusAccounts",
+  "jsonld": ["breadcrumb:Frills Plus guide", "article"]
+}
+-->
+<main id="main">
+  <article class="article shell">
+    <ol class="crumbs" aria-label="Breadcrumb">
+      <li><a href="/">Frills</a></li>
+      <li><a href="/plus/">Frills Plus</a></li>
+      <li aria-current="page">How to use it</li>
+    </ol>
+    <header class="article__head">
+      <h1 class="display">How to use Frills Plus, step by step</h1>
+      <p class="lede">You just got Frills Plus. Paying switches it on for your account, but nothing in OBS changes until you do the first four steps below. They take about five minutes. After that, pick the features you want from the list.</p>
+      <p class="article__updated">Updated {{updatedHuman}}</p>
+    </header>
+
+    <div class="article__body">
+      <h2 class="title" id="first-five-minutes">Your first five minutes</h2>
+      <ol>
+        <li><strong>Sign in.</strong> Open your <a href="/account/">account page</a> and type the email you paid with. We email you a sign-in link that works once, for 15 minutes. Check your spam folder if you do not see it. When you are in, the Frills Plus card says Plus is on for your account.</li>
+        <li><strong>Turn on your own TikTok connection.</strong> On the account page, under <strong>Dedicated TikTok server &amp; overlay code</strong>, press <strong>Activate on this browser</strong>. This makes a private code that your TikTok links carry, so they use your always-on connection and can speak AI voices. Twitch needs no key. If you press it in a second browser later, the older code stops working, so use one browser for your streaming setup.</li>
+        <li><strong>Copy your links again.</strong> A link you copied before paying still uses the free connection. Open <a href="/start/">Quick start</a> or any editor, copy the link again, and paste it over the old one in OBS Studio or TikTok LIVE Studio.</li>
+        <li><strong>Check it worked.</strong> The <strong>Get Frills Plus working in OBS</strong> checklist on the account page ticks each step off as you go. It shows <strong>All set</strong> when you are done.</li>
+      </ol>
+      <p>If you would rather never paste a link again, do the next section too.</p>
+
+      <h2 class="title" id="live-links">Live links that update by themselves</h2>
+      <p>A live link is a permanent <code>/o/…</code> address. You paste it into OBS once, and from then on every change you save in Frills shows up on your stream within a few seconds. You can save up to 50.</p>
+      <ol>
+        <li>Open any editor: <a href="/editor/">Chat</a>, <a href="/alerts/">Alerts</a>, <a href="/jar/">Gift jar</a>, <a href="/wheel/">Spin the wheel</a>, <a href="/goal/">Goal bar</a>, <a href="/timer/">Subathon timer</a>, <a href="/tts/">Talking pet</a>, <a href="/gifters/">Top gifters</a>, <a href="/likers/">Top likers</a> or <a href="/outline/">Stream outline</a>.</li>
+        <li>Pick your look and type your TikTok or Twitch channel name.</li>
+        <li>Go to the last step, <strong>Add it to your stream</strong>. Find the <strong>Live cloud link</strong> box under <strong>Copy link</strong>, name it (for example “Main chat”) and press <strong>Create live link</strong>.</li>
+        <li>Press <strong>Copy live link</strong> and paste it as a Browser source in OBS Studio, or a Link source in TikTok LIVE Studio. This is the only time you paste it.</li>
+        <li>Later, change anything in the editor and press <strong>Save live update</strong>. Choose the overlay in the <strong>Saved overlay</strong> list first if you have more than one, or pick <strong>+ New live overlay</strong> to make another.</li>
+      </ol>
+
+      <h2 class="title" id="change-theme">Change the look of everything at once</h2>
+      <p>Once you have live links, you can switch your whole stream to a new look without opening any editor.</p>
+      <ol>
+        <li>Open your <a href="/account/">account page</a> and find <strong>Sync theme across all cloud overlays</strong>.</li>
+        <li>Pick a theme from the list, such as Matcha Frog, Neko Café, Bunny Cloud or Cozy Night.</li>
+        <li>Press <strong>Apply theme to all overlays</strong>. Every live link that is open in OBS updates within a few seconds.</li>
+      </ol>
+
+      <h2 class="title" id="master-scene">One link for your whole scene</h2>
+      <p>The 1-Link Master Stream Scene puts several overlays into one Browser source, so you set up a single source instead of many. You need at least one saved live link first.</p>
+      <ol>
+        <li>On your <a href="/account/">account page</a>, scroll to <strong>1-Link Master Stream Scene</strong>.</li>
+        <li>Name it, then choose <strong>16:9 Landscape</strong> for OBS and Twitch, or <strong>9:16 Vertical</strong> for TikTok LIVE Studio.</li>
+        <li>For each overlay, pick where it sits on the screen (top-left, center, bottom-right and so on), or choose Hide.</li>
+        <li>Press <strong>Save 1-Link Master Scene</strong>, then <strong>Copy scene link</strong>.</li>
+        <li>Paste that one link into OBS at <code>1920 × 1080</code>, or into TikTok LIVE Studio at <code>1080 × 1920</code>. If you change the zones or the theme later, the scene updates on its own.</li>
+      </ol>
+
+      <h2 class="title" id="phone-deck">Run your stream from your phone</h2>
+      <p>The account page doubles as a remote control. Keep a live link (or your master scene) open in OBS on your PC, then:</p>
+      <ol>
+        <li>On your phone, open <code>frills.valwidgets.live/account/</code> and sign in with the same email. Add it to your home screen to open it like an app.</li>
+        <li>Scroll to <strong>Live cloud overlays &amp; remote deck</strong>. Each saved overlay has its own buttons:</li>
+      </ol>
+      <ul>
+        <li><strong>Subathon timer:</strong> Start, Pause, Resume, +1m, +5m and Reset.</li>
+        <li><strong>Alerts:</strong> Test Gift Alert and Test Sub Alert.</li>
+        <li><strong>Gift jar:</strong> +100 Drop, Fill &amp; Celebrate and Empty Jar.</li>
+        <li><strong>Spin the wheel:</strong> Spin Wheel Now and Clear Queue.</li>
+        <li><strong>Goal bar:</strong> +1, +10, Celebrate Goal and Reset.</li>
+        <li><strong>Talking pet:</strong> type a line and press Speak live, or press Stop / Clear.</li>
+        <li><strong>Top gifters and top likers:</strong> Reset leaderboard.</li>
+        <li><strong>Stream outline:</strong> Prev spotlight, Next spotlight and Clear spotlight.</li>
+      </ul>
+      <p>While a live link runs, your jar, goal bar, timer, top gifters and top likers save their totals to the cloud about every 12 seconds. If OBS crashes or your PC restarts, they come back where they were.</p>
+
+      <h2 class="title" id="ai-voices">AI voices and your own mascot</h2>
+      <p>Plus gives you 150,000 AI voice characters a month, about 3,000 messages. The meter on your account page shows how many are left. When they run out, your pet speaks with free browser voices until your allowance comes back at the next renewal.</p>
+      <ol>
+        <li>Make sure you pressed <strong>Activate on this browser</strong> (first five minutes, step 2), then open the <a href="/tts/">Talking pet editor</a>.</li>
+        <li>In <strong>Pet, voice &amp; triggers</strong>, leave <strong>Voice mode</strong> on Auto, or choose <strong>Plus AI voice only</strong>.</li>
+        <li>Pick a <strong>Voice style (chat)</strong> for viewers who type <code>!say</code>. Pick a different <strong>Voice style · alerts (Plus)</strong> for gifts, subs and cheers if you like.</li>
+        <li>To use your own mascot, set <strong>Talking pet</strong> to <strong>Custom PNG / GIF</strong>. Upload an idle picture, plus an optional talking picture (mouth open) and an optional excited picture. Each can be a PNG, WebP or GIF up to 1 MB.</li>
+        <li>Copy your link again, or press <strong>Save live update</strong> if you use a live link.</li>
+      </ol>
+
+      <h2 class="title" id="outline">Stream outline: collector frames, resizing and 4K</h2>
+      <p>Free outlines stay free. Plus adds four collector frames (Cyber Tactical HUD, Celestial Filigree, Scrapbook Washi and Plush Ribbon), starry and custom backdrops, your own corner art, and these two buttons under the preview:</p>
+      <ul>
+        <li><strong>Resize boxes:</strong> drag and resize every cutout, card and banner to exact pixels.</li>
+        <li><strong>4K PNG:</strong> export a transparent 4K picture. Free is 1080p.</li>
+      </ul>
+      <p>Open the <a href="/outline/">Stream outline editor</a>, pick a frame style in <strong>Frame style, motion &amp; decor</strong>, then use the buttons under the preview.</p>
+
+      <h2 class="title" id="actions">Actions without the free limits</h2>
+      <p>Free Actions gives you 10 actions and up to 10 automatic sticky notes on your avatar at once, plus unlimited manual ones. Plus removes the action and automatic-note limits and adds custom sticker shapes (pastel note, heart, star, chibi paw and dreamy cloud) and the other VTube Studio actions: hotkeys, props, expressions, zoom and flip, and color tints.</p>
+      <ol>
+        <li>Open <a href="/actions/">Actions</a> and connect OBS Studio and VTube Studio. The <a href="/actions/#about-title">Actions guide</a> on that page covers each setting.</li>
+        <li>Press <strong>+ Add action (Plus)</strong> to go past ten, and build each one as a WHEN and a DO.</li>
+        <li>For sticky notes, add a VTS sticky note step and choose a shape.</li>
+      </ol>
+
+      <h2 class="title" id="recap">A recap card after your stream</h2>
+      <ol>
+        <li>When you finish, open your <a href="/account/">account page</a> and find <strong>1-Click Stream MVP Recap Card</strong>.</li>
+        <li>Your channel, top gifter, top liker and jar or goal progress fill in from your live links. You can edit any of it.</li>
+        <li>Choose 9:16 Vertical for TikTok Stories or 16:9 Landscape for Discord and X, pick a theme, and press <strong>Download Recap PNG</strong>.</li>
+      </ol>
+
+      <h2 class="title" id="if-something-is-wrong">If something does not work</h2>
+      <ul>
+        <li><strong>The link still uses the free connection.</strong> Copy it again after you pressed <strong>Activate on this browser</strong>, and paste it over the old one.</li>
+        <li><strong>Talking pet says Plus is not active.</strong> Sign in on the account page and press <strong>Activate on this browser</strong>. If you made a code in another browser, press <strong>Make a new code here</strong>.</li>
+        <li><strong>The sign-in link does not work.</strong> It works once and lasts 15 minutes. Ask for a new one on the account page.</li>
+        <li><strong>A live link does not change in OBS.</strong> Press <strong>Save live update</strong> in the editor, then wait a few seconds. Keep the Browser source open and not hidden.</li>
+        <li><strong>Something else.</strong> Use the <a href="/feedback/">feedback form</a> and tell us what you pressed and what you saw.</li>
+      </ul>
+
+      <h2 class="title" id="billing">Billing, cancelling and refunds</h2>
+      <p>Press <strong>Manage or cancel</strong> on your account page to change your card, see receipts or cancel. If Frills Plus is not for you, tell us within 14 days of a payment and we will refund it in full. The <a href="/plus/">Frills Plus page</a> has the details. Everything that is free today stays free if Plus ends.</p>
+    </div>
+  </article>
+</main>

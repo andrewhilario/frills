@@ -9,7 +9,8 @@ import { KINDS } from "./feedback.mjs";
 import { MEDIA } from "./media.mjs";
 import { handleOffice } from "./office.mjs";
 import { parseRelayUrls, report } from "./stats-report.mjs";
-import { grantCompPlus, grantManualPlus, listPlusAccounts, resetPlusUsage, revokeCompPlus } from "./accounts.mjs";
+import { getPlus, grantCompPlus, grantManualPlus, listPlusAccounts, plusActive, resetPlusUsage, revokeCompPlus } from "./accounts.mjs";
+import { getMailer, plusOnMessage } from "./mailer.mjs";
 
 export const ADMIN = { minKey: 12, maxWrong: 10, windowMs: 10 * 60 * 1000, pageSize: 40, maxPage: 100 };
 export const STATUSES = ["new", "done"];
@@ -59,7 +60,7 @@ async function hasStatus(env) {
 const clampLimit = (value) => Math.min(ADMIN.maxPage, Math.max(1, Math.round(Number(value)) || ADMIN.pageSize));
 const likePattern = (text) => `%${text.replace(/[\\%_]/g, (c) => "\\" + c)}%`;
 
-async function summary(env, now = Date.now()) {
+async function summaryData(env, now = Date.now()) {
   const status = await hasStatus(env);
   const total = await env.DB.prepare("SELECT COUNT(*) AS n FROM feedback").first();
   const fresh = status ? await env.DB.prepare("SELECT COUNT(*) AS n FROM feedback WHERE status = 'new'").first() : total;
@@ -76,13 +77,81 @@ async function summary(env, now = Date.now()) {
       manual: list.filter((p) => p.manual && !p.comp && p.active).length,
     };
   } catch { /* older DBs before accounts/plus tables */ }
-  return json(200, {
+  return {
     ok: true,
     canMark: status,
     feedback: { total: total?.n ?? 0, new: fresh?.n ?? 0, kinds: Object.fromEntries(kinds.map((k) => [k.kind, k.n])) },
     media: { count: files?.n ?? 0, bytes: files?.bytes ?? 0, limit: MEDIA.totalBytes, kinds: Object.fromEntries(byKind.map((k) => [k.kind, k.n])) },
     plus: plusSummary,
-  });
+  };
+}
+
+async function summary(env, now = Date.now()) {
+  return json(200, await summaryData(env, now));
+}
+
+/** What Frills Plus is sold for each month, in US dollars. It is the list price the Plus page shows: what is paid out after tax and fees is less, so this is a guide, not accounts. */
+export const PLUS_PRICE_USD = 5.99;
+const DAY_MS = 86_400_000;
+const midnightUtc = (ms) => Date.UTC(new Date(ms).getUTCFullYear(), new Date(ms).getUTCMonth(), new Date(ms).getUTCDate());
+
+/** Everything the dashboard's Overview needs that lives in our own database: who signed up, who has Plus and of which kind, who is about to lose it, and the newest feedback. */
+async function overview(env, now = Date.now()) {
+  const base = await summaryData(env, now);
+  let accounts = { total: 0, last24h: 0, last7d: 0, previous7d: 0, perDay: [] };
+  let recentAccounts = [];
+  let plus = { active: 0, paid: 0, ending: 0, manual: 0, vip: 0, monthlyUsd: 0, expiring: [] };
+  try {
+    const counts = await env.DB.prepare(
+      "SELECT COUNT(*) AS total, COALESCE(SUM(created_at > ?), 0) AS d1, COALESCE(SUM(created_at > ?), 0) AS d7, COALESCE(SUM(created_at > ? AND created_at <= ?), 0) AS p7 FROM accounts",
+    ).bind(now - DAY_MS, now - 7 * DAY_MS, now - 14 * DAY_MS, now - 7 * DAY_MS).first();
+    const start = midnightUtc(now) - 13 * DAY_MS;
+    const rows = (await env.DB.prepare(
+      "SELECT strftime('%Y-%m-%d', created_at / 1000, 'unixepoch') AS day, COUNT(*) AS n FROM accounts WHERE created_at >= ? GROUP BY day",
+    ).bind(start).all()).results ?? [];
+    const byDay = new Map(rows.map((r) => [r.day, Number(r.n) || 0]));
+    accounts = {
+      total: Number(counts?.total) || 0,
+      last24h: Number(counts?.d1) || 0,
+      last7d: Number(counts?.d7) || 0,
+      previous7d: Number(counts?.p7) || 0,
+      perDay: Array.from({ length: 14 }, (_, i) => {
+        const day = new Date(start + i * DAY_MS).toISOString().slice(0, 10);
+        return { day, n: byDay.get(day) ?? 0 };
+      }),
+    };
+    const newest = (await env.DB.prepare(
+      "SELECT a.id, a.email, a.created_at, a.last_login_at, p.provider_ref, p.status, p.renews_at FROM accounts a LEFT JOIN plus p ON p.account_id = a.id ORDER BY a.created_at DESC LIMIT 6",
+    ).all()).results ?? [];
+    recentAccounts = newest.map((r) => ({
+      accountId: r.id,
+      email: r.email,
+      createdAt: Number(r.created_at) || 0,
+      lastLoginAt: Number(r.last_login_at) || 0,
+      plus: r.status === undefined || r.status === null ? null : !plusActive(r, now) ? "ended" : r.provider_ref === "comp" ? "vip" : !r.provider_ref ? "manual" : "paid",
+    }));
+    const list = await listPlusAccounts(env.DB, { now });
+    const live = list.filter((p) => p.active);
+    const paid = live.filter((p) => !p.comp && !p.manual && p.status === "active");
+    plus = {
+      active: live.length,
+      paid: paid.length,
+      ending: live.filter((p) => !p.comp && !p.manual && p.status === "canceled").length,
+      manual: live.filter((p) => p.manual && !p.comp).length,
+      vip: live.filter((p) => p.comp).length,
+      monthlyUsd: Math.round(paid.length * PLUS_PRICE_USD * 100) / 100,
+      expiring: live
+        .filter((p) => !p.comp && p.renewsAt && p.renewsAt - now <= 7 * DAY_MS && (p.manual || p.status === "canceled"))
+        .sort((x, y) => x.renewsAt - y.renewsAt)
+        .map((p) => ({ accountId: p.accountId, email: p.email, renewsAt: p.renewsAt, manual: p.manual })),
+    };
+  } catch { /* older DBs before the accounts and plus tables */ }
+  let latestFeedback = [];
+  try {
+    const rows = (await env.DB.prepare(`SELECT id, created, kind, message${base.canMark ? ", status" : ""} FROM feedback ORDER BY id DESC LIMIT 4`).all()).results ?? [];
+    latestFeedback = rows.map((r) => ({ id: r.id, created: r.created, kind: r.kind, message: String(r.message ?? "").slice(0, 200), status: base.canMark ? r.status : null }));
+  } catch { /* no feedback table yet */ }
+  return json(200, { ok: true, now, summary: base, accounts, plus, recentAccounts, latestFeedback, priceUsd: PLUS_PRICE_USD });
 }
 
 async function listFeedback(url, env) {
@@ -167,7 +236,17 @@ async function controlEuler(request, env, { fetchImpl = globalThis.fetch?.bind(g
   return json(200, { ok: results.some((r) => r.ok), action, results });
 }
 
-async function handleAdminPlus(method, rest, more, request, env, now) {
+/** Sends "Your Frills Plus is on" to an address. Never throws: the caller says what happened ({ emailed: true } or { emailed: false, emailError }). */
+async function sendPlusOn(env, email, { mailer = null, fetchImpl, request }) {
+  const sender = getMailer(env, mailer, { fetchFn: fetchImpl });
+  if (!sender) return { emailed: false, emailError: "email_off" };
+  const site = String(env.SITE_URL ?? new URL(request.url).origin).replace(/\/+$/, "");
+  let sent;
+  try { sent = await sender.send(plusOnMessage(email, site)); } catch { sent = { ok: false }; }
+  return sent?.ok ? { emailed: true } : { emailed: false, emailError: "mail_failed" };
+}
+
+async function handleAdminPlus(method, rest, more, request, env, now, deps = {}) {
   if (!rest && more.length === 0) {
     if (method === "GET") {
       const items = await listPlusAccounts(env.DB, { now });
@@ -194,7 +273,9 @@ async function handleAdminPlus(method, rest, more, request, env, now) {
       const status = result.error === "already_paid" || result.error === "already_vip" ? 409 : result.error === "full" ? 503 : 400;
       return json(status, result);
     }
-    return json(200, result);
+    // The grant stands even if the email cannot be sent: the answer says what happened to it.
+    const mail = body?.notify === true ? await sendPlusOn(env, result.email, { ...deps, request }) : {};
+    return json(200, { ...result, ...mail });
   }
   const accountId = String(rest ?? "").trim();
   if (!/^[0-9a-f]{16}$/.test(accountId)) return json(404, { ok: false, error: "not_found" });
@@ -202,6 +283,14 @@ async function handleAdminPlus(method, rest, more, request, env, now) {
     const result = await revokeCompPlus(env.DB, accountId, { now });
     if (!result.ok) return json(result.error === "not_comp" ? 409 : 404, result);
     return json(200, result);
+  }
+  if (more.length === 1 && more[0] === "notify" && method === "POST") {
+    const row = await getPlus(env.DB, accountId, now);
+    const who = row ? await env.DB.prepare("SELECT email FROM accounts WHERE id = ?").bind(accountId).first() : null;
+    if (!row || !who?.email) return json(404, { ok: false, error: "not_found" });
+    if (!plusActive(row, now)) return json(409, { ok: false, error: "not_active" });
+    const mail = await sendPlusOn(env, who.email, { ...deps, request });
+    return json(mail.emailed ? 200 : 502, { ok: mail.emailed, email: who.email, ...mail });
   }
   if (more.length === 1 && more[0] === "reset" && method === "POST") {
     let body = {};
@@ -214,7 +303,7 @@ async function handleAdminPlus(method, rest, more, request, env, now) {
 }
 
 /** Routes everything under /api/admin/. Returns a Response, or null when the address is not under it. */
-export async function handleAdmin(request, env, { now = Date.now(), fetchImpl = globalThis.fetch?.bind(globalThis) } = {}) {
+export async function handleAdmin(request, env, { now = Date.now(), fetchImpl = globalThis.fetch?.bind(globalThis), mailer = null } = {}) {
   const url = new URL(request.url);
   if (url.pathname !== "/api/admin" && !url.pathname.startsWith("/api/admin/")) return null;
   const denied = await authorize(request, env, now);
@@ -223,10 +312,11 @@ export async function handleAdmin(request, env, { now = Date.now(), fetchImpl = 
   if (method !== "GET" && !sameOrigin(request)) return json(403, { ok: false, error: "wrong_origin" });
   const [, , , area, rest, ...more] = url.pathname.split("/");
   try {
+    if (more.length === 0 && area === "overview" && !rest) return method === "GET" ? await overview(env, now) : json(405, { ok: false, error: "method" }, { allow: "GET" });
     if (more.length === 0 && area === "summary" && !rest) return method === "GET" ? await summary(env, now) : json(405, { ok: false, error: "method" }, { allow: "GET" });
     if (more.length === 0 && area === "stats" && !rest) return method === "GET" ? json(200, await report(env, { now, fetchImpl })) : json(405, { ok: false, error: "method" }, { allow: "GET" });
     if (area === "office") return await handleOffice(request, env, [rest, ...more].filter(Boolean), { now, fetchImpl });
-    if (area === "plus") return await handleAdminPlus(method, rest, more, request, env, now);
+    if (area === "plus") return await handleAdminPlus(method, rest, more, request, env, now, { mailer, fetchImpl });
     if (more.length === 0 && area === "euler" && !rest) return method === "POST" ? await controlEuler(request, env, { fetchImpl }) : json(405, { ok: false, error: "method" }, { allow: "POST" });
     if (more.length === 0 && area === "feedback") {
       if (!rest) return method === "GET" ? await listFeedback(url, env) : json(405, { ok: false, error: "method" }, { allow: "GET" });

@@ -17,6 +17,7 @@ import { handleProStatus } from "../worker/region.mjs";
 import { plusGate, spendCharacters } from "../worker/plus-gate.mjs";
 import { COMP_MONTHLY_MS, getPlus, isCompPlus, plusActive } from "../worker/accounts.mjs";
 import { handlePolarWebhook } from "../worker/polar.mjs";
+import { plusOnMessage } from "../worker/mailer.mjs";
 
 const SITE = "https://frills.example";
 const ADMIN_KEY = "super-secret-admin-key-1234";
@@ -253,4 +254,101 @@ test("a manual grant is a normal Plus (not VIP): blank payment fields, days you 
   assert.equal((await handleAdmin(adminReq("DELETE", `plus/${lone.accountId}`), env, { now: t0 + 1000 })).status, 200);
   assert.equal(plusActive(await getPlus(env.DB, lone.accountId, t0 + 2000), t0 + 2000), false);
   assert.equal((await handleAdmin(adminReq("DELETE", `plus/${granted.accountId}`), env, { now: t0 + 3 * DAY })).status, 409, "a real subscription is cancelled in Polar, not here");
+});
+
+test("the dashboard overview counts accounts and each kind of Plus, adds up the money from real subscriptions only, flags what ends soon, and lists the newest feedback", async () => {
+  const env = makeEnv();
+  const t0 = 1_800_000_000_000;
+  const DAY = 24 * 3600 * 1000;
+
+  // one paying subscriber (a payment-service reference), one manual grant that ends in 5 days, one VIP, one account without Plus
+  await env.DB.prepare("INSERT INTO accounts (id, email, created_at, last_login_at) VALUES ('aaaaaaaaaaaaaaaa', 'paid@example.com', ?, ?)").bind(t0 - 20 * DAY, t0 - DAY).run();
+  await env.DB.prepare("INSERT INTO plus (account_id, provider_ref, order_ref, status, renews_at, tts_used, tts_limit, period_start, updated_at) VALUES ('aaaaaaaaaaaaaaaa', 'sub_1', 'ord_1', 'active', ?, 0, 150000, ?, ?)").bind(t0 + 10 * DAY, t0 - 20 * DAY, t0 - 20 * DAY).run();
+  await env.DB.prepare("INSERT INTO accounts (id, email, created_at, last_login_at) VALUES ('bbbbbbbbbbbbbbbb', 'none@example.com', ?, ?)").bind(t0 - 2 * DAY, t0 - 2 * DAY).run();
+  await handleAdmin(adminReq("POST", "plus/manual", { email: "manual@example.com", days: 5 }), env, { now: t0 - 1000 });
+  await handleAdmin(adminReq("POST", "plus", { email: "vip@example.com" }), env, { now: t0 - 500 });
+  const long = "x".repeat(500);
+  await env.DB.prepare("INSERT INTO feedback (created, kind, message, contact) VALUES ('2026-11-01T00:00:00Z', 'idea', 'older one', ''), ('2026-11-02T00:00:00Z', 'broken', ?, '')").bind(long).run();
+
+  const res = await handleAdmin(adminReq("GET", "overview"), env, { now: t0 });
+  assert.equal(res.status, 200);
+  const data = await res.json();
+
+  assert.equal(data.accounts.total, 4);
+  assert.equal(data.accounts.last24h, 2, "the manual and the VIP account were just made");
+  assert.equal(data.accounts.last7d, 3);
+  assert.equal(data.accounts.perDay.length, 14);
+  assert.equal(data.accounts.perDay.reduce((n, d) => n + d.n, 0), 3, "the paid account is older than 14 days");
+
+  assert.deepEqual({ active: data.plus.active, paid: data.plus.paid, manual: data.plus.manual, vip: data.plus.vip, ending: data.plus.ending }, { active: 3, paid: 1, manual: 1, vip: 1, ending: 0 });
+  assert.equal(data.plus.monthlyUsd, 5.99, "only the real subscription counts toward the money, not the manual or VIP ones");
+  assert.deepEqual(data.plus.expiring.map((p) => [p.email, p.manual]), [["manual@example.com", true]], "the manual grant that ends in 5 days is flagged, the VIP pass and the paid plan are not");
+
+  assert.equal(data.recentAccounts.length, 4);
+  assert.deepEqual(data.recentAccounts.map((a) => a.plus).sort(), ["manual", "paid", "vip", null].sort(), "each newest account says what kind of Plus it has");
+  assert.equal(data.recentAccounts[0].createdAt >= data.recentAccounts[1].createdAt, true, "newest first");
+
+  assert.equal(data.summary.feedback.total, 2);
+  assert.equal(data.latestFeedback[0].kind, "broken", "newest feedback first");
+  assert.equal(data.latestFeedback[0].message.length, 200, "a long message is cut for the overview");
+  assert.equal(data.priceUsd, 5.99);
+
+  // it needs the password and only answers GET
+  assert.equal((await handleAdmin(new Request(`${SITE}/api/admin/overview`, { headers: { origin: SITE } }), env, { now: t0 })).status, 401);
+  assert.equal((await handleAdmin(adminReq("POST", "overview", {}), env, { now: t0 })).status, 405);
+});
+
+test("the owner can email a customer that Plus is on, from the admin: with the grant or later, never breaking the grant, and never to an account without Plus", async () => {
+  const env = makeEnv();
+  const t0 = 1_800_000_000_000;
+  const sent = [];
+  const mailer = { send: async (m) => { sent.push(m); return { ok: true }; } };
+
+  // the message says what to do, in order, with this site's own addresses, and escapes what it was given
+  const m = plusOnMessage("who@example.com", `${SITE}/`);
+  assert.equal(m.subject, "Your Frills Plus is on");
+  assert.match(m.text, /switched on for who@example\.com/);
+  assert.match(m.text, new RegExp(`${SITE}/account/ with this email`));
+  assert.match(m.text, /Activate on this browser/);
+  assert.match(m.text, new RegExp(`${SITE}/start/`));
+  assert.match(m.text, new RegExp(`${SITE}/guides/plus/`));
+  assert.match(m.html, /href="https:\/\/frills\.example\/guides\/plus\/"/);
+  assert.equal(plusOnMessage('a"<b>@example.com', SITE).html.includes("<b>"), false, "an address cannot add markup to the email");
+
+  // with the grant: asked for, it is sent; not asked for, nothing is
+  const quiet = await (await handleAdmin(adminReq("POST", "plus/manual", { email: "quiet@example.com" }), env, { now: t0, mailer })).json();
+  assert.equal(quiet.emailed, undefined);
+  assert.equal(sent.length, 0);
+  const loud = await (await handleAdmin(adminReq("POST", "plus/manual", { email: "loud@example.com", notify: true }), env, { now: t0, mailer })).json();
+  assert.equal(loud.ok, true);
+  assert.equal(loud.emailed, true);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].to, "loud@example.com");
+  assert.match(sent[0].text, /frills\.example\/account\//, "the links use this site's address");
+
+  // a mail service that refuses, or no mail service at all, leaves the grant in place and says why
+  const failing = { send: async () => ({ ok: false, status: 500 }) };
+  const failed = await (await handleAdmin(adminReq("POST", "plus/manual", { email: "failed@example.com", notify: true }), env, { now: t0, mailer: failing })).json();
+  assert.deepEqual([failed.ok, failed.emailed, failed.emailError], [true, false, "mail_failed"]);
+  assert.equal(plusActive(await getPlus(env.DB, failed.accountId, t0), t0), true, "the Plus is on even though the email failed");
+  const none = await (await handleAdmin(adminReq("POST", "plus/manual", { email: "none@example.com", notify: true }), env, { now: t0 })).json();
+  assert.deepEqual([none.ok, none.emailed, none.emailError], [true, false, "email_off"]);
+
+  // later, to an account that already has Plus
+  const again = await handleAdmin(adminReq("POST", `plus/${loud.accountId}/notify`), env, { now: t0 + 1000, mailer });
+  assert.equal(again.status, 200);
+  assert.deepEqual(await again.json(), { ok: true, email: "loud@example.com", emailed: true });
+  assert.equal(sent.length, 2);
+  assert.equal((await handleAdmin(adminReq("POST", `plus/${loud.accountId}/notify`), env, { now: t0 + 1000, mailer: failing })).status, 502);
+  assert.equal((await (await handleAdmin(adminReq("POST", `plus/${loud.accountId}/notify`), env, { now: t0 + 1000 })).json()).emailError, "email_off");
+
+  // an account whose Plus ended, one that never had Plus, and one that does not exist get nothing
+  await handleAdmin(adminReq("DELETE", `plus/${loud.accountId}`), env, { now: t0 + 2000 });
+  const ended = await handleAdmin(adminReq("POST", `plus/${loud.accountId}/notify`), env, { now: t0 + 3 * 24 * 3600 * 1000 + 5 * 24 * 3600 * 1000, mailer });
+  assert.equal(ended.status, 409);
+  assert.equal((await ended.json()).error, "not_active");
+  await env.DB.prepare("INSERT INTO accounts (id, email, created_at, last_login_at) VALUES ('cccccccccccccccc', 'free@example.com', ?, ?)").bind(t0, t0).run();
+  assert.equal((await handleAdmin(adminReq("POST", "plus/cccccccccccccccc/notify"), env, { now: t0, mailer })).status, 404);
+  assert.equal((await handleAdmin(adminReq("POST", "plus/dddddddddddddddd/notify"), env, { now: t0, mailer })).status, 404);
+  assert.equal(sent.length, 2, "nothing more was sent");
 });

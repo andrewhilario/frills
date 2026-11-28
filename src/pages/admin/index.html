@@ -1,7 +1,7 @@
 <!--
 {
   "title": "Admin | Frills",
-  "description": "The private admin page for Frills: read the feedback and manage the uploaded files.",
+  "description": "The private Frills admin dashboard: Plus accounts, feedback, uploaded files, traffic and relay health in one place.",
   "path": "/admin/",
   "css": "admin",
   "js": "admin",
@@ -12,21 +12,11 @@
   "listed": false
 }
 -->
-<main class="admin" id="main">
-  <header class="admin__bar">
-    <h1 class="admin__title">Frills admin</h1>
-    <div class="admin__bar-actions" id="bar-actions" hidden>
-      <a class="btn btn--soft btn--sm" href="/admin/office/">Virtual office</a>
-      <a class="btn btn--soft btn--sm" href="/admin/stats/">Analytics &amp; fleet</a>
-      <button class="btn btn--soft btn--sm" type="button" id="refresh">Refresh</button>
-      <button class="btn btn--outline btn--sm" type="button" id="logout">Log out</button>
-    </div>
-  </header>
-
+<main class="admin admin--dash" id="main">
   <noscript><p class="admin__note">The admin page needs JavaScript. Turn it on for this page and reload.</p></noscript>
 
   <section class="admin__login" id="login" aria-labelledby="login-title">
-    <h2 class="admin__h" id="login-title">Log in</h2>
+    <h1 class="admin__title" id="login-title">Frills admin</h1>
     <form id="login-form" class="admin__form">
       <label class="admin__label" for="key">Admin password</label>
       <input type="password" id="key" name="key" autocomplete="current-password" spellcheck="false" required>
@@ -36,17 +26,91 @@
     <p class="admin__note">The password is the <code>ADMIN_KEY</code> secret you set in Cloudflare (Workers &amp; Pages, frills, Settings, Variables and Secrets). It stays in this tab only and is forgotten when you close it.</p>
   </section>
 
-  <div id="dash" hidden>
-    <section class="admin__cards" id="cards" aria-label="Totals"></section>
-    <p class="admin__note admin__note--warn" id="no-status" hidden>Feedback cannot be marked as done yet, because the database is from before this page. Run this one line in the D1 console, then press Refresh: <code>ALTER TABLE feedback ADD COLUMN status TEXT NOT NULL DEFAULT 'new';</code></p>
+  <div class="dash" id="dash" hidden>
+    <aside class="dash__side" aria-label="Admin menu">
+      <p class="dash__brand"><span class="dash__logo" aria-hidden="true">{{>logo}}</span><span class="dash__brand-name">Frills</span><span class="dash__tag">Admin</span></p>
+      <nav class="dash__nav" aria-label="Sections">
+        <button class="dash__link" type="button" id="tab-overview" aria-pressed="true"><span>Overview</span></button>
+        <button class="dash__link" type="button" id="tab-feedback" aria-pressed="false"><span>Feedback</span><span class="dash__badge" id="nav-feedback" hidden></span></button>
+        <button class="dash__link" type="button" id="tab-files" aria-pressed="false"><span>Files</span></button>
+        <button class="dash__link" type="button" id="tab-plus" aria-pressed="false"><span>Frills Plus</span></button>
+        <a class="dash__link" href="/admin/stats/"><span>Analytics &amp; fleet</span></a>
+        <a class="dash__link" href="/admin/office/"><span>Virtual office</span></a>
+      </nav>
+    </aside>
 
-    <div class="chips admin__tabs" role="group" aria-label="What to look at">
-      <button class="chip" type="button" id="tab-feedback" aria-pressed="true">Feedback</button>
-      <button class="chip" type="button" id="tab-files" aria-pressed="false">Files</button>
-      <button class="chip" type="button" id="tab-plus" aria-pressed="false">Frills Plus VIP</button>
-    </div>
+    <div class="dash__main">
+      <header class="dash__head">
+        <div class="dash__head-text">
+          <h1 class="dash__title" id="dash-title">Overview</h1>
+          <p class="dash__sub" id="dash-sub" role="status">Loading…</p>
+        </div>
+        <div class="dash__head-actions">
+          <button class="btn btn--sm" type="button" id="quick-activate">Activate a customer</button>
+          <button class="btn btn--soft btn--sm" type="button" id="refresh">Refresh</button>
+          <button class="btn btn--outline btn--sm" type="button" id="logout">Log out</button>
+        </div>
+      </header>
+      <p class="admin__note admin__note--warn" id="no-status" hidden>Feedback cannot be marked as done yet, because the database is from before this page. Run this one line in the D1 console, then press Refresh: <code>ALTER TABLE feedback ADD COLUMN status TEXT NOT NULL DEFAULT 'new';</code></p>
 
-    <section id="panel-feedback" aria-label="Feedback">
+      <section class="dash__view" id="panel-overview" aria-label="Overview">
+        <section class="dash__panel dash__attention" aria-labelledby="attn-title">
+          <div class="dash__panel-head">
+            <h2 class="dash__h" id="attn-title">Needs attention</h2>
+            <span class="dash__count" id="attn-count"></span>
+          </div>
+          <ul class="dash__attn" id="attention" role="list"></ul>
+        </section>
+
+        <section class="dash__kpis" id="kpis" aria-label="Key numbers"></section>
+
+        <div class="dash__grid">
+          <section class="dash__panel" aria-labelledby="chart-title">
+            <div class="dash__panel-head">
+              <h2 class="dash__h" id="chart-title">Traffic, last 28 days</h2>
+              <div class="chips" id="chart-tabs" role="group" aria-label="What to chart"></div>
+            </div>
+            <div class="dash__chart" id="chart" role="img" aria-labelledby="chart-sentence"></div>
+            <div class="dash__axis" aria-hidden="true"><span id="chart-from"></span><span id="chart-to"></span></div>
+            <p class="dash__sentence" id="chart-sentence"></p>
+          </section>
+
+          <section class="dash__panel" aria-labelledby="health-title">
+            <div class="dash__panel-head">
+              <h2 class="dash__h" id="health-title">System health</h2>
+              <a class="dash__more" href="/admin/stats/">Fleet details</a>
+            </div>
+            <ul class="dash__health" id="health" role="list"></ul>
+          </section>
+        </div>
+
+        <div class="dash__grid dash__grid--even">
+          <section class="dash__panel" aria-labelledby="accounts-title">
+            <div class="dash__panel-head">
+              <h2 class="dash__h" id="accounts-title">Newest accounts</h2>
+              <button class="dash__more" type="button" id="go-plus">All Plus accounts</button>
+            </div>
+            <div class="dash__chart dash__chart--small" id="signups" role="img" aria-labelledby="signups-sentence"></div>
+            <p class="dash__sentence" id="signups-sentence"></p>
+            <ul class="dash__rows" id="accounts" role="list"></ul>
+          </section>
+
+          <section class="dash__panel" aria-labelledby="latest-title">
+            <div class="dash__panel-head">
+              <h2 class="dash__h" id="latest-title">Latest feedback</h2>
+              <button class="dash__more" type="button" id="go-feedback">Open inbox</button>
+            </div>
+            <ul class="dash__rows" id="latest" role="list"></ul>
+          </section>
+        </div>
+
+        <section class="dash__panel" aria-labelledby="inbox-title">
+          <h2 class="dash__h" id="inbox-title">Inbox and storage</h2>
+          <div class="admin__cards" id="cards" aria-label="Totals"></div>
+        </section>
+      </section>
+
+    <section class="dash__view" id="panel-feedback" aria-label="Feedback" hidden>
       <div class="admin__filters">
         <div class="chips" id="f-state" role="group" aria-label="Show"></div>
         <label class="visually-hidden" for="f-kind">Kind</label>
@@ -65,7 +129,7 @@
       <button class="btn btn--soft" type="button" id="f-more" hidden>Show more</button>
     </section>
 
-    <section id="panel-files" aria-label="Uploaded files" hidden>
+    <section class="dash__view" id="panel-files" aria-label="Uploaded files" hidden>
       <div class="admin__filters">
         <div class="chips" id="m-kind" role="group" aria-label="Show"></div>
       </div>
@@ -74,7 +138,7 @@
       <button class="btn btn--soft" type="button" id="m-more" hidden>Show more</button>
     </section>
 
-    <section id="panel-plus" aria-label="Frills Plus VIP passes" hidden>
+    <section class="dash__view" id="panel-plus" aria-label="Frills Plus" hidden>
       <form id="mp-form" class="admin__grant admin__grant--manual">
         <div class="admin__grant-head">
           <h2 class="admin__h">Activate a paying customer</h2>
@@ -93,6 +157,7 @@
             <span>AI voice chars / month</span>
             <input type="number" id="mp-limit" value="150000" min="1000" max="10000000" step="1000" inputmode="numeric">
           </label>
+          <label class="admin__check"><input type="checkbox" id="mp-notify" checked><span>Email them that Plus is on</span></label>
           <button class="btn" type="submit" id="mp-grant">Activate Plus</button>
         </div>
       </form>
@@ -113,8 +178,10 @@
           <button class="btn" type="submit" id="p-grant">Grant free Frills Plus</button>
         </div>
       </form>
+      <h2 class="dash__h" id="p-list-title">Everyone with Plus</h2>
       <p class="admin__status" id="p-status" role="status"></p>
       <div class="admin__list" id="p-list"></div>
     </section>
+    </div>
   </div>
 </main>

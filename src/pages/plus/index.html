@@ -66,6 +66,7 @@
 
 
       <h2 class="subtitle" id="how-to-use">Step-by-step setup guide</h2>
+      <p>Already subscribed? The page <a href="/guides/plus/">How to use Frills Plus, step by step</a> puts these steps in order, starting with your first five minutes.</p>
       <p>Every Frills Plus feature works right in your browser, OBS Studio, and TikTok LIVE Studio with nothing to install:</p>
 
       <h3>1. Dedicated 24/7 Cloud TikTok LIVE Server &amp; Overlay Code</h3>
@@ -78,14 +79,14 @@
       <h3>2. Live Cloud Overlays (<code>/o/…</code>) &amp; 1-Click Global Theme Sync</h3>
       <ol>
         <li>Open any overlay editor, pick your starting look, and enter your TikTok or Twitch channel name.</li>
-        <li>Scroll to the final <strong>Add it to your stream</strong> step. Inside the <strong>Live cloud link</strong> box right under <strong>Copy link</strong>, type a name (such as <em>Main Chat</em>) and click <strong>Save to cloud</strong>.</li>
+        <li>Scroll to the final <strong>Add it to your stream</strong> step. Inside the <strong>Live cloud link</strong> box right under <strong>Copy link</strong>, type a name (such as <em>Main Chat</em>) and click <strong>Create live link</strong>.</li>
         <li>Copy your permanent <code>/o/…</code> link and paste it once as a <strong>Browser Source</strong> in OBS Studio or a <strong>Link Source</strong> in TikTok LIVE Studio.</li>
         <li>To change your stream’s entire aesthetic while live, open your <a href="/account/">account page</a>, pick a theme in the top bar (<em>Matcha Frog</em>, <em>Neko Café</em>, <em>Bunny Cloud</em>, <em>Cozy Night</em>, etc.), and click <strong>Apply theme to all overlays</strong>. Every open <code>/o/…</code> source in OBS updates within 3 seconds without pasting a new URL.</li>
       </ol>
 
       <h3>3. 1-Link Master Stream Scene (16:9 OBS &amp; 9:16 TikTok LIVE Studio)</h3>
       <ol>
-        <li>Save the overlays you want in your layout (for example, Chat, Alerts, Gift Jar, and Subathon Timer) using <strong>Save to cloud</strong> in their editors.</li>
+        <li>Save the overlays you want in your layout (for example, Chat, Alerts, Gift Jar, and Subathon Timer) using <strong>Create live link</strong> in their editors.</li>
         <li>Go to your <a href="/account/">account page</a> and scroll to <strong>1-Link Master Stream Scene</strong> inside the <strong>Live cloud overlays &amp; remote deck</strong> card.</li>
         <li>Choose <strong>16:9 Landscape (OBS / Twitch)</strong> or <strong>9:16 Vertical (TikTok LIVE Studio)</strong> and pick a screen zone for each overlay (<em>Top-Left</em>, <em>Top-Center</em>, <em>Top-Right</em>, <em>Mid-Left</em>, <em>Center</em>, <em>Mid-Right</em>, <em>Bottom-Left</em>, <em>Bottom-Center</em>, <em>Bottom-Right</em>, or <em>Hide</em>).</li>
         <li>Click <strong>Save 1-Link Master Scene</strong>, press <strong>Copy scene link</strong>, and paste that single <code>/o/…</code> URL into OBS (<code>1920&times;1080</code>) or TikTok LIVE Studio (<code>1080&times;1920</code>). Any zone or theme changes you save later update live on stream.</li>
@@ -97,12 +98,14 @@
         <li>On your phone, open <code>frills.valwidgets.live/account/</code> in Safari or Chrome and sign in with your same email. <em>(Tip: tap <strong>Add to Home Screen</strong> on iOS or Android to launch it like a dedicated Stream Deck app.)</em></li>
         <li>Scroll to <strong>Live cloud overlays &amp; remote deck</strong> and tap the remote buttons under any saved overlay:
           <ul>
-            <li><strong>Subathon Timer:</strong> <em>Start / Resume</em>, <em>Pause</em>, <em>+5m</em>, <em>&minus;1m</em>, <em>Reset</em></li>
-            <li><strong>Talking Pet TTS:</strong> Type a live announcement and tap <em>Speak Live</em> or <em>Stop Voice</em></li>
+            <li><strong>Subathon Timer:</strong> <em>Start</em>, <em>Pause</em>, <em>Resume</em>, <em>+1m</em>, <em>+5m</em>, <em>Reset</em></li>
+            <li><strong>Talking Pet TTS:</strong> Type a live announcement and tap <em>Speak live</em> or <em>Stop / Clear</em></li>
             <li><strong>Alerts:</strong> <em>Test Gift Alert</em>, <em>Test Sub Alert</em></li>
-            <li><strong>Gift Jar:</strong> <em>+100 Drop</em>, <em>Fill Jar</em>, <em>Empty Jar</em></li>
-            <li><strong>Goal Bar:</strong> <em>+1</em>, <em>+10</em>, <em>Reset Goal</em></li>
-            <li><strong>Chat &amp; Leaderboards:</strong> <em>Clear Chat</em>, <em>Reset Board</em></li>
+            <li><strong>Gift Jar:</strong> <em>+100 Drop</em>, <em>Fill &amp; Celebrate</em>, <em>Empty Jar</em></li>
+            <li><strong>Spin the Wheel:</strong> <em>Spin Wheel Now</em>, <em>Clear Queue</em></li>
+            <li><strong>Goal Bar:</strong> <em>+1</em>, <em>+10</em>, <em>Celebrate Goal</em>, <em>Reset</em></li>
+            <li><strong>Top Gifters &amp; Top Likers:</strong> <em>Reset leaderboard</em></li>
+            <li><strong>Stream Outline:</strong> <em>Prev spotlight</em>, <em>Next spotlight</em>, <em>Clear spotlight</em></li>
           </ul>
         </li>
         <li>While your <code>/o/…</code> link runs in OBS, your Gift Jar, Goal Bar, Subathon Timer, Top Gifters, and Top Likers automatically checkpoint their live totals to the cloud so an OBS crash or PC restart never resets your progress.</li>
@@ -113,7 +116,7 @@
         <li>After clicking <strong>Activate on this browser</strong> on your <a href="/account/">account page</a>, open the <a href="/tts/">Talking Pet TTS editor</a>.</li>
         <li>In <strong>Step 2 (Voice &amp; speech)</strong>, pick your neural <strong>AI voice</strong> for viewer <code>!say</code> chat messages and a separate AI voice for gifts, subs, bits, or raids (you can also filter <code>!say</code> to Twitch subscribers, VIPs, or moderators).</li>
         <li>To upload your own mascot, choose <strong>Your own PNGTuber</strong> under <strong>Pet character</strong> in Step 1 and upload up to 3 images (PNG, WebP, or GIF): <strong>Idle</strong>, <strong>Talking (mouth open)</strong>, and <strong>Excited (gift / sub alert)</strong>.</li>
-        <li>Save to cloud or copy your link into OBS. Track your remaining monthly AI characters (150,000 / month) anytime on your <a href="/account/">account page</a>; if the monthly allowance runs out, your pet automatically falls back to free browser voices.</li>
+        <li>Press <strong>Create live link</strong> (or <strong>Save live update</strong>) or copy your link into OBS. Track your remaining monthly AI characters (150,000 / month) anytime on your <a href="/account/">account page</a>; if the monthly allowance runs out, your pet automatically falls back to free browser voices.</li>
       </ol>
 
       <h3>6. &#9733; VIP Jackpot Alert Tiers</h3>
@@ -136,7 +139,7 @@
         <li>Open the <a href="/actions/">Actions editor</a> and connect OBS Studio (<strong>Tools &rarr; WebSocket Server Settings</strong>, port <code>4455</code>) and/or VTube Studio (<strong>Settings &rarr; General &rarr; Start API</strong>, port <code>8001</code>). <em>(Works in OBS Studio and Streamlabs Desktop—not TikTok LIVE Studio.)</em></li>
         <li>Build unlimited <em>When &rarr; Do</em> rules past the 10-action free cap for chat commands (<code>!clip</code>, <code>!replay</code>), TikTok gifts, follows, shares, likes, and Twitch subs, bits, or raids.</li>
         <li>For VTubers, pick any sticker shape (<strong>pastel sticky note, heart sticker, star tag, chibi paw stamp, dreamy cloud, or random</strong>) to stack unlimited named viewer stickers on your avatar’s face, and add VTube Studio hotkeys, item props, expressions, zooms, flips, or color tints.</li>
-        <li>Save to cloud (<code>/o/…</code>) or copy your Browser source link into OBS Studio or Streamlabs Desktop. Your OBS password and VTube Studio token stay strictly after <code>#</code> on your PC (if you use a <code>/o/…</code> cloud link, append <code>#obsPass=…&amp;vtsToken=…</code> inside OBS).</li>
+        <li>Press <strong>Create live link</strong> (<code>/o/…</code>) or copy your Browser source link into OBS Studio or Streamlabs Desktop. Your OBS password and VTube Studio token stay strictly after <code>#</code> on your PC (if you use a <code>/o/…</code> cloud link, append <code>#obsPass=…&amp;vtsToken=…</code> inside OBS).</li>
       </ol>
 
       <h2 class="subtitle">Price and billing</h2>

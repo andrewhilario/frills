@@ -114,6 +114,90 @@ test("the files tab shows each upload (a picture, a player), and a file can be r
   await page.waitFor(`document.querySelectorAll("#cards .stat b")[2].textContent === "1"`);
 });
 
+test("the dashboard opens on the Overview: what needs attention, six numbers that never invent a figure, the chart, system health and the newest accounts and feedback; the side menu moves between sections", { skip }, async () => {
+  await click("#tab-overview");
+  assert.equal(await visible("#panel-overview"), true);
+  assert.equal(await $text("#dash-title"), "Overview");
+  await page.waitFor(`document.querySelectorAll("#kpis .kpi").length === 6 && /not connected/i.test(document.getElementById("attention").textContent)`);
+  const kpis = await page.evaluate(`[...document.querySelectorAll("#kpis .kpi")].map((k) => [k.dataset.key, k.querySelector(".kpi__value").textContent, k.querySelector(".kpi__sub").textContent])`);
+  assert.deepEqual(kpis.map((k) => k[0]), ["plus", "revenue", "accounts", "visits", "copies", "live"]);
+  assert.deepEqual(kpis[0].slice(0, 2), ["plus", "0"], "no one has Plus in this database");
+  assert.deepEqual(kpis[1].slice(0, 2), ["revenue", "$0.00"]);
+  assert.deepEqual(kpis.slice(3).map((k) => [k[1], k[2]]), [["—", "Not connected"], ["—", "Not connected"], ["—", "Not connected"]], "with no Cloudflare secrets the traffic cards say so instead of showing numbers");
+  assert.match(await $text("#chart-sentence"), /Not connected/);
+  assert.equal(await count("#chart-tabs .chip"), 3);
+  assert.match(await $text("#health"), /Database[\s\S]*Online/);
+  assert.equal(await $text("#accounts"), "No accounts yet.");
+
+  // the feedback that is still not done is on the menu, in the needs-attention list and in the latest feedback
+  const fresh = Number(await page.evaluate(`document.querySelectorAll("#cards .stat b")[1].textContent`));
+  assert.ok(fresh > 0, "the earlier tests leave some feedback not done");
+  assert.equal(await $text("#nav-feedback"), String(fresh));
+  assert.match(await $text("#attention"), new RegExp(`${fresh} new feedback`));
+  assert.ok((await count("#latest .dash__row")) >= 1);
+
+  // the buttons in the list and the menu go to the right section, and the address follows
+  await page.evaluate(`[...document.querySelectorAll("#attention button")].find((b) => b.textContent === "Open inbox").click()`);
+  assert.equal(await visible("#panel-feedback"), true);
+  assert.equal(await visible("#panel-overview"), false);
+  assert.equal(await $text("#dash-title"), "Feedback");
+  assert.equal(await page.evaluate("location.hash"), "#feedback");
+  await click("#tab-overview");
+  assert.equal(await page.evaluate("location.hash"), "");
+  await click("#quick-activate");
+  assert.equal(await visible("#panel-plus"), true);
+  assert.equal(await page.evaluate("document.activeElement.id"), "mp-email", "Activate a customer lands in the email box");
+  await page.goto(base + "/404.html", { settle: 300 });
+  await page.goto(base + "/admin/#plus", { settle: 600 });
+  await page.waitFor(`!document.getElementById("dash").hidden`);
+  assert.equal(await visible("#panel-plus"), true, "a link to #plus opens that section");
+  assert.equal(await $text("#dash-title"), "Frills Plus");
+  await click("#tab-overview");
+});
+
+test("the dashboard fits a phone: nothing runs off the side, and every button and menu link is a single line, at least 44px tall", { skip }, async () => {
+  await click("#tab-overview");
+  await page.waitFor(`document.querySelectorAll("#kpis .kpi").length === 6`);
+  for (const width of [320, 375, 414, 768]) {
+    await page.viewport(width, 800);
+    await sleep(200);
+    const m = await page.evaluate(`(() => {
+      const d = document.documentElement;
+      const touch = [...document.querySelectorAll(".dash .btn, .dash__link, .dash .chip, .dash__more")].filter((e) => e.offsetParent);
+      return { overflow: Math.max(0, d.scrollWidth - d.clientWidth), offscreen: [...document.querySelectorAll(".dash *")].filter((e) => e.getBoundingClientRect().right > innerWidth + 1).length, short: touch.filter((e) => e.getBoundingClientRect().height < 43.5).map((e) => e.textContent.trim()), tall: touch.filter((e) => e.getBoundingClientRect().height > 60).map((e) => e.textContent.trim()) };
+    })()`);
+    assert.deepEqual(m, { overflow: 0, offscreen: 0, short: [], tall: [] }, `at ${width}px: ${JSON.stringify(m)}`);
+  }
+  await page.viewport(1280, 900);
+});
+
+test("activating a customer can email them that Plus is on, any active Plus account has an email button that asks twice, and the confirmation stays on screen", { skip }, async () => {
+  await click("#tab-plus");
+  const outbox = async () => (await (await fetch(base + "/api/dev/outbox")).json());
+  await page.evaluate(`(() => { document.getElementById("mp-email").value = "buyer@example.com"; document.getElementById("mp-form").requestSubmit(); })()`);
+  await page.waitFor(`document.querySelectorAll("#p-list .item").length === 1`);
+  assert.match(await $text("#p-status"), /Frills Plus is on for buyer@example\.com for 30 days.*We emailed them\./, "the confirmation is still there after the list reloads");
+  const mail = (await outbox()).find((m) => m.to === "buyer@example.com");
+  assert.equal(mail.subject, "Your Frills Plus is on");
+  assert.match(mail.text, /\/account\/ with this email/);
+  assert.match(mail.text, /\/guides\/plus\//);
+
+  const send = "#p-list .item .admin__confirm";
+  await click(send);
+  assert.equal(await $text(send), "Really send?", "the first press only asks");
+  assert.equal((await outbox()).filter((m) => m.to === "buyer@example.com").length, 1, "nothing is sent by the first press");
+  await click(send);
+  await page.waitFor(`/Sent .Your Frills Plus is on. to buyer@example\.com/.test(document.getElementById("p-status").textContent)`);
+  assert.equal((await outbox()).filter((m) => m.to === "buyer@example.com").length, 2);
+
+  // with the box unticked, activating sends nothing
+  await page.evaluate(`(() => { document.getElementById("mp-notify").checked = false; document.getElementById("mp-email").value = "quiet@example.com"; document.getElementById("mp-form").requestSubmit(); })()`);
+  await page.waitFor(`/Frills Plus is on for quiet@example\.com/.test(document.getElementById("p-status").textContent)`);
+  assert.equal((await outbox()).some((m) => m.to === "quiet@example.com"), false);
+  assert.doesNotMatch(await $text("#p-status"), /emailed/);
+  await click("#tab-overview");
+});
+
 test("logging out forgets the password, and a reload asks again", { skip }, async () => {
   await click("#logout");
   assert.equal(await visible("#login"), true);

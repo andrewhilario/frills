@@ -3,6 +3,7 @@
 // Everything that came from visitors (messages, contacts, ids) goes in with textContent, never as HTML.
 
 import { el } from "./feed.js";
+import { CHARTS, PLUS_KIND_WORDS, attention, chartSentence, chartSeries, kpiCards, number, quotaOf, relayName, relayState } from "./admin-overview.js";
 
 const $ = (id) => document.getElementById(id);
 const KEY = "frills:admin:key";
@@ -32,6 +33,9 @@ async function api(method, path, body) {
   if (data.error === "bad_email") throw new Wrong("That does not look like a valid email address.");
   if (data.error === "already_paid") throw new Wrong("That account already has an active paid Frills Plus subscription.");
   if (data.error === "already_vip") throw new Wrong("That account has a VIP pass already. Revoke it first if you want to give a paid-style Plus instead.");
+  if (data.error === "email_off") throw new Wrong("Email is not set up on the server. Add the RESEND_API_KEY secret in Cloudflare.");
+  if (data.error === "mail_failed") throw new Wrong("The email service did not accept the message. Try again in a minute.");
+  if (data.error === "not_active") throw new Wrong("That account does not have Plus on right now.");
   if (data.error === "not_comp") throw new Wrong("Only VIP passes and manual grants can be ended here (cancel paid plans in Polar).");
   throw new Wrong("Something went wrong (" + res.status + ").");
 }
@@ -43,19 +47,19 @@ const say = (node, text, bad = false) => { node.textContent = text; node.dataset
 const run = async (node, job) => { try { return await job(); } catch (error) { if (error instanceof Wrong) say(node, error.message, true); else throw error; return undefined; } };
 
 /** A delete button that asks twice: the first press changes it to "Really delete?", the second does it. It relaxes after a few seconds. */
-function confirmButton(label, action) {
-  const button = el("button", { type: "button", className: "btn btn--outline btn--sm admin__danger", textContent: label });
+function confirmButton(label, action, { sure = "Really delete?", busy = "Deleting…", extra = "admin__danger" } = {}) {
+  const button = el("button", { type: "button", className: `btn btn--outline btn--sm ${extra}`, textContent: label });
   let timer = 0;
   button.addEventListener("click", async () => {
     if (!button.dataset.sure) {
       button.dataset.sure = "1";
-      button.textContent = "Really delete?";
+      button.textContent = sure;
       timer = setTimeout(() => { delete button.dataset.sure; button.textContent = label; }, 4000);
       return;
     }
     clearTimeout(timer);
     button.disabled = true;
-    button.textContent = "Deleting…";
+    button.textContent = busy;
     try { await action(); } catch { button.disabled = false; delete button.dataset.sure; button.textContent = label; }
   });
   return button;
@@ -65,7 +69,6 @@ function confirmButton(label, action) {
 function showDash(on) {
   $("login").hidden = on;
   $("dash").hidden = !on;
-  $("bar-actions").hidden = !on;
 }
 function logout(message = "") {
   key = "";
@@ -112,8 +115,13 @@ async function refreshSummary() {
     card(String(s.feedback.new), canMark ? "not marked done" : "(marking is off)"),
     card(String(s.media.count), `files (${plural(s.media.kinds.image ?? 0, "image", "images")}, ${plural(s.media.kinds.sound ?? 0, "sound", "sounds")})`),
     card(size(s.media.bytes), `stored of ${size(s.media.limit)}`, used),
-    card(String(s.plus?.active ?? 0), `Frills Plus active (${s.plus?.comp ?? 0} VIP)`),
   );
+  if (dash.overview) {
+    dash.overview.summary = s;
+    renderNav();
+    renderAttention();
+    renderHealth();
+  }
 }
 function card(number, label, percent) {
   const node = el("div", { className: "stat" }, el("b", { textContent: number }), el("span", { textContent: label }));
@@ -126,17 +134,167 @@ function card(number, label, percent) {
 }
 
 // ── Tabs ───────────────────────────────────────────────────────────────────────────────────────────────────────────
+const VIEWS = { overview: "Overview", feedback: "Feedback", files: "Files", plus: "Frills Plus" };
+const SUBS = { feedback: "What visitors sent you through the feedback form.", files: "The pictures and sounds visitors uploaded for their alerts.", plus: "Turn Plus on for a customer, give a VIP pass, and see who has Plus." };
+let view = "overview";
 function tab(which) {
-  for (const name of ["feedback", "files", "plus"]) {
+  if (!VIEWS[which]) which = "overview";
+  view = which;
+  for (const name of Object.keys(VIEWS)) {
     const panel = $("panel-" + name);
     const btn = $("tab-" + name);
     if (panel) panel.hidden = name !== which;
     if (btn) btn.setAttribute("aria-pressed", String(name === which));
   }
+  $("dash-title").textContent = VIEWS[which];
+  renderSub();
+  try { history.replaceState(null, "", which === "overview" ? location.pathname : "#" + which); } catch { /* the address is only a convenience */ }
 }
-$("tab-feedback").addEventListener("click", () => tab("feedback"));
-$("tab-files").addEventListener("click", () => tab("files"));
-$("tab-plus")?.addEventListener("click", () => tab("plus"));
+for (const name of Object.keys(VIEWS)) $("tab-" + name)?.addEventListener("click", () => tab(name));
+$("go-plus")?.addEventListener("click", () => tab("plus"));
+$("go-feedback")?.addEventListener("click", () => tab("feedback"));
+$("quick-activate")?.addEventListener("click", () => { tab("plus"); $("mp-email")?.focus({ preventScroll: false }); });
+
+// ── Overview ─────────────────────────────────────────────────────────────
+// dash.overview is our own database (fast); dash.stats is traffic and relay health from Cloudflare and the relays (slower, and may be off).
+const dash = { overview: undefined, stats: undefined, chart: "visits", updatedAt: 0 };
+const clock = (ms) => new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+const utcDay = (iso) => new Date(Date.parse(iso + "T00:00:00Z")).toLocaleDateString([], { month: "short", day: "numeric", timeZone: "UTC" });
+const none = (text) => el("li", { className: "dash__none", textContent: text });
+const withTone = (node, tone) => { node.dataset.tone = tone; return node; };
+const NOT_CONNECTED = "Not connected. Set the CF_ACCOUNT_ID and CF_API_TOKEN secrets in Cloudflare.";
+
+function renderSub() {
+  $("dash-sub").textContent = view === "overview" ? (dash.updatedAt ? `Updated ${clock(dash.updatedAt)}` : "Loading…") : SUBS[view];
+}
+function renderNav() {
+  const fresh = dash.overview?.summary?.feedback?.new ?? 0;
+  $("nav-feedback").hidden = !fresh;
+  $("nav-feedback").textContent = fresh ? number(fresh) : "";
+}
+const TONE_WORDS = { bad: "Urgent", warn: "Check", info: "Note", ok: "All clear" };
+function attentionRow(item) {
+  const row = withTone(el("li", { className: "dash__attn-item" }), item.tone);
+  row.append(withTone(el("span", { className: "dash__chip", textContent: TONE_WORDS[item.tone] }), item.tone), el("p", { className: "dash__attn-text", textContent: item.text }));
+  if (item.href) row.append(el("a", { className: "btn btn--soft btn--sm dash__attn-action", href: item.href, textContent: item.action }));
+  else if (item.view) {
+    const go = el("button", { type: "button", className: "btn btn--soft btn--sm dash__attn-action", textContent: item.action });
+    go.addEventListener("click", () => tab(item.view));
+    row.append(go);
+  }
+  return row;
+}
+function renderAttention() {
+  if (!dash.overview) { $("attention").replaceChildren(none("Checking…")); $("attn-count").textContent = ""; return; }
+  const items = attention({ overview: dash.overview, stats: dash.stats });
+  $("attn-count").textContent = items.length ? plural(items.length, "item", "items") : "";
+  const clear = dash.stats === undefined ? "Nothing needs you so far. Still checking the relays…" : "All clear. Nothing needs you right now.";
+  $("attention").replaceChildren(...(items.length ? items.map(attentionRow) : [attentionRow({ tone: "ok", text: clear })]));
+}
+function renderKpis() {
+  $("kpis").replaceChildren(...kpiCards({ overview: dash.overview, stats: dash.stats }).map((c) => {
+    const node = el("article", { className: "kpi" }, el("span", { className: "kpi__label", textContent: c.label }), el("b", { className: "kpi__value", textContent: c.value }), el("span", { className: "kpi__sub", textContent: c.sub }));
+    node.dataset.key = c.key;
+    if (c.change) node.append(withTone(el("span", { className: "kpi__change", textContent: c.change.text }), c.change.tone));
+    return node;
+  }));
+}
+/** Bars scaled to the biggest day. Every bar has its date and number in its title; the sentence under the chart says it in words. */
+function bars(target, series) {
+  const max = Math.max(1, ...series.map((d) => d.n));
+  target.replaceChildren(...series.map((d, i) => {
+    const bar = el("i", { title: `${utcDay(d.day)}: ${number(d.n)}` });
+    bar.style.setProperty("--h", Math.round((d.n / max) * 100) + "%");
+    if (d.n === 0) bar.dataset.zero = "true";
+    if (i === series.length - 1) bar.dataset.today = "true";
+    return bar;
+  }));
+}
+function renderChart() {
+  const tabs = $("chart-tabs");
+  if (!tabs.children.length) {
+    for (const c of CHARTS) {
+      const b = el("button", { type: "button", className: "chip", textContent: c.label });
+      b.dataset.kind = c.key;
+      b.addEventListener("click", () => { dash.chart = c.key; renderChart(); });
+      tabs.append(b);
+    }
+  }
+  for (const b of tabs.children) b.setAttribute("aria-pressed", String(b.dataset.kind === dash.chart));
+  const series = chartSeries(dash.stats, dash.chart);
+  if (!series) {
+    const words = dash.stats === undefined ? "Loading the numbers…" : dash.stats && dash.stats.ok === false ? NOT_CONNECTED : "The traffic numbers could not be read. Press Refresh to try again.";
+    $("chart").replaceChildren(el("p", { className: "dash__empty", textContent: words }));
+    $("chart-from").textContent = "";
+    $("chart-to").textContent = "";
+    $("chart-sentence").textContent = words;
+    return;
+  }
+  bars($("chart"), series);
+  $("chart-from").textContent = utcDay(series[0].day);
+  $("chart-to").textContent = "Today";
+  $("chart-sentence").textContent = chartSentence(series, CHARTS.find((c) => c.key === dash.chart).noun);
+}
+function renderHealth() {
+  const list = $("health");
+  const s = dash.stats;
+  const rows = [];
+  if (s === undefined) rows.push(none("Checking the relays…"));
+  else if (s === null) rows.push(none("The relay check could not be read. Press Refresh to try again."));
+  else if (s.ok === false) rows.push(none("Relay health: " + NOT_CONNECTED));
+  else if (!s.relays?.length) rows.push(none("No relays are set up to check."));
+  else {
+    for (const r of s.relays) {
+      const st = relayState(r);
+      const quota = quotaOf(r);
+      const line = [st.detail, quota ? `${number(quota.left)} of ${number(quota.max)} Euler requests left today` : "", r.version && r.version !== "—" ? `version ${r.version}` : ""].filter(Boolean).join(" · ");
+      rows.push(el("li", { className: "dash__relay" }, el("span", { className: "dash__relay-name", textContent: relayName(r) }), withTone(el("span", { className: "dash__chip", textContent: st.word }), st.tone), el("span", { className: "dash__relay-line", textContent: line })));
+    }
+  }
+  if (dash.overview) {
+    const o = dash.overview;
+    rows.push(el("li", { className: "dash__relay" }, el("span", { className: "dash__relay-name", textContent: "Database" }), withTone(el("span", { className: "dash__chip", textContent: "Online" }), "ok"), el("span", { className: "dash__relay-line", textContent: `${number(o.accounts.total)} accounts · ${number(o.summary.feedback.total)} feedback · ${size(o.summary.media.bytes)} of files` })));
+  }
+  list.replaceChildren(...rows);
+}
+function renderAccounts() {
+  const o = dash.overview;
+  if (!o) { $("accounts").replaceChildren(none("Loading…")); return; }
+  bars($("signups"), o.accounts.perDay);
+  const week = o.accounts.perDay.reduce((n, d) => n + d.n, 0);
+  $("signups-sentence").textContent = `${plural(week, "sign-up", "sign-ups")} in the last 14 days.`;
+  $("accounts").replaceChildren(...(o.recentAccounts.length ? o.recentAccounts.map((a) => {
+    const top = el("div", { className: "dash__row-top" }, el("span", { className: "dash__row-main", textContent: a.email }));
+    if (a.plus) { const tag = el("span", { className: "tag", textContent: PLUS_KIND_WORDS[a.plus] }); tag.dataset.kind = a.plus; top.append(tag); }
+    const seen = a.lastLoginAt && a.lastLoginAt - a.createdAt > 60_000 ? ` · last signed in ${when(a.lastLoginAt)}` : "";
+    return el("li", { className: "dash__row" }, top, el("span", { className: "dash__row-meta", textContent: `${a.plus ? "" : "Free account · "}Joined ${when(a.createdAt)}${seen}` }));
+  }) : [none("No accounts yet.")]));
+}
+function renderLatest() {
+  const o = dash.overview;
+  if (!o) { $("latest").replaceChildren(none("Loading…")); return; }
+  $("latest").replaceChildren(...(o.latestFeedback.length ? o.latestFeedback.map((f) => {
+    const top = el("div", { className: "dash__row-top" }, el("span", { className: "tag", textContent: KINDS[f.kind] ?? f.kind }));
+    if (f.status === "new") top.append(el("span", { className: "tag", textContent: "New" }));
+    top.append(el("span", { className: "dash__row-meta", textContent: when(f.created) }));
+    return el("li", { className: "dash__row" }, top, el("p", { className: "dash__clamp", textContent: f.message }));
+  }) : [none("No feedback yet.")]));
+}
+function renderStatsParts() { renderAttention(); renderKpis(); renderChart(); renderHealth(); }
+function renderOverview() { renderNav(); renderSub(); renderAttention(); renderKpis(); renderChart(); renderHealth(); renderAccounts(); renderLatest(); }
+
+async function loadOverview() {
+  dash.overview = await api("GET", "overview");
+  dash.updatedAt = Date.now();
+  renderOverview();
+}
+/** Traffic, relays and Euler quota. Slow, so it never holds the page up: the cards say "Loading…" until it answers. */
+async function loadStats() {
+  dash.stats = undefined;
+  renderStatsParts();
+  try { dash.stats = await api("GET", "stats"); } catch { dash.stats = null; }
+  renderStatsParts();
+}
 
 /** A row of chips where one is pressed. Returns { get, set }. */
 function pick(host, items, onPick) {
@@ -294,6 +452,13 @@ function plusCard(p) {
     resetBtn.disabled = false;
   });
   actions.append(resetBtn);
+  if (p.active) {
+    actions.append(confirmButton("Email: Plus is on", () => run($("p-status"), async () => {
+      const res = await api("POST", `plus/${p.accountId}/notify`);
+      say($("p-status"), `Sent “Your Frills Plus is on” to ${res.email}.`);
+      return true;
+    }).then((ok) => { if (!ok) throw new Error("not sent"); }).then(() => loadPlus()), { sure: "Really send?", busy: "Sending…", extra: "admin__confirm" }));
+  }
   if ((p.comp || p.manual) && p.active) {
     actions.append(confirmButton(p.comp ? "Revoke VIP" : "End manual Plus", () => run($("p-status"), async () => {
       await api("DELETE", `plus/${p.accountId}`);
@@ -318,13 +483,16 @@ function plusCard(p) {
   return node;
 }
 
-async function loadPlus() {
+async function loadPlus(refreshOverview = true) {
   if (!$("p-list")) return;
-  say($("p-status"), "Loading…");
   const data = await run($("p-status"), () => api("GET", "plus"));
   if (!data) return;
   $("p-list").replaceChildren(...(data.items ?? []).map(plusCard));
-  say($("p-status"), $("p-list").children.length ? "" : "No Frills Plus or VIP accounts yet. Grant one above.");
+  // The line above the list keeps what an action just said ("Frills Plus is on for…"); only its own empty-list note comes and goes.
+  const status = $("p-status");
+  if (!$("p-list").children.length) say(status, "No Frills Plus or VIP accounts yet. Activate a customer or grant a VIP pass above.");
+  else if (status.textContent.startsWith("No Frills Plus or VIP accounts yet")) say(status, "");
+  if (refreshOverview && dash.overview) void loadOverview().catch(() => {});
 }
 
 $("p-form")?.addEventListener("submit", async (event) => {
@@ -348,13 +516,15 @@ $("mp-form")?.addEventListener("submit", async (event) => {
   const address = $("mp-email").value.trim();
   const days = Math.round(Number($("mp-days").value)) || 30;
   const limit = Number($("mp-limit").value) || 150000;
+  const notify = $("mp-notify").checked;
   if (!address) return;
   $("mp-grant").disabled = true;
   say($("p-status"), "Activating…");
   await run($("p-status"), async () => {
-    const res = await api("POST", "plus/manual", { email: address, days, limit });
+    const res = await api("POST", "plus/manual", { email: address, days, limit, notify });
     $("mp-email").value = "";
-    say($("p-status"), `Frills Plus is on for ${res.email} for ${plural(res.days, "day", "days")}${res.extended ? " more" : ""}, until ${when(res.renewsAt)}.${res.created ? " They have no account yet: they sign in at /account/ with this email." : ""}`);
+    const mail = !notify ? "" : res.emailed ? " We emailed them." : res.emailError === "email_off" ? " The email was not sent: email is not set up on the server." : " The email could not be sent; use Email: Plus is on in the list to try again.";
+    say($("p-status"), `Frills Plus is on for ${res.email} for ${plural(res.days, "day", "days")}${res.extended ? " more" : ""}, until ${when(res.renewsAt)}.${res.created ? " They have no account yet: they sign in at /account/ with this email." : ""}${mail}`);
     await Promise.all([loadPlus(), refreshSummary()]);
   });
   $("mp-grant").disabled = false;
@@ -363,10 +533,12 @@ $("mp-form")?.addEventListener("submit", async (event) => {
 async function refreshAll() {
   try {
     await refreshSummary();
-    await Promise.all([loadFeedback(true), loadMedia(true), loadPlus()]);
+    await Promise.all([loadOverview(), loadFeedback(true), loadMedia(true), loadPlus(false)]);
   } catch (error) {
     if (!(error instanceof Wrong)) throw error;
   }
+  void loadStats();
 }
 
 if (key) enter(); else showDash(false);
+{ const wanted = location.hash.slice(1); if (VIEWS[wanted]) tab(wanted); else renderOverview(); }
