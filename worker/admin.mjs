@@ -9,7 +9,7 @@ import { KINDS } from "./feedback.mjs";
 import { MEDIA } from "./media.mjs";
 import { handleOffice } from "./office.mjs";
 import { parseRelayUrls, report } from "./stats-report.mjs";
-import { grantCompPlus, listPlusAccounts, resetPlusUsage, revokeCompPlus } from "./accounts.mjs";
+import { grantCompPlus, grantManualPlus, listPlusAccounts, resetPlusUsage, revokeCompPlus } from "./accounts.mjs";
 
 export const ADMIN = { minKey: 12, maxWrong: 10, windowMs: 10 * 60 * 1000, pageSize: 40, maxPage: 100 };
 export const STATUSES = ["new", "done"];
@@ -66,13 +66,14 @@ async function summary(env, now = Date.now()) {
   const kinds = (await env.DB.prepare("SELECT kind, COUNT(*) AS n FROM feedback GROUP BY kind").all()).results;
   const files = await env.DB.prepare("SELECT COUNT(*) AS n, COALESCE(SUM(size), 0) AS bytes FROM media").first();
   const byKind = (await env.DB.prepare("SELECT kind, COUNT(*) AS n FROM media GROUP BY kind").all()).results;
-  let plusSummary = { total: 0, active: 0, comp: 0 };
+  let plusSummary = { total: 0, active: 0, comp: 0, manual: 0 };
   try {
     const list = await listPlusAccounts(env.DB, { now });
     plusSummary = {
       total: list.length,
       active: list.filter((p) => p.active).length,
       comp: list.filter((p) => p.comp && p.active).length,
+      manual: list.filter((p) => p.manual && !p.comp && p.active).length,
     };
   } catch { /* older DBs before accounts/plus tables */ }
   return json(200, {
@@ -183,6 +184,17 @@ async function handleAdminPlus(method, rest, more, request, env, now) {
       return json(200, result);
     }
     return json(405, { ok: false, error: "method" }, { allow: "GET, POST" });
+  }
+  if (rest === "manual" && more.length === 0) {
+    if (method !== "POST") return json(405, { ok: false, error: "method" }, { allow: "POST" });
+    let body;
+    try { body = await request.json(); } catch { return json(400, { ok: false, error: "bad_json" }); }
+    const result = await grantManualPlus(env.DB, body?.email, { days: body?.days, limit: body?.limit, now });
+    if (!result.ok) {
+      const status = result.error === "already_paid" || result.error === "already_vip" ? 409 : result.error === "full" ? 503 : 400;
+      return json(status, result);
+    }
+    return json(200, result);
   }
   const accountId = String(rest ?? "").trim();
   if (!/^[0-9a-f]{16}$/.test(accountId)) return json(404, { ok: false, error: "not_found" });

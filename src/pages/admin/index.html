@@ -75,10 +75,31 @@
     </section>
 
     <section id="panel-plus" aria-label="Frills Plus VIP passes" hidden>
+      <form id="mp-form" class="admin__grant admin__grant--manual">
+        <div class="admin__grant-head">
+          <h2 class="admin__h">Activate a paying customer</h2>
+          <p class="admin__note">Use this when someone paid but Plus did not turn on. It is a normal Plus for the number of days you choose, not a VIP pass. A real subscription that arrives later takes over from it. Adding days to an active one makes it longer.</p>
+        </div>
+        <div class="admin__grant-fields">
+          <label class="admin__field">
+            <span>Customer email (the one they signed in with)</span>
+            <input type="email" id="mp-email" placeholder="customer@example.com" autocomplete="off" spellcheck="false" required>
+          </label>
+          <label class="admin__field">
+            <span>Days of Plus</span>
+            <input type="number" id="mp-days" value="30" min="1" max="366" step="1" inputmode="numeric">
+          </label>
+          <label class="admin__field">
+            <span>AI voice chars / month</span>
+            <input type="number" id="mp-limit" value="150000" min="1000" max="10000000" step="1000" inputmode="numeric">
+          </label>
+          <button class="btn" type="submit" id="mp-grant">Activate Plus</button>
+        </div>
+      </form>
       <form id="p-form" class="admin__grant">
         <div class="admin__grant-head">
           <h2 class="admin__h">Grant complimentary Frills Plus (VIP)</h2>
-          <p class="admin__note">Gives an email address lifetime Frills Plus with zero billing, working from any country. Once granted, they sign in at <code>/account/</code> with that email to unlock every Plus feature, including all 16 Matcha pages.</p>
+          <p class="admin__note">A free lifetime pass for friends and family, with zero billing, working from any country. It is not for customers: use the box above for anyone who paid. Once granted, they sign in at <code>/account/</code> with that email to unlock every Plus feature, including all 16 Matcha pages.</p>
         </div>
         <div class="admin__grant-fields">
           <label class="admin__field">
@@ -87,7 +108,7 @@
           </label>
           <label class="admin__field">
             <span>AI voice chars / month</span>
-            <input type="number" id="p-limit" value="150000" min="1000" max="10000000" step="10000" inputmode="numeric">
+            <input type="number" id="p-limit" value="150000" min="1000" max="10000000" step="1000" inputmode="numeric">
           </label>
           <button class="btn" type="submit" id="p-grant">Grant free Frills Plus</button>
         </div>

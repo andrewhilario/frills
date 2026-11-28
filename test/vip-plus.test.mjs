@@ -6,6 +6,8 @@
 
 import test from "node:test";
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import { join } from "node:path";
 import { localDatabase } from "../scripts/lib/d1-sqlite.mjs";
 import { handleAdmin } from "../worker/admin.mjs";
 import { handleAccount } from "../worker/account-routes.mjs";
@@ -13,7 +15,8 @@ import { handleCloudOverlays } from "../worker/cloud-overlays.mjs";
 import { handlePlusRelayTicket } from "../worker/plus-relay.mjs";
 import { handleProStatus } from "../worker/region.mjs";
 import { plusGate, spendCharacters } from "../worker/plus-gate.mjs";
-import { COMP_MONTHLY_MS } from "../worker/accounts.mjs";
+import { COMP_MONTHLY_MS, getPlus, isCompPlus, plusActive } from "../worker/accounts.mjs";
+import { handlePolarWebhook } from "../worker/polar.mjs";
 
 const SITE = "https://frills.example";
 const ADMIN_KEY = "super-secret-admin-key-1234";
@@ -162,4 +165,92 @@ test("admin grant refuses to overwrite an active paid subscription", async () =>
   const del = await handleAdmin(adminReq("DELETE", "plus/0123456789abcdef"), env, { now });
   assert.equal(del.status, 409);
   assert.equal((await del.json()).error, "not_comp");
+});
+
+test("the admin voice-allowance field accepts its own default (a number input only takes min + a whole number of steps)", () => {
+  const html = fs.readFileSync(join(import.meta.dirname, "..", "src", "pages", "admin", "index.html"), "utf8");
+  const tag = /<input[^>]*id="p-limit"[^>]*>/.exec(html)?.[0] ?? "";
+  const attr = (name) => Number(new RegExp(`${name}="([0-9]+)"`).exec(tag)?.[1]);
+  const [value, min, max, step] = [attr("value"), attr("min"), attr("max"), attr("step")];
+  assert.ok([value, min, max, step].every(Number.isFinite), "the field states its value, min, max and step");
+  assert.equal((value - min) % step, 0, "the default is a value the browser accepts");
+  for (const typed of [150000, 200000, 500000]) assert.equal((typed - min) % step, 0, `${typed} can be typed`);
+});
+
+const DAY = 24 * 3600 * 1000;
+const WEBHOOK_SECRET = "polar_whs_manual_grant_test_secret_0123456789";
+
+async function signedPolar(body, now) {
+  const raw = JSON.stringify(body);
+  const id = "msg_manual_1";
+  const ts = String(Math.floor(now / 1000));
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(WEBHOOK_SECRET), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${id}.${ts}.${raw}`)));
+  return new Request(`${SITE}/api/webhooks/polar`, { method: "POST", headers: { "webhook-id": id, "webhook-timestamp": ts, "webhook-signature": `v1,${Buffer.from(sig).toString("base64")}` }, body: raw });
+}
+
+test("a manual grant is a normal Plus (not VIP): blank payment fields, days you choose, extends, never overwrites a VIP pass or a paid plan, and can be ended", async () => {
+  const env = makeEnv();
+  const t0 = 1_800_000_000_000;
+
+  // grants Plus for the days asked, listed as manual (not VIP)
+  const res = await handleAdmin(adminReq("POST", "plus/manual", { email: " Customer@Example.com ", days: 30, limit: 150000 }), env, { now: t0 });
+  assert.equal(res.status, 200);
+  const granted = await res.json();
+  assert.equal(granted.email, "customer@example.com");
+  assert.equal(granted.created, true);
+  assert.equal(granted.extended, false);
+  assert.equal(granted.renewsAt, t0 + 30 * DAY);
+  let row = await getPlus(env.DB, granted.accountId, t0);
+  assert.equal(row.provider_ref, "", "the payment fields stay blank, so a real subscription can attach later");
+  assert.equal(isCompPlus(row), false, "it is not a VIP pass, so the country rules still apply to it");
+  assert.equal(plusActive(row, t0 + 29 * DAY), true);
+  assert.equal(plusActive(row, t0 + 34 * DAY), false, "it ends after its days (plus the usual three days of grace)");
+  const list = (await (await handleAdmin(adminReq("GET", "plus"), env, { now: t0 })).json()).items;
+  assert.equal(list[0].comp, false);
+  assert.equal(list[0].manual, true);
+  assert.equal(list[0].active, true);
+  assert.equal((await (await handleAdmin(adminReq("GET", "summary"), env, { now: t0 })).json()).plus.manual, 1);
+
+  // granting again to an active manual row adds the days to its end and keeps the voice usage
+  await env.DB.prepare("UPDATE plus SET tts_used = 4000 WHERE account_id = ?").bind(granted.accountId).run();
+  const again = await (await handleAdmin(adminReq("POST", "plus/manual", { email: "customer@example.com", days: 10 }), env, { now: t0 + DAY })).json();
+  assert.equal(again.extended, true);
+  assert.equal(again.renewsAt, t0 + 40 * DAY);
+  assert.equal((await getPlus(env.DB, granted.accountId, t0 + DAY)).tts_used, 4000);
+
+  // days are kept to a sensible range, and a bad address or bad body is refused
+  assert.equal((await (await handleAdmin(adminReq("POST", "plus/manual", { email: "long@example.com", days: 99999 }), env, { now: t0 })).json()).days, 366);
+  assert.equal((await (await handleAdmin(adminReq("POST", "plus/manual", { email: "not an email" }), env, { now: t0 })).json()).error, "bad_email");
+  assert.equal((await handleAdmin(adminReq("GET", "plus/manual"), env, { now: t0 })).status, 405);
+
+  // a real Polar subscription that arrives later takes over the same row
+  const webhookEnv = { ...env, POLAR_WEBHOOK_SECRET: WEBHOOK_SECRET };
+  const polar = await handlePolarWebhook(await signedPolar({
+    type: "subscription.created",
+    timestamp: new Date(t0 + 2 * DAY).toISOString(),
+    data: { id: "sub_real_1", status: "active", customer: { external_id: granted.accountId }, current_period_start: new Date(t0 + 2 * DAY).toISOString(), current_period_end: new Date(t0 + 32 * DAY).toISOString() },
+  }, t0 + 2 * DAY), webhookEnv, { now: t0 + 2 * DAY });
+  assert.equal(polar.status, 200);
+  row = await getPlus(env.DB, granted.accountId, t0 + 2 * DAY);
+  assert.equal(row.provider_ref, "sub_real_1", "the subscription attached to the manual row");
+  assert.equal(row.status, "active");
+
+  // ...and now it is a real paid plan, so a manual grant refuses it
+  const paid = await handleAdmin(adminReq("POST", "plus/manual", { email: "customer@example.com" }), env, { now: t0 + 3 * DAY });
+  assert.equal(paid.status, 409);
+  assert.equal((await paid.json()).error, "already_paid");
+
+  // it never replaces a VIP pass
+  const vip = await (await handleAdmin(adminReq("POST", "plus", { email: "friend@example.com" }), env, { now: t0 })).json();
+  const refused = await handleAdmin(adminReq("POST", "plus/manual", { email: "friend@example.com" }), env, { now: t0 });
+  assert.equal(refused.status, 409);
+  assert.equal((await refused.json()).error, "already_vip");
+  assert.equal(isCompPlus(await getPlus(env.DB, vip.accountId, t0)), true, "the VIP pass is untouched");
+
+  // a manual grant can be ended by the owner; a paid plan cannot
+  const lone = await (await handleAdmin(adminReq("POST", "plus/manual", { email: "lone@example.com", days: 5 }), env, { now: t0 })).json();
+  assert.equal((await handleAdmin(adminReq("DELETE", `plus/${lone.accountId}`), env, { now: t0 + 1000 })).status, 200);
+  assert.equal(plusActive(await getPlus(env.DB, lone.accountId, t0 + 2000), t0 + 2000), false);
+  assert.equal((await handleAdmin(adminReq("DELETE", `plus/${granted.accountId}`), env, { now: t0 + 3 * DAY })).status, 409, "a real subscription is cancelled in Polar, not here");
 });

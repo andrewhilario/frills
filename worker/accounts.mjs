@@ -187,13 +187,55 @@ export async function grantCompPlus(db, rawEmail, { limit = DEFAULT_COMP_LIMIT, 
   return { ok: true, accountId: account.id, email, created, limit: cleanLimit };
 }
 
-/** Revokes an owner-granted complimentary VIP pass without touching paid subscriptions. */
+export const MANUAL_DEFAULT_DAYS = 30;
+export const MANUAL_MAX_DAYS = 366;
+
+/** True when a `plus` row was added by hand for a paying customer: it has no payment-service reference, and it is not a VIP pass. */
+export const isManualPlus = (row) => Boolean(row && !row.provider_ref && row.status === "active");
+
+/**
+ * Turns Plus on by hand for someone who paid (for example when the payment notice did not arrive), for a number of days. It is a normal Plus, not a VIP pass:
+ * the payment fields stay blank, so a real subscription that arrives later attaches to this row and takes over. Granting again to an active manual row adds the days
+ * to the end of it. It never overwrites a VIP pass or an active subscription.
+ */
+export async function grantManualPlus(db, rawEmail, { days = MANUAL_DEFAULT_DAYS, limit = DEFAULT_COMP_LIMIT, now = Date.now() } = {}) {
+  const email = normalizeEmail(rawEmail);
+  if (!email) return { ok: false, error: "bad_email" };
+  const cleanDays = Math.max(1, Math.min(MANUAL_MAX_DAYS, Math.round(Number(days) || MANUAL_DEFAULT_DAYS)));
+  const cleanLimit = Math.max(1000, Math.min(10_000_000, Math.round(Number(limit) || DEFAULT_COMP_LIMIT)));
+  let account = await db.prepare("SELECT id FROM accounts WHERE email = ?").bind(email).first();
+  const created = !account;
+  if (created) {
+    const total = await db.prepare("SELECT COUNT(*) AS n FROM accounts").first();
+    if (total.n >= LIMITS.accounts) return { ok: false, error: "full" };
+    const id = randomHex(8);
+    await db.prepare("INSERT INTO accounts (id, email, created_at, last_login_at) VALUES (?, ?, ?, ?) ON CONFLICT(email) DO NOTHING").bind(id, email, now, now).run();
+    account = await db.prepare("SELECT id FROM accounts WHERE email = ?").bind(email).first();
+  }
+  const existing = await db.prepare("SELECT * FROM plus WHERE account_id = ?").bind(account.id).first();
+  const live = Boolean(existing) && plusActive(existing, now);
+  if (live && existing.provider_ref === COMP_PROVIDER) return { ok: false, error: "already_vip" };
+  if (live && existing.provider_ref) return { ok: false, error: "already_paid" };
+  const extending = live && !existing.provider_ref;
+  const renewsAt = (extending ? Math.max(now, Number(existing.renews_at) || now) : now) + cleanDays * 24 * 3600 * 1000;
+  if (extending) {
+    await db.prepare("UPDATE plus SET renews_at = ?, tts_limit = ?, updated_at = ? WHERE account_id = ?").bind(renewsAt, cleanLimit, now, account.id).run();
+  } else {
+    await db.prepare(
+      "INSERT INTO plus (account_id, provider_ref, order_ref, status, renews_at, tts_used, tts_limit, period_start, updated_at) VALUES (?, '', '', 'active', ?, 0, ?, ?, ?) " +
+      "ON CONFLICT(account_id) DO UPDATE SET provider_ref = '', order_ref = '', status = 'active', renews_at = excluded.renews_at, tts_used = 0, tts_limit = excluded.tts_limit, period_start = excluded.period_start, updated_at = excluded.updated_at",
+    ).bind(account.id, renewsAt, cleanLimit, now, now).run();
+  }
+  return { ok: true, accountId: account.id, email, created, extended: extending, days: cleanDays, renewsAt, limit: cleanLimit };
+}
+
+/** Ends an owner-granted VIP pass or a manual grant, without touching real subscriptions. */
 export async function revokeCompPlus(db, accountId, { now = Date.now() } = {}) {
   const id = String(accountId ?? "").trim();
   if (!id) return { ok: false, error: "not_found" };
   const row = await db.prepare("SELECT account_id, provider_ref FROM plus WHERE account_id = ?").bind(id).first();
   if (!row) return { ok: false, error: "not_found" };
-  if (row.provider_ref !== COMP_PROVIDER) return { ok: false, error: "not_comp" };
+  if (row.provider_ref && row.provider_ref !== COMP_PROVIDER) return { ok: false, error: "not_comp" };
   await db.prepare("UPDATE plus SET status = 'expired', renews_at = NULL, updated_at = ? WHERE account_id = ?").bind(now, id).run();
   return { ok: true, accountId: id };
 }
@@ -223,6 +265,7 @@ export async function listPlusAccounts(db, { now = Date.now(), limit = 200 } = {
       accountId: fresh.account_id,
       email: r.email,
       comp: fresh.provider_ref === COMP_PROVIDER,
+      manual: !fresh.provider_ref,
       status: fresh.status,
       active: plusActive(fresh, now),
       renewsAt: fresh.renews_at,

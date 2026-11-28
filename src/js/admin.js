@@ -31,7 +31,8 @@ async function api(method, path, body) {
   if (data.error === "no_status_column") throw new Wrong("The database has no status column yet. See the note at the top.");
   if (data.error === "bad_email") throw new Wrong("That does not look like a valid email address.");
   if (data.error === "already_paid") throw new Wrong("That account already has an active paid Frills Plus subscription.");
-  if (data.error === "not_comp") throw new Wrong("Only complimentary VIP passes can be revoked here (cancel paid plans in Polar).");
+  if (data.error === "already_vip") throw new Wrong("That account has a VIP pass already. Revoke it first if you want to give a paid-style Plus instead.");
+  if (data.error === "not_comp") throw new Wrong("Only VIP passes and manual grants can be ended here (cancel paid plans in Polar).");
   throw new Wrong("Something went wrong (" + res.status + ").");
 }
 
@@ -265,7 +266,7 @@ $("m-more").addEventListener("click", () => loadMedia(false));
 // ── Frills Plus VIP ────────────────────────────────────────────────────────────────────────────────────────────────
 function plusCard(p) {
   const node = el("article", { className: "item" + (p.active ? "" : " is-done") });
-  const kindTag = el("span", { className: p.comp ? "tag tag--vip" : "tag", textContent: p.comp ? "VIP (Free)" : "Paid" });
+  const kindTag = el("span", { className: p.comp ? "tag tag--vip" : "tag", textContent: p.comp ? "VIP (Free)" : p.manual ? "Manual" : "Paid" });
   const stateTag = el("span", { className: p.active ? "tag tag--vip" : "tag tag--off", textContent: p.active ? "Active" : p.status });
   const pct = Math.min(100, Math.round((100 * p.used) / Math.max(1, p.limit)));
   const bar = el("i", { className: "stat__bar" });
@@ -280,6 +281,7 @@ function plusCard(p) {
     el("p", { className: "item__meta", textContent: `AI voice: ${p.used.toLocaleString()} / ${p.limit.toLocaleString()} chars (${pct}%)` }),
     bar,
   );
+  if (!p.comp && p.renewsAt) node.append(el("p", { className: "item__meta", textContent: `${p.active ? "Plus until" : "Plus ended"} ${when(p.renewsAt)}` }));
   const actions = el("div", { className: "item__actions" });
   const resetBtn = el("button", { type: "button", className: "btn btn--soft btn--sm", textContent: "Reset AI credits" });
   resetBtn.addEventListener("click", async () => {
@@ -292,10 +294,10 @@ function plusCard(p) {
     resetBtn.disabled = false;
   });
   actions.append(resetBtn);
-  if (p.comp && p.active) {
-    actions.append(confirmButton("Revoke VIP", () => run($("p-status"), async () => {
+  if ((p.comp || p.manual) && p.active) {
+    actions.append(confirmButton(p.comp ? "Revoke VIP" : "End manual Plus", () => run($("p-status"), async () => {
       await api("DELETE", `plus/${p.accountId}`);
-      say($("p-status"), `Revoked complimentary Frills Plus for ${p.email}.`);
+      say($("p-status"), `${p.comp ? "Revoked complimentary" : "Ended manual"} Frills Plus for ${p.email}.`);
       await Promise.all([loadPlus(), refreshSummary()]);
       return true;
     }).then((ok) => { if (!ok) throw new Error("not revoked"); })));
@@ -339,6 +341,23 @@ $("p-form")?.addEventListener("submit", async (event) => {
     await Promise.all([loadPlus(), refreshSummary()]);
   });
   $("p-grant").disabled = false;
+});
+
+$("mp-form")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const address = $("mp-email").value.trim();
+  const days = Math.round(Number($("mp-days").value)) || 30;
+  const limit = Number($("mp-limit").value) || 150000;
+  if (!address) return;
+  $("mp-grant").disabled = true;
+  say($("p-status"), "Activating…");
+  await run($("p-status"), async () => {
+    const res = await api("POST", "plus/manual", { email: address, days, limit });
+    $("mp-email").value = "";
+    say($("p-status"), `Frills Plus is on for ${res.email} for ${plural(res.days, "day", "days")}${res.extended ? " more" : ""}, until ${when(res.renewsAt)}.${res.created ? " They have no account yet: they sign in at /account/ with this email." : ""}`);
+    await Promise.all([loadPlus(), refreshSummary()]);
+  });
+  $("mp-grant").disabled = false;
 });
 
 async function refreshAll() {
