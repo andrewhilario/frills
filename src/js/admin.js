@@ -35,7 +35,8 @@ async function api(method, path, body) {
   if (data.error === "already_vip") throw new Wrong("That account has a VIP pass already. Revoke it first if you want to give a paid-style Plus instead.");
   if (data.error === "email_off") throw new Wrong("Email is not set up on the server. Add the RESEND_API_KEY secret in Cloudflare.");
   if (data.error === "mail_failed") throw new Wrong("The email service did not accept the message. Try again in a minute.");
-  if (data.error === "not_active") throw new Wrong("That account does not have Plus on right now.");
+  if (data.error === "not_active") throw new Wrong("That account does not have an active Plus subscription right now.");
+  if (data.error === "is_vip") throw new Wrong("A VIP pass is not emailed: the email is a subscription confirmation for customers.");
   if (data.error === "not_comp") throw new Wrong("Only VIP passes and manual grants can be ended here (cancel paid plans in Polar).");
   throw new Wrong("Something went wrong (" + res.status + ").");
 }
@@ -452,10 +453,10 @@ function plusCard(p) {
     resetBtn.disabled = false;
   });
   actions.append(resetBtn);
-  if (p.active) {
-    actions.append(confirmButton("Email: Plus is on", () => run($("p-status"), async () => {
+  if (p.active && !p.comp) {
+    actions.append(confirmButton("Email: subscription active", () => run($("p-status"), async () => {
       const res = await api("POST", `plus/${p.accountId}/notify`);
-      say($("p-status"), `Sent “Your Frills Plus is on” to ${res.email}.`);
+      say($("p-status"), `Sent “Your Frills Plus subscription is active” to ${res.email}.`);
       return true;
     }).then((ok) => { if (!ok) throw new Error("not sent"); }).then(() => loadPlus()), { sure: "Really send?", busy: "Sending…", extra: "admin__confirm" }));
   }
@@ -523,8 +524,8 @@ $("mp-form")?.addEventListener("submit", async (event) => {
   await run($("p-status"), async () => {
     const res = await api("POST", "plus/manual", { email: address, days, limit, notify });
     $("mp-email").value = "";
-    const mail = !notify ? "" : res.emailed ? " We emailed them." : res.emailError === "email_off" ? " The email was not sent: email is not set up on the server." : " The email could not be sent; use Email: Plus is on in the list to try again.";
-    say($("p-status"), `Frills Plus is on for ${res.email} for ${plural(res.days, "day", "days")}${res.extended ? " more" : ""}, until ${when(res.renewsAt)}.${res.created ? " They have no account yet: they sign in at /account/ with this email." : ""}${mail}`);
+    const mail = !notify ? "" : res.emailed ? " We emailed them." : res.emailError === "email_off" ? " The email was not sent: email is not set up on the server." : " The email could not be sent; use Email: subscription active in the list to try again.";
+    say($("p-status"), `Frills Plus is now active for ${res.email} for ${plural(res.days, "day", "days")}${res.extended ? " more" : ""}, until ${when(res.renewsAt)}.${res.created ? " They have no account yet: they sign in at /account/ with this email." : ""}${mail}`);
     await Promise.all([loadPlus(), refreshSummary()]);
   });
   $("mp-grant").disabled = false;

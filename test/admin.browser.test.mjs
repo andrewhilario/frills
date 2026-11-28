@@ -171,14 +171,14 @@ test("the dashboard fits a phone: nothing runs off the side, and every button an
   await page.viewport(1280, 900);
 });
 
-test("activating a customer can email them that Plus is on, any active Plus account has an email button that asks twice, and the confirmation stays on screen", { skip }, async () => {
+test("activating a customer can email them that their subscription is active, every customer has an email button that asks twice, and the confirmation stays on screen", { skip }, async () => {
   await click("#tab-plus");
   const outbox = async () => (await (await fetch(base + "/api/dev/outbox")).json());
   await page.evaluate(`(() => { document.getElementById("mp-email").value = "buyer@example.com"; document.getElementById("mp-form").requestSubmit(); })()`);
   await page.waitFor(`document.querySelectorAll("#p-list .item").length === 1`);
-  assert.match(await $text("#p-status"), /Frills Plus is on for buyer@example\.com for 30 days.*We emailed them\./, "the confirmation is still there after the list reloads");
+  assert.match(await $text("#p-status"), /Frills Plus is now active for buyer@example\.com for 30 days.*We emailed them\./, "the confirmation is still there after the list reloads");
   const mail = (await outbox()).find((m) => m.to === "buyer@example.com");
-  assert.equal(mail.subject, "Your Frills Plus is on");
+  assert.equal(mail.subject, "Your Frills Plus subscription is active");
   assert.match(mail.text, /\/account\/ with this email/);
   assert.match(mail.text, /\/guides\/plus\//);
 
@@ -187,12 +187,12 @@ test("activating a customer can email them that Plus is on, any active Plus acco
   assert.equal(await $text(send), "Really send?", "the first press only asks");
   assert.equal((await outbox()).filter((m) => m.to === "buyer@example.com").length, 1, "nothing is sent by the first press");
   await click(send);
-  await page.waitFor(`/Sent .Your Frills Plus is on. to buyer@example\.com/.test(document.getElementById("p-status").textContent)`);
+  await page.waitFor(`/Sent .Your Frills Plus subscription is active. to buyer@example\.com/.test(document.getElementById("p-status").textContent)`);
   assert.equal((await outbox()).filter((m) => m.to === "buyer@example.com").length, 2);
 
   // with the box unticked, activating sends nothing
   await page.evaluate(`(() => { document.getElementById("mp-notify").checked = false; document.getElementById("mp-email").value = "quiet@example.com"; document.getElementById("mp-form").requestSubmit(); })()`);
-  await page.waitFor(`/Frills Plus is on for quiet@example\.com/.test(document.getElementById("p-status").textContent)`);
+  await page.waitFor(`/Frills Plus is now active for quiet@example\.com/.test(document.getElementById("p-status").textContent)`);
   assert.equal((await outbox()).some((m) => m.to === "quiet@example.com"), false);
   assert.doesNotMatch(await $text("#p-status"), /emailed/);
   await click("#tab-overview");

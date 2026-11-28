@@ -118,7 +118,7 @@ export function signInMessage(email, link) {
   };
 }
 
-/** "Your Frills Plus is on": sent by the owner from the admin page when a customer's Plus has been turned on (by hand or otherwise). It says what to do, in order. */
+/** "Your Frills Plus subscription is active": sent by the owner from the admin page to a customer whose Plus is active. It reads as an ordinary subscription confirmation and says what to do, in order. */
 export function plusOnMessage(email, siteBase) {
   const site = String(siteBase ?? "").replace(/\/+$/, "");
   const account = `${site}/account/`;
@@ -130,13 +130,13 @@ export function plusOnMessage(email, siteBase) {
   const link = (href) => `<a href="${escapeHtml(href)}" style="color:#0b57d0;">${escapeHtml(href)}</a>`;
   return {
     to: email,
-    subject: "Your Frills Plus is on",
+    subject: "Your Frills Plus subscription is active",
     text: [
       "Hi,",
       "",
-      `Thank you for getting Frills Plus. It is now switched on for ${email}.`,
+      `Thank you for subscribing to Frills Plus. Your subscription is now active on ${email}.`,
       "",
-      "Do these three things once and it all works:",
+      "To start using it, do these three things once:",
       "",
       `1. Sign in at ${account} with this email. We send you a link, so there is no password.`,
       '2. Press "Activate on this browser" under "Dedicated TikTok server & overlay code".',
@@ -144,7 +144,7 @@ export function plusOnMessage(email, siteBase) {
       "",
       `A step-by-step guide to every Plus feature is here: ${guide}`,
       "",
-      `Stuck? Tell us what you pressed and what you saw: ${feedback}`,
+      `Need help? Tell us what you pressed and what you saw: ${feedback}`,
       "",
       "Frills",
     ].join("\n"),
@@ -153,8 +153,8 @@ export function plusOnMessage(email, siteBase) {
       '<html lang="en"><body style="margin:0;padding:24px;background:#faf8f2;color:#12171b;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif;line-height:1.5;">',
       '<div style="max-width:480px;margin:0 auto;padding:28px;background:#ffffff;border:2px solid #12171b;border-radius:16px;">',
       '<p style="margin:0 0 12px;font-size:18px;font-weight:800;letter-spacing:-0.01em;">Frills</p>',
-      `<p style="margin:0 0 16px;font-size:15px;">Thank you for getting Frills Plus. It is now switched on for <strong>${who}</strong>.</p>`,
-      '<p style="margin:0 0 8px;font-size:15px;font-weight:700;">Do these three things once and it all works:</p>',
+      `<p style="margin:0 0 16px;font-size:15px;">Thank you for subscribing to Frills Plus. Your subscription is now active on <strong>${who}</strong>.</p>`,
+      '<p style="margin:0 0 8px;font-size:15px;font-weight:700;">To start using it, do these three things once:</p>',
       '<ol style="margin:0 0 20px;padding-left:20px;font-size:15px;">',
       `<li style="margin-bottom:8px;">Sign in at ${link(account)} with this email. We send you a link, so there is no password.</li>`,
       '<li style="margin-bottom:8px;">Press <strong>Activate on this browser</strong> under <strong>Dedicated TikTok server &amp; overlay code</strong>.</li>',
@@ -162,7 +162,7 @@ export function plusOnMessage(email, siteBase) {
       "</ol>",
       `<p style="margin:0 0 20px;">${button(guide, "Open the Frills Plus guide &rarr;")}</p>`,
       '<hr style="border:0;border-top:1px dashed #d6d0c4;margin:18px 0;">',
-      `<p style="margin:0;font-size:13px;color:#4a5560;">Stuck? Tell us what you pressed and what you saw: ${link(feedback)}</p>`,
+      `<p style="margin:0;font-size:13px;color:#4a5560;">Need help? Tell us what you pressed and what you saw: ${link(feedback)}</p>`,
       "</div></body></html>",
     ].join(""),
   };

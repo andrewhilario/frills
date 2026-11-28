@@ -298,7 +298,7 @@ test("the dashboard overview counts accounts and each kind of Plus, adds up the 
   assert.equal((await handleAdmin(adminReq("POST", "overview", {}), env, { now: t0 })).status, 405);
 });
 
-test("the owner can email a customer that Plus is on, from the admin: with the grant or later, never breaking the grant, and never to an account without Plus", async () => {
+test("the owner can email a customer that their subscription is active, from the admin: with the grant or later, never breaking the grant, and never to an account without Plus", async () => {
   const env = makeEnv();
   const t0 = 1_800_000_000_000;
   const sent = [];
@@ -306,8 +306,9 @@ test("the owner can email a customer that Plus is on, from the admin: with the g
 
   // the message says what to do, in order, with this site's own addresses, and escapes what it was given
   const m = plusOnMessage("who@example.com", `${SITE}/`);
-  assert.equal(m.subject, "Your Frills Plus is on");
-  assert.match(m.text, /switched on for who@example\.com/);
+  assert.equal(m.subject, "Your Frills Plus subscription is active");
+  assert.match(m.text, /Your subscription is now active on who@example\.com/);
+  assert.doesNotMatch(m.text + m.html, /switched on|by hand|manual/i, "it reads as an ordinary subscription confirmation");
   assert.match(m.text, new RegExp(`${SITE}/account/ with this email`));
   assert.match(m.text, /Activate on this browser/);
   assert.match(m.text, new RegExp(`${SITE}/start/`));
@@ -341,6 +342,13 @@ test("the owner can email a customer that Plus is on, from the admin: with the g
   assert.equal(sent.length, 2);
   assert.equal((await handleAdmin(adminReq("POST", `plus/${loud.accountId}/notify`), env, { now: t0 + 1000, mailer: failing })).status, 502);
   assert.equal((await (await handleAdmin(adminReq("POST", `plus/${loud.accountId}/notify`), env, { now: t0 + 1000 })).json()).emailError, "email_off");
+
+  // a VIP pass is a gift, not a subscription, so it is never sent a "thank you for subscribing"
+  const vip = await (await handleAdmin(adminReq("POST", "plus", { email: "gift@example.com" }), env, { now: t0 })).json();
+  const gift = await handleAdmin(adminReq("POST", `plus/${vip.accountId}/notify`), env, { now: t0, mailer });
+  assert.equal(gift.status, 409);
+  assert.equal((await gift.json()).error, "is_vip");
+  assert.equal(sent.length, 2);
 
   // an account whose Plus ended, one that never had Plus, and one that does not exist get nothing
   await handleAdmin(adminReq("DELETE", `plus/${loud.accountId}`), env, { now: t0 + 2000 });

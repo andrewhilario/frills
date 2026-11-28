@@ -236,7 +236,7 @@ async function controlEuler(request, env, { fetchImpl = globalThis.fetch?.bind(g
   return json(200, { ok: results.some((r) => r.ok), action, results });
 }
 
-/** Sends "Your Frills Plus is on" to an address. Never throws: the caller says what happened ({ emailed: true } or { emailed: false, emailError }). */
+/** Sends "Your Frills Plus subscription is active" to an address. Never throws: the caller says what happened ({ emailed: true } or { emailed: false, emailError }). */
 async function sendPlusOn(env, email, { mailer = null, fetchImpl, request }) {
   const sender = getMailer(env, mailer, { fetchFn: fetchImpl });
   if (!sender) return { emailed: false, emailError: "email_off" };
@@ -289,6 +289,7 @@ async function handleAdminPlus(method, rest, more, request, env, now, deps = {})
     const who = row ? await env.DB.prepare("SELECT email FROM accounts WHERE id = ?").bind(accountId).first() : null;
     if (!row || !who?.email) return json(404, { ok: false, error: "not_found" });
     if (!plusActive(row, now)) return json(409, { ok: false, error: "not_active" });
+    if (row.provider_ref === "comp") return json(409, { ok: false, error: "is_vip" }); // a VIP pass is a gift, not a subscription: the email would thank them for subscribing
     const mail = await sendPlusOn(env, who.email, { ...deps, request });
     return json(mail.emailed ? 200 : 502, { ok: mail.emailed, email: who.email, ...mail });
   }
